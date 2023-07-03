@@ -1,0 +1,40 @@
+logging = 'info'
+
+[inputs]
+generate_data = true
+# seed = 1234
+directory = ''
+[inputs.contingency_table]
+  ct_type = 'ContingencyTable2D'
+  sparse_margins = false
+  [inputs.contingency_table.constraints]
+    axes = [[0,1]]
+    cells = ''
+  [inputs.contingency_table.import]
+      table = 'table.txt'
+      margins = ['colsums.txt','rowsums.txt']
+      cell_values = ''
+  
+
+[inputs.contingency_table.import]
+    file = ''
+
+[inputs.spatial_interaction_model]
+  # sim_type = 'ProductionConstrainedSIM2D'
+  sim_type = 'TotalConstrained'
+  epsilon = 1.0
+  gamma = 10000.0
+  kappa = 1.1
+  delta = 0.1
+  beta_max = 10
+  noise_percentage = 3.0
+
+[inputs.spatial_interaction_model.generate]
+  alpha_true = 0.5
+  beta_true = 1.5
+  cost_matrix = [[1,2,3],[3,4,5]]
+
+
+[outputs]
+  export_basis = false
+  directory = 'tests/test_outputs'

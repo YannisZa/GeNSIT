@@ -1,0 +1,40 @@
+WARNING: Do not forget to change relative paths in config files before building a docker image.
+
+# Zip code
+zip -r ticodm.zip ticodm --exclude 'ticodm/data/outputs**' --exclude '*.git*' --exclude '*.DS_Store'
+
+Once shipped to remote machine run
+`unzip ticodm.zip`
+and then
+`./setup.sh`
+
+# Run ticodm in one of the following ways:
+python3 main.py ../data/inputs/configs/table_inference_identifiability_scalability_degree_one.toml
+ticodm run ./data/inputs/configs/table_inference_identifiability.toml
+
+
+# Build docker image
+docker build -t "ticodm" .
+
+# Remove container if it exists
+# Remove volume if it exists
+docker container rm ticodm_container && docker volume rm commuter_borough_table
+
+# Create volume
+docker volume create commuter_borough_table
+
+# Run ticodm
+docker run --name ticodm_container -v commuter_borough_table:/mnt/data/ ticodm run ./data/inputs/configs/table_inference_identifiability.toml
+
+# Interrogate outputs
+docker run -v commuter_borough_table:/mnt/data/ bash -c "ls -a /mnt/data/outputs"
+
+# Export volume to local directory
+docker cp ticodm_container:/mnt/data/outputs/exp8c_TableMCMC_19_04_2022 ./exp8c_TableMCMC_19_04_2022
+
+# Copy data to local directory (run from local machine)
+scp -r remote_host:./ticodm/data/outputs/results/ ./results/
+
+# Zip folder
+zip -r exp8c_TableMCMC_19_04_2022.zip exp8c_TableMCMC_19_04_2022/*
+zip -r exp8debug_TableMCMC_27_04_2022.zip exp8debug_TableMCMC_27_04_2022/*

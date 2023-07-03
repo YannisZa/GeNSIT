@@ -1,0 +1,24 @@
+[inputs]
+generate_data = true
+directory = ''
+[inputs.contingency_table]
+  ct_type = 'ContingencyTable2DDependenceModel'
+[inputs.contingency_table.generate]
+    I = 2
+    J = 3
+    rowsums = [6,5]
+    colsums = [5,2,4,7]
+    diagonal = false
+
+[inputs.contingency_table.import]
+    file = ''
+
+[experiments]
+
+  [experiments.simple_mcmc]
+      proposals = ['degree_one','degree_higher']
+
+
+
+[outputs]
+  directory = 'data/outputs/'

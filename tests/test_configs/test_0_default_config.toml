@@ -1,0 +1,65 @@
+logging = 'info'
+
+[inputs]
+generate_data = true
+# seed = 1234
+directory = ''
+[inputs.contingency_table]
+  ct_type = 'ContingencyTable2DIndependenceModel'
+[inputs.contingency_table.generate]
+    sampler = 'monte_carlo_sample'
+    I = 2
+    J = 3
+    rowsums = [6,5]
+    colsums = [5,2,4]
+    sample_range = [1,5]
+    diagonal = false
+
+[inputs.contingency_table.import]
+    file = ''
+
+[inputs.spatial_interaction_model]
+  # sim_type = 'ProductionConstrainedSIM2D'
+  sim_type = 'TotalConstrained'
+  epsilon = 1.0
+  gamma = 10000.0
+  kappa = 1.3
+  delta = 0.1
+  beta_max = 10
+  noise_percentage = 3.0
+
+[inputs.spatial_interaction_model.generate]
+  alpha_true = 0.5
+  beta_true = 1.5
+  cost_matrix = [[1.0,2.0,3.0],[3.0,2.0,1.0]]
+
+[mcmc]
+  N = 1000#20000
+  table_inference = true
+
+  [mcmc.contingency_table]
+    proposal = 'degree_higher'
+    table0 = 'monte_carlo_sample'#['monte_carlo_sample','maximum_entropy_solution','iterative_residual_filling_solution','iterative_uniform_residual_filling_solution']
+    table_steps = 100
+    column_sum_proposal = 'mode_estimate' #'mode_estimate','multinomial_monte_carlo','multinomial_mcmc_degree_higher','multinomial_mcmc_degree_one'
+    column_sum_steps = 10
+
+  [mcmc.spatial_interaction_model]
+    [mcmc.spatial_interaction_model.parameters]
+      alpha0 = 1.3
+      beta0 = 1.2
+      covariance = [[ 0.00749674,  0.00182529], [ 0.00182529,  0.00709968]]
+      step_size = 5.0
+    [mcmc.spatial_interaction_model.destination_attraction]
+      log_destination_attraction0 = [1,1,1]
+      leapfrog_steps = 5#3
+      step_size = 0.01#0.01#0.02
+
+[experiments]
+  seed = 1234
+  [experiments.simple_mcmc]
+      proposals = ['degree_one','degree_higher']
+
+[outputs]
+  export_basis = false
+  directory = 'tests/test_outputs'

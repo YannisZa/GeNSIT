@@ -1,0 +1,626 @@
+Location,Lat,Lon,p,e
+"City of London	City of London	London",51.512344,-0.090985,6140,99390
+"Abbey	Barking and Dagenham	London",51.481942,0.126251,4770,38870
+"Alibon	Barking and Dagenham	London",51.547616,0.151888,4120,37290
+"Becontree	Barking and Dagenham	London",51.550437,0.131144,4580,37860
+"Chadwell Heath	Barking and Dagenham	London",51.572228,0.141995,4070,38860
+"Eastbrook	Barking and Dagenham	London",51.551343,0.165792,4010,42780
+"Eastbury	Barking and Dagenham	London",51.534017,0.099424,4320,37720
+"Gascoigne	Barking and Dagenham	London",51.531498,0.080927,4710,34140
+"Goresbrook	Barking and Dagenham	London",51.5342,0.131158,4340,38130
+"Heath	Barking and Dagenham	London",51.572228,0.141995,4450,36080
+"Longbridge	Barking and Dagenham	London",51.540336,0.08261,3820,46520
+"Mayesbrook	Barking and Dagenham	London",51.532831,0.099395,3980,36280
+"Parsloes	Barking and Dagenham	London",51.546175,0.138953,3750,36640
+"River	Barking and Dagenham	London",51.52141,0.096781,3990,38390
+"Thames	Barking and Dagenham	London",51.522029,0.101013,4050,37400
+"Valence	Barking and Dagenham	London",51.555527,0.130325,4220,38080
+"Village	Barking and Dagenham	London",51.536563,0.075766,4610,36740
+"Whalebone	Barking and Dagenham	London",51.574506,0.143712,4090,42530
+"Brunswick Park	Barnet	London",51.624723,-0.154687,6040,53440
+"Burnt Oak	Barnet	London",51.605694,-0.261644,6660,39000
+"Childs Hill	Barnet	London",51.564268,-0.194796,7960,52190
+"Colindale	Barnet	London",51.589691,-0.249103,7010,39990
+"Coppetts	Barnet	London",51.602015,-0.153156,6960,50910
+"East Barnet	Barnet	London",51.631068,-0.151271,6740,53550
+"East Finchley	Barnet	London",51.58763,-0.164262,6730,55480
+"Edgware	Barnet	London",51.615786,-0.262034,6230,51380
+"Finchley Church End	Barnet	London",51.598282,-0.198414,6400,61510
+"Garden Suburb	Barnet	London",51.58306,-0.175161,6580,74940
+"Golders Green	Barnet	London",51.575666,-0.198171,6290,54940
+"Hale	Barnet	London",51.615174,-0.255032,6250,51650
+"Hendon	Barnet	London",51.586246,-0.220009,7270,51560
+"High Barnet	Barnet	London",51.659247,-0.206675,6790,59790
+"Mill Hill	Barnet	London",51.617289,-0.221389,7100,56660
+"Oakleigh	Barnet	London",51.631449,-0.165447,6470,56260
+"Totteridge	Barnet	London",51.633474,-0.202507,6140,63320
+"Underhill	Barnet	London",51.641778,-0.186249,6460,49390
+"West Finchley	Barnet	London",51.602785,-0.191554,6780,56850
+"West Hendon	Barnet	London",51.578336,-0.252671,6350,46620
+"Woodhouse	Barnet	London",51.611381,-0.166878,6920,51100
+"Barnehurst	Bexley	London",51.460893,0.165643,4300,45990
+"Belvedere	Bexley	London",51.485165,0.14827,5100,40110
+"Blackfen and Lamorbey	Bexley	London",51.437118,0.094354,4210,49390
+"Blendon and Penhill	Bexley	London",51.447872,0.117763,4320,48800
+"Brampton	Bexley	London",51.473336,0.127858,4170,49400
+"Christchurch	Bexley	London",51.429048,0.097661,4640,48590
+"Colyers	Bexley	London",51.471635,0.171184,4530,41250
+"Crayford	Bexley	London",51.450113,0.182205,4920,41810
+"Cray Meadows	Bexley	London",51.435811,0.148277,4810,42600
+"Danson Park	Bexley	London",51.455769,0.122606,4540,46480
+"East Wickham	Bexley	London",51.471627,0.10894,4350,43510
+"Erith	Bexley	London",51.480818,0.174675,5120,39690
+"Falconwood and Welling	Bexley	London",51.463641,0.0926,4290,47030
+"Lesnes Abbey	Bexley	London",51.488938,0.128743,4530,42710
+"Longlands	Bexley	London",51.43121,0.075904,4580,49520
+"North End	Bexley	London",51.468626,0.181029,4730,35880
+"Northumberland Heath	Bexley	London",51.472272,0.163438,4180,44610
+"St. Mary's	Bexley	London",51.437465,0.161626,4410,53800
+"St. Michael's	Bexley	London",51.471087,0.110974,4100,46390
+"Sidcup	Bexley	London",51.426486,0.100939,4770,49970
+"Thamesmead East	Bexley	London",51.503559,0.119933,4900,38410
+"Alperton	Brent	London",51.539896,-0.290454,4580,38550
+"Barnhill	Brent	London",51.564232,-0.262958,5560,42740
+"Brondesbury Park	Brent	London",51.541303,-0.214792,5450,49860
+"Dollis Hill	Brent	London",51.561246,-0.230969,4360,38230
+"Dudden Hill	Brent	London",51.55418,-0.243959,5320,41280
+"Fryent	Brent	London",51.579958,-0.277981,4420,43960
+"Harlesden	Brent	London",51.534933,-0.247334,6540,33620
+"Kensal Green	Brent	London",51.53053,-0.22463,5910,42750
+"Kenton	Brent	London",51.580677,-0.301482,3950,52870
+"Kilburn	Brent	London",51.546895,-0.204093,7940,42280
+"Mapesbury	Brent	London",51.54701,-0.210532,6350,45580
+"Northwick Park	Brent	London",51.567281,-0.271057,3960,51340
+"Preston	Brent	London",51.573793,-0.298865,5110,44440
+"Queens Park	Brent	London",51.533381,-0.208923,6150,53850
+"Queensbury	Brent	London",51.591869,-0.290707,4780,43360
+"Stonebridge	Brent	London",51.543113,-0.25883,6200,32250
+"Sudbury	Brent	London",51.560859,-0.328099,5030,41350
+"Tokyngton	Brent	London",51.547268,-0.277159,5450,40860
+"Welsh Harp	Brent	London",51.579738,-0.241504,4910,39000
+"Wembley Central	Brent	London",51.551615,-0.29571,4500,38290
+"Willesden Green	Brent	London",51.543974,-0.22953,6020,38710
+"Bickley	Bromley	London",51.401857,0.052503,6220,61330
+"Biggin Hill	Bromley	London",51.312059,0.032802,4060,52070
+"Bromley Common and Keston	Bromley	London",51.383845,0.039219,6540,51480
+"Bromley Town	Bromley	London",51.406025,0.013156,7890,55730
+"Chelsfield and Pratts Bottom	Bromley	London",51.340472,0.112327,5930,57790
+"Chislehurst	Bromley	London",51.412626,0.077487,6480,59910
+"Clock House	Bromley	London",51.40858,-0.04063,7210,53100
+"Copers Cope	Bromley	London",51.412205,-0.024042,8500,55310
+"Cray Valley East	Bromley	London",51.391736,0.104593,6970,40390
+"Cray Valley West	Bromley	London",51.391736,0.104593,6900,39760
+"Crystal Palace	Bromley	London",51.419883,-0.078542,6320,42730
+"Darwin	Bromley	London",51.414784,-0.034058,2150,54780
+"Farnborough and Crofton	Bromley	London",51.366109,0.053105,6350,57400
+"Hayes and Coney Hall	Bromley	London",51.371054,-0.001278,6280,59000
+"Kelsey and Eden Park	Bromley	London",51.401926,-0.030156,6560,57560
+"Mottingham and Chislehurst North	Bromley	London",51.435475,0.041365,4500,40510
+"Orpington	Bromley	London",51.374843,0.094214,6540,48100
+"Penge and Cator	Bromley	London",51.408434,-0.032854,7810,45390
+"Petts Wood and Knoll	Bromley	London",51.37632,0.092636,5580,63410
+"Plaistow and Sundridge	Bromley	London",51.406381,0.033906,6840,50000
+"Shortlands	Bromley	London",51.399212,0.004141,4300,62610
+"West Wickham	Bromley	London",51.375798,-0.014861,5870,59830
+"Belsize	Camden	London",51.548974,-0.169787,6490,84280
+"Bloomsbury	Camden	London",51.519205,-0.124262,5450,62190
+"Camden Town with Primrose Hill	Camden	London",51.538449,-0.154993,6320,71650
+"Cantelowes	Camden	London",51.545164,-0.129838,5320,60060
+"Fortune Green	Camden	London",51.555445,-0.19444,5280,73370
+"Frognal and Fitzjohns	Camden	London",51.551706,-0.158826,5480,99430
+"Gospel Oak	Camden	London",51.556394,-0.148184,4930,61590
+"Hampstead Town	Camden	London",51.549856,-0.18176,5560,104710
+"Haverstock	Camden	London",51.547859,-0.160552,5410,54740
+"Highgate	Camden	London",51.571188,-0.149069,5010,75250
+"Holborn and Covent Garden	Camden	London",51.517935,-0.109928,6850,61920
+"Kentish Town	Camden	London",51.547304,-0.142005,5720,63670
+"Kilburn	Camden	London",51.537076,-0.191135,6200,53190
+"King's Cross	Camden	London",51.533334,-0.132231,5040,50390
+"Regent's Park	Camden	London",51.532692,-0.141995,6000,52460
+"St. Pancras and Somers Town	Camden	London",51.53989,-0.135574,5760,46850
+"Swiss Cottage	Camden	London",51.543532,-0.174862,6630,79860
+"West Hampstead	Camden	London",51.547358,-0.190436,5880,72450
+"Addiscombe	Croydon	London",51.38055,-0.072275,7570,46520
+"Ashburton	Croydon	London",51.377272,-0.074541,5550,47220
+"Bensham Manor	Croydon	London",51.396111,-0.09788,6160,40730
+"Broad Green	Croydon	London",51.389331,-0.111988,7010,37670
+"Coulsdon East	Croydon	London",51.319941,-0.141267,4980,52750
+"Coulsdon West	Croydon	London",51.319941,-0.141267,4940,58380
+"Croham	Croydon	London",51.353139,-0.089384,6960,52180
+"Fairfield	Croydon	London",51.362683,-0.028541,8020,47920
+"Fieldway	Croydon	London",51.507351,-0.127758,4030,32760
+"Heathfield	Croydon	London",51.365321,-0.097223,5620,48780
+"Kenley	Croydon	London",51.32633,-0.102494,5950,54850
+"New Addington	Croydon	London",51.348184,-0.017094,4010,35060
+"Norbury	Croydon	London",51.414661,-0.114299,6050,44870
+"Purley	Croydon	London",51.339228,-0.119711,5880,55480
+"Sanderstead	Croydon	London",51.334791,-0.081587,4920,59000
+"Selhurst	Croydon	London",51.393247,-0.087384,7620,37920
+"Selsdon and Ballards	Croydon	London",51.355611,-0.064937,4570,56510
+"Shirley	Croydon	London",51.373975,-0.05293,5660,48410
+"South Norwood	Croydon	London",51.400208,-0.075726,7930,41840
+"Thornton Heath	Croydon	London",51.396747,-0.105523,6820,40960
+"Upper Norwood	Croydon	London",51.41792,-0.08475,6650,45670
+"Waddon	Croydon	London",51.375938,-0.113658,7160,42100
+"West Thornton	Croydon	London",51.349329,-0.086817,6190,39350
+"Woodside	Croydon	London",51.389349,-0.065779,7070,41170
+"Acton Central	Ealing	London",51.50872,-0.26295,6520,46260
+"Cleveland	Ealing	London",51.52137,-0.321872,5930,53560
+"Dormers Wells	Ealing	London",51.516798,-0.357227,4380,37130
+"Ealing Broadway	Ealing	London",51.514928,-0.301862,6300,59190
+"Ealing Common	Ealing	London",51.510234,-0.288233,6010,56300
+"East Acton	Ealing	London",51.51032,-0.250568,7530,41590
+"Elthorne	Ealing	London",51.499997,-0.329638,6140,49650
+"Greenford Broadway	Ealing	London",51.510264,-0.323633,6530,38540
+"Greenford Green	Ealing	London",51.550543,-0.338038,5150,44830
+"Hanger Hill	Ealing	London",51.521662,-0.291533,6360,58010
+"Hobbayne	Ealing	London",51.519691,-0.346113,5620,45900
+"Lady Margaret	Ealing	London",51.522017,-0.374729,4110,41060
+"Northfield	Ealing	London",51.503371,-0.317348,5470,63700
+"North Greenford	Ealing	London",51.531797,-0.34622,4890,46250
+"Northolt Mandeville	Ealing	London",51.548418,-0.367598,5790,40330
+"Northolt West End	Ealing	London",51.535067,-0.396097,5810,36170
+"Norwood Green	Ealing	London",51.493073,-0.368325,4500,36730
+"Perivale	Ealing	London",51.532222,-0.324477,5360,45650
+"South Acton	Ealing	London",51.501778,-0.288608,6530,43350
+"Southall Broadway	Ealing	London",51.510264,-0.323633,3880,35440
+"Southall Green	Ealing	London",51.497487,-0.390355,4370,34530
+"Southfield	Ealing	London",51.502808,-0.263491,6220,66360
+"Walpole	Ealing	London",51.50968,-0.313229,5660,60250
+"Bowes	Enfield	London",51.612343,-0.115253,5420,45290
+"Bush Hill Park	Enfield	London",51.644861,-0.072226,5500,52700
+"Chase	Enfield	London",51.653202,-0.116439,5760,45360
+"Cockfosters	Enfield	London",51.647851,-0.151255,5450,55190
+"Edmonton Green	Enfield	London",51.625081,-0.06078,6820,32940
+"Enfield Highway	Enfield	London",51.652918,-0.041145,5910,36850
+"Enfield Lock	Enfield	London",51.66794,-0.024218,6640,37780
+"Grange	Enfield	London",51.631417,-0.125221,5490,58640
+"Haselbury	Enfield	London",51.622316,-0.074791,5730,37020
+"Highlands	Enfield	London",51.629729,-0.166532,5760,55140
+"Jubilee	Enfield	London",51.652628,-0.119968,5340,38450
+"Lower Edmonton	Enfield	London",51.625081,-0.06078,6140,35300
+"Palmers Green	Enfield	London",51.623469,-0.103752,5830,47480
+"Ponders End	Enfield	London",51.646025,-0.045836,5780,35810
+"Southbury	Enfield	London",51.6487,-0.05241,5580,41440
+"Southgate	Enfield	London",51.62805,-0.126776,6090,52310
+"Southgate Green	Enfield	London",51.624596,-0.125469,5290,54020
+"Town	Enfield	London",51.652299,-0.080712,6180,53390
+"Turkey Street	Enfield	London",51.672711,-0.050112,5470,36270
+"Upper Edmonton	Enfield	London",51.609044,-0.059125,6110,35720
+"Winchmore Hill	Enfield	London",51.634102,-0.102445,5530,58520
+"Abbey Wood	Greenwich	London",51.490976,0.120832,6170,39630
+"Blackheath Westcombe	Greenwich	London",51.48132,0.01993,6340,63690
+"Charlton	Greenwich	London",51.481818,0.040177,5920,47740
+"Coldharbour and New Eltham	Greenwich	London",51.429837,0.058004,5210,48340
+"Eltham North	Greenwich	London",51.451169,0.052639,5340,54840
+"Eltham South	Greenwich	London",51.451169,0.052639,5200,46660
+"Eltham West	Greenwich	London",51.451169,0.052639,3970,42970
+"Glyndon	Greenwich	London",51.487874,0.081695,6770,39810
+"Greenwich West	Greenwich	London",51.482577,-0.007659,7630,53640
+"Kidbrooke with Hornfair	Greenwich	London",51.483462,0.05862,6000,44870
+"Middle Park and Sutcliffe	Greenwich	London",51.483462,0.05862,5700,44350
+"Peninsula	Greenwich	London",51.501273,0.004876,6750,53050
+"Plumstead	Greenwich	London",51.484807,0.087142,6070,40660
+"Shooters Hill	Greenwich	London",51.469702,0.063507,5350,49190
+"Thamesmead Moorings	Greenwich	London",51.483462,0.05862,7090,43220
+"Woolwich Common	Greenwich	London",51.47938,0.059746,6750,38090
+"Woolwich Riverside	Greenwich	London",51.49354,0.065222,8430,42080
+"Brownswood	Hackney	London",51.562652,-0.096331,4950,48860
+"Cazenove	Hackney	London",51.566259,-0.066148,4670,46380
+"Chatham	Hackney	London",51.545284,-0.050729,5760,39570
+"Clissold	Hackney	London",51.556729,-0.086962,5090,56050
+"Dalston	Hackney	London",51.547623,-0.070113,6730,46500
+"De Beauvoir	Hackney	London",51.541037,-0.080583,6240,47560
+"Hackney Central	Hackney	London",51.547124,-0.05682,5520,42840
+"Hackney Downs	Hackney	London",51.553769,-0.062443,5360,43360
+"Haggerston	Hackney	London",51.533033,-0.07069,6340,43830
+"Hoxton	Hackney	London",51.535638,-0.089344,6960,42490
+"King's Park	Hackney	London",51.561609,-0.095465,4300,38930
+"Leabridge	Hackney	London",51.558348,-0.055353,5470,42650
+"Lordship	Hackney	London",51.563081,-0.082569,4610,48700
+"New River	Hackney	London",51.573919,-0.085087,4630,43230
+"Queensbridge	Hackney	London",51.539901,-0.070183,5870,44620
+"Springfield	Hackney	London",51.568409,-0.058458,4390,40810
+"Stoke Newington Central	Hackney	London",51.515454,-0.069953,5320,51920
+"Victoria	Hackney	London",51.534606,-0.057603,5730,45410
+"Wick	Hackney	London",51.545185,-0.036978,5070,40010
+"Addison	Hammersmith and Fulham	London",51.50069,-0.217818,5880,63150
+"Askew	Hammersmith and Fulham	London",51.503028,-0.243179,6270,54390
+"Avonmore and Brook Green	Hammersmith and Fulham	London",51.495597,-0.218836,5980,62140
+"College Park and Old Oak	Hammersmith and Fulham	London",51.477343,-0.201682,3700,43410
+"Fulham Broadway	Hammersmith and Fulham	London",51.480148,-0.19633,5140,60160
+"Fulham Reach	Hammersmith and Fulham	London",51.47351,-0.181771,4650,59970
+"Hammersmith Broadway	Hammersmith and Fulham	London",51.493042,-0.224498,5400,56010
+"Munster	Hammersmith and Fulham	London",51.476953,-0.209697,4960,73820
+"North End	Hammersmith and Fulham	London",51.487971,-0.203894,5550,56020
+"Palace Riverside	Hammersmith and Fulham	London",51.486442,-0.224855,3400,79350
+"Parsons Green and Walham	Hammersmith and Fulham	London",51.473574,-0.199356,4790,83750
+"Ravenscourt Park	Hammersmith and Fulham	London",51.49528,-0.239834,4750,65710
+"Sands End	Hammersmith and Fulham	London",51.472455,-0.1839,6600,63490
+"Shepherd's Bush Green	Hammersmith and Fulham	London",51.503754,-0.221045,5660,51330
+"Town	Hammersmith and Fulham	London",51.491747,-0.234017,5000,69820
+"Wormholt and White City	Hammersmith and Fulham	London",51.508915,-0.240859,5050,44740
+"Alexandra	Haringey	London",51.591773,-0.108426,4500,69550
+"Bounds Green	Haringey	London",51.60704,-0.12421,5820,44700
+"Bruce Grove	Haringey	London",51.596434,-0.072661,5830,39330
+"Crouch End	Haringey	London",51.579747,-0.123677,5810,70560
+"Fortis Green	Haringey	London",51.590825,-0.154941,5120,67140
+"Harringay	Haringey	London",51.582426,-0.09966,5600,48190
+"Highgate	Haringey	London",51.571188,-0.149069,5200,73250
+"Hornsey	Haringey	London",51.587045,-0.121888,5600,52520
+"Muswell Hill	Haringey	London",51.590219,-0.139372,4380,73580
+"Noel Park	Haringey	London",51.595173,-0.10157,5480,39680
+"Northumberland Park	Haringey	London",51.605449,-0.059979,5870,33120
+"St. Ann's	Haringey	London",51.581113,-0.086291,5570,41990
+"Seven Sisters	Haringey	London",51.583417,-0.072434,5780,43330
+"Stroud Green	Haringey	London",51.574117,-0.110329,5280,59130
+"Tottenham Green	Haringey	London",51.587466,-0.071535,6270,37600
+"Tottenham Hale	Haringey	London",51.592578,-0.061062,6090,35720
+"West Green	Haringey	London",51.586254,-0.086763,5240,40290
+"White Hart Lane	Haringey	London",51.606153,-0.08849,4920,35340
+"Woodside	Haringey	London",51.603616,-0.11073,5520,41420
+"Belmont	Harrow	London",51.601249,-0.319275,3730,54020
+"Canons	Harrow	London",51.613127,-0.287698,5250,50460
+"Edgware	Harrow	London",51.614629,-0.277437,3780,41980
+"Greenhill	Harrow	London",51.583011,-0.332767,5280,47230
+"Harrow on the Hill	Harrow	London",51.570632,-0.339636,4760,50100
+"Harrow Weald	Harrow	London",51.604895,-0.340692,4270,46390
+"Hatch End	Harrow	London",51.608801,-0.370075,4090,53990
+"Headstone North	Harrow	London",51.597901,-0.337076,3630,57100
+"Headstone South	Harrow	London",51.597901,-0.337076,4100,49350
+"Kenton East	Harrow	London",51.580677,-0.301482,3490,41060
+"Kenton West	Harrow	London",51.580677,-0.301482,3460,48400
+"Marlborough	Harrow	London",51.590248,-0.337736,4510,43080
+"Pinner	Harrow	London",51.595172,-0.378002,4300,56320
+"Pinner South	Harrow	London",51.595172,-0.378002,3950,64680
+"Queensbury	Harrow	London",51.591869,-0.290707,3640,43850
+"Rayners Lane	Harrow	London",51.575804,-0.375362,3790,51060
+"Roxbourne	Harrow	London",51.567216,-0.36313,4780,40110
+"Roxeth	Harrow	London",51.571076,-0.346111,3870,43940
+"Stanmore Park	Harrow	London",51.621857,-0.317738,4620,49520
+"Wealdstone	Harrow	London",51.597901,-0.337076,4080,40040
+"West Harrow	Harrow	London",51.577783,-0.353272,3840,50910
+"Brooklands	Havering	London",51.583252,0.174113,6570,42630
+"Cranham	Havering	London",51.56192,0.268036,5300,51810
+"Elm Park	Havering	London",51.546122,0.203161,5290,41990
+"Emerson Park	Havering	London",51.57201,0.225394,4610,53940
+"Gooshays	Havering	London",51.603178,0.228345,6120,35640
+"Hacton	Havering	London",51.544018,0.231187,4980,48420
+"Harold Wood	Havering	London",51.590448,0.235288,5620,44860
+"Havering Park	Havering	London",51.607707,0.157121,5270,40590
+"Heaton	Havering	London",51.598909,0.207474,5460,35830
+"Hylands	Havering	London",51.571039,0.200595,5110,48630
+"Mawneys	Havering	London",51.588775,0.158259,5410,43350
+"Pettits	Havering	London",51.587239,0.185784,5320,48780
+"Rainham and Wennington	Havering	London",51.5065,0.214303,5130,41660
+"Romford Town	Havering	London",51.577076,0.178319,7420,45060
+"St. Andrew's	Havering	London",51.560696,0.226231,5830,46300
+"South Hornchurch	Havering	London",51.528252,0.188633,5640,40060
+"Squirrel's Heath	Havering	London",51.588722,0.230957,5720,51110
+"Upminster	Havering	London",51.555914,0.248894,5220,59340
+"Barnhill	Hillingdon	London",51.587397,-0.392828,4450,38450
+"Botwell	Hillingdon	London",51.507423,-0.41949,5510,37140
+"Brunel	Hillingdon	London",51.502586,-0.42251,4930,41900
+"Cavendish	Hillingdon	London",51.506133,-0.4633,4520,54290
+"Charville	Hillingdon	London",51.537206,-0.429536,4470,42870
+"Eastcote and East Ruislip	Hillingdon	London",51.577812,-0.389213,5180,59180
+"Harefield	Hillingdon	London",51.60314,-0.484045,3100,46190
+"Heathrow Villages	Hillingdon	London",51.482007,-0.462204,4740,40090
+"Hillingdon East	Hillingdon	London",51.53427,-0.455018,4710,45220
+"Ickenham	Hillingdon	London",51.563966,-0.442299,4070,61230
+"Manor	Hillingdon	London",51.566754,-0.407218,4550,53570
+"Northwood	Hillingdon	London",51.610289,-0.428278,4910,57970
+"Northwood Hills	Hillingdon	London",51.60165,-0.410168,4890,53380
+"Pinkwell	Hillingdon	London",51.497854,-0.43708,4740,38490
+"South Ruislip	Hillingdon	London",51.557321,-0.393025,4870,48910
+"Townfield	Hillingdon	London",51.513733,-0.420615,4840,36830
+"Uxbridge North	Hillingdon	London",51.549723,-0.437002,5410,50820
+"Uxbridge South	Hillingdon	London",51.5485,-0.479611,5540,41450
+"West Drayton	Hillingdon	London",51.502985,-0.46541,5780,39500
+"West Ruislip	Hillingdon	London",51.569718,-0.432239,5020,53580
+"Yeading	Hillingdon	London",51.527667,-0.396949,4880,40180
+"Yiewsley	Hillingdon	London",51.511703,-0.472012,5460,39100
+"Bedfont	Hounslow	London",51.453461,-0.437216,5020,40040
+"Brentford	Hounslow	London",51.486073,-0.310117,6240,44100
+"Chiswick Homefields	Hounslow	London",51.491609,-0.250101,4880,68670
+"Chiswick Riverside	Hounslow	London",51.458948,-0.308818,5190,65260
+"Cranford	Hounslow	London",51.47843,-0.410194,4170,38790
+"Feltham North	Hounslow	London",51.444148,-0.410772,4290,41270
+"Feltham West	Hounslow	London",51.444148,-0.410772,5800,42760
+"Hanworth	Hounslow	London",51.448948,-0.382927,4620,39140
+"Hanworth Park	Hounslow	London",51.436847,-0.397886,4640,43190
+"Heston Central	Hounslow	London",51.490313,-0.274665,3960,42200
+"Heston East	Hounslow	London",51.485355,-0.371615,4120,42790
+"Heston West	Hounslow	London",51.485355,-0.371615,4080,37120
+"Hounslow Central	Hounslow	London",51.47117,-0.366804,5530,45140
+"Hounslow Heath	Hounslow	London",51.462704,-0.387407,4970,40870
+"Hounslow South	Hounslow	London",51.460922,-0.373149,4070,50720
+"Hounslow West	Hounslow	London",51.469435,-0.383771,4370,40060
+"Isleworth	Hounslow	London",51.467121,-0.329003,4960,43770
+"Osterley and Spring Grove	Hounslow	London",51.480041,-0.343316,4870,53890
+"Syon	Hounslow	London",51.479157,-0.321031,6000,46760
+"Turnham Green	Hounslow	London",51.49203,-0.266317,5380,61230
+"Barnsbury	Islington	London",51.540356,-0.118345,5840,62770
+"Bunhill	Islington	London",51.523078,-0.089828,8400,54080
+"Caledonian	Islington	London",51.543416,-0.117476,6410,49320
+"Canonbury	Islington	London",51.543465,-0.094442,5860,56130
+"Clerkenwell	Islington	London",51.52276,-0.103842,6870,60270
+"Finsbury Park	Islington	London",51.563296,-0.107435,6900,46290
+"Highbury East	Islington	London",51.550391,-0.100775,5480,67250
+"Highbury West	Islington	London",51.549897,-0.098063,7360,60960
+"Hillrise	Islington	London",51.572144,-0.124421,5100,53930
+"Holloway	Islington	London",51.557017,-0.115522,7260,48760
+"Junction	Islington	London",51.56141,-0.136811,5980,54490
+"Mildmay	Islington	London",51.548982,-0.079761,6180,54230
+"St. George's	Islington	London",51.550851,-0.127312,5660,56520
+"St. Mary's	Islington	London",51.545439,-0.098351,5910,64670
+"St. Peter's	Islington	London",51.534783,-0.098709,5900,61060
+"Tollington	Islington	London",51.557249,-0.114259,6270,52490
+"Abingdon	Kensington and Chelsea	London",51.498101,-0.196306,5210,113950
+"Brompton	Kensington and Chelsea	London",51.495506,-0.174254,5930,139710
+"Campden	Kensington and Chelsea	London",51.50101,-0.193279,4490,143000
+"Colville	Kensington and Chelsea	London",51.516111,-0.203962,4550,87080
+"Courtfield	Kensington and Chelsea	London",51.49227,-0.188847,5420,132770
+"Cremorne	Kensington and Chelsea	London",51.480156,-0.179249,4240,87900
+"Earl's Court	Kensington and Chelsea	London",51.49034,-0.195862,5260,88300
+"Golborne	Kensington and Chelsea	London",51.522629,-0.207378,4450,59110
+"Hans Town	Kensington and Chelsea	London",51.485093,-0.174936,6370,122800
+"Holland	Kensington and Chelsea	London",51.500611,-0.21127,4910,114140
+"Norland	Kensington and Chelsea	London",51.50655,-0.209771,4260,110760
+"Notting Barns	Kensington and Chelsea	London",51.523658,-0.219194,4240,72150
+"Pembridge	Kensington and Chelsea	London",51.509876,-0.197327,4170,116580
+"Queen's Gate	Kensington and Chelsea	London",51.496611,-0.179176,5620,137770
+"Redcliffe	Kensington and Chelsea	London",51.486719,-0.187527,5140,113600
+"Royal Hospital	Kensington and Chelsea	London",51.486787,-0.158185,4340,129490
+"St. Charles	Kensington and Chelsea	London",51.521712,-0.215533,4230,70930
+"Stanley	Kensington and Chelsea	London",51.512555,-0.205144,4300,114710
+"Alexandra	Kingston upon Thames	London",51.417844,-0.286233,3410,53150
+"Berrylands	Kingston upon Thames	London",51.394685,-0.284087,4260,54530
+"Beverley	Kingston upon Thames	London",51.412715,-0.249912,4030,52140
+"Canbury	Kingston upon Thames	London",51.415744,-0.29406,5260,59440
+"Chessington North and Hook	Kingston upon Thames	London",51.376931,-0.283018,3360,47240
+"Chessington South	Kingston upon Thames	London",51.363583,-0.296254,4110,48740
+"Coombe Hill	Kingston upon Thames	London",51.414655,-0.249893,3760,59520
+"Coombe Vale	Kingston upon Thames	London",51.412708,-0.285436,3700,57500
+"Grove	Kingston upon Thames	London",51.412203,-0.313714,5130,53170
+"Norbiton	Kingston upon Thames	London",51.411739,-0.28294,4140,43740
+"Old Malden	Kingston upon Thames	London",51.384967,-0.252908,3670,53680
+"St. James	Kingston upon Thames	London",51.408187,-0.304922,3360,53810
+"St. Mark's	Kingston upon Thames	London",51.393724,-0.303017,4490,58420
+"Surbiton Hill	Kingston upon Thames	London",51.399237,-0.302513,4610,55750
+"Tolworth and Hook Rise	Kingston upon Thames	London",51.378277,-0.302558,3780,48080
+"Tudor	Kingston upon Thames	London",51.417009,-0.314258,3730,64010
+"Bishop's	Lambeth	London",51.478874,-0.123807,4960,51170
+"Brixton Hill	Lambeth	London",51.453349,-0.120576,6770,49370
+"Clapham Common	Lambeth	London",51.457831,-0.148165,5630,64590
+"Clapham Town	Lambeth	London",51.461903,-0.145376,6380,57720
+"Coldharbour	Lambeth	London",51.465633,-0.102982,7100,40490
+"Ferndale	Lambeth	London",51.462783,-0.122067,6600,49960
+"Gipsy Hill	Lambeth	London",51.42357,-0.083542,6420,46160
+"Herne Hill	Lambeth	London",51.454547,-0.096661,6650,53040
+"Knight's Hill	Lambeth	London",51.427752,-0.104649,6250,46550
+"Larkhall	Lambeth	London",51.472149,-0.129386,7080,46970
+"Oval	Lambeth	London",51.482021,-0.112792,7320,49580
+"Prince's	Lambeth	London",51.464006,-0.142031,7200,47420
+"St. Leonard's	Lambeth	London",51.415821,-0.123731,6230,50510
+"Stockwell	Lambeth	London",51.468813,-0.125439,6390,44070
+"Streatham Hill	Lambeth	London",51.44695,-0.125802,6280,49650
+"Streatham South	Lambeth	London",51.427871,-0.124058,5410,46230
+"Streatham Wells	Lambeth	London",51.455325,-0.118401,6300,48320
+"Thornton	Lambeth	London",51.462651,-0.091484,5430,53300
+"Thurlow Park	Lambeth	London",51.439594,-0.099645,5990,52900
+"Tulse Hill	Lambeth	London",51.44477,-0.101123,6730,44800
+"Vassall	Lambeth	London",51.477501,-0.107931,6510,43790
+"Bellingham	Lewisham	London",51.431226,-0.014319,6240,37860
+"Blackheath	Lewisham	London",51.466677,0.0035,6550,55200
+"Brockley	Lewisham	London",51.463606,-0.036092,7770,46130
+"Catford South	Lewisham	London",51.444641,-0.020106,5810,47390
+"Crofton Park	Lewisham	London",51.451706,-0.033394,6280,52020
+"Downham	Lewisham	London",51.425291,0.005105,6270,37320
+"Evelyn	Lewisham	London",51.485862,-0.034828,6980,36950
+"Forest Hill	Lewisham	London",51.439778,-0.054642,6670,49880
+"Grove Park	Lewisham	London",51.435473,0.020279,6290,43660
+"Ladywell	Lewisham	London",51.454559,-0.022312,5740,48990
+"Lee Green	Lewisham	London",51.463582,0.004675,6210,52300
+"Lewisham Central	Lewisham	London",51.437692,-0.051923,8250,43180
+"New Cross	Lewisham	London",51.471022,-0.040245,6950,38070
+"Perry Vale	Lewisham	London",51.435123,-0.046842,6760,47470
+"Rushey Green	Lewisham	London",51.447302,-0.018435,6490,41830
+"Sydenham	Lewisham	London",51.42476,-0.059399,6900,44810
+"Telegraph Hill	Lewisham	London",51.467806,-0.044844,6730,45020
+"Whitefoot	Lewisham	London",51.433299,0.00735,5740,39620
+"Abbey	Merton	London",51.416085,-0.185232,4680,62540
+"Cannon Hill	Merton	London",51.40181,-0.216822,3520,57720
+"Colliers Wood	Merton	London",51.41717,-0.179942,4490,52340
+"Cricket Green	Merton	London",51.400872,-0.165995,4360,39970
+"Dundonald	Merton	London",51.416594,-0.208294,4080,70060
+"Figge's Marsh	Merton	London",51.413133,-0.160238,4360,41200
+"Graveney	Merton	London",51.429784,-0.170135,3650,47680
+"Hillside	Merton	London",51.419994,-0.219987,4380,72750
+"Lavender Fields	Merton	London",51.409228,-0.170661,4120,44570
+"Longthornton	Merton	London",51.408361,-0.138997,3810,45940
+"Lower Morden	Merton	London",51.402305,-0.169717,3470,52260
+"Merton Park	Merton	London",51.411406,-0.208017,3770,64060
+"Pollards Hill	Merton	London",51.401445,-0.12317,3900,42640
+"Ravensbury	Merton	London",51.441058,-0.190812,3950,43160
+"Raynes Park	Merton	London",51.406696,-0.23224,4430,69100
+"St. Helier	Merton	London",51.3899,-0.19875,4110,43430
+"Trinity	Merton	London",51.421693,-0.197064,4350,65820
+"Village	Merton	London",51.448446,-0.199277,3640,92240
+"West Barnes	Merton	London",51.397779,-0.238714,3810,60630
+"Wimbledon Park	Merton	London",51.434534,-0.199526,4390,71450
+"Beckton	Newham	London",51.510493,0.067811,5770,40180
+"Boleyn	Newham	London",51.53886,0.029471,4930,37370
+"Canning Town North	Newham	London",51.514105,0.01874,5830,34390
+"Canning Town South	Newham	London",51.514105,0.01874,6540,38770
+"Custom House	Newham	London",51.509866,0.026244,5040,37610
+"East Ham Central	Newham	London",51.529318,0.052763,4550,38210
+"East Ham North	Newham	London",51.528737,0.055472,3630,38170
+"East Ham South	Newham	London",51.528737,0.055472,5190,37150
+"Forest Gate North	Newham	London",51.545791,0.024397,5690,40370
+"Forest Gate South	Newham	London",51.545791,0.024397,5910,40710
+"Green Street East	Newham	London",51.538595,0.033368,4210,37310
+"Green Street West	Newham	London",51.538595,0.033368,4020,36760
+"Little Ilford	Newham	London",51.55163,0.058857,5190,35280
+"Manor Park	Newham	London",51.549395,0.048641,4720,37310
+"Plaistow North	Newham	London",51.527552,0.012627,5160,36380
+"Plaistow South	Newham	London",51.527552,0.012627,5410,37500
+"Royal Docks	Newham	London",51.513839,0.070573,4880,45530
+"Stratford and New Town	Newham	London",51.507351,-0.127758,8210,42220
+"Wall End	Newham	London",51.536762,0.061442,4330,38150
+"West Ham	Newham	London",51.538265,0.014525,5350,38130
+"Aldborough	Redbridge	London",51.589492,0.103124,4960,45980
+"Barkingside	Redbridge	London",51.588497,0.080808,4400,49040
+"Bridge	Redbridge	London",51.605984,0.057462,4900,48640
+"Chadwell	Redbridge	London",51.581452,0.118146,5290,45180
+"Church End	Redbridge	London",51.584549,-0.011744,5150,57150
+"Clayhall	Redbridge	London",51.584166,0.062276,4040,51550
+"Clementswood	Redbridge	London",51.553101,0.073299,4510,37160
+"Cranbrook	Redbridge	London",51.568319,0.054683,4100,47260
+"Fairlop	Redbridge	London",51.59219,0.081033,5170,46300
+"Fullwell	Redbridge	London",51.574818,0.050754,4950,43880
+"Goodmayes	Redbridge	London",51.563944,0.110134,4380,41520
+"Hainault	Redbridge	London",51.608139,0.10079,5300,38700
+"Loxford	Redbridge	London",51.548665,0.079912,5100,35150
+"Mayfield	Redbridge	London",51.605111,0.023655,4400,43790
+"Monkhams	Redbridge	London",51.620238,0.035386,4470,62140
+"Newbury	Redbridge	London",51.575104,0.092449,5290,43690
+"Roding	Redbridge	London",51.578267,0.067526,4810,50980
+"Seven Kings	Redbridge	London",51.566967,0.093946,4800,42350
+"Snaresbrook	Redbridge	London",51.58405,0.018068,5470,56800
+"Valentines	Redbridge	London",51.558126,0.067694,4930,42870
+"Wanstead	Redbridge	London",51.576451,0.021154,4600,58560
+"Barnes	Richmond upon Thames	London",51.475265,-0.239303,4470,80160
+"East Sheen	Richmond upon Thames	London",51.462851,-0.267883,4210,81320
+"Fulwell and Hampton Hill	Richmond upon Thames	London",51.432379,-0.348814,4330,68550
+Ham,51.458948,-0.308818,4550,62050
+"Hampton	Richmond upon Thames	London",51.413394,-0.366712,4300,65120
+"Hampton North	Richmond upon Thames	London",51.414148,-0.361323,4150,53560
+"Hampton Wick	Richmond upon Thames	London",51.413541,-0.321331,4680,65130
+"Heathfield	Richmond upon Thames	London",51.451858,-0.336576,3910,49870
+"Kew	Richmond upon Thames	London",51.475251,-0.284891,5180,74260
+"Mortlake and Barnes Common	Richmond upon Thames	London",51.468125,-0.241399,5070,70740
+"North Richmond	Richmond upon Thames	London",51.461311,-0.303742,4950,72050
+"St. Margarets & North Twickenham	Richmond upon Thames	London",51.470875,-0.328423,4640,75550
+"South Richmond	Richmond upon Thames	London",51.461311,-0.303742,5380,75230
+"South Twickenham	Richmond upon Thames	London",51.444581,-0.335246,4120,72960
+"Teddington	Richmond upon Thames	London",51.426799,-0.331342,4790,71610
+"Twickenham Riverside	Richmond upon Thames	London",51.447558,-0.315743,4950,72910
+"West Twickenham	Richmond upon Thames	London",51.444581,-0.335246,4370,62320
+"Whitton	Richmond upon Thames	London",51.453848,-0.373265,3890,57850
+"Brunswick Park	Southwark	London",51.474953,-0.085455,5650,46940
+"Camberwell Green	Southwark	London",51.475193,-0.092234,6510,41140
+"Cathedrals	Southwark	London",51.497659,-0.107548,7100,52610
+"Chaucer	Southwark	London",51.489755,-0.074095,6780,48920
+"College	Southwark	London",51.502914,-0.105903,5340,55720
+"East Dulwich	Southwark	London",51.454564,-0.07321,5370,64860
+"East Walworth	Southwark	London",51.489876,-0.092897,5180,40110
+"Faraday	Southwark	London",51.499414,-0.092081,5340,39800
+"Grange	Southwark	London",51.495835,-0.077162,7760,49920
+"Livesey	Southwark	London",51.48303,-0.066078,5650,37520
+"Newington	Southwark	London",51.500194,-0.103378,7060,44150
+"Nunhead	Southwark	London",51.464821,-0.055261,5940,43310
+"Peckham	Southwark	London",51.474191,-0.069137,5730,38900
+"Peckham Rye	Southwark	London",51.460511,-0.060837,5990,56040
+"Riverside	Southwark	London",51.507762,-0.094864,7590,56470
+"Rotherhithe	Southwark	London",51.498235,-0.045992,6550,47830
+"South Bermondsey	Southwark	London",51.48814,-0.05465,6030,40280
+"South Camberwell	Southwark	London",51.474085,-0.093014,5260,53610
+"Surrey Docks	Southwark	London",51.497596,-0.049638,6240,59870
+"The Lane	Southwark	London",51.508708,-0.094148,6660,49140
+"Village	Southwark	London",51.502781,-0.087738,4710,80780
+"Beddington North	Sutton	London",51.368509,-0.134218,4090,48270
+"Beddington South	Sutton	London",51.368509,-0.134218,4190,43390
+"Belmont	Sutton	London",51.343119,-0.198743,4460,55230
+"Carshalton Central	Sutton	London",51.354235,-0.17284,4380,52290
+"Carshalton South and Clockhouse	Sutton	London",51.507351,-0.127758,3620,55240
+"Cheam	Sutton	London",51.361927,-0.218926,4030,58070
+"Nonsuch	Sutton	London",51.360026,-0.217831,4070,52920
+"St. Helier	Sutton	London",51.385429,-0.178818,4540,37720
+"Stonecot	Sutton	London",51.382952,-0.214831,3920,48160
+"Sutton Central	Sutton	London",51.378911,-0.242302,5430,43470
+"Sutton North	Sutton	London",51.361428,-0.193961,4210,46630
+"Sutton South	Sutton	London",51.361428,-0.193961,5050,49870
+"Sutton West	Sutton	London",51.372949,-0.205482,4800,51470
+"The Wrythe	Sutton	London",51.373354,-0.175639,4360,44940
+"Wallington North	Sutton	London",51.363978,-0.151845,4800,47500
+"Wallington South	Sutton	London",51.363978,-0.151845,4620,46490
+"Wandle Valley	Sutton	London",51.419893,-0.178781,4870,39290
+"Worcester Park	Sutton	London",51.38029,-0.24468,4980,50070
+"Bethnal Green North	Tower Hamlets	London",51.526974,-0.06672,5740,47380
+"Bethnal Green South	Tower Hamlets	London",51.526974,-0.06672,5860,43160
+"Blackwall and Cubitt Town	Tower Hamlets	London",51.508296,-0.003815,9840,56890
+"Bow East	Tower Hamlets	London",51.530627,-0.028353,7080,48110
+"Bow West	Tower Hamlets	London",51.530627,-0.028353,5080,53680
+"Bromley-by-Bow	Tower Hamlets	London",51.522444,-0.008645,6210,42100
+"East India and Lansbury	Tower Hamlets	London",51.507351,-0.127758,5560,39370
+"Limehouse	Tower Hamlets	London",51.51324,-0.035233,6790,47410
+"Mile End and Globe Town	Tower Hamlets	London",51.522517,-0.041814,5620,44940
+"Mile End East	Tower Hamlets	London",51.526806,-0.039713,5360,42740
+"Millwall	Tower Hamlets	London",51.49767,-0.020534,12780,62060
+"St. Dunstan's and Stepney Green	Tower Hamlets	London",51.501869,-0.092163,5850,43240
+"St. Katherine's and Wapping	Tower Hamlets	London",51.5044,-0.055746,6430,67760
+"Shadwell	Tower Hamlets	London",51.511218,-0.050716,6150,47540
+"Spitalfields and Banglatown	Tower Hamlets	London",51.507351,-0.127758,5120,52210
+"Weavers	Tower Hamlets	London",51.522706,-0.067059,5730,49350
+"Whitechapel	Tower Hamlets	London",51.513949,-0.070728,6740,49140
+"Cann Hall	Waltham Forest	London",51.555378,0.011371,4910,39010
+"Cathall	Waltham Forest	London",51.559786,0.004342,4590,36980
+"Chapel End	Waltham Forest	London",51.599222,-0.015747,5030,43550
+"Chingford Green	Waltham Forest	London",51.635007,0.011015,4680,47150
+"Endlebury	Waltham Forest	London",51.625402,-0.003447,4350,46250
+"Forest	Waltham Forest	London",51.570247,0.01212,4410,43100
+"Grove Green	Waltham Forest	London",51.56701,0.005673,5390,43440
+"Hale End and Highams Park	Waltham Forest	London",51.607554,-0.003815,4240,47420
+"Hatch Lane	Waltham Forest	London",51.618714,0.004447,4630,43140
+"High Street	Waltham Forest	London",51.583287,-0.02667,5630,41540
+"Higham Hill	Waltham Forest	London",51.593388,-0.030667,5010,37350
+"Hoe Street	Waltham Forest	London",51.582821,-0.018319,5530,41630
+"Larkswood	Waltham Forest	London",51.615276,-0.013932,4550,41980
+"Lea Bridge	Waltham Forest	London",51.562137,-0.045763,5620,37560
+"Leyton	Waltham Forest	London",51.561948,-0.013139,5520,37090
+"Leytonstone	Waltham Forest	London",51.568463,0.009983,4940,46400
+"Markhouse	Waltham Forest	London",51.575148,-0.029574,5020,40300
+"Valley	Waltham Forest	London",51.625341,-0.021916,4490,40860
+"William Morris	Waltham Forest	London",51.59047,-0.028096,5030,41860
+"Wood Street	Waltham Forest	London",51.586305,-0.002407,5490,41930
+"Balham	Wandsworth	London",51.442831,-0.152614,6440,76280
+"Bedford	Wandsworth	London",51.439404,-0.155508,6480,64470
+"Earlsfield	Wandsworth	London",51.441971,-0.187674,6740,61190
+"East Putney	Wandsworth	London",51.458868,-0.210977,7570,68740
+"Fairfield	Wandsworth	London",51.45791,-0.19015,6910,68040
+"Furzedown	Wandsworth	London",51.427091,-0.152778,6170,51860
+"Graveney	Wandsworth	London",51.429784,-0.170135,6290,51450
+"Latchmere	Wandsworth	London",51.468314,-0.163255,7480,47200
+"Nightingale	Wandsworth	London",51.450228,-0.157353,6430,71740
+"Northcote	Wandsworth	London",51.457078,-0.165644,6460,80510
+"Queenstown	Wandsworth	London",51.475956,-0.147902,8400,53840
+"Roehampton	Wandsworth	London",51.453886,-0.245483,6240,40880
+"St. Mary's Park	Wandsworth	London",51.479221,-0.165685,8300,61760
+"Shaftesbury	Wandsworth	London",51.429137,-0.178377,6570,71090
+"Southfields	Wandsworth	London",51.447491,-0.199689,7080,67330
+"Thamesfield	Wandsworth	London",51.457072,-0.181782,6850,79730
+"Tooting	Wandsworth	London",51.420845,-0.168075,6230,48630
+"Wandsworth Common	Wandsworth	London",51.453165,-0.169008,5650,72820
+"West Hill	Wandsworth	London",51.453456,-0.212072,6830,55010
+"West Putney	Wandsworth	London",51.460574,-0.21718,6520,59490
+"Abbey Road	Westminster	London",51.535052,-0.180758,5900,90170
+"Bayswater	Westminster	London",51.513434,-0.183801,5870,85610
+"Bryanston and Dorset Square	Westminster	London",51.519455,-0.157098,7560,88470
+"Churchill	Westminster	London",51.493717,-0.147363,5020,65830
+"Church Street	Westminster	London",51.522775,-0.171286,4910,44380
+"Harrow Road	Westminster	London",51.522592,-0.193959,5440,58030
+"Hyde Park	Westminster	London",51.507268,-0.16573,7830,79530
+"Knightsbridge and Belgravia	Westminster	London",51.502092,-0.159415,6050,176950
+"Lancaster Gate	Westminster	London",51.51165,-0.179702,7500,84280
+"Little Venice	Westminster	London",51.5222,-0.180528,5110,83230
+"Maida Vale	Westminster	London",51.527928,-0.183626,4720,77170
+"Marylebone High Street	Westminster	London",51.519973,-0.151808,6800,103240
+"Queen's Park	Westminster	London",51.532856,-0.20398,5130,53520
+"Regent's Park	Westminster	London",51.531271,-0.156969,7020,78810
+"St. James's	Westminster	London",51.506993,-0.13606,7180,90820
+"Tachbrook	Westminster	London",51.490487,-0.136876,5030,80420
+"Vincent Square	Westminster	London",51.493043,-0.133748,5840,78880
+"Warwick	Westminster	London",51.511132,-0.137464,5460,86200
+"Westbourne	Westminster	London",51.515295,-0.191661,5520,53730
+"West End	Westminster	London",51.51509,-0.133648,8000,95940

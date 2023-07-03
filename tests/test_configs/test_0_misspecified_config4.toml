@@ -1,0 +1,40 @@
+logging = 'info'
+
+[inputs]
+generate_data = true
+# seed = 1234
+directory = ''
+[inputs.contingency_table]
+  ct_type = 'ContingencyTable2DDependenceModel'
+[inputs.contingency_table.generate]
+    I = 2
+    J = 3
+    rowsums = [6,5]
+    colsums = [5,2,4]
+    diagonal = false
+[inputs.contingency_table.import]
+    file = ''
+
+[inputs.spatial_interaction_model]
+  # sim_type = 'ProductionConstrainedSIM2D'
+  sim_type = 'TotalConstrained'
+  epsilon = 1.0
+  gamma = 10000.0
+  kappa = 1.3
+  delta = 0.1
+  noise_percentage = 3.0
+
+[inputs.spatial_interaction_model.generate]
+  alpha_true = -0.5
+  beta_true = 1.5
+  cost_matrix = [[1.0,2.0,3.0],[3.0,2.0,1.0]]
+
+[experiments]
+  seed = 1234
+  [experiments.simple_mcmc]
+      proposals = ['degree_one','degree_higher']
+
+
+
+[outputs]
+  directory = 'data/outputs/'
