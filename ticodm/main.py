@@ -1,3 +1,4 @@
+from copy import deepcopy
 import os
 
 import ast
@@ -264,7 +265,8 @@ def run(config_path,
     """
 
     # Gather all arguments in dictionary
-    settings = locals()
+    settings = {k:v for k,v in locals().items() if k != 'ctx'}
+
     # Remove all nulls
     settings = {k: v for k, v in settings.items() if v}
     # Convert strings to ints
@@ -342,7 +344,7 @@ _output_options = [
     click.option('--sample', '-s', multiple = True, required = False,
                 type=click.Choice(DATA_TYPES.keys()), help=f'Sets type of samples to compute metrics over.'),
     click.option('--statistic','-stat', multiple=True, default=[['','']], type = (click.STRING,click.STRING),required=False,
-            help='Every argument corresponds to a list of statistics and their corresponding axes e.g. passing  (\"mean,sum\",  \"0,1\") corresponds to applying mean across axis 0 and then sum across axis 1'),
+            help='Every argument corresponds to a list of statistics and their corresponding axes e.g. passing  (\"mean|sum\",  \"0|0_1\") corresponds to applying mean across axis 0 and then sum across axes 0,1'),
     click.option('--metric','-m', multiple=True, type=click.Choice(METRICS.keys()), required=False, default=['none'],
                 help=f'Sets list of metrics to compute over samples.'),
     click.option('--dates','-dt', type=click.STRING, default=[''], multiple=True, required=False),
@@ -393,6 +395,8 @@ def output_options(func):
               type=click.Choice(['eps', 'png', 'pdf', 'tex']), help=f"Sets figure format.")#, case_sensitive=False)
 @click.option('--data_format', '-df', default='dat', show_default=True,
               type=click.Choice(['dat', 'txt']), help=f"Sets figure data format.")#, case_sensitive=False)
+@click.option('--data_precision', '-dp', default=5, show_default=True,
+              type=click.INT, help=f"Sets figure data precision.")#, case_sensitive=False)
 @click.option('--figure_size', '-fs', default=(7,5), show_default=True,
               type=(float, float), help=f"Sets figure format.")
 @click.option('--main_colormap', '-mc', default='cblue',required=False, show_default=True,
@@ -492,6 +496,7 @@ def plot(
         distance_metric,
         figure_format,
         data_format,
+        data_precision,
         figure_size,
         main_colormap,
         aux_colormap,
@@ -531,7 +536,8 @@ def plot(
     """
 
     # Gather all options in dictionary
-    settings = locals()
+    settings = {k:v for k,v in locals().items() if k != 'ctx'}
+    
     # Add context arguments
     undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
 
@@ -541,15 +547,16 @@ def plot(
     # Convert strings to ints
     settings['n_threads'] = [thread for thread in settings.get('n_threads',[1,1])]
     settings['n_workers'] = settings.get('n_workers',1)
+
+    # Add undefined settings to settings
+    settings = {**settings, **undefined_settings}
+
     # Update number of workers
     update_numpy_threads(settings['n_threads'][0])
     
     # Import modules
     from ticodm.plot import Plot
-    from ticodm.utils import update_numba_threads,deep_updates
-
-    # Add undefined settings to settings
-    settings = {**settings, **undefined_settings}
+    from ticodm.utils import update_numba_threads
 
     # Set number of cores used (numba package)
     update_numba_threads(settings['n_threads'])
@@ -569,6 +576,7 @@ def plot(
             raise click.BadOptionUsage("%s is not an available plot." % c)
 
     logger.info('Starting')
+
     # Run plot
     Plot(
         plot_ids=plots,
@@ -578,7 +586,10 @@ def plot(
 
     logger.info('Done')
 
-@cli.command('summarise')
+@cli.command(name='summarise',context_settings=dict(
+    ignore_unknown_options=True,
+    allow_extra_args=True,
+))
 @output_options
 @common_options
 @click.option("--metadata_keys","-k", multiple=True, type=click.STRING, required=False)
@@ -588,7 +599,9 @@ def plot(
               type=click.STRING, help=f"Sets algorihm name for use in.")
 @click.option("--sort_by","-sort", multiple=True, type=click.STRING, required=False)
 @click.option("--ascending","-asc", default=False, is_flag=True, show_default=True, required=False)
+@click.pass_context
 def summarise(
+        ctx,
         directories,
         output_directory,
         dataset_name,
@@ -621,14 +634,21 @@ def summarise(
     :param experiment_outputs_path: Path to experimental outputs directory
     """
     # Gather all options in dictionary
-    settings = locals()
-    settings['figure_format'] = ''
+    settings = {k:v for k,v in locals().items() if k != 'ctx'}
+
+    # Add context arguments
+    undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
+
     # Capitalise all single-letter arguments
     settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
 
     # Convert strings to ints
     settings['n_threads'] = [thread for thread in settings.get('n_threads',[1,1])]
     settings['n_workers'] = settings.get('n_workers',1)
+
+    # Add undefined settings to settings
+    settings = {**settings, **undefined_settings}
+    
     # Update number of workers
     update_numpy_threads(settings['n_threads'][0])
 
@@ -649,7 +669,6 @@ def summarise(
     logger = logging.getLogger(__name__)
 
     logger.info('Gathering data')
-
 
     # Run output handler
     OutputSummary(

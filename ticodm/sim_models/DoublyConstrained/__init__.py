@@ -1,1 +1,1 @@
-raise ValueError('Not implemented yet')
+raise NotImplementedError("Doubly constrained model not implemented")

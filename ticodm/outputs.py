@@ -40,7 +40,6 @@ class OutputSummary(object):
         self.experiment_metadata = {}
         # Enable garbage collector
         gc.enable()
-
         # Update settings to parse statistics argument
         deep_updates(
             self.settings,
@@ -258,7 +257,6 @@ class OutputSummary(object):
 
                 for metric in self.settings['metric']:
                     metric_shape = convert_string_to_numpy_shape(METRICS[metric]['shape'],N=N,dims=dims)
-                    
                     # Get all attributes and their values
                     attribute_keys = METRICS[metric]['loop_over']
                     if len(attribute_keys) > 0:
@@ -311,6 +309,7 @@ class OutputSummary(object):
                                                   for experiment {experiment_id} failed')
                                 print('\n')
                                 continue
+                            print(sample_name,metric,samples_metric)
                             self.logger.debug(f"Samples metric is {np.shape(samples_metric)}")
                             # Apply statistics after metric
                             try:
@@ -332,11 +331,11 @@ class OutputSummary(object):
                             metric_summarised = np.squeeze(metric_summarised)
                             # Make sure metric summarised is not multidimensional
                             if np.size(metric_summarised) > 1:
-                                self.logger.warning(f"{stringify_statistic(sample_statistics_axes)}>"+
+                                self.logger.warning(f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}>"+
                                                     f"{sample_name}>"+
                                                     f"{metric}>"+
                                                     f"{attribute_settings_string}>"+
-                                                    f"{stringify_statistic(metric_statistics_axes)} is multidimensional and will not be written to file")
+                                                    f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])} is multidimensional and will not be written to file")
                                 self.logger.warning(f"Shape of summarised metric is {np.shape(metric_summarised)}")
                                 continue
                             else:
@@ -350,11 +349,11 @@ class OutputSummary(object):
                                     "value"
                                 ]
                                 metric_data_vals = [
-                                    f"{stringify_statistic(sample_statistics_axes)}",
+                                    f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}>",
                                     f"{sample_name}",
                                     f"{metric}",
                                     *attribute_settings.values(),
-                                    f"{stringify_statistic(metric_statistics_axes)}",
+                                    f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])}>",
                                     f"{metric_summarised}"
                                 ]
                                 metric_data.append(dict(zip(metric_data_keys,metric_data_vals)))
@@ -401,8 +400,8 @@ class OutputSummary(object):
                         except Exception as e:
                             self.logger.debug(traceback.format_exc())
                             self.logger.error(f"Shape of metric is {np.shape(samples_metric)}")
-                            self.logger.error(f"Applying statistic {stringify_statistic(metric_statistics_axes)} \
-                                              over metric {metric} and sample {sample_name} for experiment {experiment_id} failed")
+                            self.logger.error(f"Applying statistic {'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])}>" + \
+                                              f"over metric {metric} and sample {sample_name} for experiment {experiment_id} failed")
                             print('\n')
                             continue
                         self.logger.debug(f"Summarised metric is {np.shape(metric_summarised)}")
@@ -411,10 +410,10 @@ class OutputSummary(object):
                         if np.size(metric_summarised) > 1:
                             self.logger.debug(traceback.format_exc())
                             # Make sure metric summarised is not multidimensional
-                            self.logger.warning(f"{stringify_statistic(sample_statistics_axes)}>"+
+                            self.logger.warning(f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}>"+
                                                 f"{sample_name}>"+
                                                 f"{metric}>"+
-                                                f"{stringify_statistic(metric_statistics_axes)} is multidimensional \
+                                                f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])} is multidimensional \
                                                 and will not be written to file")
                             self.logger.warning(f"Shape of summarised metric is {np.shape(metric_summarised)}")
                             print('\n')
@@ -429,10 +428,10 @@ class OutputSummary(object):
                                 "value"
                             ]
                             metric_data_vals = [
-                                f"{stringify_statistic(sample_statistics_axes)}",
+                                f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}",
                                 f"{sample_name}",
                                 f"{metric}",
-                                f"{stringify_statistic(metric_statistics_axes)}",
+                                f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])}>",
                                 f"{metric_summarised}"
                             ]                        
                             metric_data.append(dict(zip(metric_data_keys,metric_data_vals)))

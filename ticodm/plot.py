@@ -294,7 +294,7 @@ class Plot(object):
             errors,
             Path(filepath).parent,
             groupby=[],
-            key_type={'x':'int32','y':'float32'},
+            key_type={'x':'int','y':'float'},
             **self.settings
         )
         write_figure(fig,filepath,**self.settings)
@@ -366,7 +366,7 @@ class Plot(object):
             write_figure_data(
                 embedded_data,
                 Path(filepath).parent,
-                key_type={'x':'float32','y':'float32'},
+                key_type={'x':'float','y':'float'},
                 groupby=['sample_name'],
                 **self.settings
             )
@@ -1449,7 +1449,7 @@ class Plot(object):
             prediction_data,
             Path(filepath).parent,
             groupby=[],
-            key_type={'x':'float32','y':'float32'},
+            key_type={'x':'float','y':'float'},
             **self.settings
         )
         
@@ -2024,15 +2024,10 @@ class Plot(object):
                     self.logger.debug(traceback.format_exc())
                     self.logger.error(f"Could not load sample {sample} for experiment {outputs.experiment_id}. Tabular heatmap could not be plotted.")
                     continue
-                
-                # print('table',np.shape(table))
-                # print('origin_demand',np.shape(origin_demand))
-                # print('destination_demand',np.shape(destination_demand))
 
                 # Get table dimensions
                 I,J = np.shape(table)
                 cells = [(i,j) for i in range(I+1) for j in range(J+1)]
-
 
                 # Define filepath
                 self.settings['viz_type'] = 'tabular'
@@ -2040,14 +2035,14 @@ class Plot(object):
                 filepath = os.path.join(outputs.outputs_path,'figures',filename)
 
                 flow_colorbar_min,flow_colorbar_max = None, None
-                if str_in_list("main_colorbar_limit",self.settings.keys()) and self.settings['main_colorbar_limit'] is not None:
+                if self.settings.get('main_colorbar_limit',None) is not None:
                     flow_colorbar_min,flow_colorbar_max = self.settings['main_colorbar_limit']
                 else:
                     flow_colorbar_min,flow_colorbar_max = np.min(table.ravel()),np.max(table.ravel())
                 
                 origin_colorbar_min,origin_colorbar_max = None, None
                 destination_colorbar_min,destination_colorbar_max = None, None
-                if str_in_list("auxiliary_colorbar_limit",self.settings.keys()) and len(self.settings['auxiliary_colorbar_limit']) > 0:
+                if len(self.settings.get('auxiliary_colorbar_limit',[])) > 0:
                     if len(np.shape(self.settings['auxiliary_colorbar_limit'])) == 1:
                         origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit']
                     elif len(np.shape(self.settings['auxiliary_colorbar_limit'])) > 1:
@@ -2060,17 +2055,17 @@ class Plot(object):
                 # Normalise colormaps
                 if flow_colorbar_min < 0:
                     # If error flows are plotted, center colormap at zero
-                    flow_norm = mpl.colors.TwoSlopeNorm(vmin=flow_colorbar_min, vcenter=0, vmax=flow_colorbar_max)
+                    flow_norm = mpl.colors.SymLogNorm(vmin=flow_colorbar_min, vmax=flow_colorbar_max, linthresh=0.001)
                 else:
-                    flow_norm = mpl.colors.Normalize(vmin=flow_colorbar_min, vmax=flow_colorbar_max)
+                    flow_norm = mpl.colors.TwoSlopeNorm(vmin=flow_colorbar_min, vmax=flow_colorbar_max,vcenter=float(self.settings.get('fvcenter',np.mean(table))))
                 if origin_colorbar_min < 0:
                     # If error origin demand is plotted, center colormap at zero
-                    origin_norm = mpl.colors.TwoSlopeNorm(vmin=origin_colorbar_min, vcenter=0, vmax=origin_colorbar_max)
+                    origin_norm = mpl.colors.SymLogNorm(vmin=origin_colorbar_min, vmax=origin_colorbar_max, linthresh=0.001)
                 else:
                     origin_norm = mpl.colors.Normalize(vmin=origin_colorbar_min, vmax=origin_colorbar_max)
                 if destination_colorbar_min < 0:
                     # If error destination demand is plotted, center colormap at zero
-                    destination_norm = mpl.colors.TwoSlopeNorm(vmin=destination_colorbar_min, vcenter=0, vmax=destination_colorbar_max)
+                    destination_norm = mpl.colors.SymLogNorm(vmin=destination_colorbar_min, vmax=destination_colorbar_max, linthresh=0.001)
                 else:
                     destination_norm = mpl.colors.Normalize(vmin=destination_colorbar_min, vmax=destination_colorbar_max)
                 print('\n')
@@ -2088,7 +2083,6 @@ class Plot(object):
                 print('destination')
                 print('data',np.min(destination_demand.ravel()), np.max(destination_demand.ravel()))
                 print('settings',destination_norm.vmin,destination_norm.vmax)
-                print('\n\n\n')
 
                 # Define colorbars for flows, and margins
                 flow_base_cmap = cm.get_cmap(self.settings['main_colormap'])
@@ -2113,30 +2107,6 @@ class Plot(object):
                     norm = destination_norm, 
                     cmap = cm.get_cmap(self.settings['aux_colormap'][1])
                 )
-                # Collect table data
-                table_data = {
-                    "x":np.array([cell[0] for cell in cells],dtype='int32'),
-                    "y":np.array([cell[1] for cell in cells],dtype='int32'),
-                    "z":np.array([table[cell[0]-1,cell[1]-1] if ((cell[0] > 0) and (cell[1] > 0)) else 0 for cell in cells],dtype='float64'),
-                    "color":np.array([flow_norm(table[cell[0]-1,cell[1]-1]) if ((cell[0] > 0) and (cell[1] > 0)) else 0.5 for cell in cells],dtype='float64'),
-                    "label":f"{sample}_cell_data",
-                    "subconfig":outputs.experiment.subconfig,
-                    "outputs_path":outputs.outputs_path
-                }
-                origin_demand_data = {
-                    "x":np.linspace(0.,I+0.,I+1,dtype='int32'),
-                    "y":origin_demand.astype('float64'),
-                    "label":f"{sample}_origin_demand_cell_data",
-                    "subconfig":outputs.experiment.subconfig,
-                    "outputs_path":outputs.outputs_path
-                }
-                destination_demand_data = {
-                    "x":np.linspace(0.,J+0.,J+1,dtype='int32'),
-                    "y":destination_demand.astype('float64'),
-                    "label":f"{sample}_destination_demand_cell_data",
-                    "subconfig":outputs.experiment.subconfig,
-                    "outputs_path":outputs.outputs_path
-                }
                 
                 # Setup plot
                 fig = plt.figure(figsize=self.settings['figure_size'])
@@ -2213,7 +2183,7 @@ class Plot(object):
                 if self.settings['transpose']:
                     table_ax.imshow(
                         table.T,
-                        cmap=flow_color_segmented_cmap,#flow_mapper.get_cmap(),
+                        cmap=flow_mapper.get_cmap(),
                         interpolation='nearest',
                         norm = flow_norm,
                         zorder = 1,
@@ -2377,6 +2347,7 @@ class Plot(object):
                                     fontsize=self.settings['annotation_label_size']
                                 )
                     # Get covered cells
+                    print(np.mean(coverage_probabilities))
                     covered_cell_locations = np.argwhere(coverage_probabilities==1)
                     covered_cells = {
                         "x":covered_cell_locations[:,0].astype('int32'),
@@ -2451,31 +2422,110 @@ class Plot(object):
                 # Remove space
                 plt.tight_layout()
                 # Write figure
-                print(filepath)
                 write_figure(
                     fig,
-                    filepath
-                    ,**self.settings
+                    filepath,
+                    **self.settings
+                )
+                # Collect table data
+                table_data = {
+                    "x":np.array([cell[0] for cell in cells],dtype='int32'),
+                    "y":np.array([cell[1] for cell in cells],dtype='int32'),
+                    "z":np.array([table[cell[0]-1,cell[1]-1] if ((cell[0] > 0) and (cell[1] > 0)) else 0 for cell in cells],dtype='float64'),
+                    "color":np.array([flow_norm(table[cell[0]-1,cell[1]-1]) if ((cell[0] > 0) and (cell[1] > 0)) else 0.5 for cell in cells],dtype='float64'),
+                    "label":f"{sample}_cell_data",
+                    "subconfig":outputs.experiment.subconfig,
+                    "outputs_path":outputs.outputs_path
+                }
+                origin_demand_data = {
+                    "x":np.array([cell[0] for cell in cells if (cell[1] >= J-1) and (cell[0] < I)],dtype='int32'),
+                    "y":np.array([cell[1]+1 for cell in cells if (cell[1] >= J-1) and (cell[0] < I)],dtype='int32'),
+                    "z":np.array([origin_demand[cell[0]-1] for cell in cells if (cell[1] >= J-1) and (cell[0] < I)],dtype='float64'),
+                    "color":np.array([origin_norm(origin_demand[cell[0]-1]) for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='float64'),
+                    "label":f"{sample}_origin_demand_cell_data",
+                    "subconfig":outputs.experiment.subconfig,
+                    "outputs_path":outputs.outputs_path
+                }
+                destination_demand_data = {
+                    "x":np.array([cell[0]+1 for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='int32'),
+                    "y":np.array([cell[1] for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='int32'),
+                    "z":np.array([destination_demand[cell[1]-1] for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='float64'),
+                    "color":np.array([destination_norm(destination_demand[cell[1]-1]) for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='float64'),
+                    "label":f"{sample}_destination_demand_cell_data",
+                    "subconfig":outputs.experiment.subconfig,
+                    "outputs_path":outputs.outputs_path
+                }
+                print(table.sum(axis=0))
+                print(destination_demand_data['z'])
+                print(destination_demand_data['x'].shape)
+                print(destination_demand_data['y'].shape)
+                print(destination_demand_data['z'].shape)
+
+                flow_colorbar_data = {
+                    "ticks":np.array([t for t in flow_cbar.ax.get_yticks()],dtype='float32'),
+                    "locations":np.array([flow_norm(t) for t in flow_cbar.ax.get_yticks()],dtype='float32'),
+                    "label":f"{sample}_colorbar_ticks",
+                    "subconfig":outputs.experiment.subconfig,
+                    "outputs_path":outputs.outputs_path
+                }
+                origin_demand_colorbar_data = {
+                    "ticks":np.array([t for t in origin_margin_cbar.ax.get_yticks()],dtype='float32'),
+                    "locations":np.array([origin_norm(t) for t in origin_margin_cbar.ax.get_yticks()],dtype='float32'),
+                    "label":f"{sample}_origin_demand_colorbar_ticks",
+                    "subconfig":outputs.experiment.subconfig,
+                    "outputs_path":outputs.outputs_path
+                }
+                destination_demand_colorbar_data = {
+                    "ticks":np.array([t for t in destination_margin_cbar.ax.get_yticks()],dtype='float32'),
+                    "locations":np.array([destination_norm(t) for t in destination_margin_cbar.ax.get_yticks()],dtype='float32'),
+                    "label":f"{sample}_destination_demand_colorbar_ticks",
+                    "subconfig":outputs.experiment.subconfig,
+                    "outputs_path":outputs.outputs_path
+                }
+                # Write figure data
+                write_figure_data(
+                    {outputs.experiment_id:flow_colorbar_data},
+                    Path(filepath).parent,
+                    groupby=[],
+                    key_type={'ticks':'float','locations':'float'},
+                    data_format='txt',
+                    data_precision=4,
+                )
+                write_figure_data(
+                    {outputs.experiment_id:origin_demand_colorbar_data},
+                    Path(filepath).parent,
+                    groupby=[],
+                    key_type={'ticks':'float','locations':'float'},
+                    data_format='txt',
+                    data_precision=4,
+                )
+                write_figure_data(
+                    {outputs.experiment_id:destination_demand_colorbar_data},
+                    Path(filepath).parent,
+                    groupby=[],
+                    key_type={'ticks':'float','locations':'float'},
+                    data_format='txt',
+                    data_precision=4,
                 )
                 write_figure_data(
                     {outputs.experiment_id:table_data},
                     Path(filepath).parent,
                     groupby=[],
-                    key_type={'x':'int32','y':'int32','z':'float64','color':'float64'},
+                    key_type={'x':'int','y':'int','z':'float','color':'float'},
                     **self.settings
                 )
                 write_figure_data(
                     {outputs.experiment_id:origin_demand_data},
                     Path(filepath).parent,
                     groupby=[],
-                    key_type={'x':'int32','y':'float64'},
+                    key_type={'x':'int','y':'int','z':'float','color':'float'},
                     **self.settings
                 )
                 write_figure_data(
                     {outputs.experiment_id:destination_demand_data},
                     Path(filepath).parent,
                     groupby=[],
-                    key_type={'x':'int32','y':'float64'},
+                    key_type={'x':'int','y':'int','z':'float','color':'float'},
                     **self.settings
                 )
                 if covered_cells is not None:
@@ -2483,8 +2533,9 @@ class Plot(object):
                         {outputs.experiment_id:covered_cells},
                         Path(filepath).parent,
                         groupby=[],
-                        key_type={'x':'float64','y':'float64'},
-                        **self.settings
+                        key_type={'x':'int','y':'int'},
+                        data_format='dat',
+                        precision=0
                     )
                 if sample == 'table':
                     dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
@@ -2514,175 +2565,176 @@ class Plot(object):
                             {outputs.experiment_id:fixed_cells},
                             Path(filepath).parent,
                             groupby=[],
-                            key_type={'x':'int32','y':'int32'},
-                            **self.settings
+                            key_type={'x':'int','y':'int'},
+                            data_format='dat',
+                            data_precision=self.settings['data_precision']
                         )
 
 
-    def origin_destination_table_colorbars(self):
+    # def origin_destination_table_colorbars(self):
         
-        self.logger.info('Running origin_destination_table_colorbars')
-        # Define arrow kwargs
-        kw = dict(arrowstyle="Simple, tail_width=0.5, head_width=4, head_length=8")
+    #     self.logger.info('Running origin_destination_table_colorbars')
+    #     # Define arrow kwargs
+    #     kw = dict(arrowstyle="Simple, tail_width=0.5, head_width=4, head_length=8")
         
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                disable_logger=True
-            )
+    #     for output_directory in tqdm(self.outputs_directories): 
+    #         self.logger.debug(f"Experiment id {output_directory}")
+    #         # Load contingency table
+    #         outputs = Outputs(
+    #             output_directory,
+    #             self.settings,
+    #             disable_logger=True
+    #         )
     
-            # Define filepath
-            filename = f"table_{outputs.experiment.subconfig['table_dim']}_total_{self.settings['table_total']}_{self.settings['sample'][0]}_flows_colorbar"
+    #         # Define filepath
+    #         filename = f"table_{outputs.experiment.subconfig['table_dim']}_total_{self.settings['table_total']}_{self.settings['sample'][0]}_flows_colorbar"
 
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
+    #         filepath = os.path.join(outputs.outputs_path,'figures',filename)
 
-            flow_colorbar_min,flow_colorbar_max = None, None
-            if str_in_list("main_colorbar_limit",self.settings.keys()):
-                flow_colorbar_min,flow_colorbar_max = self.settings['main_colorbar_limit']
+    #         flow_colorbar_min,flow_colorbar_max = None, None
+    #         if str_in_list("main_colorbar_limit",self.settings.keys()):
+    #             flow_colorbar_min,flow_colorbar_max = self.settings['main_colorbar_limit']
             
-            origin_colorbar_min,origin_colorbar_max = None, None
-            destination_colorbar_min,destination_colorbar_max = None, None
-            if str_in_list("auxiliary_colorbar_limit",self.settings.keys()):
-                if len(np.shape(self.settings['auxiliary_colorbar_limit'])) == 1:
-                    origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit']
-                elif len(np.shape(self.settings['auxiliary_colorbar_limit'])) > 1:
-                    origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit'][0]
-                    destination_colorbar_min,destination_colorbar_max = self.settings['auxiliary_colorbar_limit'][1]
+    #         origin_colorbar_min,origin_colorbar_max = None, None
+    #         destination_colorbar_min,destination_colorbar_max = None, None
+    #         if str_in_list("auxiliary_colorbar_limit",self.settings.keys()):
+    #             if len(np.shape(self.settings['auxiliary_colorbar_limit'])) == 1:
+    #                 origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit']
+    #             elif len(np.shape(self.settings['auxiliary_colorbar_limit'])) > 1:
+    #                 origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit'][0]
+    #                 destination_colorbar_min,destination_colorbar_max = self.settings['auxiliary_colorbar_limit'][1]
 
-            table = outputs.compute_sample_statistics(
-                    outputs.experiment.results[self.settings['sample'][0]],
-                    self.settings['sample'][0],
-                    self.settings['statistic'][0][0]
-            )
-            origin_demand = outputs.compute_sample_statistics(
-                    outputs.experiment.results[self.settings['sample'][0]],
-                    self.settings['sample'][0],
-                    'rowsums'
-            )
-            destination_demand = outputs.compute_sample_statistics(
-                outputs.experiment.results[self.settings['sample'][0]],
-                self.settings['sample'][0],
-                'colsums'
-            )
-            self.settings['viz_type'] = 'colorbars'
-            filename = outputs.create_filename()
+    #         table = outputs.compute_sample_statistics(
+    #                 outputs.experiment.results[self.settings['sample'][0]],
+    #                 self.settings['sample'][0],
+    #                 self.settings['statistic'][0][0]
+    #         )
+    #         origin_demand = outputs.compute_sample_statistics(
+    #                 outputs.experiment.results[self.settings['sample'][0]],
+    #                 self.settings['sample'][0],
+    #                 'rowsums'
+    #         )
+    #         destination_demand = outputs.compute_sample_statistics(
+    #             outputs.experiment.results[self.settings['sample'][0]],
+    #             self.settings['sample'][0],
+    #             'colsums'
+    #         )
+    #         self.settings['viz_type'] = 'colorbars'
+    #         filename = outputs.create_filename()
 
-            # Normalise colormaps
-            if flow_colorbar_min is not None and flow_colorbar_max is not None:    
-                flow_norm = mpl.colors.Normalize(vmin=flow_colorbar_min, vmax=flow_colorbar_max)
-            else:
-                flow_norm = mpl.colors.Normalize(vmin=np.min(table.ravel()), vmax=np.max(table.ravel()))
+    #         # Normalise colormaps
+    #         if flow_colorbar_min is not None and flow_colorbar_max is not None:    
+    #             flow_norm = mpl.colors.Normalize(vmin=flow_colorbar_min, vmax=flow_colorbar_max)
+    #         else:
+    #             flow_norm = mpl.colors.Normalize(vmin=np.min(table.ravel()), vmax=np.max(table.ravel()))
             
-            if origin_colorbar_min is not None and origin_colorbar_max is not None:    
-                origin_norm = mpl.colors.Normalize(vmin=origin_colorbar_min, vmax=origin_colorbar_max)
-            else:
-                origin_norm = mpl.colors.Normalize(vmin=np.min(origin_demand.ravel()), vmax=np.max(origin_demand.ravel()))
+    #         if origin_colorbar_min is not None and origin_colorbar_max is not None:    
+    #             origin_norm = mpl.colors.Normalize(vmin=origin_colorbar_min, vmax=origin_colorbar_max)
+    #         else:
+    #             origin_norm = mpl.colors.Normalize(vmin=np.min(origin_demand.ravel()), vmax=np.max(origin_demand.ravel()))
             
-            if destination_colorbar_min is not None and destination_colorbar_max is not None:    
-                destination_norm = mpl.colors.Normalize(vmin=destination_colorbar_min, vmax=destination_colorbar_max)
-            else:
-                destination_norm = mpl.colors.Normalize(vmin=np.min(destination_demand.ravel()), vmax=np.max(destination_demand.ravel()))
+    #         if destination_colorbar_min is not None and destination_colorbar_max is not None:    
+    #             destination_norm = mpl.colors.Normalize(vmin=destination_colorbar_min, vmax=destination_colorbar_max)
+    #         else:
+    #             destination_norm = mpl.colors.Normalize(vmin=np.min(destination_demand.ravel()), vmax=np.max(destination_demand.ravel()))
 
-            print(flow_norm.vmin,flow_norm.vmax)
-            print(origin_norm.vmin,origin_norm.vmax)
-            print(destination_norm.vmin,destination_norm.vmax)
+    #         print(flow_norm.vmin,flow_norm.vmax)
+    #         print(origin_norm.vmin,origin_norm.vmax)
+    #         print(destination_norm.vmin,destination_norm.vmax)
 
-            # Define colorbars for flows, and margins
-            flow_base_cmap = cm.get_cmap(self.settings['main_colormap'])
-            # Clip colors in colorbar to specific range
-            colors = flow_base_cmap( 
-                np.linspace(
-                        self.settings['color_segmentation_limits'][0], 
-                        self.settings['color_segmentation_limits'][1], 
-                        self.settings['x_tick_frequency']
-                )
-            )
-            flow_color_segmented_cmap = mpl.colors.LinearSegmentedColormap.from_list(self.settings['main_colormap'], colors)
-            flow_mapper = cm.ScalarMappable(
-                        norm=flow_norm, 
-                        cmap=flow_color_segmented_cmap
-            )
-            origin_flow_mapper = cm.ScalarMappable(
-                    norm=origin_norm, 
-                    cmap=self.settings['aux_colormap'][0]
-            )
-            destination_flow_mapper = cm.ScalarMappable(
-                    norm=destination_norm, 
-                    cmap=self.settings['aux_colormap'][1]
-            )
+    #         # Define colorbars for flows, and margins
+    #         flow_base_cmap = cm.get_cmap(self.settings['main_colormap'])
+    #         # Clip colors in colorbar to specific range
+    #         colors = flow_base_cmap( 
+    #             np.linspace(
+    #                     self.settings['color_segmentation_limits'][0], 
+    #                     self.settings['color_segmentation_limits'][1], 
+    #                     self.settings['x_tick_frequency']
+    #             )
+    #         )
+    #         flow_color_segmented_cmap = mpl.colors.LinearSegmentedColormap.from_list(self.settings['main_colormap'], colors)
+    #         flow_mapper = cm.ScalarMappable(
+    #                     norm=flow_norm, 
+    #                     cmap=self.settings['main_colormap']#flow_color_segmented_cmap
+    #         )
+    #         origin_flow_mapper = cm.ScalarMappable(
+    #                 norm=origin_norm, 
+    #                 cmap=self.settings['aux_colormap'][0]
+    #         )
+    #         destination_flow_mapper = cm.ScalarMappable(
+    #                 norm=destination_norm, 
+    #                 cmap=self.settings['aux_colormap'][1]
+    #         )
 
-            # Setup figure
-            fig = plt.figure(figsize=(3,6))
-            gs = GridSpec(
-                nrows=1,
-                ncols=3,
-                width_ratios=[1,1,1],
-                hspace=0.0,
-                wspace=1.0
-            )
-            origin_cbar_ax = fig.add_subplot(gs[0])
-            destination_cbar_ax = fig.add_subplot(gs[1])
-            flow_cbar_ax = fig.add_subplot(gs[2])
+    #         # Setup figure
+    #         fig = plt.figure(figsize=(3,6))
+    #         gs = GridSpec(
+    #             nrows=1,
+    #             ncols=3,
+    #             width_ratios=[1,1,1],
+    #             hspace=0.0,
+    #             wspace=1.0
+    #         )
+    #         origin_cbar_ax = fig.add_subplot(gs[0])
+    #         destination_cbar_ax = fig.add_subplot(gs[1])
+    #         flow_cbar_ax = fig.add_subplot(gs[2])
             
-            flow_cbar_ax.axis('off')
-            origin_cbar_ax.axis('off')
-            destination_cbar_ax.axis('off')
+    #         flow_cbar_ax.axis('off')
+    #         origin_cbar_ax.axis('off')
+    #         destination_cbar_ax.axis('off')
 
-            # Construct colorbars for flows
-            flow_cbar = fig.colorbar(
-                    flow_mapper, 
-                    ax=flow_cbar_ax,
-                    fraction=1.0,
-                    pad=0.0,
-                    # location = 'left'
-            )
-            flow_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-            if self.settings['colorbar_title'] is not None:
-                flow_cbar.ax.set_title(self.settings['colorbar_title'].replace("_"," ").capitalize(),fontsize=self.settings['legend_label_size'])
-            else:
-                flow_cbar.ax.set_title('Flow',fontsize=self.settings['legend_label_size'])
-            flow_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-            flow_cbar.ax.yaxis.set_ticks_position('left')
-            flow_cbar.update_ticks()
+    #         # Construct colorbars for flows
+    #         flow_cbar = fig.colorbar(
+    #                 flow_mapper, 
+    #                 ax=flow_cbar_ax,
+    #                 fraction=1.0,
+    #                 pad=0.0,
+    #                 # location = 'left'
+    #         )
+    #         flow_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
+    #         if self.settings['colorbar_title'] is not None:
+    #             flow_cbar.ax.set_title(self.settings['colorbar_title'].replace("_"," ").capitalize(),fontsize=self.settings['legend_label_size'])
+    #         else:
+    #             flow_cbar.ax.set_title('Flow',fontsize=self.settings['legend_label_size'])
+    #         flow_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
+    #         flow_cbar.ax.yaxis.set_ticks_position('left')
+    #         flow_cbar.update_ticks()
             
-            # Construct colorbars for margins (rowsums column sums)
-            origin_flow_mapper._A = []
-            destination_flow_mapper._A = []
+    #         # Construct colorbars for margins (rowsums column sums)
+    #         origin_flow_mapper._A = []
+    #         destination_flow_mapper._A = []
         
-            if np.abs(origin_norm.vmax - origin_norm.vmin) > 1e-3:
-                origin_cbar = fig.colorbar(
-                    origin_flow_mapper, 
-                    ax=origin_cbar_ax,
-                    fraction=1.0,
-                    pad=0.1,
-                    # location = 'left'
-                )
-                origin_cbar.ax.yaxis.set_ticks_position('left')
-                origin_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-                origin_cbar.ax.set_title('Origin',fontsize=self.settings['legend_label_size'])
-                origin_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-                origin_cbar.update_ticks()
+    #         if np.abs(origin_norm.vmax - origin_norm.vmin) > 1e-3:
+    #             origin_cbar = fig.colorbar(
+    #                 origin_flow_mapper, 
+    #                 ax=origin_cbar_ax,
+    #                 fraction=1.0,
+    #                 pad=0.1,
+    #                 # location = 'left'
+    #             )
+    #             origin_cbar.ax.yaxis.set_ticks_position('left')
+    #             origin_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
+    #             origin_cbar.ax.set_title('Origin',fontsize=self.settings['legend_label_size'])
+    #             origin_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
+    #             origin_cbar.update_ticks()
             
-            # Origin demand colorbar
-            if np.abs(destination_norm.vmax - destination_norm.vmin) > 1e-3:
-                destination_cbar = fig.colorbar(
-                    destination_flow_mapper, 
-                    ax=destination_cbar_ax,
-                    fraction=1.0,
-                    pad=0.1,
-                    # location = 'left'
-                )
-                destination_cbar.ax.yaxis.set_ticks_position('left')
-                destination_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-                destination_cbar.ax.set_title('Destination',fontsize=self.settings['legend_label_size'])
-                destination_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-                destination_cbar.update_ticks()
+    #         # Origin demand colorbar
+    #         if np.abs(destination_norm.vmax - destination_norm.vmin) > 1e-3:
+    #             destination_cbar = fig.colorbar(
+    #                 destination_flow_mapper, 
+    #                 ax=destination_cbar_ax,
+    #                 fraction=1.0,
+    #                 pad=0.1,
+    #                 # location = 'left'
+    #             )
+    #             destination_cbar.ax.yaxis.set_ticks_position('left')
+    #             destination_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
+    #             destination_cbar.ax.set_title('Destination',fontsize=self.settings['legend_label_size'])
+    #             destination_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
+    #             destination_cbar.update_ticks()
 
-            # Remove space
-            gs.tight_layout(fig)
+    #         # Remove space
+    #         gs.tight_layout(fig)
 
-            # Write figure
-            write_figure(fig,filepath,**self.settings)
+    #         # Write figure
+    #         write_figure(fig,filepath,**self.settings)

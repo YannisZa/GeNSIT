@@ -551,7 +551,9 @@ clear; ticodm plot -tab table_lsoas_to_msoas.txt \
 -p 40 -fs 20 7 -ff tex -mc redgreen -ac yellowblue -ac yellowblue --transpose -b 10000 -fe cost_matrix \
 -csl 0.0 1.0 -tfs 14 -afs 18 -lls 18 -als 18 -mcl -0.01 0.01 -acl -0.0001 0.0001 -acl -0.05 0.05
 
----
+### Ground truth table
+
+clear; ticodm plot -tab table_lsoas_to_msoas.txt -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIMLatentMCMC_HighNoise_both_margins_permuted_cells_20%_05_06_2023_12_40_31 -s ground_truth_table -stat '|' '|' -stat 'sum|' '1|' -stat 'sum|' '0|' -p 40 -fs 20 7 -ff pdf -mc yellowpurple -ac bluegreen -ac bluegreen --transpose -b 10000 -fe ground_truth -csl 0.0 1.0 -tfs 14 -afs 18 -lls 18 -als 18 
 
 #### Mean error
 

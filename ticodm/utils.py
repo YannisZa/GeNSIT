@@ -98,8 +98,9 @@ def write_figure_data(figure_data:Union[dict,pd.DataFrame],dirpath:str,groupby:l
             # Write dat file
             write_tex_data(
                 key_type=key_type,
-                data=list(zip(*[np.asarray(figure_data[fgid][k],dtype=key_type[k]) for k in sorted(key_type.keys())])),
-                filepath=filepath
+                data=list(zip(*[np.asarray(figure_data[fgid][k],dtype=key_type[k]) for k in key_type.keys()])),
+                filepath=filepath,
+                precision=settings.get('data_precision',19)
             )
     elif isinstance(figure_data,pd.DataFrame):
         for group_id,group in figure_data.groupby(groupby):
@@ -149,9 +150,9 @@ def write_tex_data(data:Union[np.array,np.ndarray],key_type:Union[list,np.array,
         np.savetxt(
             f, 
             data,
-            header=' '.join(sorted(key_type.keys())),
+            header=' '.join(key_type.keys()),
             comments='',
-            fmt=[NUMPY_TYPE_TO_DAT_TYPE[key_type[x]] for x in sorted(key_type.keys())]
+            fmt=[(NUMPY_TYPE_TO_DAT_TYPE[key_type[x]]+str(kwargs.get('precision',19))) if "d" in key_type[x] else NUMPY_TYPE_TO_DAT_TYPE[key_type[x]] for x in key_type.keys()]
         )
 
 
@@ -438,8 +439,8 @@ def unpack_statistics(settings):
             # print('stat',stat)
             # print('ax',ax)
             if isinstance(stat,str):
-                if '|' in stat:
-                    stat_unpacked = stat.split('|')
+                if '&' in stat:
+                    stat_unpacked = stat.split('&')
                 else:
                     stat_unpacked = [stat]
             elif hasattr(stat,'__len__'):
@@ -448,22 +449,36 @@ def unpack_statistics(settings):
                 raise Exception(f'Statistic name {stat} of type {type(stat)} not recognized')
             
             if isinstance(ax,str): 
-                if '|' in ax:
-                    ax_unpacked = [_ax.split("_") if len(_ax) > 0 else '' for _ax in ax.split('|')]
+                #  if len(_ax) > 0
+                if '&' in ax:
+                    ax_unpacked = ax.split('&')
                 else:
-                    ax_unpacked = [ax.split("_")]
+                    ax_unpacked = [ax]
             elif hasattr(ax,'__len__'):
                 ax_unpacked = deepcopy(ax)
             else:
                 raise Exception(f'Statistic axes {ax_unpacked} of type {type(ax_unpacked)} not recognized')
-            # print('stat_unpacked',stat_unpacked)
-            # print('ax_unpacked',ax_unpacked)
-            ax_unpacked = [tuple([int(_subax) for _subax in _ax]) \
+            # Make sure number of statistics and axes provided is the same
+            assert len(stat_unpacked) == len(ax_unpacked)
+            substatistics = []
+            for substat,subax in list(zip(stat_unpacked,ax_unpacked)):
+                # print('substat',substat)
+                # print('subax',subax)
+                substat_unpacked = [_s for _s in substat.split('|')] if '|' in substat else [substat]
+                subax_unpacked = [_ax for _ax in subax.split('|')] if '|' in subax else [subax]
+                # Unpack individual axes
+                subax_unpacked = [tuple([int(_subax) for _subax in _ax.split("_")]) \
                             if (_ax is not None and len(_ax) > 0) \
                             else None
-                            for _ax in ax_unpacked]
+                            for _ax in subax_unpacked]
+                # print('substat_unpacked',substat_unpacked)
+                # print('subax_unpacked',subax_unpacked)
+                # Add statistic name and axes pair to list
+                substatistics.append(list(zip(substat_unpacked,subax_unpacked)))
+            
             # Add statistic name and axes pair to list
-            statistics.append(list(zip(stat_unpacked,ax_unpacked)))
+            statistics.append(substatistics)
+
         return {'statistic': statistics}
 
 
@@ -526,7 +541,7 @@ def format_bytes(size):
 def convert_string_to_numpy_function(s:str=''):
     if 'mean' == s.lower():
         return np.mean
-    elif 'var' == s.lower():
+    elif 'var' == s.lower() or 'variance' == s.lower():
         return np.var
     elif 'std' == s.lower():
         return np.std

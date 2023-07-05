@@ -30,10 +30,8 @@ SAMPLE_TYPES = {
 DATA_TYPES = {**INPUT_TYPES,**SAMPLE_TYPES}
 
 NUMPY_TYPE_TO_DAT_TYPE = {
-    "float32":"%f",
-    "float64":"%.18e",
-    "int32":"%d",
-    "int64":"%d"
+    "float":"%f",
+    "int":"%d",
 }
 
 SIM_TYPE_CONSTRAINTS = {
@@ -48,6 +46,8 @@ MARGINAL_SOLVERS = ['multinomial']
 
 METRICS = {
     'SRMSE':{"shape":"(N,1)","loop_over":[],'apply_axis':(0,1)},
+    'p_distance':{"shape":"(N,dims)","loop_over":[],'apply_axis':(1,2)},
+    'SSI':{"shape":"(N,1)","loop_over":[],'apply_axis':(0,1)},
     'sparsity':{"shape":"(N,1)","loop_over":[],'apply_axis':(0,1)},
     'shannon_entropy':{"shape":"(1,1)","loop_over":[],'apply_axis':(0,1)},
     'von_neumann_entropy':{"shape":"(N,1)","loop_over":[],'apply_axis':(0,1)},
@@ -57,7 +57,6 @@ METRICS = {
     'none':{"shape":"(N,dims)","loop_over":[],'apply_axis':(0,1,2)}
 }
 
-# Create colormap
 COLORS = {'monte_carlo_sample_degree_one':'tab:blue',
         'monte_carlo_sample_degree_higher':'tab:blue',
         'iterative_residual_filling_solution_degree_one':'tab:orange',
@@ -65,10 +64,8 @@ COLORS = {'monte_carlo_sample_degree_one':'tab:blue',
         'maximum_entropy_solution_degree_one':'tab:green',
         'maximum_entropy_solution_degree_higher':'tab:green',
         'iterative_uniform_residual_filling_solution_degree_one':'tab:red',
-        'iterative_uniform_residual_filling_solution_degree_higher':'tab:red'}#,
-            # 'H':'tab:purple',
-            # 'I':'tab:brown',
-            # 'J':'tab:pink'}
+        'iterative_uniform_residual_filling_solution_degree_higher':'tab:red'}
+
 LINESTYLES = {"monte_carlo_sample_degree_one":'dashed',
             "iterative_residual_filling_solution_degree_one":'dashed',
             "maximum_entropy_solution_degree_one":'dashed',

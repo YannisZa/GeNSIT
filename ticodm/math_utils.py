@@ -224,6 +224,22 @@ def l_2(tab:np.ndarray,tab0:np.ndarray,progress_proxy):
                 progress_proxy.update(1)
     return res
 
+def _p_distance(tab,p):
+    if p == 0:
+        return tab
+    else:
+        return np.abs(tab)**p
+
+
+def p_distance(tab:np.array,tab0:np.array,**kwargs:dict):
+    # Type of norm
+    p = float(kwargs['kwargs'].get('p_norm',2))
+    dims = np.shape(tab)
+    if len(dims) > 2:
+        return np.array([_p_distance(tab[n]-tab0,p=p) for n in range(dims[0])],dtype='float32').reshape(dims)
+    else:
+        return _p_distance(tab[0]-tab0,p=p).reshape(dims)
+
 @njit()
 def relative_l_2(tab:np.ndarray,tab0:np.ndarray,normalisation_constant:float=None,progress_proxy=None):
     N,I,J = np.shape(tab)
@@ -292,7 +308,7 @@ def edit_distance_degree_higher(tab:np.ndarray,tab0:np.ndarray,**kwargs):
     if dims is not None:
         tab = tab.reshape(dims)
         tab0 = tab0.reshape(dims)
-    return np.sum((tab - tab0) >= 0)
+    return np.sum((tab - tab0) > 0)
 
 
 def edit_degree_higher_error(tab:np.ndarray,tab0:np.ndarray,**kwargs):
@@ -303,11 +319,11 @@ def edit_degree_higher_error(tab:np.ndarray,tab0:np.ndarray,**kwargs):
         res = np.zeros((N,1),dtype='float32')
         if K == N:
             for n in prange(N):
-                res[n,0] += np.sum((tab[n] - tab0[n]) > 0)
+                res[n,0] = np.sum((tab[n] - tab0[n]) > 0)
                 progress_proxy.update(1)
         elif K == 1:
             for n in prange(N):
-                res[n,0] += np.sum((tab[n] - tab0[0]) > 0)
+                res[n,0] = np.sum((tab[n] - tab0[0]) > 0)
                 progress_proxy.update(1)
         return res
        
@@ -380,6 +396,46 @@ def SRMSE(tab:np.array,tab0:np.array,**kwargs:dict):
 
     return res
 
+def SSI(tab:np.array,tab0:np.array,**kwargs:dict):
+    """ Computes Sorensen similarity index. See equation (23) of
+    "A primer for working with the Spatial Interaction modeling (SpInt) module
+    in the python spatial analysis library (PySAL)" for more details.
+
+    Parameters
+    ----------
+    table : np.array [NxM]
+        Estimated flows.
+    true_table : np.array [NxM]
+        Actual flows.
+
+    Returns
+    -------
+    float
+        Standardised root mean square error of t_hat.
+
+    """
+    res = np.zeros((np.shape(tab)[0]),dtype='float32')
+    @guvectorize([(int32[:,:,:], int32[:,:,:], float32[:]),
+            (float32[:,:,:], int32[:,:,:], float32[:]),
+            (int32[:,:,:], float32[:,:,:], float32[:]),
+            (float32[:,:,:], float32[:,:,:], float32[:])], '(n,d1,d2),(k,d1,d2)->(n)')
+    def _SSI(tab:np.array,tab0:np.array,res:np.array):
+        N = np.shape(tab)[0]
+        dims = np.shape(tab)[1:]
+        for n in range(N):
+            denominator = (tab0[0]+tab[n])
+            denominator[denominator<=0] = 1
+            ratio = ((2*np.minimum(tab0[0],tab[n]))/denominator)
+            res[n] = ( np.sum(ratio) / (np.prod(dims))).astype('float32')
+    # print('\n')
+    # print(tab[0])
+    # print(np.shape(tab))
+    # print(tab0[0].sum())
+    # sys.exit()
+    # Compute SRMSE
+    _SSI(tab,tab0,res)
+
+    return res
 
 def shannon_entropy(tab:np.array,tab0:np.array,**kwargs:dict):
     """Computes entropy for a table X
@@ -491,7 +547,6 @@ def coverage_probability(tab:np.array,tab0:np.array,**kwargs:dict):
         cell_covered = (tab0[(0,*table_index)] >= lower_bound_hpdr) and (tab0[(0,*table_index)] <= upper_bound_hpdr)
         # Add that flag to a table of flags
         cell_coverage[table_index] = cell_covered
-    
     return cell_coverage
 
 
