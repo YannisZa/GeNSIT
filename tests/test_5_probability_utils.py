@@ -7,10 +7,10 @@ import pytest
 import pandas as pd
 from copy import deepcopy
 from argparse import Namespace
-from ticodm.config import Config
-from ticodm.contingency_table import ContingencyTable2D
-from ticodm.spatial_interaction_model import ProductionConstrainedSIM,TotalConstrainedSIM
-from ticodm.probability_utils import *
+from multiresticodm.config import Config
+from multiresticodm.contingency_table import ContingencyTable2D
+from multiresticodm.spatial_interaction_model import ProductionConstrainedSIM,TotalConstrainedSIM
+from multiresticodm.probability_utils import *
 from tests.test_4_spatial_interaction_model import Test4Helpers
 
 class Test5Helpers:

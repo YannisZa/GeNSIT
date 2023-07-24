@@ -1,10 +1,10 @@
 import pytest
 import numpy as np
 from copy import deepcopy
-from ticodm.config import Config
-from ticodm.utils import str_in_list,f_to_array,deep_updates
-from ticodm.contingency_table import ContingencyTable2D
-from ticodm.markov_basis import instantiate_markov_basis
+from multiresticodm.config import Config
+from multiresticodm.utils import str_in_list,f_to_array,deep_updates
+from multiresticodm.contingency_table import ContingencyTable2D
+from multiresticodm.markov_basis import instantiate_markov_basis
 
 @pytest.fixture
 def default_config():

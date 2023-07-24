@@ -7,10 +7,10 @@ import numpy as np
 # from pprint import pprint
 from copy import deepcopy
 from argparse import Namespace
-from ticodm.config import Config
-from ticodm.utils import f_to_df,df_to_f,f_to_array,array_to_f
-from ticodm.math_utils import logsumexp,normalise,normalised_manhattan_distance
-from ticodm.contingency_table import ContingencyTable2D
+from multiresticodm.config import Config
+from multiresticodm.utils import f_to_df,df_to_f,f_to_array,array_to_f
+from multiresticodm.math_utils import logsumexp,normalise,normalised_manhattan_distance
+from multiresticodm.contingency_table import ContingencyTable2D
 
 @pytest.fixture
 def default_config():

@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from argparse import Namespace
-from ticodm.config import Config
-from ticodm.utils import *
-from ticodm.contingency_table import instantiate_ct
-from ticodm.markov_basis import instantiate_markov_basis
-from ticodm.spatial_interaction_model import ProductionConstrained
-from ticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from multiresticodm.config import Config
+from multiresticodm.utils import *
+from multiresticodm.contingency_table import instantiate_ct
+from multiresticodm.markov_basis import instantiate_markov_basis
+from multiresticodm.spatial_interaction_model import ProductionConstrained
+from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 
 @pytest.fixture
 def default_config():

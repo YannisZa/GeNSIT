@@ -5,8 +5,8 @@ import pandas as pd
 
 # from pprint import pprint
 
-from ticodm.config import Config
-from ticodm.spatial_interaction_model import instantiate_sim
+from multiresticodm.config import Config
+from multiresticodm.spatial_interaction_model import instantiate_sim
 
 class Test4Helpers:
 
