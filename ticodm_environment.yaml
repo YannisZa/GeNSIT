@@ -1,4 +1,4 @@
-name: ticodm
+name: multiresticodm
 dependencies:
   - python==3.9
   - anaconda
