@@ -5,13 +5,7 @@ import logging
 
 class Config:
 
-    DEFAULT_SETTINGS = {
-        "logging":'info',
-        "inputs":{"seed":None},
-        "outputs":{"directory":'data/outputs/'}
-    }
-
-    def __init__(self, path:str=None):
+    def __init__(self, path:str=None, settings:dict=None):
         """
         Config object constructor.
         :param path: Path to configuration TOML file
@@ -21,12 +15,29 @@ class Config:
         if path:
             self.logger.debug(f' Loading config from {path}')
             self.settings = toml.load(path, _dict=dict)
+        elif settings:
+            self.settings = settings
         else:
             self.settings = None
             raise Exception(f'Config not found in {path}')
 
     def __str__(self):
         return json.dumps(self.settings,indent=2)
+    
+    def keys(self):
+        return self.settings.keys()
+
+    def get(self,key,default):
+        return self.settings.get(key,default)
+
+    def __delitem__(self, key):
+        del self.settings[key]
+
+    def __getitem__(self, key):
+        return self.settings[key]
+
+    def __setitem__(self, key, value):
+        self.settings[key] = value
 
     def set_paths_root(self)  -> None:
         """

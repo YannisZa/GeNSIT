@@ -13,17 +13,19 @@ from argparse import Namespace
 from scipy.optimize import minimize
 from joblib import Parallel, delayed
 
-
-from ticodm.utils import *
-from ticodm.config import Config
-from ticodm.outputs import Outputs
-from ticodm.global_variables import *
-from ticodm.markov_basis import MarkovBasis
-from ticodm.contingency_table import ContingencyTable,instantiate_ct
-from ticodm.math_utils import apply_norm,running_average_multivariate
-from ticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
-from ticodm.spatial_interaction_model import SpatialInteraction,instantiate_sim
-from ticodm.spatial_interaction_model_mcmc import instantiate_spatial_interaction_mcmc
+from multiresticodm.utils import *
+from multiresticodm.config import Config
+from multiresticodm.inputs import Inputs
+from multiresticodm.outputs import Outputs
+from multiresticodm.global_variables import *
+from multiresticodm.markov_basis import MarkovBasis
+from multiresticodm.contingency_table import ContingencyTable,instantiate_ct
+from multiresticodm.math_utils import apply_norm,running_average_multivariate
+from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from multiresticodm.harris_wilson_model import HarrisWilson
+from multiresticodm.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
+from multiresticodm.spatial_interaction_model import SpatialInteraction,instantiate_sim
+from multiresticodm.spatial_interaction_model_mcmc import instantiate_spatial_interaction_mcmc
 
 # Suppress scientific notation
 np.set_printoptions(suppress=True)
@@ -41,12 +43,6 @@ class ExperimentHandler(object):
         self.config = config
         # Instatiate list of experiments
         self.experiments = []
-        # Setup table
-        self.ct = instantiate_ct(table=None,config=self.config)
-        # Update table distribution
-        self.config.settings['inputs']['contingency_table']['distribution_name'] = self.ct.distribution_name
-        # Build spatial interaction model
-        self.sim = instantiate_sim(self.config)
 
         # Setup experiments
         self.setup_experiments()
@@ -69,7 +65,7 @@ class ExperimentHandler(object):
                 # Instatiate new experiment
                 experiment = self.map_experiment_type_to_class(self.config.settings['experiments'][experiment_id]['type'])
                 # Construct sub-config with only data relevant for experiment
-                subconfig = deepcopy(self.config.settings['experiments'][experiment_id])
+                subconfig = Config(settings=deepcopy(self.config.settings['experiments'][experiment_id]))
                 # Update id, seed and logging detail
                 subconfig['experiment_id'] = experiment_id
                 if self.config.settings['inputs'].get('dataset',None) is not None:
@@ -81,7 +77,9 @@ class ExperimentHandler(object):
                         subconfig[k] = self.config.settings[k]
                 # print(json.dumps(subconfig,indent=2))
                 # Build it
-                new_experiment = experiment(deepcopy(self.ct),deepcopy(self.sim),subconfig)
+                new_experiment = experiment(
+                    subconfig,
+                )
 
                 # Append it to list of experiments
                 self.experiments[experiment_id] = new_experiment
@@ -100,15 +98,11 @@ class ExperimentHandler(object):
                 pass
 
 class Experiment(object):
-    def __init__(self, ct:ContingencyTable, sim:SpatialInteraction, subconfig:Dict, disable_logger:bool=False):
+    def __init__(self, subconfig:Config, disable_logger:bool=False, **kwargs):
         # Create logger
         self.logger = logging.getLogger(__name__)
         numba_logger = logging.getLogger('numba')
         numba_logger.setLevel(logging.WARNING)
-        # Store contingency table
-        self.ct = ct
-        # Store spatial interaction model
-        self.sim = sim
         # Store subconfig
         self.subconfig = subconfig
         if len(self.subconfig['inputs'].get('load_experiment',[])) > 0:
@@ -122,7 +116,7 @@ class Experiment(object):
             del settings_flattened['load_experiment']
             deep_updates(self.subconfig,settings_flattened,overwrite=True)
             # Merge settings to config
-            self.subconfig = {**self.subconfig, **settings_flattened}
+            self.subconfig = Config(settings={**self.subconfig, **settings_flattened})
         
         # Update config with current timestamp ( but do not overwrite)
         datetime_results = list(deep_get(key='datetime',value=self.subconfig))
@@ -139,8 +133,7 @@ class Experiment(object):
         # Disable loggers if necessary
         if disable_logger:
             self.logger.disabled = True
-            self.ct.logger.disable = True
-            self.sim.logger.disable = True
+
         # Update current config
         # self.subconfig = self.sim.config.update_recursively(self.subconfig,updated_config,overwrite=True)
         # print(self.subconfig)
@@ -153,10 +146,12 @@ class Experiment(object):
         self.seed = None
         if "seed" in self.subconfig.keys():
             self.seed = int(self.subconfig["seed"])
-            self.logger.warning(f'Updated seed to {self.seed}')
+            self.logger.warning(f'   Updated seed to {self.seed}')
         # Get experiment data
-        experiment_data = path.basename(path.normpath(self.subconfig['inputs']['dataset']))
-        self.logger.info(f"Experiment {self.subconfig['experiment_id']} of type {self.subconfig['type']} has been set up.")
+        self.logger.info(f"   Experiment {self.subconfig['experiment_id']} of type {self.subconfig['type']} has been set up.")
+
+        # Get device name
+        self.device = self.subconfig['inputs']['device']
 
     def run(self) -> None:
         pass
@@ -174,13 +169,13 @@ class Experiment(object):
                 # Write samples
                 for res in self.results:
                     outputs.write_samples(list(res['samples'].keys()))
-            self.logger.info(f'Outputs have been written.')
+            self.logger.info(f'   Outputs have been written.')
         else:
             if self.subconfig.get('store_progress',1.0) >= 1.0:
-                self.logger.warn(f"Cannot write results: No {self.subconfig['type']} experiment (tabular or plotting) results found for experiment {self.subconfig['experiment_id']}")
+                self.logger.warn(f"   Cannot write results: No {self.subconfig['type']} experiment (tabular or plotting) results found for experiment {self.subconfig['experiment_id']}")
 
     def reset(self,metadata:bool=False) -> None:
-        self.logger.info(f'Resetting experimental results to release memory.')
+        self.logger.info(f'   Resetting experimental results to release memory.')
         
         # Get shapes 
         theta_shape = deepcopy(np.shape(self.thetas[-1])[0] if hasattr(self,'thetas') and self.thetas is not None else (2))
@@ -196,7 +191,7 @@ class Experiment(object):
         
         if metadata:
             safe_delete(self.subconfig)
-            self.subconfig = Namespace(**{"settings":{}})
+            self.subconfig = Config(settings={})
 
         # Run garbage collector
         gc.collect()
@@ -283,13 +278,13 @@ class Experiment(object):
                         None
                     )
                 except:
-                    self.logger.warning('Unconstrained margins could not be sampled.')
+                    self.logger.warning('   Unconstrained margins could not be sampled.')
                 
                 try:
                     parameter_inits['table'] = deep_call(self,'.od_mcmc.initialise_table()',None)
                 except:
                     parameter_inits['table'] = None
-                    self.logger.warning('Table could not be initialised.')
+                    self.logger.warning('   Table could not be initialised.')
             
             if hasattr(self,'sim_mcmc'):
                 # Parameter values
@@ -307,7 +302,7 @@ class Experiment(object):
             parameter_acceptances = dict(zip(list(parameter_inits.keys()),[0]*len(parameter_inits.keys())))
         
         if parameter_inits['batch_counter'] == (len(batch_sizes) - 1):
-            self.logger.warning('Experiment cannot be resumed.')
+            self.logger.warning('   Experiment cannot be resumed.')
 
         # Update metadata initially
         self.update_metadata(
@@ -456,9 +451,12 @@ class Experiment(object):
 
 class RSquaredAnalysis(Experiment):
 
-    def __init__(self,ct:ContingencyTable, sim:SpatialInteraction, subconfig:Dict):
+    def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
-        super().__init__(ct,sim,subconfig)
+        super().__init__(subconfig,disable_logger)
+        # Build spatial interaction model
+        self.sim = instantiate_sim(self.config)
+
         self.grid_size = subconfig['grid_size']
         self.amin,self.amax = subconfig['a_range']
         self.bmin,self.bmax = subconfig['b_range']
@@ -548,9 +546,12 @@ class RSquaredAnalysis(Experiment):
 
 class RSquaredAnalysisGridSearch(Experiment):
 
-    def __init__(self,ct:ContingencyTable, sim:SpatialInteraction, subconfig:Dict):
+    def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
-        super().__init__(ct,sim,subconfig)
+        super().__init__(subconfig,disable_logger)
+        # Build spatial interaction model
+        self.sim = instantiate_sim(self.config)
+        
         self.grid_size = subconfig['grid_size']
         self.amin,self.amax = subconfig['a_range']
         self.bmin,self.bmax = subconfig['b_range']
@@ -692,9 +693,12 @@ class RSquaredAnalysisGridSearch(Experiment):
 
 class LogTargetAnalysis(Experiment):
 
-    def __init__(self,ct:ContingencyTable, sim:SpatialInteraction, subconfig:Dict):
+    def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
-        super().__init__(ct,sim,subconfig)
+        super().__init__(subconfig,disable_logger)
+        # Build spatial interaction model
+        sim = instantiate_sim(self.config)
+
         self.grid_size = subconfig['grid_size']
         self.amin,self.amax = subconfig['a_range']
         self.bmin,self.bmax = subconfig['b_range']
@@ -775,9 +779,13 @@ class LogTargetAnalysis(Experiment):
         
 class LogTargetAnalysisGridSearch(Experiment):
 
-    def __init__(self,ct:ContingencyTable, sim:SpatialInteraction, subconfig:Dict):
+    def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
-        super().__init__(ct,sim,subconfig)
+        super().__init__(subconfig,disable_logger)
+        
+        # Build spatial interaction model
+        sim = instantiate_sim(self.config)
+
         self.grid_size = subconfig['grid_size']
         self.amin,self.amax = subconfig['a_range']
         self.bmin,self.bmax = subconfig['b_range']
@@ -907,15 +915,17 @@ class LogTargetAnalysisGridSearch(Experiment):
 
 
 class SIMLatentMCMC(Experiment):
-    def __init__(self, ct:ContingencyTable, sim:SpatialInteraction, subconfig:Dict, disable_logger:bool=False):
+    def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
-        super().__init__(ct,sim,subconfig,disable_logger)
+        super().__init__(subconfig,disable_logger)
+
+        # Build spatial interaction model
+        sim = instantiate_sim(self.config)
 
         # Spatial interaction model MCMC
         self.sim_mcmc = instantiate_spatial_interaction_mcmc(sim,disable_logger)
 
-        # Delete duplicate of contingency table and spatial interaction model
-        safe_delete(self.ct)
+        # Delete duplicate of spatial interaction model
         safe_delete(self.sim)
         
         # Run garbage collector
@@ -925,14 +935,13 @@ class SIMLatentMCMC(Experiment):
         
     def run(self) -> None:
 
-        self.logger.info(f'Running MCMC inference of {self.sim_mcmc.sim.noise_regime} noise SpatialInteraction.')
+        self.logger.info(f'   Running MCMC inference of {self.sim_mcmc.sim.noise_regime} noise SpatialInteraction.')
 
         # Time run
         self.start_time = time.time()
 
         # Fix random seed
-        np.random.seed(self.seed)
-        numba_set_seed(self.seed)
+        set_seed(self.seed)
 
         # Initialise parameters
         parameter_inits,parameter_acceptances = self.initialise()
@@ -1091,10 +1100,9 @@ class SIMLatentMCMC(Experiment):
                 batch_counter += 1
         
         # Unfix random seed
-        np.random.seed(None)
-        numba_set_seed(None)
+        set_seed(None)
 
-        self.logger.info(f'Experimental results have been compiled.')
+        self.logger.info(f'   Experimental results have been compiled.')
 
         # Append to result array
         self.results.append({"samples":{"log_destination_attraction":self.log_destination_attractions,
@@ -1104,12 +1112,22 @@ class SIMLatentMCMC(Experiment):
 
 class JointTableSIMLatentMCMC(Experiment):
 
-    def __init__(self, ct:ContingencyTable, sim:SpatialInteraction, subconfig:Dict, disable_logger:bool=False):
+    def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
-        super().__init__(ct,sim,subconfig,disable_logger)
+        super().__init__(subconfig,disable_logger)
+        
+        # Setup table
+        ct = instantiate_ct(table=None,config=self.config)
+        # Update table distribution
+        self.config.settings['inputs']['contingency_table']['distribution_name'] = ct.distribution_name
+        # Build spatial interaction model
+        sim = instantiate_sim(self.config)
 
         # Spatial interaction model MCMC
-        self.sim_mcmc = instantiate_spatial_interaction_mcmc(sim,disable_logger)
+        self.sim_mcmc = instantiate_spatial_interaction_mcmc(
+            sim,
+            disable_logger
+        )
         # Contingency Table mcmc
         self.od_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct,
@@ -1131,14 +1149,13 @@ class JointTableSIMLatentMCMC(Experiment):
 
     def run(self) -> None:
 
-        self.logger.info(f'Running joint MCMC inference of contingency tables and {self.sim_mcmc.sim.noise_regime} noise SpatialInteraction.')
+        self.logger.info(f'   Running joint MCMC inference of contingency tables and {self.sim_mcmc.sim.noise_regime} noise SpatialInteraction.')
 
         # Time run
         self.start_time = time.time()
 
         # Fix random seed
-        np.random.seed(self.seed)
-        numba_set_seed(self.seed)
+        set_seed(self.seed)
 
         # Initialise parameters
         parameter_inits,parameter_acceptances = self.initialise()
@@ -1345,10 +1362,9 @@ class JointTableSIMLatentMCMC(Experiment):
                 batch_counter += 1
 
         # Unfix random seed
-        np.random.seed(None)
-        numba_set_seed(None)
+        set_seed(None)
 
-        self.logger.info(f'Experimental results have been compiled.')
+        self.logger.info(f'   Experimental results have been compiled.')
 
         # Append to result array
         self.results.append({"samples":{"log_destination_attraction":self.log_destination_attractions,
@@ -1357,16 +1373,23 @@ class JointTableSIMLatentMCMC(Experiment):
                                         "table":self.tables}})
 
 class TableMCMC(Experiment):
-    def __init__(self, ct:ContingencyTable, sim:SpatialInteraction, subconfig:Dict, disable_logger:bool=False):
+    def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
-        super().__init__(ct,sim,subconfig,disable_logger)
+        super().__init__(subconfig,disable_logger)
+
+        # Setup table
+        ct = instantiate_ct(table=None,config=self.config)
+        # Update table distribution
+        self.config.settings['inputs']['contingency_table']['distribution_name'] = ct.distribution_name
+        # Build spatial interaction model
+        sim = instantiate_sim(self.config)
         
         # Update config with table dimension
         # self.subconfig['table_dim'] = 'x'.join(map(str,ct.dims))
         # self.subconfig['table_total'] = int(ct.margins[tuplize(range(ct.ndims()))])
         # Initialise intensities at ground truths
         if (ct is not None) and (ct.table is not None):
-            self.logger.info('Using table as ground truth intensity')
+            self.logger.info('   Using table as ground truth intensity')
             # Use true table to construct intensities
             with np.errstate(invalid='ignore',divide='ignore'):
                 self.true_log_intensities = np.log(
@@ -1375,7 +1398,7 @@ class TableMCMC(Experiment):
                                             )
             
         elif (sim is not None) and (sim.ground_truth_known):
-            self.logger.info('Using SIM model as ground truth intensity')
+            self.logger.info('   Using SIM model as ground truth intensity')
             # Spatial interaction model MCMC
             # Compute intensities
             self.true_log_intensities = sim.log_intensity(
@@ -1451,8 +1474,7 @@ class TableMCMC(Experiment):
         self.start_time = time.time()
 
         # Fix random seed
-        np.random.seed(self.seed)
-        numba_set_seed(self.seed)
+        set_seed(self.seed)
 
         # Initialise parameters
         parameter_inits = self.initialise()
@@ -1517,30 +1539,36 @@ class TableMCMC(Experiment):
                 batch_counter += 1
 
         # Unfix random seed
-        np.random.seed(None)
-        numba_set_seed(None)
+        set_seed(None)
 
-        self.logger.info(f'Experimental results have been compiled.')
+        self.logger.info(f'   Experimental results have been compiled.')
 
         # Append to result array
         self.results.append({"samples":{"table":self.tables}})
 
 
 class TableSummariesMCMCConvergence(Experiment):
-    def __init__(self, ct:ContingencyTable, sim:SpatialInteraction, subconfig:Dict, disable_logger:bool=False):
+    def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
-        super().__init__(ct,sim,subconfig,disable_logger)
+        super().__init__(subconfig,disable_logger)
+
+        # Setup table
+        ct = instantiate_ct(table=None,config=self.config)
+        # Update table distribution
+        self.config.settings['inputs']['contingency_table']['distribution_name'] = ct.distribution_name
+        # Build spatial interaction model
+        sim = instantiate_sim(self.config)
         
         # Cell constraints cannot be handled here due to the different margins generated
         try:
             assert len(self.ct.config.settings['inputs']['contingency_table']['constraints'].get('cells',[])) == 0
         except:
             self.logger.error(self.ct.config.settings['inputs']['contingency_table']['constraints'].get('cells',[]))
-            self.logger.error('Cell constraints found in config.')
+            self.logger.error('   Cell constraints found in config.')
             raise Exception('TableSummariesMCMCConvergence cannot handle cell constraints due to the different margins generated')
         # Initialise intensities at ground truths
         if (ct is not None) and (ct.table is not None):
-            self.logger.info('Using table as ground truth intensity')
+            self.logger.info('   Using table as ground truth intensity')
             # Use true table to construct intensities
             # with np.errstate(invalid='ignore',divide='ignore'):
             self.true_log_intensities = np.log(
@@ -1549,7 +1577,7 @@ class TableSummariesMCMCConvergence(Experiment):
                                         )
             # np.log(ct.table,out=np.ones(np.shape(ct.table),dtype='float32')*(-1e10),where=(ct.table!=0),dtype='float32')
         elif (sim is not None) and (sim.ground_truth_known):
-            self.logger.info('Using SIM model as ground truth intensity')
+            self.logger.info('   Using SIM model as ground truth intensity')
             # Spatial interaction model MCMC
             # Compute intensities
             self.true_log_intensities = sim.log_intensity(
@@ -1624,8 +1652,7 @@ class TableSummariesMCMCConvergence(Experiment):
         self.start_time = time.time()
 
         # Fix random seed
-        np.random.seed(self.seed)
-        numba_set_seed(self.seed)
+        set_seed(self.seed)
 
         # Initialise table samples
         self.tables = self.initialise()
@@ -1711,10 +1738,9 @@ class TableSummariesMCMCConvergence(Experiment):
         )
 
         # Unfix random seed
-        np.random.seed(None)
-        numba_set_seed(None)
+        set_seed(None)
 
-        self.logger.info(f'Experimental results have been compiled.')
+        self.logger.info(f'   Experimental results have been compiled.')
 
         self.results = [{
             "samples":{
@@ -1723,3 +1749,96 @@ class TableSummariesMCMCConvergence(Experiment):
         }]
 
         return self.results[-1]
+
+class SIM_NN(Experiment):
+    def __init__(self, subconfig:Config, disable_logger:bool=False):
+        
+        # Initalise superclass
+        super().__init__(subconfig,disable_logger)
+
+        # Fix random seed
+        rng = set_seed(self.seed)
+        # Store 
+        subconfig.settings['inputs']['rng'] = self.seed
+
+        # Prepare inputs
+        self.inputs = Inputs(
+            subconfig,
+            model = 'neural_net',
+            synthetic_data = False
+        )
+
+        # Set up the neural net
+        self.logger.info("   Initializing the neural net ...")
+        neural_network = NeuralNet(
+            input_size=self.inputs.destination_attraction_ts.shape[1],
+            output_size=len(subconfig['neural_net']['to_learn']),
+            **subconfig['neural_net']['hyperparameters'],
+        ).to(self.device)
+
+        # Pass inputs to device
+        self.inputs.pass_to_device()
+
+        # Instantiate Spatial Interaction Model
+        sim = instantiate_sim(
+            config=subconfig,
+            origin_demand=self.inputs.origin_demand,
+            log_destination_attraction=np.log(self.inputs.destination_attraction_ts[:,-1].flatten()),
+            cost_matrix=self.inputs.cost_matrix,
+            true_parameters=subconfig['spatial_interaction_model']['parameters'],
+            device = self.device
+        )
+
+        # Build Harris Wilson model
+        harris_wilson_model = HarrisWilson(
+            sim=sim,
+            true_parameters = self.inputs.true_parameters,
+            dt = subconfig['harris_wilson_model'].get('dt',0.001),
+            device = self.device
+        )
+
+        # Instantiate model
+        self.harris_wilson_nn = HarrisWilson_NN(
+            rng=rng,
+            # h5group=h5group,
+            neural_net=neural_network,
+            loss_function=subconfig['neural_net'].pop('loss_function'),
+            physics_model=harris_wilson_model,
+            to_learn=(subconfig['spatial_interaction_model']['sim_to_learn']+subconfig['harris_wilson_model']['hw_to_learn']),
+            write_every=subconfig['outputs']['write_every'],
+            write_start=subconfig['outputs']['write_start']
+        )
+
+        self.logger.info(f"   Initialized Harris Wilson Neural Net.")
+        
+        # Run garbage collector
+        gc.collect()
+
+        self.sample_names = subconfig['neural_net']['to_learn']
+        
+    def run(self) -> None:
+
+        self.logger.info(f'   Running Neural Network training of Harris Wilson model.')
+
+        # Time run
+        self.start_time = time.time()
+        
+        # Train the neural net
+        num_epochs = self.subconfig['neural_net']['N']
+
+        for e in range(num_epochs):
+
+
+            self.harris_wilson_nn.epoch(
+                training_data=self.inputs.destination_attraction_ts, 
+                **self.subconfig['neural_net']
+            )
+
+            self.logger.progress(f"   Completed epoch {e+1} / {num_epochs}.")
+
+        self.logger.info("   Simulation run finished.")
+        # h5file.close()
+        
+        # Append to result array
+        # self.results.append({"samples":{"destination_attraction_ts":self.log_destination_attractions,
+                                        # "theta":self.thetas}})

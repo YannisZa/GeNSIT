@@ -15,9 +15,9 @@ from functools import partial, update_wrapper
 from joblib import Parallel, delayed
 from shapely.geometry import Point,LineString, Polygon, MultiPoint
 
-from ticodm.utils import *
-from ticodm.math_utils import *
-from ticodm.global_variables import SIM_TYPE_CONSTRAINTS
+from multiresticodm.utils import *
+from multiresticodm.math_utils import *
+from multiresticodm.global_variables import SIM_TYPE_CONSTRAINTS
 
 def mean_euclidean_distance_from_centroid(multipoly1,multipoly2):
     distances = []
@@ -261,7 +261,7 @@ def save_cost_matrices(
     norm:str='',
     mode:str='',
     correction_method:str='',
-    ticodm_format:bool=None,
+    multiresticodm_format:bool=None,
     dataset:str='',
     geometry_name:str=''
 ):
@@ -275,16 +275,16 @@ def save_cost_matrices(
     # If there is no correction applied just store normalised matrix
     if correction_method == '':
         for index,cm in enumerate(cost_matrices):
-            if ticodm_format is None or ticodm_format:
+            if multiresticodm_format is None or multiresticodm_format:
                 np.savetxt(os.path.join(main_directory,f'{mode}{cost_matrix_names[index]}_cost_matrix{norm}.txt'),cm.values)
-            if ticodm_format is None or not ticodm_format:
+            if multiresticodm_format is None or not multiresticodm_format:
                 np.exp(-cm).reset_index().to_csv(os.path.join(neural_net_directory,f'{geometry_name}_{mode}{cost_matrix_names[index]}_exp_cost_matrix{norm}.csv'),index=False)
     # Otherwise store edge-corrected normalised matrix
     else:
         for index,cm in enumerate(cost_matrices):
-            if ticodm_format is None or ticodm_format:
+            if multiresticodm_format is None or multiresticodm_format:
                 np.savetxt(os.path.join(main_directory,f'{mode}{cost_matrix_names[index]}_{correction_method}_edge_corrected_cost_matrix{norm}.txt'),cm.values)
-            if ticodm_format is None or not ticodm_format:
+            if multiresticodm_format is None or not multiresticodm_format:
                 np.exp(-cm).reset_index().to_csv(os.path.join(neural_net_directory,f'{geometry_name}_{mode}{cost_matrix_names[index]}_{correction_method}_edge_corrected_exp_cost_matrix{norm}.csv'),index=False)
         
         
@@ -477,7 +477,7 @@ def prepare_cost_matrices(
                 norm = norm_type,
                 mode = transport_mode,
                 correction_method = shorten_filename(correction_methods),
-                ticodm_format = True,
+                multiresticodm_format = True,
                 dataset = data,
                 geometry_name = geo_name
             )

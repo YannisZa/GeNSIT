@@ -10,10 +10,10 @@ from itertools import product
 from tabulate import tabulate
 from typing import List, Union, Callable
 
-from ticodm.config import Config
-from ticodm.global_variables import *
-from ticodm.utils import str_in_list, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth
-from ticodm.math_utils import logsumexp, powerset
+from multiresticodm.config import Config
+from multiresticodm.global_variables import *
+from multiresticodm.utils import str_in_list, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth
+from multiresticodm.math_utils import logsumexp, powerset
 
 # -> Union[ContingencyTable,None]:
 def instantiate_ct(table, config: Config, disable_logger: bool = False, **kwargs):

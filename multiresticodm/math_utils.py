@@ -1,3 +1,4 @@
+import torch 
 import numpy as np
 
 from tqdm import tqdm
@@ -6,11 +7,11 @@ from itertools import product
 from scipy.optimize import minimize
 from itertools import chain, combinations
 
-from numba_progress import ProgressBar
+# from numba_progress import ProgressBar
 from numba import njit, vectorize, float32, int32, int64, int8, prange, guvectorize
 
-from ticodm.utils import flatten
-from ticodm.global_variables import MATH_UTILS_CACHED
+from multiresticodm.utils import flatten
+from multiresticodm.global_variables import MATH_UTILS_CACHED
 
 
 @njit(cache=MATH_UTILS_CACHED)
@@ -30,6 +31,7 @@ def logsumexp(xx:np.ndarray) -> float:
 @njit(cache=MATH_UTILS_CACHED)
 def positive_sigmoid(x,scale:float=1.0):
     return 2/(1+np.exp(-x/scale)) - 1
+
 
 def powerset(iterable):
     # Flatten list

@@ -10,11 +10,11 @@ import click
 import logging
 import psutil
 
-from ticodm.config import Config
-from ticodm.global_variables import TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS
+from multiresticodm.config import Config
+from multiresticodm.global_variables import TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS
 
 
-def update_numpy_threads(n_threads):
+def set_numpy_threads(n_threads):
     os.environ['OMP_NUM_THREADS'] = str(n_threads)
     os.environ['MKL_NUM_THREADS'] = str(n_threads)
     os.environ['NUMEXPR_NUM_THREADS'] = str(n_threads)
@@ -110,7 +110,7 @@ class OptionEatAll(click.Option):
         return retval
 
 
-@click.group('ticodm')
+@click.group('multiresticodm')
 def cli():
     """
     Command line tool for running data augmentation on spatial Interaction models.
@@ -131,73 +131,82 @@ _common_options = [
     click.option('--table','-tab', type=click.STRING,default=None, help = 'Overwrites input table filename in config')
 ]
 
+_common_run_options = [
+    click.argument('config_path', type=click.Path(exists=True), required=True),
+    click.option('--load_experiment','-le', multiple=False, type=click.Path(exists=True), default=None, 
+                   help="Defines path to existing experiment output in order to load it and resume experimentation."),
+    click.option('--run_experiments','-re', type=click.STRING, multiple=True,
+               default = [], help = 'Decides which experiments to run'),
+    click.option('--experiment_title','-et', type=click.STRING,
+               default = '', help = 'Title appended to output filename of experiment'),
+    click.option('--dataset','-d', type=click.Path(exists=True),
+               default=None, help = 'Overwrites inputs dataset in config'),
+    click.option('--sim_type','-sim', type=click.Choice(['TotalConstrained','ProductionConstrained']),
+               default=None, help = 'Overwrites spatial interaction model of choice (intensity function)'),
+    click.option('--origin_demand','-od', type=click.STRING,
+               default=None, help = 'Overwrites input origin demand filename in config'),
+    click.option('--cost_matrix','-cm', type=click.STRING,
+           default=None, help = 'Overwrites input cost matrix filename in config'),
+    click.option('--table0','-tab0', type=click.Choice(TABLE_SOLVERS), default = None,
+           help = 'Overwrites table initialisation method name in MCMC.'),
+    click.option('--margins','-ma', type=click.STRING, cls=OptionEatAll,
+           default=None, help = 'Overwrites input margin filenames in config'),
+    click.option('--margin0','-m0', type=click.Choice(MARGINAL_SOLVERS), default = None,
+            help = 'Overwrites margin initialisation method name in MCMC.'),
+    click.option('--sparse_margins','-sm', is_flag=True, default = False,
+           help = 'Flag for allowing sparsity in margins of contingency table'),
+    click.option('--store_progress','-sp', default = 1.0, show_default=True, 
+           type=click.FloatRange(min=0.01,max=1.0),
+           help = 'Sets percentage of total samples that will be exported as a batch'),
+    click.option('--axes','-ax', cls=PythonLiteralOption, multiple=True, default = [],
+               help = '''Overwrites constrained margin axes (axes over which table is summed) in config.\
+               Use the following syntax: -ax '[ENTER AXES SEPARATED BY COMMA HERE]' e.g -ax '[0]' -ax '[0, 1]'
+               The unconstrained case is just -ax '[]' '''),
+    click.option('--cells','-c', type=click.STRING, default = None,
+               help = 'Overwrites constrained cells filename in config. '),
+    click.option('--seed','-seed', type=click.IntRange(min=0), show_default=True,
+               default=None, help = 'Overwrites random number generation seed.'),
+    click.option('--dims','-dims', type=click.IntRange(min=1), cls=OptionEatAll,
+                default=None, help = 'Overwrites input table column size'),
+    click.option('--delta','-delta', type=click.FloatRange(min=0), default = None,
+            help = 'Overwrites delta parameter in Spatial Interaction Model.'),
+    click.option('--kappa','-kappa', type=click.FloatRange(min=0), default = None,
+            help = 'Overwrites kappa parameter in Spatial Interaction Model.')
+
+]
+
 def common_options(func):
     for option in reversed(_common_options):
         func = option(func)
     return func
 
-@cli.command('run')
+def common_run_options(func):
+    for option in reversed(_common_run_options):
+        func = option(func)
+    return func
+
+@cli.command('run-mcmc')
 # @click.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.argument('config_path', type=click.Path(exists=True), required=True)
-@click.option('--load_experiment','-le', multiple=False, type=click.Path(exists=True), default=None, 
-                help="Defines path to existing experiment output in order to load it and resume experimentation.")
-@click.option('--run_experiments','-re', type=click.STRING, multiple=True,
-            default = [], help = 'Decides which experiments to run')
-@click.option('--experiment_title','-et', type=click.STRING,
-            default = '', help = 'Title appended to output filename of experiment')
-@click.option('--dataset','-d', type=click.Path(exists=True),
-            default=None, help = 'Overwrites inputs dataset in config')
-@click.option('--sim_type','-sim', type=click.Choice(['TotalConstrained','ProductionConstrained']),
-            default=None, help = 'Overwrites spatial interaction model of choice (intensity function)')
-@click.option('--origin_demand','-od', type=click.STRING,
-            default=None, help = 'Overwrites input origin demand filename in config')
 @click.option('--log_destination_attraction','-lda', type=click.STRING,
             default=None, help = 'Overwrites input log destination attraction filename in config')
-@click.option('--cost_matrix','-cm', type=click.STRING,
-            default=None, help = 'Overwrites input cost matrix filename in config')
-@click.option('--margins','-ma', type=click.STRING, cls=OptionEatAll,
-            default=None, help = 'Overwrites input margin filenames in config')
-@click.option('--axes','-ax', cls=PythonLiteralOption, multiple=True, default = [],
-             help = '''Overwrites constrained margin axes (axes over which table is summed) in config.\
-             Use the following syntax: -ax '[ENTER AXES SEPARATED BY COMMA HERE]' e.g -ax '[0]' -ax '[0, 1]'
-             The unconstrained case is just -ax '[]' ''')
-@click.option('--cells','-c', type=click.STRING, default = None,
-             help = 'Overwrites constrained cells filename in config. ')
-@click.option('--seed','-seed', type=click.IntRange(min=0), show_default=True,
-            default=None, help = 'Overwrites random number generation seed.')
-@click.option('--dims','-dims', type=click.IntRange(min=1), cls=OptionEatAll,
-            default=None, help = 'Overwrites input table column size')
 @click.option('--proposal','-p', type=click.Choice(['direct_sampling','degree_higher','degree_one']),
             default = None, help = 'Overwrites contingency table MCMC proposal')
-@click.option('--sparse_margins','-sm', is_flag=True, default = False,
-            help = 'Flag for allowing sparsity in margins of contingency table')
-@click.option('--store_progress','-sp', default = 1.0, show_default=True, 
-            type=click.FloatRange(min=0.01,max=1.0),
-            help = 'Sets percentage of total samples that will be exported as a batch')
 @click.option('--grid_size','-gs', type=click.IntRange(min=1),
             default = None, help = 'Overwrites size of square grid for R^2 and Log Target analyses.')
 @click.option('--theta_steps','-pn', type=click.IntRange(min=1),
             default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joInt scheme.')
 @click.option('--log_destination_attraction_steps','-dan', type=click.IntRange(min=1),
             default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joInt scheme.')
-@click.option('--table_steps','-tn', type=click.IntRange(min=1),
-            default = None, help = 'Overwrites number of Spatial Interaction Model MCMC steps in joInt scheme.')
 @click.option('--k','-k', type=click.IntRange(min=1), default = None,
             help = 'Overwrites size of ensemble of datasets for MCMC convergence diagnostic')
-@click.option('--table0','-tab0', type=click.Choice(TABLE_SOLVERS), default = None,
-            help = 'Overwrites table initialisation method name in MCMC.')
-@click.option('--marginal0','-m0', type=click.Choice(MARGINAL_SOLVERS), default = None,
-            help = 'Overwrites margin initialisation method name in MCMC.')
+@click.option('--table_steps','-tn', type=click.IntRange(min=1),
+            default = None, help = 'Overwrites number of Spatial Interaction Model MCMC steps in joInt scheme.')
 @click.option('--alpha0','-alpha0', type=click.FloatRange(min=0), default = None,
             help = 'Overwrites initialisation of alpha parameter in MCMC.')
 @click.option('--beta0','-beta0', type=click.FloatRange(min=0), default = None,
             help = 'Overwrites initialisation of beta parameter in MCMC.')
 @click.option('--beta_max','-bm', type=click.FloatRange(min=0), default = None,
             help = 'Overwrites maximum beta in SIM parameters.')
-@click.option('--delta','-delta', type=click.FloatRange(min=0), default = None,
-            help = 'Overwrites delta parameter in production constrained Spatial Interaction Model differential equation.')
-@click.option('--kappa','-kappa', type=click.FloatRange(min=0), default = None,
-            help = 'Overwrites kappa parameter in production constrained Spatial Interaction Model differential equation.')
 @click.option('--covariance','-cov', type=click.STRING, default = None, 
             help = 'Overwrites covariance matrix of parameter Gaussian Randow walk proposal')
 @click.option('--step_size','-ss', type=click.FloatRange(min=0), default = None,
@@ -215,36 +224,17 @@ def common_options(func):
 @click.option('--n_bridging_distributions','-nb', type=click.IntRange(min=1), default = None,
             help = 'Overwrites number of temperatures in tempered distribution in AIS (normalising constant sampling)')
 @common_options
-def run(config_path,
-            load_experiment,
-            dataset,
-            sim_type,
-            origin_demand,
+@common_run_options
+def run_mcmc(
             log_destination_attraction,
-            cost_matrix,
-            table,
-            margins,
-            axes,
-            cells,
-            run_experiments,
-            experiment_title,
-            seed,
-            dims,
             proposal,
-            store_progress,
             grid_size,
-            sparse_margins,
             theta_steps,
             log_destination_attraction_steps,
             table_steps,
-            k,
-            table0,
-            margin0,
             alpha0,
             beta0,
             beta_max,
-            delta,
-            kappa,
             covariance,
             step_size,
             leapfrog_steps,
@@ -253,6 +243,27 @@ def run(config_path,
             ais_leapfrog_step_size,
             ais_samples,
             n_bridging_distributions,
+            config_path,
+            load_experiment,
+            dataset,
+            sim_type,
+            origin_demand,
+            cost_matrix,
+            run_experiments,
+            experiment_title,
+            table,
+            table0,
+            margins,
+            margin0,
+            axes,
+            store_progress,
+            cells,
+            sparse_margins,
+            k,
+            seed,
+            dims,
+            delta,
+            kappa,
             logging_mode,
             n_workers,
             n_threads,
@@ -266,22 +277,18 @@ def run(config_path,
 
     # Gather all arguments in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
-
     # Remove all nulls
     settings = {k: v for k, v in settings.items() if v}
     # Convert strings to ints
     settings['n_threads'] = [int(thread) for thread in settings.get('n_threads',[1,1])]
     settings['n_workers'] = settings.get('n_workers',1)
     # Update number of workers
-    update_numpy_threads(settings['n_threads'][0])
+    set_numpy_threads(settings['n_threads'][0])
 
     # Import all modules
     from numpy import asarray
-    from ticodm.experiments import ExperimentHandler
-    from ticodm.utils import str_in_list,deep_updates,update_numba_threads
-
-    # Set number of cores used (numba package)
-    update_numba_threads(settings['n_threads'])
+    from multiresticodm.experiments import ExperimentHandler
+    from multiresticodm.utils import str_in_list,deep_updates,set_numba_torch_threads,update_device
 
     # Convert covariance to 2x2 array
     if str_in_list('covariance',settings.keys()):
@@ -294,6 +301,14 @@ def run(config_path,
 
     # Update settings with overwritten values
     deep_updates(config.settings,settings,overwrite=True)
+
+    # Set device to run code on
+    config.settings['inputs']['device'] = update_device(
+        config.settings['inputs'].get('device','cpu')
+    )
+
+    # Set number of cores used (numba package)
+    set_numba_torch_threads(settings['n_threads'])
 
     # Update root
     config.set_paths_root()
@@ -326,7 +341,106 @@ def run(config_path,
     # Run experiments
     eh.run_and_write_experiments_sequentially()
 
-    logger.info('Done')
+    logger.success('Done')
+
+@cli.command('run-nn')
+@click.option('--destination_attraction_ts','-dats', type=click.STRING,
+            default=None, help = 'Overwrites input destination attraction time series filename in config')
+@common_options
+@common_run_options
+def run_nn(
+    destination_attraction_ts,
+    config_path,
+    load_experiment,
+    dataset,
+    sim_type,
+    origin_demand,
+    cost_matrix,
+    run_experiments,
+    experiment_title,
+    table,
+    table0,
+    margins,
+    margin0,
+    axes,
+    store_progress,
+    cells,
+    sparse_margins,
+    seed,
+    dims,
+    delta,
+    kappa,
+    logging_mode,
+    n_workers,
+    n_threads,
+    norm,
+    n
+):
+
+    # Gather all arguments in dictionary
+    settings = {k:v for k,v in locals().items() if k != 'ctx'}
+    # Remove all nulls
+    settings = {k: v for k, v in settings.items() if v}
+    # Convert strings to ints
+    settings['n_threads'] = [int(thread) for thread in settings.get('n_threads',[1,1])]
+    settings['n_workers'] = settings.get('n_workers',1)
+    # Update number of workers
+    set_numpy_threads(settings['n_threads'][0])
+
+    # Import all modules
+    from numpy import asarray
+    from multiresticodm.experiments import ExperimentHandler
+    from multiresticodm.utils import str_in_list,deep_updates,set_numba_torch_threads,update_device
+
+    # Capitalise all single-letter arguments
+    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
+
+    # Read config
+    config = Config(config_path)
+
+    # Update settings with overwritten values
+    deep_updates(config.settings,settings,overwrite=True)
+
+    # Set device to run code on
+    config.settings['inputs']['device'] = update_device(
+        config.settings['inputs'].get('device','cpu')
+    )
+
+    # Set number of cores used (numba package)
+    config.settings['inputs']['rng'] = set_numba_torch_threads(settings['n_threads'])
+
+    # Update root
+    config.set_paths_root()
+    # Keep experiment ids argument
+    if len(run_experiments) > 0:
+        config.settings['experiments']["run_experiments"] = list(run_experiments)
+    else:
+        config.settings['experiments']["run_experiments"] = list(config.settings['experiments'].keys())
+
+    logging.basicConfig(
+        level=logging.getLevelName(settings.get('logging_mode','info').upper()),
+        # format='%(asctime)s %(name)-12s %(levelname)-3s %(message)s',
+        # datefmt='%m-%d %H:%M:%S'
+        format='%(asctime)s.%(msecs)03d %(levelname)-3s %(message)s',
+        datefmt='%M:%S'
+    )
+    logger = logging.getLogger(__name__)
+
+    # Create output folder if it does not exist
+    if not os.path.exists(config.settings['outputs']['output_path']):
+        logger.info(f"Creating new output directory {config.settings['outputs']['output_path']}")
+        os.makedirs(config.settings['outputs']['output_path'])
+
+    # Update settings
+    # config.settings = config.update_recursively(config.settings,{"inputs":{"generate":{"I":2,"J":2}}},overwrite=True)
+
+    # Intialise experiment handler
+    eh = ExperimentHandler(config)
+
+    # Run experiments
+    eh.run_and_write_experiments_sequentially()
+
+    logger.success('Done')
 
 
 _output_options = [
@@ -531,7 +645,7 @@ def plot(
         colorbar
     ):
     """
-    Postprocess and plot ticodm experimental outputs.
+    Postprocess and plot multiresticodm experimental outputs.
     :param experiment_outputs_path: Path to experimental outputs directory
     """
 
@@ -552,14 +666,15 @@ def plot(
     settings = {**settings, **undefined_settings}
 
     # Update number of workers
-    update_numpy_threads(settings['n_threads'][0])
+    set_numpy_threads(settings['n_threads'][0])
     
     # Import modules
-    from ticodm.plot import Plot
-    from ticodm.utils import update_numba_threads
+    from multiresticodm.plot import Plot
+    from multiresticodm.utils import set_numba_torch_threads
 
     # Set number of cores used (numba package)
-    update_numba_threads(settings['n_threads'])
+    # and get torch random number generator
+    set_numba_torch_threads(settings['n_threads'])
 
     logging.basicConfig(
         level=logging.getLevelName(settings.get('logging_mode','info').upper()),
@@ -630,7 +745,7 @@ def summarise(
     ):
     """
     
-    Compute metrics for ticodm experimental outputs in tabular format.
+    Compute metrics for multiresticodm experimental outputs in tabular format.
     :param experiment_outputs_path: Path to experimental outputs directory
     """
     # Gather all options in dictionary
@@ -650,14 +765,14 @@ def summarise(
     settings = {**settings, **undefined_settings}
     
     # Update number of workers
-    update_numpy_threads(settings['n_threads'][0])
+    set_numpy_threads(settings['n_threads'][0])
 
     # Import modules
-    from ticodm.outputs import OutputSummary
-    from ticodm.utils import update_numba_threads
+    from multiresticodm.outputs import OutputSummary
+    from multiresticodm.utils import set_numba_torch_threads
 
     # Set number of cores used (numba package)
-    update_numba_threads(settings['n_threads'])
+    set_numba_torch_threads(settings['n_threads'])
 
     logging.basicConfig(
         level=logging.getLevelName(settings.get('logging_mode','info').upper()),

@@ -23,14 +23,14 @@ from argparse import Namespace
 from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
 from statsmodels.graphics.tsaplots import plot_acf
 
-from ticodm.utils import *
-from ticodm.global_variables import *
-from ticodm.colormaps import *
-from ticodm.outputs import Outputs,OutputSummary
-from ticodm.contingency_table import instantiate_ct
-from ticodm.spatial_interaction_model import instantiate_sim
-from ticodm.probability_utils import log_odds_ratio_wrt_intensity
-from ticodm.math_utils import running_average,apply_norm,positive_sigmoid,logsumexp,map_distance_name_to_function,coverage_probability,calculate_min_interval
+from multiresticodm.utils import *
+from multiresticodm.global_variables import *
+from multiresticodm.colormaps import *
+from multiresticodm.outputs import Outputs,OutputSummary
+from multiresticodm.contingency_table import instantiate_ct
+from multiresticodm.spatial_interaction_model import instantiate_sim
+from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
+from multiresticodm.math_utils import running_average,apply_norm,positive_sigmoid,logsumexp,map_distance_name_to_function,coverage_probability,calculate_min_interval
 
 latex_preamble = r'''
 \usepackage{amsmath}
@@ -1430,7 +1430,7 @@ class Plot(object):
 
             # Get filename
             filename = f"table_{prediction_data[experiment_id]['subconfig']['table_dim']}_" + \
-                    f"gamma_{prediction_data[experiment_id]['subconfig']['inputs']['spatial_interaction_model']['gamma']}" + \
+                    f"gamma_{prediction_data[experiment_id]['subconfig']['spatial_interaction_model']['gamma']}" + \
                     f"{prediction_data[experiment_id]['subconfig']['type']}_{self.settings['experiment_title']}_log_destination_attraction_predictions_"+\
                     f"burnin_{self.settings['burnin']}_" + \
                     f"thinning_{self.settings['thinning']}_" + \
@@ -1533,7 +1533,7 @@ class Plot(object):
 
             # Get filename
             filename = f"table_{outputs.experiment.subconfig['table_dim']}_" + \
-                    f"gamma_{outputs.experiment.subconfig['inputs']['spatial_interaction_model']['gamma']}" + \
+                    f"gamma_{outputs.experiment.subconfig['spatial_interaction_model']['gamma']}" + \
                     f"{outputs.experiment.subconfig['type']}_{self.settings['experiment_title']}_log_destination_attraction_residuals_thinning_{self.settings['thinning']}_"+\
                     f"N_{outputs.experiment.subconfig['mcmc']['N']}"
 

@@ -8,13 +8,12 @@ from typing import Union
 from functools import partial
 from pathlib import Path as PathLib
 from joblib import Parallel, delayed
-from numba_progress import ProgressBar
+# from numba_progress import ProgressBar
+import multiresticodm.probability_utils as ProbabilityUtils
 
-import ticodm.probability_utils as ProbabilityUtils
-
-from ticodm.math_utils import scipy_optimize
-from ticodm.spatial_interaction_model import SpatialInteraction
-from ticodm.utils import str_in_list,makedir,numba_set_seed,deep_get,update_numba_threads
+from multiresticodm.math_utils import scipy_optimize
+from multiresticodm.spatial_interaction_model import SpatialInteraction
+from multiresticodm.utils import str_in_list,makedir,set_seed,deep_get,set_numba_torch_threads
 
 def instantiate_spatial_interaction_mcmc(sim:SpatialInteraction,disable_logger:bool=False):
     if hasattr(sys.modules[__name__], (sim.sim_name+'MarkovChainMonteCarlo')):
@@ -40,7 +39,7 @@ class SpatialInteractionMarkovChainMonteCarlo():
         self.n_threads = next(deep_get('n_threads',self.sim.config.settings))
 
         # Update numba threads
-        update_numba_threads(self.n_threads)
+        set_numba_torch_threads(self.n_threads)
 
         # Get seed and number of cores for multiprocessing
         self.seed = int(self.sim.config.settings['inputs'].get('seed',None)) \
@@ -66,8 +65,7 @@ class SpatialInteractionMarkovChainMonteCarlo():
             self.logger.info('Generating stopping times')
             self.stopping_times = ProbabilityUtils.generate_stopping_times(N=n_samples_required,k_power=self.k_power,seed=self.seed)
             # Reset random seed
-            np.random.seed(None)
-            numba_set_seed(None)
+            set_seed(None)
             # Export stopping times
             self.export_stopping_times()
 
@@ -82,7 +80,7 @@ class SpatialInteractionMarkovChainMonteCarlo():
         directory = path.join(str(parent_directory),'stopping_times')
         makedir(directory)
         # Extract filepath
-        self.stopping_times_filepath = path.join(parent_directory,'stopping_times',self.sim.config.settings['inputs']['spatial_interaction_model']['import']['stopping_times'])
+        self.stopping_times_filepath = path.join(parent_directory,'stopping_times',self.sim.config.settings['spatial_interaction_model']['import']['stopping_times'])
         if path.isfile(self.stopping_times_filepath):
             # Get number of samples of stopping times in file
             self.stopping_times = np.loadtxt(self.stopping_times_filepath,dtype='int32')
@@ -221,7 +219,7 @@ class SpatialInteraction2DMarkovChainMonteCarlo(SpatialInteractionMarkovChainMon
         return f"""
             2D Spatial Interaction Model Markov Chain Monte Carlo algorithm
             Dataset: {self.sim.config.settings['inputs']['dataset']}
-            Cost matrix: {self.sim.config.settings['inputs']['spatial_interaction_model']['import']['cost_matrix']}
+            Cost matrix: {self.sim.config.settings['spatial_interaction_model']['import']['cost_matrix']}
             Destination attraction sum: {np.exp(self.sim.log_destination_attraction).sum()}
             Cost matrix sum: {np.sum(self.sim.cost_matrix.ravel())}
             Origin demand sum: {np.sum(self.sim.origin_demand)}

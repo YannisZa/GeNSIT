@@ -15,15 +15,15 @@ from itertools import product,chain
 from argparse import Namespace
 from datetime import datetime
 from typing import Union,List,Tuple
-from numba_progress import ProgressBar
+# from numba_progress import ProgressBar
 
-import ticodm.probability_utils as ProbabilityUtils
+import multiresticodm.probability_utils as ProbabilityUtils
 
-from ticodm.utils import *
-from ticodm.math_utils import *
-from ticodm.global_variables import *
-from ticodm.contingency_table import instantiate_ct
-from ticodm.spatial_interaction_model import instantiate_sim
+from multiresticodm.utils import *
+from multiresticodm.math_utils import *
+from multiresticodm.global_variables import *
+from multiresticodm.contingency_table import instantiate_ct
+from multiresticodm.spatial_interaction_model import instantiate_sim
 
 OUTPUTS_MODULE = sys.modules[__name__]
 
@@ -503,7 +503,7 @@ class Outputs(object):
             # Store experiment id
             self.experiment = Namespace(**{'subconfig':metadata,'results':{}})
             # Get intensity model class
-            self.intensity_model_class = [input_name for input_name in self.experiment.subconfig['inputs'].keys() if input_name != 'contingency_table' and isinstance(self.experiment.subconfig['inputs'][input_name],dict)][0]
+            self.intensity_model_class = [input_name for input_name in self.experiment.subconfig.keys() if input_name != 'contingency_table' and isinstance(self.experiment.subconfig[input_name],dict)][0]
             # Define output experiment path to directory
             self.outputs_path = experiment
             assert str_in_list('input_path',list(metadata['inputs'].keys()))
@@ -524,7 +524,7 @@ class Outputs(object):
                         self.ground_truth_table = np.loadtxt(
                             os.path.join(
                                 self.experiment.subconfig['inputs']['dataset'],
-                                self.experiment.subconfig['inputs']['contingency_table']['import']['table']
+                                self.experiment.subconfig['inputs']['data_files']['table']
                             )
                         ).astype('int32')
                     except:
@@ -562,7 +562,7 @@ class Outputs(object):
             # Store experiment
             self.experiment = experiment
             # Get intensity model class
-            self.intensity_model_class = [input_name for input_name in self.experiment.subconfig['inputs'].keys() if input_name != 'contingency_table' and isinstance(self.experiment.subconfig['inputs'][input_name],dict)][0]
+            self.intensity_model_class = [input_name for input_name in self.experiment.subconfig.keys() if input_name != 'contingency_table' and isinstance(self.experiment.subconfig[input_name],dict)][0]
             # Define output experiment directory
             self.experiment_id = self.update_experiment_directory_id()
             # Define output experiment path to directory
@@ -582,10 +582,12 @@ class Outputs(object):
         # self.logger.info(f"Output directory is set to {self.outputs_path}")
 
     def update_experiment_directory_id(self):
-        if self.experiment.subconfig['inputs'][self.intensity_model_class]['gamma'] >= 10000:
-            noise_level = 'Low'
+        if hasattr(self.experiment,'sim'):
+            noise_level = self.experiment.sim.noise_regime
         else:
-            noise_level = 'High'
+            noise_level = next(deep_get('noise_regime',self.experiment.subconfig.settings))
+            if noise_level is None: noise_level = 'unknown'
+        noise_level = noise_level.capitalize()
         
         if not str_in_list('experiment_title',self.experiment.subconfig['outputs'].keys()):
             self.experiment.subconfig['outputs']['experiment_title'] = ""
@@ -619,9 +621,8 @@ class Outputs(object):
     def write_metadata(self) -> None:
         # Define filepath
         filepath = os.path.join(self.outputs_path,f"{self.experiment_id}_metadata.json")
-
         if (os.path.exists(filepath) and self.experiment.subconfig['overwrite']) or (not os.path.exists(filepath)):
-            write_json(self.experiment.subconfig,filepath,indent=2)
+            write_json(self.experiment.subconfig.settings,filepath,indent=2)
 
     def print_metadata(self) -> None:
         print_json(self.experiment.subconfig,indent=2)
@@ -705,7 +706,7 @@ class Outputs(object):
             # Get total number of samples
             N = theta_samples.shape[0]
             # Scale beta
-            theta_samples[:,1] *= self.experiment.subconfig['inputs'][self.intensity_model_class]['beta_max']
+            theta_samples[:,1] *= self.experiment.subconfig[self.intensity_model_class]['beta_max']
 
             # Compute intensities for all samples
             table_total = self.settings.get('table_total') if self.settings.get('table_total',-1.0) > 0 else 1.0

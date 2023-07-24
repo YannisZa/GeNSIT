@@ -5,6 +5,8 @@ import ast
 import zlib
 import gzip
 import json
+import torch
+import numba
 import numexpr
 import operator
 import tikzplotlib
@@ -16,12 +18,12 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 from itertools import chain, count
 from difflib import SequenceMatcher
-from numba import njit, set_num_threads
+from numba import njit
 from typing import Dict, List, Union, Tuple
 from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
 
-from ticodm.global_variables import NUMPY_TYPE_TO_DAT_TYPE#,UTILS_CACHED
+from multiresticodm.global_variables import NUMPY_TYPE_TO_DAT_TYPE#,UTILS_CACHED
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -494,18 +496,35 @@ def stringify_statistic(statistic):
     return text
 
 
-@njit
-def numba_set_seed(value):
+def set_seed(value):
     if value is not None:
+        rng = np.random.default_rng(value)
         np.random.seed(value)
+        torch.random.manual_seed(value)
+        return rng
+    else:
+        return np.random.default_rng(None)
+
+def update_device(device):
+    if device is None or len(device) == 0:
+        device = (
+            "mps"
+            if torch.backends.mps.is_available()
+            else "cuda"
+            if torch.cuda.is_available()
+            else "cpu"
+        )
+    return device
 
 
-def update_numba_threads(n_threads):
-    # Update threads used by numba 
+def set_numba_torch_threads(n_threads):
+    # Update threads used by numba and torch
     if len(n_threads) == 1:
-        set_num_threads(int(n_threads[0]))
+        numba.set_num_threads(int(n_threads[0]))
+        torch.set_num_threads(int(n_threads[0]))
     elif len(n_threads) > 1:
-        set_num_threads(int(n_threads[1]))
+        numba.set_num_threads(int(n_threads[1]))
+        torch.set_num_threads(int(n_threads[1]))
     else:
         raise ValueError(f"Invalid number of threads '{str(n_threads)}' provided ")
 
@@ -719,3 +738,4 @@ def create_dynamic_data_label(__self__,data):
                         f"{str(label_by_value[i]).replace('_',' ')}"
     # Add label to error data
     return x_label,label_by_key,label_by_value
+

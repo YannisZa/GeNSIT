@@ -8,11 +8,11 @@ from typing import Union, Tuple, Dict, List
 from scipy.stats import nchypergeom_fisher
 
 
-from ticodm.utils import  str_in_list, tuplize, flatten, update_numba_threads
-from ticodm.math_utils import logsumexp, log_factorial
-from ticodm.probability_utils import uniform_binary_choice, log_odds_cross_ratio
-from ticodm.markov_basis import instantiate_markov_basis,MarkovBasis
-from ticodm.contingency_table import ContingencyTable, ContingencyTable2D
+from multiresticodm.utils import  str_in_list, tuplize, flatten, set_numba_torch_threads
+from multiresticodm.math_utils import logsumexp, log_factorial
+from multiresticodm.probability_utils import uniform_binary_choice, log_odds_cross_ratio
+from multiresticodm.markov_basis import instantiate_markov_basis,MarkovBasis
+from multiresticodm.contingency_table import ContingencyTable, ContingencyTable2D
 
 
 class ContingencyTableMarkovChainMonteCarlo(object):
@@ -49,7 +49,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         self.n_threads = list(self.ct.config.settings['inputs'].get('n_threads',['1','1']))
 
         # Update numba threads
-        update_numba_threads(self.n_threads)
+        set_numba_torch_threads(self.n_threads)
 
         # Initialise Markov Chain Monte Carlo proposal, acceptance ratio
         self.build()
