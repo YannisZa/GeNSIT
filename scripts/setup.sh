@@ -11,7 +11,7 @@ trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
 # python ./create_directories.py
 # printf "\n"
 
-echo "Installing python requirements and ticodm package"
+echo "Installing python requirements and multiresticodm package"
 printf "\n"
 pip3 install -e .
 
