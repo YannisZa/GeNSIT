@@ -1,0 +1,696 @@
+{
+  "sweep_parameters": {
+    "sweepable": false,
+    "optional": false,
+    "type": "bool",
+    "default-value": false
+  },
+  "logging_mode": {
+    "sweepable": false,
+    "optional": false,
+    "type": "str",
+    "default-value": "info",
+    "is-any-of": ["info", "warn", "error", "critical", "debug"]
+  },
+  "inputs": {
+    "seed": {
+      "sweepable": true,
+      "optional": true,
+      
+      "sweep": {
+        "default": {
+          "type": "int",
+          "default-value": 1234,
+          "valid-range": [1, null]
+        },
+        "range": {
+          "type": "list",
+          "list-length": [0, null],
+          "list-type": "int",
+          "default-value": "range[1,100,1]",
+          "valid-range": [1, null]
+        }
+      }
+    },
+    "n_workers": {
+      "sweepable": false,
+      "optional": true,
+      "type": "int",
+      "default-value": 1,
+      "valid-range": [1, 16]
+    },
+    "n_threads": {
+      "sweepable": false,
+      "optional": true,
+      "type": "list",
+      "list-length": [2],
+      "list-type": "int",
+      "default-value": [8, 8],
+      "valid-range": [1, 16]
+    },
+    "device": {
+      "sweepable": false,
+      "optional": true,
+      "type": "str",
+      "default-value": "cpu",
+      "is-any-of": ["cpu", "mps", "cuda"]
+    },
+    "dataset": {
+      "sweepable": false,
+      "optional": false,
+      "type": "directory",
+      "directory-exists": true,
+      "default-value": "./data/inputs/synthetic_2x3_N_100/"
+    },
+    "load_experiment": {
+      "sweepable": false,
+      "optional": true,
+      "type": "str",
+      "default-value": ""
+    },
+    "dims": {
+      "sweepable": false,
+      "optional": true,
+      "type": "list",
+      "list-length": [2],
+      "list-type": "int",
+      "default-value": [1, 1],
+      "valid-range": [1, null]
+    },
+    "data_files": {
+      "sweepable": false,
+      "optional": false,
+      
+      "origin_demand": {
+        "sweepable": true,
+        "optional": false,
+        
+        "sweep": {
+          "default": {
+            "type": "file",
+            "file-exists": false,
+            "file-extension": "txt",
+            "default-value": "origin_demand.txt"
+          },
+          "range": {
+            "type": "list",
+            "list-length": [1, null],
+            "list-type": "file",
+            "file-exists": false,
+            "file-extension": "txt",
+            "default-value": ["origin_demand.txt"]
+          }
+        }
+      },
+      "destination_attraction_ts": {
+        "sweepable": true,
+        "optional": false,
+        
+        "sweep": {
+          "default": {
+            "type": "file",
+            "file-exists": false,
+            "file-extension": "txt",
+            "default-value": "destination_attraction_ts.txt"
+          },
+          "range": {
+            "type": "list",
+            "list-length": [1, null],
+            "list-type": "file",
+            "file-exists": false,
+            "file-extension": "txt",
+            "default-value": ["destination_attraction_ts.txt"]
+          }
+        }
+      },
+      "cost_matrix": {
+        "sweepable": true,
+        "optional": false,
+        
+        "sweep": {
+          "default": {
+            "type": "file",
+            "file-exists": false,
+            "file-extension": "txt",
+            "default-value": "cost_matrix.txt"
+          },
+          "range": {
+            "type": "list",
+            "list-length": [1, null],
+            "list-type": "file",
+            "file-exists": false,
+            "file-extension": "txt",
+            "default-value": ["cost_matrix.txt"]
+          }
+        }
+      },
+      "log_destination_attraction": {
+        "sweepable": true,
+        "optional": false,
+        
+        "sweep": {
+          "default": {
+            "type": "file",
+            "file-exists": false,
+            "file-extension": "txt",
+            "default-value": "log_destination_attraction.txt"
+          },
+          "range": {
+            "type": "list",
+            "list-length": [1, null],
+            "list-type": "file",
+            "file-exists": false,
+            "file-extension": "txt",
+            "default-value": ["log_destination_attraction.txt"]
+          }
+        }
+      }
+    },
+    "spatial_interaction_model": {
+      "sweepable": false,
+      "optional": true,
+      
+      "sim_type": {
+        "sweepable": true,
+        "optional": false,
+        
+        "sweep": {
+          "default": {
+            "type": "str",
+            "default-value": "TotallyConstrained",
+            "is-any-of": ["TotallyConstrained", "ProductionConstrained"]
+          },
+          "range": {
+            "type": "list",
+            "list-length": [1, 2],
+            "list-type": "str",
+            "default-value": ["TotallyConstrained"],
+            "is-any-of": ["TotallyConstrained", "ProductionConstrained"]
+          }
+        }
+      },
+      "grand_total": {
+        "sweepable": false,
+        "optional": true,
+        "type": "int",
+        "default-value": 1,
+        "valid-range": [1, null]
+      },
+      "parameters": {
+        "sweepable": false,
+        "optional": false,
+        
+        "alpha": {
+          "sweepable": true,
+          "optional": true,
+          
+          "sweep": {
+            "type": "float",
+            "default-value": 1.0,
+            "valid-range": [0.0, null]
+          },
+          "range": {
+            "type": "list",
+            "list-length": [0, null],
+            "list-type": "float",
+            "default-value": [1.0],
+            "valid-range": [0.0, null]
+          }
+        },
+        "beta": {
+          "sweepable": true,
+          "optional": true,
+          
+          "sweep": {
+            "type": "float",
+            "default-value": 0.0,
+            "valid-range": [0.0, null]
+          },
+          "range": {
+            "type": "list",
+            "list-length": [0, null],
+            "list-type": "float",
+            "default-value": [0.0],
+            "valid-range": [0.0, null]
+          }
+        },
+        "bmax": {
+          "sweepable": true,
+          "optional": false,
+          
+          "sweep": {
+            "type": "float",
+            "default-value": 1.0,
+            "valid-range": [0.0, null],
+            "inclusive": false
+          },
+          "range": {
+            "type": "list",
+            "list-length": [0, null],
+            "list-type": "float",
+            "default-value": [0.0],
+            "valid-range": [0.0, null],
+            "inclusive": false
+          }
+        }
+      },
+      "harris_wilson_model": {
+        "sweepable":false,
+        "optional": false,
+          
+        "dt": {
+          "sweepable":true,
+          "optional": false,
+            
+          "sweep": {
+            "default": {
+              "type":"float",
+              "default-value":0.001,
+              "valid-range":[0,1]
+            },
+            "range":{
+              "type": "list",
+              "list-length":[0,null],
+              "list-type":"float",
+              "default-value":[0.001],
+              "valid-range":[0,1]
+            }
+          }
+        },
+        "parameters": {
+          "sweepable": false,
+          "optional": false,
+            
+          "delta": {
+            "sweepable": true,
+            "optional": true,
+            
+            "sweep": {
+              "type": "float",
+              "default-value": 0.0,
+              "valid-range": [0.0, null]
+            },
+            "range": {
+              "type": "list",
+              "list-length": [0, null],
+              "list-type": "float",
+              "default-value": [0.0],
+              "valid-range": [0.0, null]
+            }
+          },
+          "kappa": {
+            "sweepable": true,
+            "optional": true,
+            
+            "sweep": {
+              "type": "float",
+              "default-value": 0.0,
+              "valid-range": [0.0, null],
+              "inclusive": false
+            },
+            "range": {
+              "type": "list",
+              "list-length": [0, null],
+              "list-type": "float",
+              "default-value": [0.0],
+              "valid-range": [0.0, null],
+              "inclusive": false
+            }
+          },
+          "sigma": {
+            "sweepable": true,
+            "optional": true,
+            
+            "sweep": {
+              "type": "float",
+              "default-value": 0.0,
+              "valid-range": [0.0, null]
+            },
+            "range": {
+              "type": "list",
+              "list-length": [0, null],
+              "list-type": "float",
+              "default-value": [0.0],
+              "valid-range": [0.0, null]
+            }
+          },
+          "epsilon": {
+            "sweepable": true,
+            "optional": true,
+            
+            "sweep": {
+              "type": "float",
+              "default-value": 1.0,
+              "valid-range": [0.0, null],
+              "inclusive": false
+            },
+            "range": {
+              "type": "list",
+              "list-length": [0, null],
+              "list-type": "float",
+              "default-value": [0.0],
+              "valid-range": [0.0, null],
+              "inclusive": false
+            }
+          }
+        }
+      },
+      "neural_net": {
+        "sweepable":false,
+        "optional": false,
+          
+        "disable_tqdm": {
+          "sweepable":false,
+          "optional": true,
+          "type":"bool",
+          "default-value":true
+        },
+        "table_inference": {
+          "sweepable":false,
+          "optional": false,
+          "type":"bool",
+          "default-value":false
+        },
+        "N": {
+          "sweepable":true,
+          "optional": false,
+            
+          "sweep": {
+            "default": {
+              "type":"int",
+              "default-value": 1,
+              "valid-range":[1,null]
+            },
+            "range": {
+              "type":"list",
+              "list-type":"int",
+              "list-length": [1, null],
+              "default-value": [1],
+              "valid-range":[1,null]
+            }
+          }
+        },
+        "num_steps": {
+          "sweepable":false,
+          "optional": true,
+          "type":"int",
+          "default-value":1,
+          "valid-range":[1,null]
+        },
+        "batch_size": {
+          "sweepable":false,
+          "optional": false,            
+          "type":"int",
+          "default-value":1,
+          "valid-range":[1,null]
+        },
+        "batch_size": {
+          "sweepable":false,
+          "optional": false,
+          "type":"int",
+          "default-value":1,
+          "valid-range":[1,null]
+        },
+        "to_learn": {
+          "sweepable":true,
+          "optional": false,
+            
+          "sweep": {
+            "default":{
+              "type":"list",
+              "list-type":"str",
+              "default-value":["alpha","beta","sigma"],
+              "is-any-of":["alpha","beta","kappa","delta","sigma"]
+            },
+            "range":{
+              "type":"list",
+              "list-type":"list",
+              "list-list-type":"str",
+              "default-value":[["alpha","beta","sigma"]],
+              "is-any-of":["alpha","beta","kappa","delta","sigma"]
+            }
+          }
+        },
+        "loss_function": {
+          "sweepable":false,
+          "optional": true,
+            
+          "name": {
+            "default": {
+              "type":"str",
+              "default-value":"MSELoss",
+              "is-any-of":[ "abs","celu","cos","cosine","elu","gelu","hardshrink","hardsigmoid","hardswish",
+                "hardtanh","leakyrelu","linear","logsigmoid","mish","prelu","relu","rrelu","selu",
+              "sigmoid","silu","sin","sine","softplus","softshrink","swish","tanh","tanhshrink","threshold"
+              ]
+            },
+            "range": {
+              "type":"list",
+              "list-type":"str",
+              "default-value":["MSELoss"],
+              "is-any-of":[ "abs","celu","cos","cosine","elu","gelu","hardshrink","hardsigmoid","hardswish",
+                "hardtanh","leakyrelu","linear","logsigmoid","mish","prelu","relu","rrelu","selu",
+              "sigmoid","silu","sin","sine","softplus","softshrink","swish","tanh","tanhshrink","threshold"
+              ]                
+            }
+          },
+          "hyperparameters": {
+            "sweepable":false,
+            "optional": false,
+              
+            "num_layers": {
+              "sweepable":true,
+              "optional": true,
+                
+              "sweep": {
+                "default": {
+                  "type": "int",
+                  "default-value": 1,
+                  "valid-range":[1,null]
+                },
+                "range": {
+                  "type":"list",
+                  "list-type": "int",
+                  "default-value": [1],
+                  "valid-range":[1,null]
+                }
+              }
+            },
+            "optimizer": {
+              "sweepable":true,
+              "optional": true,
+                
+              "sweep": {
+                "default": {
+                  "type": "str",
+                  "default-value": "Adam",
+                  "is-any-of":[ 
+                    "Adagrad","Adam","AdamW","SparseAdam","Adamax","ASGD",
+                    "LBFGS","NAdam","RAdam","RMSprop","Rprop","SGD"
+                  ]
+                },
+                "range": {
+                  "type":"list",
+                  "list-type": "str",
+                  "default-value": ["Adam"],
+                  "is-any-of":[ 
+                    "Adagrad","Adam","AdamW","SparseAdam","Adamax","ASGD",
+                    "LBFGS","NAdam","RAdam","RMSprop","Rprop","SGD"
+                  ]
+                }
+              }
+            },
+            "learning_rate": {
+              "sweepable":true,
+              "optional": false,
+                
+              "sweep": {
+                "default": {
+                  "type": "float",
+                  "default-value": 0.002,
+                  "valid-range":[0,1]
+                },
+                "range": {
+                  "type":"list",
+                  "list-type": "float",
+                  "default-value": [0.002],
+                  "valid-range":[0,1]
+                }
+              }
+            },
+            "biases": {
+              "sweepable":false,
+              "optional": true,
+                
+              "default": {
+                "sweepable":false,
+                "optional": true,
+                  
+                "type":"list",
+                "list-type":"float",
+                "default-value":[0.0, 4.0],
+                "valid-range":[null,null]
+              },
+              "layer_specific": {
+                "sweepable":false,
+                "optional": true,
+                  
+                "type":"dict",
+                "dict-key-type":"str",
+                "dict-value-type":"float",
+                "default-value":{},
+                "key-valid-range":[0,null],
+                "value-valid-range":[null,null]
+              }
+            },
+            "nodes_per_layer": {
+              "sweepable":false,
+              "optional": true,
+                
+              "default": {
+                "sweepable":false,
+                "optional": true,
+                  
+                "type":"int",
+                "default-value":20,
+                "valid-range":[1,null]
+              },
+              "layer_specific": {
+                "sweepable":false,
+                "optional": true,
+                  
+                "type":"dict",
+                "dict-key-type":"str",
+                "dict-value-type":"float",
+                "default-value":{},
+                "key-valid-range":[0,null],
+                "value-valid-range":[null,null]
+              }
+            },
+            "activation_funcs": {
+              "sweepable":false,
+              "optional": true,
+                
+              "default": {
+                "sweepable":false,
+                "optional": true,
+                  
+                "type":"str",
+                "default-value":"linear",
+                "valid-range": [
+                  "abs","celu","cos","cosine","elu","gelu","hardshrink","hardsigmoid","hardswish",
+                  "hardtanh","leakyrelu","linear","logsigmoid","mish","prelu","relu","rrelu","selu",
+                  "sigmoid","silu","sin","sine","softplus","softshrink","swish","tanh","tanhshrink","threshold"
+                ]
+              },
+              "layer_specific": {
+                "sweepable":false,
+                "optional": true,
+                  
+                "type":"dict",
+                "dict-key-type":"str",
+                "dict-value-type":"str",
+                "default-value":{"1":"abs"},
+                "key-valid-range":[0,null],
+                "value-valid-range": [
+                  "abs","celu","cos","cosine","elu","gelu","hardshrink","hardsigmoid","hardswish",
+                  "hardtanh","leakyrelu","linear","logsigmoid","mish","prelu","relu","rrelu","selu",
+                  "sigmoid","silu","sin","sine","softplus","softshrink","swish","tanh","tanhshrink","threshold"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "experiments": {
+        "sweepable": false,
+        "optional": false,
+          
+        "*": {
+          "sweepable": false,
+          "optional": false,
+            
+          "type": {
+            "sweepable": false,
+            "optional": false,
+            "type": "str",
+            "default-value":"SIM_NN",
+            "is-any-of":["SIM_NN","SIM_MCMC","JointTableSIM_NN","JointTableSIM_MCMC"]
+          },
+          "comment": {
+            "sweepable": false,
+            "optional": true,
+            "type": "str",
+            "default-value":""
+          },
+          "disable_tqdm": {
+            "sweepable": false,
+            "optional": true,
+            "type": "bool",
+            "default-value":true
+          },
+          "print_statements": {
+            "sweepable": false,
+            "optional": true,
+            "type": "bool",
+            "default-value":false
+          },
+          "export_samples": {
+            "sweepable": false,
+            "optional": true,
+            "type": "bool",
+            "default-value":true
+          },
+          "export_metadata": {
+            "sweepable": false,
+            "optional": true,
+            "type": "bool",
+            "default-value":true
+          },
+          "overwrite": {
+            "sweepable": false,
+            "optional": true,
+            "type": "bool",
+            "default-value":true
+          }
+        }
+      },
+      "outputs": {
+        "sweepable": false,
+        "optional": false,
+          
+        "write_start" : {
+          "sweepable": false,
+          "optional": true,
+            
+          "type": "int",
+          "default-value": 1,
+          "valid-range":[1,null]
+        },
+        "write_every" : {
+          "sweepable": false,
+          "optional": true,
+            
+          "type": "int",
+          "default-value": 1,
+          "valid-range":[1,null]
+        },
+        "directory": {
+          "sweepable": false,
+          "optional": false,
+            
+          "type": "path",
+          "default-value": "./data/outputs/",
+          "path-exists": true
+        },
+        "experiment_title": {
+          "optional": true,
+          "sweepable": false,
+            
+          "type": "str",
+          "default-value": ""
+        }
+      }
+    }
+  }
+}

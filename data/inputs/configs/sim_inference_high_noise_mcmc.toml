@@ -17,7 +17,7 @@ dims = [10,10]
 
 [inputs.spatial_interaction_model]
   # sim_type = 'ProductionConstrained'
-  sim_type = 'TotalConstrained'
+  sim_type = 'TotallyConstrained'
   beta_max = 100000
   epsilon = 1.0
   gamma = 100.0
@@ -103,7 +103,7 @@ dims = [10,10]
   
   [experiments.exp5]
     # seed = 1111
-    type = 'SIMLatentMCMC'
+    type = 'SIM_MCMC'
     comment = 'Spatial interaction model latent (x,theta) mcmc in high noise regime.'
     disable_tqdm = false
     print_statements = true
@@ -113,7 +113,7 @@ dims = [10,10]
       
   [experiments.exp6]
       M = 10
-      type = 'SIMLatentMCMCConvergence'
+      type = 'SIM_MCMCConvergence'
       comment = 'Spatial interaction model latent (x,theta) mcmc in high noise regime multiple chains for 2x3 table'
       disable_tqdm = false
       print_statements = false

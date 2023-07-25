@@ -23,7 +23,7 @@ dims = [10,10]
 
 [inputs.spatial_interaction_model]
   # sim_type = 'ProductionConstrained'
-  sim_type = 'TotalConstrained'
+  sim_type = 'TotallyConstrained'
   beta_max = 10
   epsilon = 1.0
   gamma = 10000.0
@@ -68,7 +68,7 @@ dims = [10,10]
 
 [experiments.exp6]
     # seed = 1111
-    type = 'JointTableSIMLatentMCMC'
+    type = 'JointTableSIM_MCMC'
     comment = 'Joint contingency table and spatial interaction model latent (x,theta) mcmc in low noise regime.'
     store_progress = 1.0 #0.1
     disable_tqdm = false

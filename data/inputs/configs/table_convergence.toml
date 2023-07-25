@@ -22,7 +22,7 @@ dims = [10,10]
 
 [inputs.spatial_interaction_model]
   # sim_type = 'ProductionConstrained'
-  sim_type = 'TotalConstrained'
+  sim_type = 'TotallyConstrained'
   beta_max = 10
   epsilon = 1.0
   gamma = 10000.0
@@ -68,7 +68,7 @@ dims = [10,10]
 
   [experiments.exp3]
       # seed = 1111
-      type = 'TableMCMC'
+      type = 'Table_MCMC'
       comment = '''Identifiability of tables for fixed intensities (x and theta) is examined.
                 Direct sampling using product of multinomials is used on synthetic 33x33 table'''
       store_progress = 1.0#0.1
@@ -96,7 +96,7 @@ dims = [10,10]
 
     [experiments.exp11]
         # seed = 1111
-        type = 'TableMCMCConvergence'
+        type = 'Table_MCMC_Convergence'
         K = 1000
         comment = '''Identifiability of tables for fixed intensities (x and theta) is examined.
                   Direct sampling using product of multinomials is used on synthetic 33x33 table'''
