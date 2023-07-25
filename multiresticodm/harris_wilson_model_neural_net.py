@@ -15,7 +15,8 @@ from torch import nn
 from dantro import logging
 from typing import Any, List, Union
 
-from multiresticodm.utils import safe_delete
+from multiresticodm.config import Config
+from multiresticodm.utils import str_in_list
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS
 
@@ -208,11 +209,11 @@ class HarrisWilson_NN:
         self,
         *,
         rng: np.random.Generator,
-        # h5group: h5.Group,
         neural_net: NeuralNet,
         loss_function: dict,
         physics_model: HarrisWilson,
         to_learn: list,
+        config: Config = None,
         write_every: int = 1,
         write_start: int = 1,
         **__,
@@ -230,15 +231,17 @@ class HarrisWilson_NN:
             write_start: iteration at which to start writing
             num_steps: number of iterations of the physics_model
         '''
-        # self._h5group = h5group
         self._rng = rng
 
         # The numerical solver
-        self._physics_model = physics_model
+        self.physics_model = physics_model
+
+        # Parameters to learn
+        self.parameters_to_learn = to_learn
 
         # Config file
-        self.config = physics_model.config
-        safe_delete(physics_model.config)
+        if config is not None:
+            self.config = config
 
         # Initialise neural net, loss tracker and prediction tracker
         self._neural_net = neural_net
@@ -251,48 +254,27 @@ class HarrisWilson_NN:
             [torch.tensor(0.0, requires_grad=False)] * len(to_learn)
         )
 
-        # Setup chunked dataset to store the state data in
-        # self._dset_loss = self._h5group.create_dataset(
-        #     'loss',
-        #     (0,),
-        #     maxshape=(None,),
-        #     chunks=True,
-        #     compression=3,
-        # )
-        # self._dset_loss.attrs['dim_names'] = ['time']
-        # self._dset_loss.attrs['coords_mode__time'] = 'start_and_step'
-        # self._dset_loss.attrs['coords__time'] = [write_start, write_every]
-
-        # self.dset_time = self._h5group.create_dataset(
-        #     'computation_time',
-        #     (0,),
-        #     maxshape=(None,),
-        #     chunks=True,
-        #     compression=3,
-        # )
-        # self.dset_time.attrs['dim_names'] = ['epoch']
-        # self.dset_time.attrs['coords_mode__epoch'] = 'trivial'
-
-        # dset_predictions = []
-        # for p_name in to_learn:
-        #     dset = self._h5group.create_dataset(
-        #         p_name, (0,), maxshape=(None,), chunks=True, compression=3
-        #     )
-        #     dset.attrs['dim_names'] = ['time']
-        #     dset.attrs['coords_mode__time'] = 'start_and_step'
-        #     dset.attrs['coords__time'] = [write_start, write_every]
-
-        #     dset_predictions.append(dset)
-        # self._dset_predictions = dset_predictions
-
         # Count the number of gradient descent steps
         self._time = 0
         self._write_every = write_every
         self._write_start = write_start
 
+        # Determine noise regime
+        if str_in_list('sigma',to_learn):
+            self.physics_model.noise_regime = 'variable'
+        else:
+            self.physics_model.gamma = 2/torch.pow(self.physics_model.sigma,2)
+            if self.physics_model.gamma >= 10000:
+                self.physics_model.noise_regime = 'low'
+            else:
+                self.physics_model.noise_regime = 'high'
+        if hasattr(self,'config'):
+            self.config.settings['harris_wilson_model']['noise_regime'] = self.physics_model.noise_regime
+
     def epoch(
         self,
         *,
+        experiment,
         training_data: torch.tensor,
         batch_size: int,
         dt: float = None,
@@ -309,9 +291,6 @@ class HarrisWilson_NN:
         :param __: other parameters (ignored)
         '''
 
-        # Track the epoch training time
-        start_time = time.time()
-
         # Track the training loss
         loss = torch.tensor(0.0, requires_grad=True)
 
@@ -321,16 +300,16 @@ class HarrisWilson_NN:
         # Process the training set elementwise, updating the loss after batch_size steps
         for t, sample in enumerate(training_data):
 
-            predicted_parameters = self._neural_net(torch.flatten(sample))
-            predicted_data = self._physics_model.run_single(
+            predicted_theta = self._neural_net(torch.flatten(sample))
+            predicted_dest_attraction = self.physics_model.run_single(
                 curr_destination_attractions=sample,
-                free_parameters=predicted_parameters,
+                free_parameters=predicted_theta,
                 dt=dt,
                 requires_grad=True,
             )
 
             # Update loss
-            loss = loss + self.loss_function(predicted_data, sample)
+            loss = loss + self.loss_function(predicted_dest_attraction, sample)
 
             n_processed_steps += 1
 
@@ -343,17 +322,16 @@ class HarrisWilson_NN:
                 self._current_loss = (
                     loss.clone().detach().cpu().numpy().item() / n_processed_steps
                 )
-                self._current_predictions = predicted_parameters.clone().detach().cpu()
-                # self.write_data()
+                self._theta_sample = predicted_theta.clone().detach().cpu()
+                self._log_destination_attraction_sample = predicted_dest_attraction.clone().detach().cpu()
+                self.write_data(experiment)
                 del loss
                 loss = torch.tensor(0.0, requires_grad=True)
                 n_processed_steps = 0
 
-        # Write the epoch training time (wall clock time)
-        # self.dset_time.resize(self.dset_time.shape[0] + 1, axis=0)
-        # self.dset_time[-1] = time.time() - start_time
+        return predicted_theta, torch.log(torch.squeeze(predicted_dest_attraction))
 
-    def write_data(self):
+    def write_data(self,experiment):
         '''Write the current state into the state dataset.
 
         In the case of HDF5 data writing that is used here, this requires to
@@ -362,10 +340,28 @@ class HarrisWilson_NN:
         '''
         if self._time >= self._write_start and (self._time % self._write_every == 0):
 
-            self._dset_loss.resize(self._dset_loss.shape[0] + 1, axis=0)
-            self._dset_loss[-1] = self._current_loss
+            if 'loss' in experiment.sample_names:
+                experiment.losses.resize(experiment.losses.shape[0] + 1, axis=0)
+                experiment.losses[-1] = self._current_loss
 
-            for idx, dset in enumerate(self._dset_predictions):
-                dset.resize(dset.shape[0] + 1, axis=0)
-                dset[-1] = self._current_predictions[idx]
+            if 'theta' in experiment.sample_names:
+                for idx, dset in enumerate(experiment.thetas):
+                    dset.resize(dset.shape[0] + 1, axis=0)
+                    dset[-1] = self._theta_sample[idx]
+            
+            if 'log_destination_attraction' in experiment.sample_names:
+                experiment.log_destination_attractions.resize(experiment.log_destination_attractions.shape[1] + 1, axis=1)
+                experiment.log_destination_attractions[:,-1] = np.log(self._log_destination_attraction_sample.flatten())
 
+
+    def __repr__(self):
+        return f"{self.noise_regime}Noise HarrisWilson NeuralNet( {self.sim.sim_type}(SpatialInteraction2D) )"
+
+    def __str__(self):
+
+        return f"""
+            {'x'.join([str(d.cpu().detach().numpy()) for d in self.physics_model.sim.dims])} Harris Wilson Neural Network using {self.physics_model.sim.sim_type} Constrained Spatial Interaction Model
+            Learned parameters: {', '.join(self.parameters_to_learn)}
+            dt: {self.config['harris_wilson_model'].get('dt',0.001) if hasattr(self,'config') else ''}
+            Noise regime: {self.physics_model.noise_regime}
+        """

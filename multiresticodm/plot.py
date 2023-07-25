@@ -388,7 +388,7 @@ class Plot(object):
                 self.settings,
                 disable_logger=True
             )
-            if not valid_experiment_type(outputs.experiment_id,['tablesummariesmcmcconvergence','tablemcmcconvergence']):
+            if not valid_experiment_type(outputs.experiment_id,['tablesummariesmcmcconvergence','table_mcmc_convergence']):
                 self.logger.info(f'Experiment {outputs.experiment_id} is not of type Table(Summaries)MCMCConvergence')
                 # Remove experiment from output directories
                 self.outputs_directories.remove(outputs_directories[i])
@@ -442,9 +442,9 @@ class Plot(object):
                 # Find supremum of norm below epsilon
                 convergence_index = np.argmax(table_error_statistic < (self.settings['epsilon_threshold']))
                 # Get metadata
-                N = list(deep_get(key='N',value=outputs.experiment.subconfig))[0]
+                N = list(deep_get(key='N',value=outputs.experiment.subconfig.settings))[0]
                 try:
-                    thinning = list(deep_get(key='thinning',value=outputs.experiment.subconfig))[0]
+                    thinning = list(deep_get(key='thinning',value=outputs.experiment.subconfig.settings))[0]
                 except:
                     thinning = 1
                 # Extraction iteration number
@@ -483,8 +483,8 @@ class Plot(object):
                 self.settings,
                 disable_logger=True
             )
-            if not valid_experiment_type(outputs.experiment_id,['jointtablesimlatent']):
-                self.logger.info(f'Experiment {outputs.experiment_id} is not of type JointTableSIMLatent')
+            if not valid_experiment_type(outputs.experiment_id,['jointtablesim_mcmc']):
+                self.logger.info(f'Experiment {outputs.experiment_id} is not of type JointTableSIM_MCMC')
                 # Remove experiment from output directories
                 self.outputs_directories.remove(output_directory)
 
@@ -646,7 +646,7 @@ class Plot(object):
     def table_distribution_low_dimensional_embedding(self):
         
         self.logger.info('Running table_distribution_low_dimensional_embedding')
-        valid_experiment_types = ['tablemcmc','jointtablesimlatent','simlatent','neuralabm']
+        valid_experiment_types = ['table_mcmc','jointtablesim_mcmc','sim_mcmc','sim_nn','jointtablesim_nn']
         
         # Add ground truth table to embedding
         outputs = Outputs(
@@ -689,7 +689,7 @@ class Plot(object):
             try:
                 label = ''
                 for k in list(self.settings['label_by']):
-                    value = list(deep_get(key=k,value=outputs.experiment.subconfig))[0]
+                    value = list(deep_get(key=k,value=outputs.experiment.subconfig.settings))[0]
                     # If label not included in metadata ignore it
                     if value is not None:
                         label += '_'+str(value)

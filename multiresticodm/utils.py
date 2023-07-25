@@ -372,17 +372,17 @@ def deep_flatten(d, parent_key='', sep='_'):
     return dict(items)
 
 
-def deep_update(d,key,val,overwrite:bool=True):
+def deep_update(d,key,val,**kwargs):
     for dict_key,dict_val in d.items():
-        if (dict_key == key) and overwrite:
+        if (dict_key == key) and kwargs.get('overwrite',True):
             d[key] = val
         elif isinstance(dict_val, dict):
-            deep_update(dict_val,key,val,overwrite)
+            deep_update(dict_val,key,val,**kwargs)
         
 
-def deep_updates(main_dict,update_dict,overwrite:bool=True):
+def deep_updates(main_dict,update_dict,**kwargs):
     for k,v in update_dict.items():
-        deep_update(main_dict,k,v,overwrite)
+        deep_update(main_dict,k,v,**kwargs)
     return main_dict
             
 
@@ -397,6 +397,23 @@ def deep_delete(dictionary, keys):
             else:
                 modified_dict[key] = value  # or copy.deepcopy(value) if a copy is desired for non-dicts.
     return modified_dict
+
+def deep_apply(ob, func, **kwargs):
+    for k, v in ob.items():
+        if isinstance(v, Mapping):
+            deep_apply(v, func, **kwargs)
+        else:
+            ob[k] = func(v,**kwargs)
+    return ob
+
+def pop_variable(_self,var):
+    if hasattr(_self,var):
+        res = getattr(_self,var)
+        delattr(_self,var)
+        gc.collect()
+        return res
+    else:
+        return None
 
 def extract_config_parameters(conf,fields=dict):
     trimmed_conf = {}
@@ -415,21 +432,11 @@ def extract_config_parameters(conf,fields=dict):
                 trimmed_conf[f] = extract_config_parameters(conf[f],v)
     return trimmed_conf
 
-def safe_delete(variable):
+def safe_delete(variable,instance=None):
     try:
         del variable
     except:
         None
-    
-def safe_delete_and_clean(variable):
-    print('Safe delete and clean')
-    if not hasattr(variable,'__len__'):
-        variable = [variable]
-    for var in variable:
-        try:
-            del variable
-        except:
-            None
     gc.collect()
 
 

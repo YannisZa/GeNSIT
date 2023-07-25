@@ -4,6 +4,7 @@ import gc
 import sys
 import logging
 import traceback
+import h5py as h5
 import pandas as pd
 import geopandas as gpd
 
@@ -21,6 +22,7 @@ import multiresticodm.probability_utils as ProbabilityUtils
 
 from multiresticodm.utils import *
 from multiresticodm.math_utils import *
+from multiresticodm.config import Config
 from multiresticodm.global_variables import *
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.spatial_interaction_model import instantiate_sim
@@ -358,7 +360,6 @@ class OutputSummary(object):
                                 ]
                                 metric_data.append(dict(zip(metric_data_keys,metric_data_vals)))
                             self.logger.debug(f"Summarised metric is updated to {np.shape(metric_summarised)}")
-                            # safe_delete_and_clean([samples_metric,metric_summarised])
                     else:                        
                         # Update kwargs specific for each metric
                         metric_kwargs = self.update_metric_arguments(
@@ -437,9 +438,6 @@ class OutputSummary(object):
                             metric_data.append(dict(zip(metric_data_keys,metric_data_vals)))
 
                         self.logger.debug(f"Summarised metric is updated to {np.shape(metric_summarised)}")
-                        # safe_delete_and_clean([samples_metric,metric_summarised])
-            #     safe_delete_and_clean(samples_summarised)
-            # safe_delete_and_clean(samples)
     
         return metric_data
     
@@ -558,9 +556,14 @@ class Outputs(object):
                 self.logger.warning('Ground truth missing')
 
             
-        else:
+        elif hasattr(experiment,'subconfig'):
             # Store experiment
             self.experiment = experiment
+            # Remove unnecessary data
+            for attr in ['inputs','harris_wilson_nn','sim_mcmc','sim','ct']:
+                if hasattr(self.experiment,attr):
+                    safe_delete(getattr(self.experiment,attr))
+
             # Get intensity model class
             self.intensity_model_class = [input_name for input_name in self.experiment.subconfig.keys() if input_name != 'contingency_table' and isinstance(self.experiment.subconfig[input_name],dict)][0]
             # Define output experiment directory
@@ -578,28 +581,35 @@ class Outputs(object):
                 pass
             # Create output directories
             self.create_output_subdirectories()
+
+            self.logger.note(f"   Creating output file at:\n        {self.outputs_path}")
+            self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f'seed{self.experiment.seed}','data.h5'), mode="w")
+            self.h5group = self.h5file.create_group(self.experiment.subconfig['type'])
         
+        else:
+            raise Exception(f'Experiment {experiment} of type {type(experiment)} not recognised')
         # self.logger.info(f"Output directory is set to {self.outputs_path}")
 
     def update_experiment_directory_id(self):
-        if hasattr(self.experiment,'sim'):
-            noise_level = self.experiment.sim.noise_regime
+
+        noise_level = list(deep_get('noise_regime',self.experiment.subconfig.settings))
+        if len(noise_level) <= 0: 
+            noise_level = 'unknown'
         else:
-            noise_level = next(deep_get('noise_regime',self.experiment.subconfig.settings))
-            if noise_level is None: noise_level = 'unknown'
+            noise_level = noise_level[0]
         noise_level = noise_level.capitalize()
         
         if not str_in_list('experiment_title',self.experiment.subconfig['outputs'].keys()):
             self.experiment.subconfig['outputs']['experiment_title'] = ""
 
-        if str_in_list(self.experiment.subconfig['type'].lower(),['tablesummariesmcmcconvergence','tablemcmcconvergence']):
+        if str_in_list(self.experiment.subconfig['type'].lower(),['tablesummariesmcmcconvergence','table_mcmc_convergence']):
             return self.experiment.subconfig['experiment_id']+'_K'+\
                     str(self.experiment.subconfig['K'])+'_'+\
                     self.experiment.subconfig['mcmc']['contingency_table']['proposal']+'_'+\
                     self.experiment.subconfig['type']+'_'+\
                     self.experiment.subconfig['outputs']['experiment_title']+'_'+\
                     self.experiment.subconfig['datetime']
-        elif self.experiment.subconfig['type'].lower() == 'tablemcmc':
+        elif self.experiment.subconfig['type'].lower() == 'table_mcmc':
             return self.experiment.subconfig['experiment_id']+'_'+\
                     self.experiment.subconfig['mcmc']['contingency_table']['proposal']+'_'+\
                     self.experiment.subconfig['type']+'_'+\
@@ -613,16 +623,23 @@ class Outputs(object):
                     self.experiment.subconfig['datetime']
 
     def create_output_subdirectories(self) -> None:
-    
+        
         makedir(os.path.join(self.outputs_path,'samples'))
+        makedir(os.path.join(self.outputs_path,'samples',f'seed{self.experiment.seed}'))
         makedir(os.path.join(self.outputs_path,'figures'))
         makedir(os.path.join(self.outputs_path,'sample_derivatives'))
+
 
     def write_metadata(self) -> None:
         # Define filepath
         filepath = os.path.join(self.outputs_path,f"{self.experiment_id}_metadata.json")
         if (os.path.exists(filepath) and self.experiment.subconfig['overwrite']) or (not os.path.exists(filepath)):
-            write_json(self.experiment.subconfig.settings,filepath,indent=2)
+            if isinstance(self.experiment.subconfig,Config):
+                write_json(self.experiment.subconfig.settings,filepath,indent=2)
+            elif isinstance(self.experiment.subconfig,dict):
+                write_json(self.experiment.subconfig,filepath,indent=2)
+            else:
+                raise Exception(f'Cannot write metadata of invalid type {type(self.experiment.subconfig)}')
 
     def print_metadata(self) -> None:
         print_json(self.experiment.subconfig,indent=2)
@@ -713,7 +730,7 @@ class Outputs(object):
 
             # Instantiate ct
             sim = instantiate_sim({
-                'sim_type':next(deep_get('sim_type',self.experiment.subconfig), None),
+                'sim_type':next(deep_get('sim_type',self.experiment.subconfig.settings), None),
                 'cost_matrix':cost_matrix,
                 'origin_demand':origin_demand,
                 'log_destination_attraction':self.log_destination_attraction

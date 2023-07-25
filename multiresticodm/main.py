@@ -9,6 +9,7 @@ import json
 import click
 import logging
 import psutil
+import coloredlogs
 
 from multiresticodm.config import Config
 from multiresticodm.global_variables import TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS
@@ -141,7 +142,7 @@ _common_run_options = [
                default = '', help = 'Title appended to output filename of experiment'),
     click.option('--dataset','-d', type=click.Path(exists=True),
                default=None, help = 'Overwrites inputs dataset in config'),
-    click.option('--sim_type','-sim', type=click.Choice(['TotalConstrained','ProductionConstrained']),
+    click.option('--sim_type','-sim', type=click.Choice(['TotallyConstrained','ProductionConstrained']),
                default=None, help = 'Overwrites spatial interaction model of choice (intensity function)'),
     click.option('--origin_demand','-od', type=click.STRING,
                default=None, help = 'Overwrites input origin demand filename in config'),
@@ -326,6 +327,7 @@ def run_mcmc(
         datefmt='%M:%S'
     )
     logger = logging.getLogger(__name__)
+    coloredlogs.install(fmt="%(levelname)s %(message)s", level="INFO", logger=logger)
 
     # Create output folder if it does not exist
     if not os.path.exists(config.settings['outputs']['output_path']):
@@ -425,6 +427,7 @@ def run_nn(
         datefmt='%M:%S'
     )
     logger = logging.getLogger(__name__)
+    coloredlogs.install(fmt="%(levelname)s %(message)s", level="INFO", logger=logger)
 
     # Create output folder if it does not exist
     if not os.path.exists(config.settings['outputs']['output_path']):
@@ -684,6 +687,7 @@ def plot(
         datefmt='%M:%S'
     )
     logger = logging.getLogger(__name__)
+    coloredlogs.install(fmt="%(levelname)s %(message)s", level="INFO", logger=logger)
 
     # Validate passed plots
     for c in plots:
@@ -782,6 +786,7 @@ def summarise(
         datefmt='%M:%S'
     )
     logger = logging.getLogger(__name__)
+    coloredlogs.install(fmt="%(levelname)s %(message)s", level="INFO", logger=logger)
 
     logger.info('Gathering data')
 

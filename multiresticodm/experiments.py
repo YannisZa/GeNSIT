@@ -89,8 +89,7 @@ class ExperimentHandler(object):
         for _,experiment in self.experiments.items():
             # Run experiment
             experiment.run()
-            # Write outputs to file
-            experiment.write(metadata=True)
+
             # Reset
             try:
                 experiment.reset()
@@ -103,6 +102,13 @@ class Experiment(object):
         self.logger = logging.getLogger(__name__)
         numba_logger = logging.getLogger('numba')
         numba_logger.setLevel(logging.WARNING)
+        
+        # Make sure you are reading a config
+        if isinstance(subconfig,dict):
+            subconfig = Config(settings=subconfig)
+        elif not isinstance(subconfig,Config):
+            raise Exception(f'Subconfig provided has invalid type {type(subconfig)}')
+
         # Store subconfig
         self.subconfig = subconfig
         if len(self.subconfig['inputs'].get('load_experiment',[])) > 0:
@@ -119,14 +125,11 @@ class Experiment(object):
             self.subconfig = Config(settings={**self.subconfig, **settings_flattened})
         
         # Update config with current timestamp ( but do not overwrite)
-        datetime_results = list(deep_get(key='datetime',value=self.subconfig))
+        datetime_results = list(deep_get(key='datetime',value=self.subconfig.settings))
         if len(datetime_results) > 0:
             deep_update(self.subconfig, key='datetime', val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), overwrite=False)
         else:
             self.subconfig['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-        # Store progress
-        if not str_in_list('store_progress',self.subconfig.keys()):
-            self.subconfig['store_progress'] = 1
         # Initialise empty results
         self.results = []
 
@@ -139,7 +142,7 @@ class Experiment(object):
         # print(self.subconfig)
         # Decide how often to print statemtents
         self.print_statements = self.subconfig.get('print_statements',True)
-        self.store_progress = self.subconfig.get('store_progress',0.05)
+        self.store_progress = self.subconfig.get('store_progress',1.0)
         self.print_percentage = min(0.05,self.store_progress)*int(self.print_statements)
 
         # Update seed if specified
@@ -155,24 +158,6 @@ class Experiment(object):
 
     def run(self) -> None:
         pass
-
-    def write(self,metadata:bool=False) -> None:
-        # Initalise output handler
-        outputs = Outputs(self,self.subconfig)
-
-        if (metadata) and self.subconfig['export_metadata'] and hasattr(self,'subconfig'):
-            # Write metadata
-            outputs.write_metadata()
-
-        if hasattr(self,'results') and len(self.results) > 0:
-            if self.subconfig['export_samples'] and hasattr(self,'results'):
-                # Write samples
-                for res in self.results:
-                    outputs.write_samples(list(res['samples'].keys()))
-            self.logger.info(f'   Outputs have been written.')
-        else:
-            if self.subconfig.get('store_progress',1.0) >= 1.0:
-                self.logger.warn(f"   Cannot write results: No {self.subconfig['type']} experiment (tabular or plotting) results found for experiment {self.subconfig['experiment_id']}")
 
     def reset(self,metadata:bool=False) -> None:
         self.logger.info(f'   Resetting experimental results to release memory.')
@@ -224,15 +209,16 @@ class Experiment(object):
         sample_sizes = np.cumsum(sample_sizes)
         return sample_sizes
     
-    def initialise(self):
+    def initialise_parameters(self):
         # Get batch sizes
         batch_sizes = self.define_sample_batch_sizes()
         self.subconfig['n_batches'] = len(batch_sizes)
 
+        # Load last sample
         if str_in_list('load_experiment',self.subconfig['inputs']) and len(self.subconfig['inputs']['load_experiment']) > 0:
             # Read last batch of experiments
             outputs = Outputs(self,self.subconfig)
-            # Parameter initialisations
+            # All parameter initialisations
             parameter_inits = dict(zip(self.sample_names,[0]*len(self.sample_names)))
             parameter_acceptances = dict(zip(self.sample_names,[0]*len(self.sample_names)))
             # Total samples for table,theta,x posteriors, respectively
@@ -267,6 +253,7 @@ class Experiment(object):
                     parameter_acceptances[sample_name] = self.subconfig.get((f"{sample_name}_acceptance"),0)*total_samples
                 else:
                     raise Exception(f'Failed tried loading experiment {self.experiment_id}')
+        # Initialise parameters
         else:
             parameter_inits = {}
             if hasattr(self,'od_mcmc'):
@@ -312,6 +299,98 @@ class Experiment(object):
             update_flag=True
         )
         return parameter_inits,parameter_acceptances
+
+    def initialise_data_structures(self):
+        # Count the number of gradient descent steps
+        self._time = 0
+        self._write_every = self.subconfig['outputs'].get('write_every',1)
+        self._write_start = self.subconfig['outputs'].get('write_start',1)
+        # Get dimensions
+        dims = self.subconfig['inputs']['dims']
+        
+        # Setup neural net loss
+        if str_in_list('loss',self.sample_names):
+            # Setup chunked dataset to store the state data in
+            self.losses = self.outputs.h5group.create_dataset(
+                'loss',
+                (0,),
+                maxshape=(None,),
+                chunks=True,
+                compression=3,
+            )
+            self.losses.attrs['dim_names'] = ['time']
+            self.losses.attrs['coords_mode__time'] = 'start_and_step'
+            self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+        
+        # Setup sampled/predicted log destination attractions
+        if str_in_list('log_destination_attraction',self.sample_names) or \
+            str_in_list('destination_attraction_ts',self.sample_names):
+            self.log_destination_attractions = self.outputs.h5group.create_dataset(
+                "log_destination_attraction",
+                (dims[1],0),
+                maxshape=(dims[1],None),
+                chunks=True,
+                compression=3,
+            )
+            self.log_destination_attractions.attrs["dim_names"] = ["destination","time"]
+            self.log_destination_attractions.attrs["coords_mode__time"] = "start_and_step"
+            self.log_destination_attractions.attrs["coords__time"] = [self._write_start, self._write_every]
+        
+        # Setup computation time
+        if str_in_list('computation_time',self.sample_names):
+            self.compute_time = self.outputs.h5group.create_dataset(
+                'computation_time',
+                (0,),
+                maxshape=(None,),
+                chunks=True,
+                compression=3,
+            )
+            self.compute_time.attrs['dim_names'] = ['epoch']
+            self.compute_time.attrs['coords_mode__epoch'] = 'trivial'
+
+        # Setup sampled/predicted theta
+        if str_in_list('theta',self.sample_names):
+            predicted_thetas = []
+            for p_name in self.theta_names:
+                dset = self.outputs.h5group.create_dataset(
+                    p_name, 
+                    (0,), 
+                    maxshape=(None,), 
+                    chunks=True, 
+                    compression=3
+                )
+                dset.attrs['dim_names'] = ['time']
+                dset.attrs['coords_mode__time'] = 'start_and_step'
+                dset.attrs['coords__time'] = [self._write_start, self._write_every]
+
+                predicted_thetas.append(dset)
+            self.thetas = predicted_thetas
+        
+        # Setup sampled signs
+        if str_in_list('sign',self.sample_names):
+            self.signs = self.outputs.h5group.create_dataset(
+                "sign",
+                (0,),
+                maxshape=(None,),
+                chunks=True,
+                compression=3,
+            )
+            self.signs.attrs["dim_names"] = ["sign","time"]
+            self.signs.attrs["coords_mode__time"] = "start_and_step"
+            self.signs.attrs["coords__time"] = [self._write_start, self._write_every]
+
+        # Setup sampled tables
+        if str_in_list('table',self.sample_names):
+            self.tables = self.outputs.h5group.create_dataset(
+                "table",
+                (*dims,0),
+                maxshape=(*dims,None),
+                chunks=True,
+                compression=3,
+            )
+            self.tables.attrs["dim_names"] = ["origin","destination","time"]
+            self.tables.attrs["coords_mode__time"] = "start_and_step"
+            self.tables.attrs["coords__time"] = [self._write_start, self._write_every]
 
     def print_initialisations(self,parameter_inits,print_lengths:bool=True,print_values:bool=False):
         for p,v in parameter_inits.items():
@@ -914,7 +993,7 @@ class LogTargetAnalysisGridSearch(Experiment):
 
 
 
-class SIMLatentMCMC(Experiment):
+class SIM_MCMC(Experiment):
     def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
         super().__init__(subconfig,disable_logger)
@@ -944,7 +1023,8 @@ class SIMLatentMCMC(Experiment):
         set_seed(self.seed)
 
         # Initialise parameters
-        parameter_inits,parameter_acceptances = self.initialise()
+        parameter_inits,parameter_acceptances = self.initialise_parameters()
+
         # If experiment is complete return
         if parameter_inits['N0'] >= self.sim_mcmc.N:
             return
@@ -1091,7 +1171,7 @@ class SIMLatentMCMC(Experiment):
                 )
                 
                 # Write samples and metadata
-                self.write(metadata=True)
+                # self.write(metadata=True)
 
                 # Reset tables and columns sums to release memory
                 self.reset(metadata=False)
@@ -1110,7 +1190,7 @@ class SIMLatentMCMC(Experiment):
                                         "sign":self.signs}})
 
 
-class JointTableSIMLatentMCMC(Experiment):
+class JointTableSIM_MCMC(Experiment):
 
     def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
@@ -1158,7 +1238,7 @@ class JointTableSIMLatentMCMC(Experiment):
         set_seed(self.seed)
 
         # Initialise parameters
-        parameter_inits,parameter_acceptances = self.initialise()
+        parameter_inits,parameter_acceptances = self.initialise_parameters()
         # If experiment is complete return
         if parameter_inits['N0'] >= self.sim_mcmc.N:
             return
@@ -1353,7 +1433,7 @@ class JointTableSIMLatentMCMC(Experiment):
                 )
                 
                 # Write samples and metadata
-                self.write(metadata=True)
+                # self.write(metadata=True)
 
                 # Reset tables and columns sums to release memory
                 self.reset(metadata=False)
@@ -1372,7 +1452,7 @@ class JointTableSIMLatentMCMC(Experiment):
                                         "sign":self.signs,
                                         "table":self.tables}})
 
-class TableMCMC(Experiment):
+class Table_MCMC(Experiment):
     def __init__(self, subconfig:Config, disable_logger:bool=False):
         # Initalise superclass
         super().__init__(subconfig,disable_logger)
@@ -1425,7 +1505,7 @@ class TableMCMC(Experiment):
 
         self.sample_names = ['table']
 
-    def initialise(self):
+    def initialise_parameters(self):
         if str_in_list('load_experiment',self.subconfig['inputs']) and \
             len(self.subconfig['inputs']['load_experiment']) > 0:
             # Read last batch of experiments 
@@ -1477,7 +1557,7 @@ class TableMCMC(Experiment):
         set_seed(self.seed)
 
         # Initialise parameters
-        parameter_inits = self.initialise()
+        parameter_inits = self.initialise_parameters()
         
         # Initialise table
         self.tables = parameter_inits['tables'].astype('int32')
@@ -1530,7 +1610,7 @@ class TableMCMC(Experiment):
                 )
                 
                 # Write samples and metadata
-                self.write(metadata=True)
+                # self.write(metadata=True)
 
                 # Reset tables and columns sums to release memory
                 self.reset(metadata=False)
@@ -1627,7 +1707,7 @@ class TableSummariesMCMCConvergence(Experiment):
 
         self.sample_names = ['table']
 
-    def initialise(self):
+    def initialise_parameters(self):
             
         # Initialise table
         tables0 = []
@@ -1655,7 +1735,7 @@ class TableSummariesMCMCConvergence(Experiment):
         set_seed(self.seed)
 
         # Initialise table samples
-        self.tables = self.initialise()
+        self.tables = self.initialise_parameters()
 
         # Initiliase means by MCMC iteration
         table_mean = np.mean(np.array(self.tables,dtype='float32'),axis=0)
@@ -1759,12 +1839,11 @@ class SIM_NN(Experiment):
         # Fix random seed
         rng = set_seed(self.seed)
         # Store 
-        subconfig.settings['inputs']['rng'] = self.seed
+        self.subconfig['inputs']['seed'] = str(self.seed)
 
         # Prepare inputs
         self.inputs = Inputs(
-            subconfig,
-            model = 'neural_net',
+            config=subconfig,
             synthetic_data = False
         )
 
@@ -1772,15 +1851,17 @@ class SIM_NN(Experiment):
         self.logger.info("   Initializing the neural net ...")
         neural_network = NeuralNet(
             input_size=self.inputs.destination_attraction_ts.shape[1],
-            output_size=len(subconfig['neural_net']['to_learn']),
-            **subconfig['neural_net']['hyperparameters'],
+            output_size=len(subconfig['neural_network']['to_learn']),
+            **subconfig['neural_network']['hyperparameters'],
         ).to(self.device)
 
         # Pass inputs to device
         self.inputs.pass_to_device()
 
         # Instantiate Spatial Interaction Model
+        self.logger.info("   Initializing the spatial interaction model ...")
         sim = instantiate_sim(
+            sim_type=subconfig['spatial_interaction_model']['sim_type'],
             config=subconfig,
             origin_demand=self.inputs.origin_demand,
             log_destination_attraction=np.log(self.inputs.destination_attraction_ts[:,-1].flatten()),
@@ -1788,57 +1869,106 @@ class SIM_NN(Experiment):
             true_parameters=subconfig['spatial_interaction_model']['parameters'],
             device = self.device
         )
+        # Get and remove config
+        config = pop_variable(sim,'config')
 
         # Build Harris Wilson model
+        self.logger.info("   Initializing the Harris Wilson physics model ...")
         harris_wilson_model = HarrisWilson(
             sim=sim,
-            true_parameters = self.inputs.true_parameters,
+            config=config,
             dt = subconfig['harris_wilson_model'].get('dt',0.001),
+            true_parameters = self.inputs.true_parameters,
             device = self.device
         )
+        # Get and remove config
+        config = pop_variable(harris_wilson_model,'config')
 
-        # Instantiate model
+        # Instantiate harris and wilson neural network model
+        self.logger.info("   Initializing the Harris Wilson Neural Network model ...")
         self.harris_wilson_nn = HarrisWilson_NN(
             rng=rng,
-            # h5group=h5group,
+            config=config,
             neural_net=neural_network,
-            loss_function=subconfig['neural_net'].pop('loss_function'),
+            loss_function=subconfig['neural_network'].pop('loss_function'),
             physics_model=harris_wilson_model,
-            to_learn=(subconfig['spatial_interaction_model']['sim_to_learn']+subconfig['harris_wilson_model']['hw_to_learn']),
+            to_learn=subconfig['neural_network']['to_learn'],
             write_every=subconfig['outputs']['write_every'],
             write_start=subconfig['outputs']['write_start']
         )
+        # Get config
+        config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else None
 
-        self.logger.info(f"   Initialized Harris Wilson Neural Net.")
+        # Update subconfig
+        if config is not None:
+            self.subconfig = config
+
+        # Create outputs
+        self.outputs = Outputs(self)
+
+        # Write metadata
+        if self.subconfig.get('export_metadata',True):
+            self.outputs.write_metadata()
+        
+        print(self.harris_wilson_nn.physics_model.sim)
+        self.logger.info(f"   {self.harris_wilson_nn}")
         
         # Run garbage collector
         gc.collect()
 
-        self.sample_names = subconfig['neural_net']['to_learn']
+        self.sample_names = ['log_destination_attraction','theta','loss']
+        self.theta_names = subconfig['neural_network']['to_learn']
         
     def run(self) -> None:
 
         self.logger.info(f'   Running Neural Network training of Harris Wilson model.')
 
         # Time run
-        self.start_time = time.time()
+        start_time = time.time()
+
+        # Initialise data structures
+        self.initialise_data_structures()
         
         # Train the neural net
-        num_epochs = self.subconfig['neural_net']['N']
+        num_epochs = self.subconfig['neural_network']['N']
 
+        # For each epoch
         for e in range(num_epochs):
 
-
-            self.harris_wilson_nn.epoch(
+            # Track the epoch training time
+            start_time = time.time()
+            
+            # Train neural net
+            theta_sample, log_destination_attraction_sample = self.harris_wilson_nn.epoch(
                 training_data=self.inputs.destination_attraction_ts, 
-                **self.subconfig['neural_net']
+                experiment=self,
+                **self.subconfig['neural_network']
             )
+            
+            # Add axis to every sample to ensure compatibility 
+            # with the functions used below
+            theta_sample = torch.unsqueeze(theta_sample,0)
+            log_destination_attraction_sample = torch.unsqueeze(log_destination_attraction_sample,0)
 
+            # Compute log intensity
+            # log_intensity = self.harris_wilson_nn._physics_model.sim.log_intensity(
+            #     log_destination_attraction_sample,
+            #     theta_sample,
+            #     torch.tensor(1.0).float()
+            #     #self.harris_wilson_nn._physics_model.sim.grand_total
+            # )
+            # intensity = np.exp(log_intensity.cpu().detach().numpy())
             self.logger.progress(f"   Completed epoch {e+1} / {num_epochs}.")
 
-        self.logger.info("   Simulation run finished.")
-        # h5file.close()
+            # Write the epoch training time (wall clock time)
+            if hasattr(self,'compute_time'):
+                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
+                self.compute_time[-1] = time.time() - start_time
+
         
-        # Append to result array
-        # self.results.append({"samples":{"destination_attraction_ts":self.log_destination_attractions,
-                                        # "theta":self.thetas}})
+        # Write metadata
+        if self.subconfig.get('export_metadata',True):
+            self.outputs.write_metadata()
+            
+        self.outputs.h5file.close()
+        self.logger.info("   Simulation run finished.")

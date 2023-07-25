@@ -2,13 +2,11 @@
     Code extended from https://github.com/ThGaskin/NeuralABM
 """
 import sys
-import json
 import torch
 import logging
-import h5py as h5
 
 from multiresticodm.config import Config
-from multiresticodm.utils import safe_delete,str_in_list
+# from multiresticodm.utils import safe_delete,str_in_list
 from multiresticodm.global_variables import PARAMETER_DEFAULTS
 from multiresticodm.spatial_interaction_model import SpatialInteraction2D
 
@@ -17,44 +15,31 @@ from multiresticodm.spatial_interaction_model import SpatialInteraction2D
 log = logging.getLogger(__name__)
 
 
-# def instantiate_hw(config:Config,disable_logger:bool=False): #-> Union[ContingencyTable,None]:
-#     hw_type = ''
-#     if isinstance(config,Config) or hasattr(config,'settings'):
-#         hw_type = config.settings['spatial_interaction_model'].get('sim_type',None)
-#         if hw_type is not None and hasattr(sys.modules[__name__], hw_type):
-#             hw_type += 'HarrisWilson'
-#             return getattr(sys.modules[__name__], hw_type)(config,disable_logger)
-#     elif isinstance(config,dict):
-#         hw_type = config.get('sim_type',None)
-#         if hw_type is not None and hasattr(sys.modules[__name__], hw_type):
-#             hw_type += 'HarrisWilson'
-#             return getattr(sys.modules[__name__], hw_type)(config,disable_logger)
-    
-#     raise ValueError(f"Input class '{hw_type}' not found")
-
 class HarrisWilson:
     def __init__(
         self,
         *,
         sim: SpatialInteraction2D = None,
-        true_parameters: dict = None,
+        config: Config = None,
         dt: float = 0.001,
-        device: str
+        true_parameters: dict = None,
+        device: str = None
     ):
 
         """The Harris and Wilson model of economic activity.
 
         :param sim: the Spatial interaction model with all necessary data
-        :param params_to_learn: (optional) the names of free parameters to learn
-        :param true_parameters: (optional) a dictionary of the true parameters
+        :param learnable_parameters: (optional) the names of free parameters to learn
         :param dt: (optional) the time differential to use for the solver
+        :param true_parameters: (optional) a dictionary of the true parameters
         :param device: the training device to use
         """
 
         # Store SIM and its config separately
         self.sim = sim
-        self.config = sim.config
-        safe_delete(sim.config)
+
+        if config is not None:
+            self.config = config
 
         # Device name
         self.device = device
@@ -64,7 +49,7 @@ class HarrisWilson:
         self.learned_param_names = ['alpha','beta','kappa','sigma','delta']
         self.true_parameters = true_parameters
         
-        params_to_learn = (
+        learnable_parameters = (
             {}
             if true_parameters is not None
             else {k:PARAMETER_DEFAULTS[k] for k in self.learned_param_names}
@@ -73,9 +58,9 @@ class HarrisWilson:
             idx = 0
             for param in self.learned_param_names:
                 if param not in true_parameters.keys():
-                    params_to_learn[param] = idx
+                    learnable_parameters[param] = idx
                     idx += 1
-        self.params_to_learn = params_to_learn
+        self.learnable_parameters = learnable_parameters
 
         # Auxiliary hyperparameters
         for param in PARAMETER_DEFAULTS.keys():
@@ -84,24 +69,15 @@ class HarrisWilson:
                 param,
                 torch.tensor(true_parameters.get(param,PARAMETER_DEFAULTS[param])).float().to(device)
             )
-            self.config.settings['harris_wilson_model']['parameters'][param] = true_parameters.get(param,PARAMETER_DEFAULTS[param])
+            if hasattr(self,'config'):
+                self.config.settings['harris_wilson_model']['parameters'][param] = true_parameters.get(param,PARAMETER_DEFAULTS[param])
         self.dt = torch.tensor(dt).float().to(device)
 
         # Error noise on log destination attraction
         noise_percentage = true_parameters.get('noise_percentage',PARAMETER_DEFAULTS['noise_percentage'])
         self.noise_var = torch.pow(((noise_percentage/torch.tensor(100).float())*torch.log(self.sim.dims[1])),2)
-        self.config.settings['harris_wilson_model']['noise_percentage'] = noise_percentage
-
-        # Determine noise regime
-        if str_in_list('sigma',self.params_to_learn.keys()):
-            self.noise_regime = 'variable'
-        else:
-            self.gamma = 2/torch.pow(self.sigma,2)
-            if self.gamma >= 10000:
-                self.noise_regime = 'low'
-            else:
-                self.noise_regime = 'high'
-        self.config.settings['harris_wilson_model']['noise_regime'] = self.noise_regime
+        if hasattr(self,'config'):
+            self.config.settings['harris_wilson_model']['noise_percentage'] = noise_percentage
 
     
     def elicit_delta_and_kappa(self):
@@ -115,7 +91,9 @@ class HarrisWilson:
             self.kappa = (torch.sum(self.sim.origin_demand) + self.delta*self.sim.dims[1])/torch.sum(torch.exp(self.sim.log_destination_attraction))
         elif self.kappa is not None and self.delta is None:
             self.delta = self.kappa * torch.min(torch.exp(self.sim.log_destination_attraction)).float()
-
+        for param in ['delta','kappa']:
+            if hasattr(self,'config'):
+                self.config['harris_wilson_model']['parameters'][param] = getattr(self,param)
     
 
 
@@ -276,23 +254,28 @@ class HarrisWilson:
         # Parameters to learn
         alpha = (
             self.true_parameters["alpha"]
-            if 'alpha' not in self.params_to_learn.keys()
-            else free_parameters[self.params_to_learn["alpha"]]
+            if 'alpha' not in self.learnable_parameters.keys()
+            else free_parameters[self.learnable_parameters["alpha"]]
         )
         beta = (
             self.true_parameters["beta"]
-            if "beta" not in self.params_to_learn.keys()
-            else free_parameters[self.params_to_learn["beta"]]
+            if "beta" not in self.learnable_parameters.keys()
+            else free_parameters[self.learnable_parameters["beta"]]
         )
         kappa = (
             self.true_parameters["kappa"]
-            if "kappa" not in self.params_to_learn.keys()
-            else free_parameters[self.params_to_learn["kappa"]]
+            if "kappa" not in self.learnable_parameters.keys()
+            else free_parameters[self.learnable_parameters["kappa"]]
+        )
+        delta = (
+            self.true_parameters["delta"]
+            if "delta" not in self.learnable_parameters.keys()
+            else free_parameters[self.learnable_parameters["delta"]]
         )
         sigma = (
             self.true_parameters["sigma"]
-            if "sigma" not in self.params_to_learn.keys()
-            else free_parameters[self.params_to_learn["sigma"]]
+            if "sigma" not in self.learnable_parameters.keys()
+            else free_parameters[self.learnable_parameters["sigma"]]
         )
 
         # Training parameters
@@ -318,7 +301,7 @@ class HarrisWilson:
             new_sizes
             + +torch.mul(
                 curr_destination_attractions,
-                self.epsilon * (demand - kappa * curr_destination_attractions)
+                self.epsilon * (demand - kappa * curr_destination_attractions + delta)
                 + sigma
                 * 1
                 / torch.sqrt(torch.tensor(2, dtype=torch.float) * torch.pi * dt).to(
@@ -407,10 +390,9 @@ class HarrisWilson:
 
         return f"""
             {'x'.join([str(d.cpu().detach().numpy()) for d in self.sim.dims])} Harris Wilson model using {self.sim.sim_type} Constrained Spatial Interaction Model
-            Learned parameters: {', '.join(self.params_to_learn.keys())}
+            Learned parameters: {', '.join(self.learnable_parameters.keys())}
             Epsilon: {self.epsilon}
             Kappa: {self.kappa}
             Delta: {self.delta}
             Sigma: {self.sigma}
-            Noise regime: {self.noise_regime}
         """

@@ -3,6 +3,10 @@ import os.path
 import toml
 import logging
 
+from pathlib import Path
+from copy import deepcopy
+from multiresticodm.utils import deep_apply
+
 class Config:
 
     def __init__(self, path:str=None, settings:dict=None):
@@ -12,17 +16,33 @@ class Config:
         """
         self.logger = logging.getLogger(__name__)
 
+        # Load config
         if path:
             self.logger.debug(f' Loading config from {path}')
             self.settings = toml.load(path, _dict=dict)
+
+            # Load schema
+            with open('./data/inputs/configs/cfg_schema.json', 'r') as f:
+                self.schema = json.load(f)
+
+            # Load all parameter positions
+            with open('./data/inputs/configs/cfg_parameters.json', 'r') as f:
+                self.parameters = json.load(f)
+
+            # Validate config against schema
+            self.validate_config(self.settings,key_path=[])
+
         elif settings:
             self.settings = settings
         else:
             self.settings = None
             raise Exception(f'Config not found in {path}')
 
-    def __str__(self):
-        return json.dumps(self.settings,indent=2)
+    def __str__(self,settings=None):
+        if settings is not None:
+            return json.dumps(settings,indent=2)
+        else:
+            return json.dumps(self.settings,indent=2)
     
     def keys(self):
         return self.settings.keys()
@@ -55,3 +75,28 @@ class Config:
         # Remove backslash if path starts with it
         directory = os.path.abspath(self.settings['outputs']['directory'])
         self.settings['outputs']['output_path'] = directory
+
+    def deep_apply(self,func,**kwargs):
+        return deep_apply(self.settings, func, **kwargs)
+        
+    def print_types(self):
+        settings_copy = deepcopy(self.settings)
+        settings_copy = deep_apply(settings_copy, type)
+        try:
+            print(self.__str__(settings_copy))
+        except:
+            print(settings_copy)
+
+    def validate_config(self,settings,key_path=[]):
+        for k, v in self.parameters.items():
+            if type(v) == dict:
+                # Append key to path
+                key_path.append(k)
+                # Apply function recursively
+                self.validate_config(v,key_path)
+            else:
+                if v:
+                    print('>'.join(key_path),v)
+                    print(k)
+                    key_path.remove(k)
+eyu9uA

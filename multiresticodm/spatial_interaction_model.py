@@ -7,34 +7,28 @@ import torch
 from typing import Union
 
 from multiresticodm.config import Config
-from multiresticodm.sim_models import ProductionConstrained,TotalConstrained
+from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
 from multiresticodm.global_variables import SIM_DATA_TYPES, PARAMETER_DEFAULTS
-from multiresticodm.utils import write_txt,makedir,str_in_list
+from multiresticodm.utils import write_txt,makedir
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
 
 
 def instantiate_sim(
-        config:Config,
+        sim_type:str,
+        config:Config=None,
         origin_demand=None,
         destination_demand=None,
         log_origin_attraction=None,
         log_destination_attraction=None,
         cost_matrix=None,
         dims=None,
-        learned_parameters: dict = None,
-        auxiliary_parameters: dict = None,
+        true_parameters=None,
+        device=None,
         **kwargs
     ):
     
-    sim_type = ''
-    if isinstance(config,Config) or hasattr(config,'settings'):
-        sim_type = config.settings['spatial_interaction_model'].get('sim_type',None)
-        if sim_type is not None and hasattr(sys.modules[__name__], sim_type):
-            sim_type += 'SIM'
-    elif isinstance(config,dict):
-        sim_type = config.get('sim_type',None)
-        if sim_type is not None and hasattr(sys.modules[__name__], sim_type):
-            sim_type += 'SIM'
+    if sim_type is not None and hasattr(sys.modules[__name__], sim_type):
+        sim_type += 'SIM'
     else:
         raise ValueError(f"Input class '{sim_type}' not found")
     
@@ -46,8 +40,8 @@ def instantiate_sim(
         log_destination_attraction=log_destination_attraction,
         cost_matrix=cost_matrix,
         dims=dims,
-        learned_parameters = learned_parameters,
-        auxiliary_parameters = auxiliary_parameters,
+        true_parameters=true_parameters,
+        device=device,
         **kwargs
     )
     
@@ -59,7 +53,7 @@ class SpatialInteraction():
 class SpatialInteraction2D():
     def __init__(
             self,
-            config:Config,
+            config:Config=None,
             origin_demand=None,
             destination_demand=None,
             log_origin_attraction=None,
@@ -82,7 +76,8 @@ class SpatialInteraction2D():
         self.sim_name = 'SpatialInteraction2D'
         
         # Configuration settings
-        self.config = config
+        if config is not None:
+            self.config = config
 
         # Device name
         self.device = device
@@ -93,7 +88,8 @@ class SpatialInteraction2D():
         all_parameter_names = self.free_param_names + self.aux_param_names
 
         # Grand total
-        self.grand_total = torch.tensor(self.config['spatial_interaction_model'].get('grand_total',1.0)).float()
+        if hasattr(self,'config'):
+            self.grand_total = torch.tensor(self.config['spatial_interaction_model'].get('grand_total',1.0)).float()
 
         # Dimensions
         self.dims = None
@@ -137,6 +133,10 @@ class SpatialInteraction2D():
         # Update dims
         if self.dims is None and self.cost_matrix is not None:
             self.dims = torch.tensor(self.cost_matrix.size())
+
+        # Update config
+        if hasattr(self,'config'):
+            self.config.settings['inputs']['dims'] = self.dims.cpu().detach().numpy().tolist()
 
         # Determine if true data exists
         if np.all([hasattr(self,attr) and getattr(self,attr) is not None for attr in all_parameter_names]):
@@ -185,12 +185,12 @@ class SpatialInteraction2D():
     def __str__(self):
 
         return f"""
-            {'x'.join([str(d) for d in self.dims])} {self.sim_type} Constrained Spatial Interaction Model
-            Origin demand sum: {np.sum(self.origin_demand) if self.origin_demand is not None else None}
-            Destination demand sum: {np.sum(self.destination_demand) if self.destination_demand is not None  else None}
-            Origin attraction sum: {np.exp(self.log_origin_attraction).sum() if self.log_origin_attraction is not None  else None}
-            Destination attraction sum: {np.exp(self.log_destination_attraction).sum() if self.log_destination_attraction is not None  else None}
-            Cost matrix sum: {np.sum(self.cost_matrix.ravel()) if self.cost_matrix is not None else None}
+            {'x'.join([str(d.cpu().detach().numpy()) for d in self.dims])} {self.sim_type} Constrained Spatial Interaction Model
+            Origin demand sum: {torch.sum(self.origin_demand) if self.origin_demand is not None else None}
+            Destination demand sum: {torch.sum(self.destination_demand) if self.destination_demand is not None  else None}
+            Origin attraction sum: {torch.sum(torch.exp(self.log_origin_attraction)) if self.log_origin_attraction is not None  else None}
+            Destination attraction sum: {torch.sum(torch.exp(self.log_destination_attraction)) if self.log_destination_attraction is not None  else None}
+            Cost matrix sum: {torch.sum(torch.ravel(self.cost_matrix)) if self.cost_matrix is not None else None}
             Alpha: {self.alpha}
             Beta: {self.beta}
             Beta scaling: {self.bmax}
@@ -232,15 +232,15 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
 
     def __init__(
         self,
-        config:Config,
+        config:Config=None,
         origin_demand=None,
         destination_demand=None,
         log_origin_attraction=None,
         log_destination_attraction=None,
         cost_matrix=None,
         dims=None,
-        learned_parameters: dict = None,
-        auxiliary_parameters: dict = None,
+        true_parameters=None,
+        device=None,
         **kwargs
     ):
         '''  Constructor '''
@@ -255,8 +255,8 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
             log_destination_attraction=log_destination_attraction,
             cost_matrix=cost_matrix,
             dims=dims,
-            learned_parameters = learned_parameters,
-            auxiliary_parameters = auxiliary_parameters,
+            true_parameters=true_parameters,
+            device=device,
             **kwargs
         )
         # Make sure you have the necessary data
@@ -329,25 +329,25 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
         return log_intensity, intensity_gradient
 
 
-class TotalConstrainedSIM(SpatialInteraction2D):
+class TotallyConstrainedSIM(SpatialInteraction2D):
     """ Object including flow (O/D) matrix inference routines of SIM with only total constrained. """
 
     def __init__(
             self,
-            config:Config,
+            config:Config=None,
             origin_demand=None,
             destination_demand=None,
             log_origin_attraction=None,
             log_destination_attraction=None,
             cost_matrix=None,
             dims=None,
-            learned_parameters: dict = None,
-            auxiliary_parameters: dict = None,
+            true_parameters=None,
+            device=None,
             **kwargs
     ):
         '''  Constructor '''
         # Define type of spatial interaction model
-        self.sim_type = "TotalConstrained"
+        self.sim_type = "TotallyConstrained"
         # Initiliase constructor
         super().__init__(
             config=config,
@@ -357,8 +357,8 @@ class TotalConstrainedSIM(SpatialInteraction2D):
             log_destination_attraction=log_destination_attraction,
             cost_matrix=cost_matrix,
             dims=dims,
-            learned_parameters = learned_parameters,
-            auxiliary_parameters = auxiliary_parameters,
+            true_parameters=true_parameters,
+            device=device,
             **kwargs
         )
         # Make sure you have the necessary data
@@ -368,12 +368,12 @@ class TotalConstrainedSIM(SpatialInteraction2D):
             except:
                 raise Exception(f"{self.sim_type} requires {attr} but it is missing!")
         # Inherit numba functions
-        self.inherit_functions(TotalConstrained)
+        self.inherit_functions(TotallyConstrained)
 
         # self.logger.info(('Building ' + self.__str__()))
 
     def __repr__(self):
-        return "TotalConstrained(SpatialInteraction2D)"
+        return "TotallyConstrained(SpatialInteraction2D)"
     
     def log_intensity(self,xx:Union[np.ndarray,torch.tensor],theta:Union[np.ndarray,torch.tensor],grand_total:torch.float32):
         """ Reconstruct expected flow matrices (intensity function)

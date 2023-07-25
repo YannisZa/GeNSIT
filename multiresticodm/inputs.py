@@ -15,7 +15,6 @@ class Inputs:
     def __init__(
             self,
             config:Config,
-            model:str = 'neural_net',
             synthetic_data:bool = False
     ):
         # Read logging
@@ -24,118 +23,11 @@ class Inputs:
         # Store config
         self.config = config
 
-        if model == 'neural_net':
-            if not synthetic_data:
-                self.read_neural_net_data()
+        if not synthetic_data:
+            self.read_data()
 
     
-    def read_sim_data(
-        self,
-    ):
-        self.logger.note("   Loading SIM data ...")
-        if not str_in_list('dataset',self.config.settings['inputs']):
-            raise Exception('Input dataset NOT provided. SIM cannot be loaded.')
-            
-
-        if str_in_list('origin_demand',self.config.settings['inputs']['data_files'].keys()):
-            origin_demand_filepath = os.path.join(
-                self.config.settings['inputs']['dataset'],
-                self.config.settings['inputs']['data_files']['origin_demand']
-            )
-            if os.path.isfile(origin_demand_filepath):
-                # Import rowsums
-                origin_demand = np.loadtxt(origin_demand_filepath,dtype='float32')
-                # Store size of rows
-                self.dims[0] = len(origin_demand)
-                # Check to see see that they are all positive
-                if (origin_demand <= 0).any():
-                    raise Exception(f'Origin demand {origin_demand} are NOT strictly positive')
-            else:
-                raise Exception(f"Origin demand file {origin_demand_filepath} NOT found")
-        else:
-            raise Exception(f"Origin demand filepath NOT provided")
-
-        if len(self.config.settings['inputs']['data_files'].get('log_destination_attraction',[])) >= 0:
-            log_destination_attraction_filepath = os.path.join(self.config.settings['inputs']['dataset'],self.config.settings['inputs']['data_files']['log_destination_attraction'])
-            if os.path.isfile(log_destination_attraction_filepath):
-                # Import log destination attractions
-                self.log_destination_attraction = np.loadtxt(log_destination_attraction_filepath,dtype='float32')
-                # Store size of rows
-                self.dims[1] = len(self.log_destination_attraction)
-                # Check to see see that they are all positive
-                # if (self.log_destination_attraction <= 0).any():
-                    # raise Exception(f'Log destination attraction {self.log_destination_attraction} are NOT strictly positive')
-            else:
-                raise Exception(f"Log destination attraction file {log_destination_attraction_filepath} NOT found")
-        else:
-            raise Exception(f"Log destination attraction filepath NOT provided")
-
-        if str_in_list('cost_matrix',self.config.settings['inputs']['data_files'].keys()):
-            cost_matrix_filepath = os.path.join(self.config.settings['inputs']['dataset'],self.config.settings['inputs']['data_files']['cost_matrix'])
-            if os.path.isfile(cost_matrix_filepath):
-                # Import rowsums
-                cost_matrix = np.loadtxt(os.path.join(self.config.settings['inputs']['dataset'],self.config.settings['inputs']['data_files']['cost_matrix']),dtype='float32')
-                # Make sure it has the right dimension
-                try:
-                    assert np.shape(cost_matrix) == tuple(self.dims)
-                except:
-                    self.dims = np.asarray(np.shape(cost_matrix))
-                    raise Exception(f"Cost matrix does NOT have the required dimension {tuple(self.dims)} but has {self.dims}")
-            else:
-                raise Exception(f"Cost matrix file {cost_matrix_filepath} NOT found")
-
-            # Check to see see that they are all positive
-            if (cost_matrix < 0).any():
-                raise Exception(f'Cost matrix {cost_matrix} is NOT non-negative.')
-        else:
-            raise Exception(f"Cost matrix filepath NOT provided")
-
-        # Reshape cost matrix if necessary
-        if self.dims[0] == 1:
-            cost_matrix = np.reshape(cost_matrix[:,np.newaxis],tuple(self.dims))
-        if self.dims[1] == 1:
-            cost_matrix = np.reshape(cost_matrix[np.newaxis,:],tuple(self.dims))
-
-        # Update noise level
-        if str_in_list('noise_percentage',self.config.settings['spatial_interaction_model'].keys()):
-            self.noise_var = ((self.config.settings['spatial_interaction_model']['noise_percentage']/100)*np.log(self.dims[1]))**2
-        else:
-            self.noise_var = (0.03*np.log(self.dims[1]))**2
-            self.config.settings['spatial_interaction_model']['noise_percentage'] = 3
-
-        # Normalise origin demand
-        self.origin_demand = origin_demand
-
-        # Normalise cost matrix
-        self.cost_matrix = cost_matrix
-
-        # Determine if true data exists
-        if (hasattr(self,'alpha_true') and self.alpha_true is not None) and (hasattr(self,'beta_true') and self.beta_true is not None):
-            self.ground_truth_known = True
-        else:
-            self.ground_truth_known = False
-
-        # Store additional sim-specific parameters
-        # Update delta and kappa
-        if self.delta is None and self.kappa is None:
-            self.kappa = (np.sum(self.origin_demand))/(np.sum(np.exp(self.log_destination_attraction))-np.min(np.exp(self.log_destination_attraction))*self.dims[1])
-            self.delta = np.min(np.exp(self.log_destination_attraction)) * self.kappa
-            # Update config
-            self.config.settings['spatial_interaction_model']['delta'] = self.delta
-            self.config.settings['spatial_interaction_model']['kappa'] = self.kappa
-        elif self.kappa is None and self.delta is not None:
-            self.kappa = (np.sum(self.origin_demand) + self.delta*self.dims[1])/np.sum(np.exp(self.log_destination_attraction))
-            # Update config
-            self.config.settings['spatial_interaction_model']['kappa'] = self.kappa
-        elif self.kappa is not None and self.delta is None:
-            self.delta = self.kappa * np.min(np.exp(self.log_destination_attraction))
-            # Update config
-            self.config.settings['spatial_interaction_model']['delta'] = self.delta
-
-    
-    
-    
-    def read_neural_net_data(
+    def read_data(
         self,
     ):
         self.logger.note("   Loading Harris Wilson data ...")
@@ -193,7 +85,10 @@ class Inputs:
         self.destination_attraction_ts = destination_attraction_ts
         self.cost_matrix = cost_matrix
         # Extract parameters to learn
-        params_to_learn = self.config.settings['spatial_interaction_model']['sim_to_learn'] + self.config.settings['harris_wilson_model']['hw_to_learn']
+        if self.config.settings.get('neural_network',None) is not None:
+            params_to_learn = self.config.settings['neural_network']['to_learn']
+        else:
+            params_to_learn = ['alpha','beta']
         # Extract the underlying parameters from the config
         parameter_settings = {**self.config.settings['spatial_interaction_model']['parameters'],**self.config.settings['harris_wilson_model']['parameters']}
         self.true_parameters = {
@@ -254,8 +149,8 @@ class Inputs:
             compression=3,
         )
 
-        write_start = self.config.settings['outputs']['neural_net']['write_start']
-        write_every = self.config.settings['outputs']['neural_net']['write_every']
+        write_start = self.config.settings['outputs']['neural_network']['write_start']
+        write_every = self.config.settings['outputs']['neural_network']['write_every']
         dset_time_series.attrs["dim_names"] = ["time", "zone_id"]
         dset_time_series.attrs["coords_mode__time"] = "start_and_step"
         dset_time_series.attrs["coords__time"] = [write_start, write_every]
@@ -423,7 +318,17 @@ class Inputs:
 #     return or_sizes, dset_sizes_ts, cost_matrix
 
     def __str__(self):
+        od = Path(self.config.settings['inputs']['data_files'].get('origin_demand',''))
+        dd = Path(self.config.settings['inputs']['data_files'].get('destination_demand',''))
+        loa = Path(self.config.settings['inputs']['data_files'].get('log_origin_attraction',''))
+        lda = Path(self.config.settings['inputs']['data_files'].get('log_destination_attraction',''))
+        dats = Path(self.config.settings['inputs']['data_files'].get('destination_attraction_time_series',''))
         return f"""
             Dataset: {Path(self.config.settings['inputs']['dataset']).stem}
             Cost matrix: {Path(self.config.settings['inputs']['data_files']['cost_matrix']).stem}
+            Origin demand: {od.stem if len(od) > 0 else ''}
+            Destination demand: {dd.stem if len(dd) > 0 else ''}
+            Log origin attraction: {loa.stem if len(loa) > 0 else ''}
+            Log destination attraction: {lda.stem if len(lda) > 0 else ''}
+            Destination attraction time series: {dats.stem if len(dats) > 0 else ''}
         """

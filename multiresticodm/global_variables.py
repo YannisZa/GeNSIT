@@ -56,7 +56,7 @@ NUMPY_TYPE_TO_DAT_TYPE = {
 }
 
 SIM_TYPE_CONSTRAINTS = {
-    'TotalConstrained':'grand_total',
+    'TotallyConstrained':'grand_total',
     'ProductionConstrained':'row_margin'
 }
 

@@ -135,8 +135,8 @@ from multiresticodm.global_variables import NUMBA_PARALLELISE
 
 def _log_flow_matrix(xx,theta,origin_demand,cost_matrix,total_flow):
     # Extract dimensions
-    N = xx.size(dim=0)
     nrows,ncols = cost_matrix.size(dim=0), cost_matrix.size(dim=1)
+    N = xx.size(dim=0)
     log_flow = torch.zeros((N,nrows,ncols),dtype=float32)
     # Get first two parameters
     alpha = theta[:,0]
@@ -147,7 +147,7 @@ def _log_flow_matrix(xx,theta,origin_demand,cost_matrix,total_flow):
     # Compute log utility
     log_utility = xx.float()*alpha - cost_matrix.float()*beta
     # Compute log normalisation factor
-    normalisation = torch.logsumexp(torch.ravel(log_utility))
+    normalisation = torch.logsumexp(torch.ravel(log_utility),dim=(0))
     # Evaluate log flow scaled
     log_flow = log_utility - normalisation + log_total + torch.log(total_flow.float())
     return log_flow
