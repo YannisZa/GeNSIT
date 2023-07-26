@@ -746,3 +746,10 @@ def create_dynamic_data_label(__self__,data):
     # Add label to error data
     return x_label,label_by_key,label_by_value
 
+def in_range(v,limits:list,inclusive:bool=False):
+    within_range = True
+    if limits[0] is not None:
+        within_range = within_range and (v >= limits[0] if inclusive else v > limits[0])
+    if limits[1] is not None:
+        within_range = within_range and (v <= limits[1] if inclusive else v < limits[0])
+    return within_range

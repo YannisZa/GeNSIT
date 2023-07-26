@@ -3,10 +3,10 @@
   "logging_mode": true,
   "inputs": {
     "seed": {
-        "sweep": {
-            "default":true,
-            "range": true
-        }
+      "sweep": {
+        "default": true,
+        "range": true
+      }
     },
     "n_workers": true,
     "n_threads": true,
@@ -15,16 +15,16 @@
     "load_experiment": true,
     "dims": true,
     "data_files": {
-        "origin_demand": {
-            "sweep": {
-                "default": true,
-                "range": true
-            }
+      "origin_demand": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
       },
       "destination_attraction_ts": {
         "sweep": {
-            "default": true,
-            "range": true
+          "default": true,
+          "range": true
         }
       },
       "cost_matrix": {
@@ -40,141 +40,142 @@
         }
       }
     }
-   },
-   "spatial_interaction_model": {
-        "sim_type": {
-            "sweep": {
-                "default": true,
-                "range": true
-            }
-        },
-        "grand_total": true,
-        "parameters": {
-          "alpha": {
-            "sweep": {
-                "default": true,
-                "range": true
-            }
-          },
-          "beta": {
-           "sweep": {
-                "default": true,
-                "range": true
-            }
-          },
-          "bmax": {    
-            "sweep": {
-                "default": true,
-                "range": true
-            }
-          }
-        }
-    },
-    "harris_wilson_model": {
-        "dt": {
-        "sweep": {
-            "default": true,
-            "range": true
-        }
-        },
-        "parameters": {
-        "delta": {
-            "sweep": {
-            "default": true,
-            "range": true
-            }
-        },
-        "kappa": {
-            "sweep": {
-            "default": true,
-            "range": true
-            }
-        },
-        "sigma": {
-            "sweep": {
-            "default": true,
-            "range": true
-            }
-        },
-        "epsilon": {
-            "sweep": {
-            "default": true,
-            "range": true
-            }
-        }
-        }
-    },
-    "neural_net": {
-        "disable_tqdm": true,
-        "N": {
-        "sweep": {
-            "default": true,
-            "range": true
-            }
-        },
-        "num_steps": true,
-        "batch_size": true,
-        "batch_size": true,
-        "to_learn": {
-        "sweep": {
-            "default": true,
-            "range": true
-        }
-        },
-        "loss_function": {  
-        "name": {
-            "default": true,
-            "range": true
-        },
-        "hyperparameters": {
-            "num_layers": {
-            "sweep": {
-                "default": true,
-                "range": true
-            }
-            },
-            "optimizer": {
-            "sweep": {
-                "default": true,
-                "range": true
-            }
-            },
-            "learning_rate": {
-            "sweep": {
-                "default": true,
-                "range": true
-            }
-            },
-            "biases": {
-            "default": true,
-            "layer_specific": true
-            },
-            "nodes_per_layer": {
-            "default": true,
-            "layer_specific": true
-            },
-            "activation_funcs": {
-            "default": true,
-            "layer_specific": true
-            }
-        }
+  },
+  "spatial_interaction_model": {
+    "sim_type": {
+      "sweep": {
+        "default": true,
+        "range": true
       }
     },
-    "experiments": {           
-        "*": { 
-        "type": true,
-        "comment": true,
-        "disable_tqdm": true,
-        "print_statements": true,
-        "export_samples": true,
-        "export_metadata": true,
-        "overwrite": true
+    "grand_total": true,
+    "parameters": {
+      "alpha": {
+        "sweep": {
+          "default": true,
+          "range": true
         }
-    },
-    "outputs": {
-        "write_start" : true,
-        "write_every" : true,
-        "directory": true,
-        "experiment_title": true
+      },
+      "beta": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "bmax": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      }
     }
+  },
+  "harris_wilson_model": {
+    "dt": {
+      "sweep": {
+        "default": true,
+        "range": true
+      }
+    },
+    "parameters": {
+      "delta": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "kappa": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "sigma": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "epsilon": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      }
+    }
+  },
+  "neural_network": {
+    "disable_tqdm": true,
+    "N": {
+      "sweep": {
+        "default": true,
+        "range": true
+      }
+    },
+    "num_steps": true,
+    "batch_size": true,
+    "to_learn": {
+      "sweep": {
+        "default": true,
+        "range": true
+      }
+    },
+    "loss_function": {
+      "name": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "hyperparameters": {
+        "num_layers": {
+          "sweep": {
+            "default": true,
+            "range": true
+          }
+        },
+        "optimizer": {
+          "sweep": {
+            "default": true,
+            "range": true
+          }
+        },
+        "learning_rate": {
+          "sweep": {
+            "default": true,
+            "range": true
+          }
+        },
+        "biases": {
+          "default": true,
+          "layer_specific": true
+        },
+        "nodes_per_layer": {
+          "default": true,
+          "layer_specific": true
+        },
+        "activation_funcs": {
+          "default": true,
+          "layer_specific": true
+        }
+      }
+    }
+  },
+  "experiments": {
+    "*": {
+      "type": true,
+      "comment": true,
+      "disable_tqdm": true,
+      "print_statements": true,
+      "export_samples": true,
+      "export_metadata": true,
+      "overwrite": true
+    }
+  },
+  "outputs": {
+    "write_start": true,
+    "write_every": true,
+    "directory": true,
+    "experiment_title": true
+  }
 }
