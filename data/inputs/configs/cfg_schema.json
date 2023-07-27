@@ -1,5 +1,5 @@
 {
-  "sweep_parameters": {
+  "sweep_mode": {
     "sweepable": false,
     "optional": false,
     "dtype": "bool",
@@ -24,9 +24,9 @@
           "valid-range": [1, null]
         },
         "range": {
-          "dtype": "list",
+          "dtype": "customList",
           "list-dtype": "int",
-          "default-value": "range(1,100,1)",
+          "default-value": "1:100:1",
           "valid-range": [1, null]
         }
       }
@@ -715,7 +715,7 @@
       }
     }
   },
-  "experiment": {
+  "experiments": {
     "sweepable": false,
     "optional": false,
     "dtype": "list",

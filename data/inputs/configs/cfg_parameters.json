@@ -1,5 +1,5 @@
 {
-  "sweep_parameters": true,
+  "sweep_mode": true,
   "logging_mode": true,
   "inputs": {
     "seed": {
@@ -161,7 +161,7 @@
       }
     }
   },
-  "experiment": [
+  "experiments": [
     {
       "name": true,
       "comment": true,
