@@ -753,3 +753,35 @@ def in_range(v,limits:list,inclusive:bool=False):
     if limits[1] is not None:
         within_range = within_range and (v <= limits[1] if inclusive else v < limits[0])
     return within_range
+
+def dict_inverse(d:dict):
+    return {v:k for k,v in d.items()}
+
+def get_keys_in_path(d, target_keys, path=[]):
+    paths = []
+    for key, value in d.items():
+        current_path = path + [key]
+        if key in target_keys:
+            paths.append(current_path[:-1])
+        if isinstance(value, dict):
+            nested_paths = get_keys_in_path(value, target_keys, current_path)
+            paths.extend(nested_paths)
+    return paths
+
+def get_value_from_path(d, path=[]):
+    if len(path) <= 0:
+        return 'not-found'
+    elif len(path) == 1:
+        return d.get(path[0],'not-found')
+
+    for key in path:
+        if isinstance(d.get(key,'not-found'),dict):
+            return get_value_from_path(d.get(key,'not-found'),path[1:])
+        else:
+            return 'not-found'
+
+def string_to_numeric(s):
+    f = float(s)
+    i = int(f)
+    return i if i == f else f
+
