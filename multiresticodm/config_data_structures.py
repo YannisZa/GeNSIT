@@ -1,9 +1,11 @@
 import os
 import sys
+from typing import Any
 
-from collections.abc import Iterable
+from numpy import arange
+from collections.abc import Iterable,Sequence
 
-from multiresticodm.utils import in_range, str_in_list
+from multiresticodm.utils import in_range, str_in_list,string_to_numeric
 
 def instantiate_data_type(
     data,
@@ -30,8 +32,11 @@ class Entry():
         self.data = data
         self.schema = schema
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "Entry()"
+    
+    def value(self) -> Any:
+        return self.data
     
     def check_type(self,data_type=None,key_path=[]):
         data_type = self.schema.get("dtype",data_type)
@@ -53,11 +58,12 @@ class PrimitiveEntry(Entry):
     def __init__(self,data,schema):
         super().__init__(data,schema)
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "PrimitiveEntry()"
     
     def check(self,key_path=[]):
         pass
+
     
     def check_range(self,key_path=[]):
         # Check that correct range is used for each element
@@ -85,7 +91,7 @@ class Bool(PrimitiveEntry):
         super().__init__(data,schema)
         self.dtype = bool
     
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "Boolean()"
     
     def check_boolean(self,key_path=[]):
@@ -114,7 +120,7 @@ class Numeric(PrimitiveEntry):
         # Check that input is in the scope of allowable inputs
         self.check_scope(key_path=key_path)
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "Numeric()"
     
 class Int(Numeric):
@@ -122,7 +128,7 @@ class Int(Numeric):
         super().__init__(data,schema)
         self.dtype = int
     
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "Integer()"
     
 class Float(Numeric):
@@ -130,7 +136,7 @@ class Float(Numeric):
         super().__init__(data,schema)
         self.dtype = float
     
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "Float()"
     
 class Str(PrimitiveEntry):
@@ -138,7 +144,7 @@ class Str(PrimitiveEntry):
         super().__init__(data,schema)
         self.dtype = str
     
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "String()"
 
     def check(self,key_path=[]):
@@ -152,7 +158,7 @@ class StrInt(Numeric):
         super().__init__(data,schema)
         self.dtype = str
     
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "StringInteger()"
 
     def check(self,key_path=[]):
@@ -170,7 +176,7 @@ class Path(Str):
         super().__init__(data,schema)
         self.dtype = str
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "Path(String)"
 
     def check_path_exists(self,key_path=[]):
@@ -218,7 +224,7 @@ class File(Path):
         super().__init__(data,schema)
         self.dtype = str
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "File(Path)"
 
     def check(self,key_path=[]):
@@ -234,7 +240,7 @@ class Directory(Path):
         super().__init__(data,schema)
         self.dtype = str
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "Directory(Path)"
 
     def check(self,key_path=[]):
@@ -254,7 +260,7 @@ class NonPrimitiveEntry(Entry):
         super().__init__(data,schema)
         self.names = ['dict','list']
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return "NonPrimitiveEntry()"
 
     def check_length(self,key_path=[]):
@@ -278,22 +284,19 @@ class NonPrimitiveEntry(Entry):
 
 
 class List(NonPrimitiveEntry):
-    def __init__(self,data,schema,key_path=[]):
+    def __init__(self,data,schema):
         super().__init__(data,schema)
         self.dtype = list
-        # print('before')
-        # print(self.data,type(self.data))
-        # print(self.schema)
+
         # First check that input is indeed a list
-        self.check_type(key_path=key_path)
-        # print('after')
+        self.check_type(key_path=[])
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
-        # Remove 'type' key
+        # Remove 'dtype' key
         self.schema = {} 
         for k,v in schema.items():
-            if str_in_list(k,['type','sweepable','optional']):
+            if str_in_list(k,['dtype','sweepable','optional']):
                 continue
             # Remove all non-primitive entry names from preffix
             stored = False
@@ -308,6 +311,9 @@ class List(NonPrimitiveEntry):
                 
         # Get all value entries
         self.data = [instantiate_data_type(val,self.schema) for val in data]
+
+    def value(self) -> list:
+        return [datum.value() for datum in self.data]
             
     def check_elements(self,key_path=[]):
         # Check that all elements of the list are valid
@@ -322,20 +328,98 @@ class List(NonPrimitiveEntry):
         # by calling their respective check functions
         self.check_elements(key_path=key_path)
 
+class CustomList(NonPrimitiveEntry):
+    def __init__(self,data,schema):
+        super().__init__(data,schema)
+        self.dtype = Sequence
+        # Parse data
+        self.data, self.parsing_success = self.parse(self.data,self.schema)
+        # First check that input is indeed a list
+        self.check_type(key_path=[])
+
+        # Then prep schema for list values
+        # Remove all key prefixes that start with 'list'
+        # Remove 'dtype' key
+        self.schema = {} 
+        for k,v in schema.items():
+            if str_in_list(k,['dtype','sweepable','optional']):
+                continue
+            # Remove all non-primitive entry names from preffix
+            stored = False
+            for name in self.names:
+                if k.startswith((name+'-')):
+                    self.schema[k.replace((name+'-'),'',1)] = v
+                    stored = True
+                    continue
+            # If not done so already, store schema setting
+            if not stored:
+                self.schema[k] = v
+        
+        # Get all value entries
+        self.data = [instantiate_data_type(val,self.schema) for val in self.data]
+    
+    def value(self) -> list:
+        return [datum.value() for datum in self.data]
+
+    def parse(self,data,schema):
+        # Split by ':'
+        d = data.split(":")
+        # Count number of occurences of ':'
+        column_count = data.count(":")
+        # Get whether bounds are inclusive
+        inclusive = schema.get('inclusive',True)
+        if column_count > 0:
+            d = [string_to_numeric(elem) for elem in d]
+        if column_count == 1:
+            if inclusive:
+                return arange(d[0],d[1]+1).tolist(),True
+            else:
+                return arange(d[0],d[1]).tolist(),True
+        elif column_count == 2:
+            if inclusive:
+                return arange(d[0],d[1]+1,d[2]).tolist(),True
+            else:
+                return arange(d[0],d[1],d[2]).tolist(),True
+        else:
+            return [],False
+
+
+    def check_elements(self,key_path=[]):
+        # Check that all elements of the list are valid
+        for elem in self.data:
+            elem.check(key_path=key_path)
+        return True
+    
+    def check_parsing(self,key_path=[]):
+        try:
+            assert self.parsing_success
+        except:
+            raise CustomListParsingException(f"Data {self.data} contain > 2 or < 0 ':' strings.",key_path=key_path)
+        return True
+
+    def check(self,key_path=[]):
+        # Check that parsing was completed successfully
+        self.check_parsing(key_path=key_path)
+        # Check that correct length is provided
+        self.check_length(key_path=key_path)
+        # Check that each element of the list is valid 
+        # by calling their respective check functions
+        self.check_elements(key_path=key_path)
+
 class Dict(NonPrimitiveEntry):
-    def __init__(self,data,schema,key_path=[]):
+    def __init__(self,data,schema):
         super().__init__(data,schema)
         self.dtype = dict
 
         # First check that input is indeed a dict
-        self.check_type(key_path=key_path)
+        self.check_type(key_path=[])
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
-        # Remove 'type' key
+        # Remove 'dtype' key
         self.schema = {} 
         for k,v in schema.items():
-            if str_in_list(k,['type','sweepable','optional']):
+            if str_in_list(k,['dtype','sweepable','optional']):
                 continue
             # Remove all non-primitive entry names from preffix
             stored = False
@@ -354,7 +438,10 @@ class Dict(NonPrimitiveEntry):
         value_schema = {k.replace('value-','',1):v for k,v in self.schema.items() if k.startswith('value-')}
         # Get all value entries
         self.data = {instantiate_data_type(key,key_schema):instantiate_data_type(val,value_schema) for key,val in data.items()}
-            
+    
+    def value(self) -> dict:
+        return {key.value():value.value() for key,value in self.data.items()}
+    
     def check_elements(self,key_path=[]):
         # Check that all keys of the dictionary are valid
         for key in self.data.keys():
@@ -372,12 +459,12 @@ class Dict(NonPrimitiveEntry):
         self.check_elements(key_path=key_path)
 
 class CustomDict(NonPrimitiveEntry):
-    def __init__(self,data,schema,key_path=[]):
+    def __init__(self,data,schema):
         super().__init__(data,schema)
         self.dtype = dict
 
         # First check that input is indeed a dict
-        self.check_type(key_path=key_path)
+        self.check_type(key_path=[])
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
@@ -403,6 +490,9 @@ class CustomDict(NonPrimitiveEntry):
         # Get all value entries
         self.data = {instantiate_data_type(key,key_schema):instantiate_data_type(val,value_schema[key]) for key,val in data.items()}
             
+    def value(self) -> dict:
+        return {key.value():value.value() for key,value in self.data.items()}
+    
     def check_elements(self,key_path=[]):
         # Check that all keys of the dictionary are valid
         for key in self.data.keys():
@@ -470,6 +560,10 @@ class InvalidExtensionException(EntryException):
         super().__init__(message,key_path=key_path,**kwargs)
 
 class InvalidBooleanException(EntryException):
+    def __init__(self,message,key_path=[],**kwargs):
+        super().__init__(message,key_path=key_path,**kwargs)
+
+class CustomListParsingException(EntryException):
     def __init__(self,message,key_path=[],**kwargs):
         super().__init__(message,key_path=key_path,**kwargs)
 
