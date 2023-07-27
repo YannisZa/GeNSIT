@@ -15,17 +15,17 @@ from multiresticodm.math_utils import scipy_optimize
 from multiresticodm.spatial_interaction_model import SpatialInteraction
 from multiresticodm.utils import str_in_list,makedir,set_seed,deep_get,set_numba_torch_threads
 
-def instantiate_spatial_interaction_mcmc(sim:SpatialInteraction,disable_logger:bool=False):
+def instantiate_spatial_interaction_mcmc(sim:SpatialInteraction,**kwargs):
     if hasattr(sys.modules[__name__], (sim.sim_name+'MarkovChainMonteCarlo')):
-        return getattr(sys.modules[__name__], (sim.sim_name+'MarkovChainMonteCarlo'))(sim,disable_logger)
+        return getattr(sys.modules[__name__], (sim.sim_name+'MarkovChainMonteCarlo'))(sim,**kwargs)
     else:
         raise Exception(f"Input class {(sim.sim_name+'MarkovChainMonteCarlo')} not found")
 
 class SpatialInteractionMarkovChainMonteCarlo():
 
-    def __init__(self, sim:SpatialInteraction,disable_logger:bool=False):
+    def __init__(self, sim:SpatialInteraction,**kwargs):
         self.logger = logging.getLogger(__name__)
-        self.logger.disabled = disable_logger
+        self.logger.disabled = kwargs.get('disable_logger',False)
         numba_logger = logging.getLogger('numba')
         numba_logger.setLevel(logging.WARNING)
         # Store sim model
@@ -102,10 +102,10 @@ class SpatialInteractionMarkovChainMonteCarlo():
 
 class SpatialInteraction2DMarkovChainMonteCarlo(SpatialInteractionMarkovChainMonteCarlo):
 
-    def __init__(self, sim:SpatialInteraction,disable_logger:bool=False):
+    def __init__(self, sim:SpatialInteraction,**kwargs):
         
         # Instantiate superclass
-        super().__init__(sim,disable_logger)
+        super().__init__(sim,**kwargs)
 
         # Store table distribution name
         try:

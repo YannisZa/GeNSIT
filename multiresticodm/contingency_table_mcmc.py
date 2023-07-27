@@ -21,9 +21,9 @@ class ContingencyTableMarkovChainMonteCarlo(object):
     Work Station for holding and running Monte Carlo methods on table space.
     """
 
-    def __init__(self, ct: ContingencyTable, table_mb:MarkovBasis=None, disable_logger: bool = False):
+    def __init__(self, ct: ContingencyTable, table_mb:MarkovBasis=None, **kwargs):
         self.logger = logging.getLogger(__name__)
-        self.logger.disabled = disable_logger
+        self.logger.disabled = kwargs.get('disable_logger',False)
         numba_logger = logging.getLogger('numba')
         numba_logger.setLevel(logging.WARNING)
 

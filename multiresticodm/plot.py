@@ -194,14 +194,14 @@ class Plot(object):
                 filename
             )
         else:
-            subconfig = errors[list(errors.keys())[0]]['subconfig']
+            config = errors[list(errors.keys())[0]]['config']
             outputs_path = errors[list(errors.keys())[0]]['outputs_path']
-            filename = f"{subconfig['table_dim']}_{statistic_name}_{sample_name}_" + \
+            filename = f"{config['table_dim']}_{statistic_name}_{sample_name}_" + \
                     f"{self.settings['norm']}_norm_vs_iteration_" + \
-                    f"N{subconfig['mcmc']['N']}_" + \
+                    f"N{config['mcmc']['N']}_" + \
                     f"burnin{self.settings['burnin']}_" + \
                     f"thinning{self.settings['thinning']}_" + \
-                    f"{subconfig['mcmc']['contingency_table']['proposal']}"
+                    f"{config['mcmc']['contingency_table']['proposal']}"
             filepath = os.path.join(outputs_path,'figures',filename)
 
         # Plot
@@ -215,13 +215,13 @@ class Plot(object):
             # Read label(s) from settings
             errors[experiment_id]['label'], \
             label_by_key, \
-            label_by_val = create_dynamic_data_label(__self__=self,data=errors[experiment_id]['subconfig'])
+            label_by_val = create_dynamic_data_label(__self__=self,data=errors[experiment_id]['config'])
 
             # Plot error norm for current file
-            x_max = self.settings.get('N',errors[experiment_id]['subconfig']['mcmc'].get('N',-1))
+            x_max = self.settings.get('N',errors[experiment_id]['config']['mcmc'].get('N',-1))
             x_range = list(range(
                         self.settings['burnin'],
-                        errors[experiment_id]['subconfig']['mcmc'].get('N',1),
+                        errors[experiment_id]['config']['mcmc'].get('N',1),
                         self.settings['thinning']
             ))
             x_range = x_range[0:int(x_max):1]
@@ -393,20 +393,20 @@ class Plot(object):
                 # Remove experiment from output directories
                 self.outputs_directories.remove(outputs_directories[i])
                 # Remove relevant metadata
-                del outputs.experiment.subconfig
+                del outputs.experiment.config
                 continue
 
             if i == 0:
-                K = outputs.experiment.subconfig['K']
+                K = outputs.experiment.config['K']
             else:
                 # All experiment must be using the same ensemble size
                 try: 
-                    assert outputs.experiment.subconfig['K'] == K
+                    assert outputs.experiment.config['K'] == K
                 except:
                     # Remove experiment from output directories
                     self.outputs_directories.remove(outputs_directories[i])
                     # Remove relevant metadata
-                    del outputs.experiment.subconfig
+                    del outputs.experiment.config
                     continue    
 
     def table_posterior_mean_convergence_fixed_intensity(self):
@@ -436,15 +436,15 @@ class Plot(object):
                 )
                 table_norms[outputs.experiment_id] = {
                         'y':table_error_statistic,
-                        'subconfig':outputs.experiment.subconfig,
+                        'config':outputs.experiment.config,
                         'outputs_path':outputs.outputs_path
                 }
                 # Find supremum of norm below epsilon
                 convergence_index = np.argmax(table_error_statistic < (self.settings['epsilon_threshold']))
                 # Get metadata
-                N = list(deep_get(key='N',value=outputs.experiment.subconfig.settings))[0]
+                N = list(deep_get(key='N',value=outputs.experiment.config.settings))[0]
                 try:
-                    thinning = list(deep_get(key='thinning',value=outputs.experiment.subconfig.settings))[0]
+                    thinning = list(deep_get(key='thinning',value=outputs.experiment.config.settings))[0]
                 except:
                     thinning = 1
                 # Extraction iteration number
@@ -458,7 +458,7 @@ class Plot(object):
 
             # Decide on statistic symbol based on size of ensemble of datasets
             statistic_symbol = ''
-            if outputs.experiment.subconfig['K'] == 1:
+            if outputs.experiment.config['K'] == 1:
                 statistic_symbol = "\mathbb{{E}}[\mathbf{T}|\mathcal{C}_{T},\Lambda]"
             else:
                 statistic_symbol = "\mathbb{{E}}[\mathbb{{E}}[\mathbf{T}|\mathcal{C}_{T},\Lambda]]"
@@ -469,7 +469,7 @@ class Plot(object):
                         'mean',
                         statistic_symbol,
                         'table',
-                        outputs.experiment.subconfig['K']
+                        outputs.experiment.config['K']
             )
         else:
             self.logger.error('No valid experiments found')
@@ -489,14 +489,14 @@ class Plot(object):
                 self.outputs_directories.remove(output_directory)
 
             # Load contingency table
-            dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+            dummy_config = Namespace(**{'settings':outputs.experiment.config})
             ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True)
             # If no table is provided
             if ct.table is None:
                 # Remove experiment from output directories
                 self.outputs_directories.remove(output_directory)
                 # Remove relevant metadata
-                del outputs.experiment.subconfig
+                del outputs.experiment.config
                 continue
 
     def table_posterior_mean_convergence(self):
@@ -519,7 +519,7 @@ class Plot(object):
                 )
                 
                 # Instantiate contingency table
-                dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+                dummy_config = Namespace(**{'settings':outputs.experiment.config})
                 ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True)
                 
                 # Load samples and apply moving averages
@@ -571,7 +571,7 @@ class Plot(object):
                 # Add error norms to dict
                 error_norms[outputs.experiment_id] = {
                         'y':mean_error_norm,
-                        'subconfig':outputs.experiment.subconfig,
+                        'config':outputs.experiment.config,
                         'outputs_path':outputs.outputs_path
                 }
                 
@@ -603,14 +603,14 @@ class Plot(object):
                 # Remove experiment from output directories
                 self.outputs_directories.remove(output_directory)
                 # Remove relevant metadata
-                del outputs.experiment.subconfig
+                del outputs.experiment.config
                 continue
             # If experiment does not use ensemble size of 1
-            elif outputs.experiment.subconfig['K'] != 1:
+            elif outputs.experiment.config['K'] != 1:
                 # Remove experiment from output directories
                 self.outputs_directories.remove(output_directory)
                 # Remove relevant metadata
-                del outputs.experiment.subconfig
+                del outputs.experiment.config
                 continue   
 
     def colsum_posterior_mean_convergence_fixed_intensity(self):        
@@ -680,16 +680,16 @@ class Plot(object):
             )
             # Make sure the right experiments are provided
             try:
-                assert np.any([exp_type in outputs.experiment.subconfig['type'].lower() for exp_type in valid_experiment_types])
+                assert np.any([exp_type in outputs.experiment.config['name'].lower() for exp_type in valid_experiment_types])
             except:
-                self.logger.warning(f"Skipping invalid experiment {outputs.experiment.subconfig['type'].lower()}")
+                self.logger.warning(f"Skipping invalid experiment {outputs.experiment.config['name'].lower()}")
                 continue
             
             # Read label(s) from settings
             try:
                 label = ''
                 for k in list(self.settings['label_by']):
-                    value = list(deep_get(key=k,value=outputs.experiment.subconfig.settings))[0]
+                    value = list(deep_get(key=k,value=outputs.experiment.config.settings))[0]
                     # If label not included in metadata ignore it
                     if value is not None:
                         label += '_'+str(value)
@@ -770,8 +770,8 @@ class Plot(object):
 
         # Get filepath
         figure_filepath = os.path.join(
-            outputs.experiment.subconfig['outputs']['directory'],
-            outputs.experiment.subconfig['experiment_data'],
+            outputs.experiment.config['outputs']['directory'],
+            outputs.experiment.config['experiment_data'],
             output_dir,
             filename
         )
@@ -846,16 +846,16 @@ class Plot(object):
         }
 
         # plt.rcParams.update(params)
-        grid_size = outputs.experiment.subconfig['grid_size']
-        amin,amax = outputs.experiment.subconfig['a_range']
-        bmin,bmax = outputs.experiment.subconfig['b_range']
+        grid_size = outputs.experiment.config['grid_size']
+        amin,amax = outputs.experiment.config['a_range']
+        bmin,bmax = outputs.experiment.config['b_range']
         # Get config and sim
         outputs = Outputs(
             output_directory,
             self.settings,
             disable_logger=True
         )
-        dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+        dummy_config = Namespace(**{'settings':outputs.experiment.config})
         sim = instantiate_sim(dummy_config)
         
         # Update max values
@@ -900,7 +900,7 @@ class Plot(object):
                 "figures",
                 f"table_{'x'.join([str(s) for s in sim.shape()])}_" + \
                 f"total_{sim.total_flow}_" + \
-                f"{outputs.experiment.subconfig['type']}" + \
+                f"{outputs.experiment.config['name']}" + \
                 f"{self.settings['experiment_title']}" + \
                 f"{sim.noise_regime.title()}Noise"
         )
@@ -924,7 +924,7 @@ class Plot(object):
         cbar = plt.colorbar()
         cbar.set_label(sample_symbol,rotation=self.settings['colorbar_label_rotation'],labelpad=self.settings['colorbar_labelpad'])
         # Plot ground truth and fitted value
-        plt.scatter(outputs.experiment.subconfig['fitted_alpha'],outputs.experiment.subconfig['fitted_scaled_beta'],color='blue',s=self.settings['marker_size']*(2/3),label='fitted')
+        plt.scatter(outputs.experiment.config['fitted_alpha'],outputs.experiment.config['fitted_scaled_beta'],color='blue',s=self.settings['marker_size']*(2/3),label='fitted')
         # *(1/sim.bmax)
         if hasattr(sim,'alpha_true') and hasattr(sim,'beta_true'):
             plt.scatter(sim.alpha_true,sim.beta_true,color='red',s=self.settings['marker_size'],label='true',marker='x')
@@ -969,9 +969,9 @@ class Plot(object):
             parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
 
             # Get filename
-            filename = f"table_{outputs.experiment.subconfig['table_dim']}_" + \
-                    f"{outputs.experiment.subconfig['type']}_{self.settings['experiment_title']}_parameter_mixing_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.subconfig['mcmc']['N']}" 
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_parameter_mixing_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}" 
 
             # Define filepath
             filepath = os.path.join(output_directory.parent.absolute(),outputs.experiment_id,'figures',filename)
@@ -1052,10 +1052,10 @@ class Plot(object):
             parameter_samples = outputs.load_samples('theta')
 
             # Get filename
-            filename = f"table_{outputs.experiment.subconfig['table_dim']}_" + \
-                    f"{outputs.experiment.subconfig['type']}_{self.settings['experiment_title']}_" + \
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_" + \
                     f"parameter_acf_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.subconfig['mcmc']['N']}"
+                    f"N_{outputs.experiment.config['mcmc']['N']}"
 
             
             # Define filepath
@@ -1107,7 +1107,7 @@ class Plot(object):
                 self.settings,
                 disable_logger=True
             )
-            # dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+            # dummy_config = Namespace(**{'settings':outputs.experiment.config})
             # sim = instantiate_sim(dummy_config)
             # Convert to path object
             output_directory = Path(output_directory)
@@ -1117,9 +1117,9 @@ class Plot(object):
             sign_samples = outputs.load_samples('sign')
             
             # Get filename
-            filename = f"table_{outputs.experiment.subconfig['table_dim']}_" + \
-                    f"{outputs.experiment.subconfig['type']}_{self.settings['experiment_title']}_parameter_contours_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.subconfig['mcmc']['N']}"
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_parameter_contours_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}"
 
             # Define filepath
             filepath = os.path.join(outputs.outputs_path,'figures',filename)
@@ -1210,7 +1210,7 @@ class Plot(object):
                 self.settings,
                 disable_logger=True
             )
-            dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+            dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
 
             # Get only first n_samples as specified by settings
@@ -1218,9 +1218,9 @@ class Plot(object):
             sign_samples = outputs.load_samples('sign')
 
             # Get filename
-            filename = f"table_{outputs.experiment.subconfig['table_dim']}_" + \
-                    f"{outputs.experiment.subconfig['type']}_{self.settings['experiment_title']}_parameter_histogram_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.subconfig['mcmc']['N']}"
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_parameter_histogram_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}"
 
             # Define filepath
             filepath = os.path.join(outputs.outputs_path,'figures',filename)
@@ -1302,7 +1302,7 @@ class Plot(object):
                 self.settings,
                 disable_logger=True
             )
-            dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+            dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
 
             # Get only first n_samples as specified by settings
@@ -1310,9 +1310,9 @@ class Plot(object):
             sign_samples = outputs.load_samples('sign')
 
             # Get filename
-            filename = f"table_{outputs.experiment.subconfig['table_dim']}_" + \
-                    f"{outputs.experiment.subconfig['type']}_{self.settings['experiment_title']}_log_destination_attraction_mixing_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.subconfig['mcmc']['N']}"
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_log_destination_attraction_mixing_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}"
 
             # Define filepath
             filepath = os.path.join(outputs.outputs_path,'figures',filename)
@@ -1429,12 +1429,12 @@ class Plot(object):
         else:
 
             # Get filename
-            filename = f"table_{prediction_data[experiment_id]['subconfig']['table_dim']}_" + \
-                    f"gamma_{prediction_data[experiment_id]['subconfig']['spatial_interaction_model']['gamma']}" + \
-                    f"{prediction_data[experiment_id]['subconfig']['type']}_{self.settings['experiment_title']}_log_destination_attraction_predictions_"+\
+            filename = f"table_{prediction_data[experiment_id]['config']['table_dim']}_" + \
+                    f"gamma_{prediction_data[experiment_id]['config']['spatial_interaction_model']['gamma']}" + \
+                    f"{prediction_data[experiment_id]['config']['name']}_{self.settings['experiment_title']}_log_destination_attraction_predictions_"+\
                     f"burnin_{self.settings['burnin']}_" + \
                     f"thinning_{self.settings['thinning']}_" + \
-                    f"N_{prediction_data[experiment_id]['subconfig']['mcmc']['N']}"
+                    f"N_{prediction_data[experiment_id]['config']['mcmc']['N']}"
 
             # Define filepath
             filepath = os.path.join(prediction_data[experiment_id]['outputs_path'],'figures',filename)
@@ -1470,7 +1470,7 @@ class Plot(object):
                 slice_samples=True,
                 disable_logger=True
             )
-            dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+            dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
 
             # Create label
@@ -1478,7 +1478,7 @@ class Plot(object):
             _, \
             _ = create_dynamic_data_label(
                 __self__=self,
-                data=outputs.experiment.subconfig
+                data=outputs.experiment.config
             )
             
             # Get mean 
@@ -1504,7 +1504,7 @@ class Plot(object):
                 'x':mu_x,
                 'y':sim.log_destination_attraction,
                 'title':r2,
-                'subconfig':outputs.experiment.subconfig,
+                'config':outputs.experiment.config,
                 'outputs_path':outputs.outputs_path
             }
 
@@ -1524,7 +1524,7 @@ class Plot(object):
                 self.settings,
                 disable_logger=True
             )
-            dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+            dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
 
             # Get only first n_samples as specified by settings
@@ -1532,10 +1532,10 @@ class Plot(object):
             sign_samples = outputs.load_samples('sign')
 
             # Get filename
-            filename = f"table_{outputs.experiment.subconfig['table_dim']}_" + \
-                    f"gamma_{outputs.experiment.subconfig['spatial_interaction_model']['gamma']}" + \
-                    f"{outputs.experiment.subconfig['type']}_{self.settings['experiment_title']}_log_destination_attraction_residuals_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.subconfig['mcmc']['N']}"
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"gamma_{outputs.experiment.config['spatial_interaction_model']['gamma']}" + \
+                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_log_destination_attraction_residuals_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}"
 
             # Define filepath
             filepath = os.path.join(outputs.outputs_path,'figures',filename)
@@ -2314,7 +2314,7 @@ class Plot(object):
                         self.logger.debug(traceback.format_exc())
                         self.logger.error(f"Annotation by coverage probabilities omitted")
                         continue
-                    # dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+                    # dummy_config = Namespace(**{'settings':outputs.experiment.config})
                     # ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True)
                     # print('\n')
                     for (i,j),label in np.ndenumerate(coverage_probabilities):
@@ -2353,7 +2353,7 @@ class Plot(object):
                         "x":covered_cell_locations[:,0].astype('int32'),
                         "y":covered_cell_locations[:,1].astype('int32'),
                         "label":f"{sample}_covered_cell_coordinates",
-                        "subconfig":outputs.experiment.subconfig,
+                        "config":outputs.experiment.config,
                         "outputs_path":outputs.outputs_path
                     }
 
@@ -2434,7 +2434,7 @@ class Plot(object):
                     "z":np.array([table[cell[0]-1,cell[1]-1] if ((cell[0] > 0) and (cell[1] > 0)) else 0 for cell in cells],dtype='float64'),
                     "color":np.array([flow_norm(table[cell[0]-1,cell[1]-1]) if ((cell[0] > 0) and (cell[1] > 0)) else 0.5 for cell in cells],dtype='float64'),
                     "label":f"{sample}_cell_data",
-                    "subconfig":outputs.experiment.subconfig,
+                    "config":outputs.experiment.config,
                     "outputs_path":outputs.outputs_path
                 }
                 origin_demand_data = {
@@ -2443,7 +2443,7 @@ class Plot(object):
                     "z":np.array([origin_demand[cell[0]-1] for cell in cells if (cell[1] >= J-1) and (cell[0] < I)],dtype='float64'),
                     "color":np.array([origin_norm(origin_demand[cell[0]-1]) for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='float64'),
                     "label":f"{sample}_origin_demand_cell_data",
-                    "subconfig":outputs.experiment.subconfig,
+                    "config":outputs.experiment.config,
                     "outputs_path":outputs.outputs_path
                 }
                 destination_demand_data = {
@@ -2452,7 +2452,7 @@ class Plot(object):
                     "z":np.array([destination_demand[cell[1]-1] for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='float64'),
                     "color":np.array([destination_norm(destination_demand[cell[1]-1]) for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='float64'),
                     "label":f"{sample}_destination_demand_cell_data",
-                    "subconfig":outputs.experiment.subconfig,
+                    "config":outputs.experiment.config,
                     "outputs_path":outputs.outputs_path
                 }
                 print(table.sum(axis=0))
@@ -2465,21 +2465,21 @@ class Plot(object):
                     "ticks":np.array([t for t in flow_cbar.ax.get_yticks()],dtype='float32'),
                     "locations":np.array([flow_norm(t) for t in flow_cbar.ax.get_yticks()],dtype='float32'),
                     "label":f"{sample}_colorbar_ticks",
-                    "subconfig":outputs.experiment.subconfig,
+                    "config":outputs.experiment.config,
                     "outputs_path":outputs.outputs_path
                 }
                 origin_demand_colorbar_data = {
                     "ticks":np.array([t for t in origin_margin_cbar.ax.get_yticks()],dtype='float32'),
                     "locations":np.array([origin_norm(t) for t in origin_margin_cbar.ax.get_yticks()],dtype='float32'),
                     "label":f"{sample}_origin_demand_colorbar_ticks",
-                    "subconfig":outputs.experiment.subconfig,
+                    "config":outputs.experiment.config,
                     "outputs_path":outputs.outputs_path
                 }
                 destination_demand_colorbar_data = {
                     "ticks":np.array([t for t in destination_margin_cbar.ax.get_yticks()],dtype='float32'),
                     "locations":np.array([destination_norm(t) for t in destination_margin_cbar.ax.get_yticks()],dtype='float32'),
                     "label":f"{sample}_destination_demand_colorbar_ticks",
-                    "subconfig":outputs.experiment.subconfig,
+                    "config":outputs.experiment.config,
                     "outputs_path":outputs.outputs_path
                 }
                 # Write figure data
@@ -2538,7 +2538,7 @@ class Plot(object):
                         precision=0
                     )
                 if sample == 'table':
-                    dummy_config = Namespace(**{'settings':outputs.experiment.subconfig})
+                    dummy_config = Namespace(**{'settings':outputs.experiment.config})
                     ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True)  
                     # for cell in ct.constraints['cells']:
                         # print('ground truth', ct.table[cell[0],cell[1]])
@@ -2558,7 +2558,7 @@ class Plot(object):
                             "x":np.array([c[0] for c in ct.constraints['cells']],dtype='int32'),
                             "y":np.array([c[1] for c in ct.constraints['cells']],dtype='int32'),
                             "label":f"{sample}_fixed_cell_coordinates",
-                            "subconfig":outputs.experiment.subconfig,
+                            "config":outputs.experiment.config,
                             "outputs_path":outputs.outputs_path
                         }
                         write_figure_data(
@@ -2587,7 +2587,7 @@ class Plot(object):
     #         )
     
     #         # Define filepath
-    #         filename = f"table_{outputs.experiment.subconfig['table_dim']}_total_{self.settings['table_total']}_{self.settings['sample'][0]}_flows_colorbar"
+    #         filename = f"table_{outputs.experiment.config['table_dim']}_total_{self.settings['table_total']}_{self.settings['sample'][0]}_flows_colorbar"
 
     #         filepath = os.path.join(outputs.outputs_path,'figures',filename)
 

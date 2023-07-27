@@ -729,7 +729,6 @@ def export_competitive_method_outputs(
         log_destination_attractions
 ):
     output_folder = metadata['experiment_id']+'_'+\
-        metadata['type']+'_'+\
         metadata['noise_regime'].capitalize()+'Noise_'+\
         metadata['outputs']['experiment_title']+'_'+\
         metadata['datetime']

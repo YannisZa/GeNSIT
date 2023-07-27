@@ -10,17 +10,17 @@ from typing import Dict,Tuple,List
 from multiresticodm.utils import f_to_df,df_to_f,f_to_array,makedir,write_compressed_string,read_compressed_string,str_in_list
 from multiresticodm.contingency_table import ContingencyTable
 
-def instantiate_markov_basis(ct:ContingencyTable,disable_logger:bool=False): #-> Union[MarkovBasis,None]:
+def instantiate_markov_basis(ct:ContingencyTable,**kwargs): #-> Union[MarkovBasis,None]:
     if hasattr(sys.modules[__name__], ct.markov_basis_class):
-        return getattr(sys.modules[__name__], ct.markov_basis_class)(ct,disable_logger)
+        return getattr(sys.modules[__name__], ct.markov_basis_class)(ct,**kwargs)
     else:
         raise Exception(f"Input class {ct.markov_basis_class} not found")
 
 class MarkovBasis(object):
-    def __init__(self, ct:ContingencyTable,disable_logger:bool=False):
+    def __init__(self, ct:ContingencyTable,**kwargs):
         # Import logger
         self.logger = logging.getLogger(__name__)
-        self.logger.disabled = disable_logger
+        self.logger.disabled = kwargs.get('disable_logger',False)
         numba_logger = logging.getLogger('numba')
         numba_logger.setLevel(logging.WARNING)
 
@@ -299,9 +299,9 @@ class MarkovBasis(object):
 
 class MarkovBasis1DTable(MarkovBasis):
 
-    def __init__(self, ct:ContingencyTable,disable_logger:bool=False):
+    def __init__(self, ct:ContingencyTable,**kwargs):
         # Initialise superclass constructor
-        super().__init__(ct,disable_logger)
+        super().__init__(ct,**kwargs)
 
         # Build object
         self.build()
@@ -324,9 +324,9 @@ class MarkovBasis1DTable(MarkovBasis):
 
 class MarkovBasis2DTable(MarkovBasis):
 
-    def __init__(self, ct:ContingencyTable,disable_logger:bool=False):
+    def __init__(self, ct:ContingencyTable,**kwargs):
         # Initialise superclass constructor
-        super().__init__(ct,disable_logger)
+        super().__init__(ct,**kwargs)
 
         # Build object
         self.build()

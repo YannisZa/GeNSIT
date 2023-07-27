@@ -30,7 +30,7 @@ class Inputs:
     def read_data(
         self,
     ):
-        self.logger.note("   Loading Harris Wilson data ...")
+        self.logger.note("Loading Harris Wilson data ...")
         if not str_in_list('dataset',self.config.settings['inputs']):
             raise Exception('Input dataset NOT provided. Harris Wilson model cannot be created.')
         
@@ -253,7 +253,7 @@ class Inputs:
 #     :returns the origin sizes, cost_matrix, and the time series
 #     """
 
-#     log.note("   Generating synthetic data ...")
+#     log.note("Generating synthetic data ...")
 
 #     # Get run configuration properties
 #     data_cfg = cfg["synthetic_data"]
