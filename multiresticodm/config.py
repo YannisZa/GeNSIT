@@ -1,10 +1,8 @@
-import sys
 import json
 import os.path
 import toml
 import logging
 
-from pathlib import Path
 from copy import deepcopy
 from multiresticodm.utils import deep_apply, str_in_list
 from multiresticodm.config_data_structures import instantiate_data_type
@@ -24,17 +22,9 @@ class Config:
             self.settings = toml.load(path, _dict=dict)
 
             # Load schema
-            with open('./data/inputs/configs/cfg_schema.json', 'r') as f:
-                self.schema = json.load(f)
-
-            # Load all parameter positions
-            with open('./data/inputs/configs/cfg_parameters.json', 'r') as f:
-                self.parameters = json.load(f)
-
-            # Validate config against schema
-            self.validate_config(self.parameters,self.settings,key_path=[])
-
-            sys.exit()
+            self.load_schema()
+            # Load parameter positions
+            self.load_parameters()
 
         elif settings:
             self.settings = settings
@@ -47,7 +37,17 @@ class Config:
             return json.dumps(settings,indent=2)
         else:
             return json.dumps(self.settings,indent=2)
-    
+
+    def load_schema(self):
+        # Load schema
+        with open('./data/inputs/configs/cfg_schema.json', 'r') as f:
+            self.schema = json.load(f)
+
+    def load_parameters(self):
+        # Load all parameter positions
+        with open('./data/inputs/configs/cfg_parameters.json', 'r') as f:
+            self.parameters = json.load(f)
+
     def keys(self):
         return self.settings.keys()
 
@@ -63,7 +63,8 @@ class Config:
     def __setitem__(self, key, value):
         self.settings[key] = value
 
-    def set_paths_root(self)  -> None:
+
+    def path_sets_root(self)  -> None:
         """
         Add root path to all configured paths (inputs, output directories).
         :param root: root path
@@ -91,13 +92,22 @@ class Config:
         except:
             print(settings_copy)
 
-    def path_get(self,settings,path=[]):
+    def parse_data(self,settings,key_path):
+        # Get schema given the path
+        schema,_ = self.path_get(settings=self.schema,path=key_path)
+        # Instantiate data type
+        data = instantiate_data_type(settings,schema)
+        # return parsed data
+        return data.value()
+
+    def path_get(self,settings=None,path=[]):
         if len(path) <= 0:
             return None,False
+        if settings is None:
+            settings = self.settings
+        
         settings_copy = deepcopy(settings)
         for i,key in enumerate(path):
-            # print(key,settings_copy.keys())
-            # print('\n')
             if key == 'sweep':
                 if isinstance(settings_copy,dict):
                     if settings_copy.get(key,'not-found') == 'not-found':
@@ -107,7 +117,6 @@ class Config:
                 else:
                     return settings_copy,(settings_copy!='not-found')
             else:
-                # print(settings_copy)
                 if isinstance(settings_copy,dict):
                     settings_copy = settings_copy.get(key,'not-found')
                 else:
@@ -122,14 +131,21 @@ class Config:
         
         value_set = False
         if len(path) == 1:
-            settings.setdefault(path[0],value)
+            if str_in_list(path[0],list(settings.keys())):
+                settings[path[0]] = value
             value_set = True
         else:
             value_set = self.path_set(settings.get(path[0],'not-found'),value,path[1:])
         
         return value_set
 
-    def validate_config(self,parameters,settings,key_path=[]):
+    def validate_config(self,parameters=None,settings=None,key_path=[]):
+        # Pass defaults if no meaningful arguments are provided
+        if parameters is None:
+            parameters = self.parameters
+        if settings is None:
+            settings = self.settings
+        
         for k, v in parameters.items():
             try:
                 # Experiment settings are provided in list of dictionaries
@@ -228,7 +244,7 @@ class Config:
 
                         # 3: Check that if parameter sweep is activated
                         sweep_active = False
-                        if key_path[-1] == 'sweep_parameters':
+                        if key_path[-1] == 'sweep_mode':
                             sweep_active = settings_val
                         
                         # 3: If sweep is deactivated and only sweep configuration
@@ -267,8 +283,6 @@ class Config:
                                     ) 
                                 ):
                                 # Read parent schema
-                                # print(settings_val)
-                                # print(schema_val)
                                 schema_val, _ = self.path_get(self.schema,key_path[:-1])
                                 # Extract schema from sweep's 'default' key 
                                 if key_path[-1] == 'range':
@@ -290,8 +304,6 @@ class Config:
                                         schema=schema_val
                                     )
                                 except:
-                                    print("settings_val")
-                                    print(settings_val)
                                     raise Exception
                             # Check that entry is valid
                             entry.check(key_path=key_path)
@@ -299,4 +311,5 @@ class Config:
                         # Remove it from path
                         key_path.remove(k)
             except:
-                raise Exception('Exception found in '+'>'.join(key_path+[k]))
+
+                raise Exception('Exception found in '+'>'.join(key_path))
