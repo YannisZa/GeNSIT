@@ -47,7 +47,7 @@ dims = [+69,+13]
     optimizer = 'Adam'
     learning_rate = +0.002
     [neural_network.hyperparameters.biases]
-      default = [+0, +4]
+      default = [+0.0, +4.0]
       [neural_network.hyperparameters.biases.layer_specific]
     [neural_network.hyperparameters.nodes_per_layer]
       default = +20
@@ -57,16 +57,14 @@ dims = [+69,+13]
       [neural_network.hyperparameters.activation_funcs.layer_specific]
         1 = 'abs'
 
-[experiments]
-
-  [experiments.exp7]
-    type = 'SIM_NN'
-    comment = 'Spatial interaction model parameter learning using neural networks'
-    disable_tqdm = false
-    print_statements = true
-    export_samples = true
-    export_metadata = true
-    overwrite = true
+[[experiment]]
+  name = 'SIM_NN'
+  comment = 'Spatial interaction model parameter learning using neural networks'
+  disable_tqdm = false
+  print_statements = true
+  export_samples = true
+  export_metadata = true
+  overwrite = true
 
 [outputs]
     write_start = +1

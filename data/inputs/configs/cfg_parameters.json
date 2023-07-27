@@ -126,44 +126,44 @@
           "default": true,
           "range": true
         }
-      },
-      "hyperparameters": {
-        "num_layers": {
-          "sweep": {
-            "default": true,
-            "range": true
-          }
-        },
-        "optimizer": {
-          "sweep": {
-            "default": true,
-            "range": true
-          }
-        },
-        "learning_rate": {
-          "sweep": {
-            "default": true,
-            "range": true
-          }
-        },
-        "biases": {
+      }
+    },
+    "hyperparameters": {
+      "num_layers": {
+        "sweep": {
           "default": true,
-          "layer_specific": true
-        },
-        "nodes_per_layer": {
-          "default": true,
-          "layer_specific": true
-        },
-        "activation_funcs": {
-          "default": true,
-          "layer_specific": true
+          "range": true
         }
+      },
+      "optimizer": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "learning_rate": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "biases": {
+        "default": true,
+        "layer_specific": true
+      },
+      "nodes_per_layer": {
+        "default": true,
+        "layer_specific": true
+      },
+      "activation_funcs": {
+        "default": true,
+        "layer_specific": true
       }
     }
   },
-  "experiments": {
-    "*": {
-      "type": true,
+  "experiment": [
+    {
+      "name": true,
       "comment": true,
       "disable_tqdm": true,
       "print_statements": true,
@@ -171,7 +171,7 @@
       "export_metadata": true,
       "overwrite": true
     }
-  },
+  ],
   "outputs": {
     "write_start": true,
     "write_every": true,
