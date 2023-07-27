@@ -2,14 +2,13 @@ import gc
 import sys
 import time
 import logging
+import itertools
 
 from os import path
 from tqdm import tqdm
 from glob import glob
-from typing import Dict
 from copy import deepcopy
 from datetime import datetime
-from argparse import Namespace
 from scipy.optimize import minimize
 from joblib import Parallel, delayed
 
@@ -31,6 +30,27 @@ from multiresticodm.spatial_interaction_model_mcmc import instantiate_spatial_in
 np.set_printoptions(suppress=True)
 
 
+def instantiate_experiment(experiment_type:str,config:Config,**kwargs):
+    # Get whether sweep is active and its settings available
+    sweep_param_key_paths = get_keys_in_path(
+        config.settings,
+        "sweep",
+        path = []
+    )
+    sweep_param_key_paths = [] if sweep_param_key_paths is None else sweep_param_key_paths
+    if hasattr(sys.modules[__name__], experiment_type):
+        if config.settings.get("sweep_mode",False) and \
+            len(sweep_param_key_paths) > 0:
+            return ExperimentSweep(
+                config=config,
+                sweep_key_paths=sweep_param_key_paths,
+                **kwargs
+            )
+        else:
+            return getattr(sys.modules[__name__], experiment_type)(config=config,**kwargs)
+    else:
+        raise Exception(f'Experiment class {experiment_type} not found')
+
 class ExperimentHandler(object):
 
     def __init__(self, config:Config):
@@ -39,50 +59,45 @@ class ExperimentHandler(object):
         numba_logger = logging.getLogger('numba')
         numba_logger.setLevel(logging.WARNING)
         
-        # Get contingency table
+        # Get configuration
         self.config = config
+        # Store experiment name to list index dictionary
+        self.avail_experiments = self.config.settings['available_experiments']
         # Instatiate list of experiments
         self.experiments = []
 
         # Setup experiments
         self.setup_experiments()
 
-    def map_experiment_type_to_class(self,experiment_type:str):
-        if hasattr(sys.modules[__name__], experiment_type):
-            return getattr(sys.modules[__name__], experiment_type)
-        else:
-            raise Exception(f'Experiment class {experiment_type} not found')
-
-
     def setup_experiments(self):
 
         self.experiments = {}
 
         # Only run experiments specified in command line
-        for experiment_id in self.config.settings['experiments']['run_experiments']:
+        for experiment_id in self.config.settings['run_experiments']:
             # Check that such experiment already exists in the config file
-            if experiment_id in self.config.settings['experiments'].keys():
-                # Instatiate new experiment
-                experiment = self.map_experiment_type_to_class(self.config.settings['experiments'][experiment_id]['type'])
+            if experiment_id in self.avail_experiments.keys():
                 # Construct sub-config with only data relevant for experiment
-                subconfig = Config(settings=deepcopy(self.config.settings['experiments'][experiment_id]))
+                experiment_config = Config(
+                    settings=deepcopy(self.config.settings)
+                )
+                # Store one experiment
+                experiment_config['experiments'] = [
+                    self.config.settings['experiments'][self.avail_experiments[experiment_id]]
+                ]
                 # Update id, seed and logging detail
-                subconfig['experiment_id'] = experiment_id
+                experiment_config['experiment_id'] = experiment_id
                 if self.config.settings['inputs'].get('dataset',None) is not None:
-                    subconfig['experiment_data'] = path.basename(path.normpath(self.config.settings['inputs']['dataset']))
+                    experiment_config['experiment_data'] = path.basename(path.normpath(self.config.settings['inputs']['dataset']))
                 else:
                     raise Exception(f'No dataset found for experiment id {experiment_id}')
-                for k in self.config.settings.keys():
-                    if k != 'experiments':
-                        subconfig[k] = self.config.settings[k]
-                # print(json.dumps(subconfig,indent=2))
-                # Build it
-                new_experiment = experiment(
-                    subconfig,
+                # Instatiate new experiment
+                experiment = instantiate_experiment(
+                    experiment_type=experiment_config.settings['experiments'][0]['name'],
+                    config=experiment_config
                 )
-
                 # Append it to list of experiments
-                self.experiments[experiment_id] = new_experiment
+                self.experiments[experiment_id] = experiment
 
     def run_and_write_experiments_sequentially(self):
         # Run all experiments sequential
@@ -97,70 +112,67 @@ class ExperimentHandler(object):
                 pass
 
 class Experiment(object):
-    def __init__(self, subconfig:Config, disable_logger:bool=False, **kwargs):
+    def __init__(self, config:Config, **kwargs):
         # Create logger
         self.logger = logging.getLogger(__name__)
+        self.logger.disabled = kwargs.get('disable_logger',False)
         numba_logger = logging.getLogger('numba')
         numba_logger.setLevel(logging.WARNING)
         
         # Make sure you are reading a config
-        if isinstance(subconfig,dict):
-            subconfig = Config(settings=subconfig)
-        elif not isinstance(subconfig,Config):
-            raise Exception(f'Subconfig provided has invalid type {type(subconfig)}')
+        if isinstance(config,dict):
+            config = Config(settings=config)
+        elif not isinstance(config,Config):
+            raise Exception(f'config provided has invalid type {type(config)}')
 
-        # Store subconfig
-        self.subconfig = subconfig
-        if len(self.subconfig['inputs'].get('load_experiment',[])) > 0:
+        # Store config
+        self.config = config
+        if len(self.config['inputs'].get('load_experiment',[])) > 0:
             # Get path
-            filepath = self.subconfig['inputs'].get('load_experiment','')
+            filepath = self.config['inputs'].get('load_experiment','')
             # Load metadata
             settings = read_json(path.join(filepath,path.basename(filepath)+'_metadata.json'))
             # Deep update config settings based on metadata
             settings_flattened = deep_flatten(settings,parent_key='',sep='')
             # Remove load experiment 
             del settings_flattened['load_experiment']
-            deep_updates(self.subconfig,settings_flattened,overwrite=True)
+            deep_updates(self.config,settings_flattened,overwrite=True)
             # Merge settings to config
-            self.subconfig = Config(settings={**self.subconfig, **settings_flattened})
+            self.config = Config(settings={**self.config, **settings_flattened})
         
         # Update config with current timestamp ( but do not overwrite)
-        datetime_results = list(deep_get(key='datetime',value=self.subconfig.settings))
+        datetime_results = list(deep_get(key='datetime',value=self.config.settings))
         if len(datetime_results) > 0:
-            deep_update(self.subconfig, key='datetime', val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), overwrite=False)
+            deep_update(self.config, key='datetime', val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), overwrite=False)
         else:
-            self.subconfig['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+            self.config['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
         # Initialise empty results
         self.results = []
 
-        # Disable loggers if necessary
-        if disable_logger:
-            self.logger.disabled = True
-
         # Update current config
-        # self.subconfig = self.sim.config.update_recursively(self.subconfig,updated_config,overwrite=True)
-        # print(self.subconfig)
+        # self.config = self.sim.config.update_recursively(self.config,updated_config,overwrite=True)
+        # print(self.config)
         # Decide how often to print statemtents
-        self.print_statements = self.subconfig.get('print_statements',True)
-        self.store_progress = self.subconfig.get('store_progress',1.0)
+        self.print_statements = self.config.get('print_statements',True)
+        self.store_progress = self.config.get('store_progress',1.0)
         self.print_percentage = min(0.05,self.store_progress)*int(self.print_statements)
 
         # Update seed if specified
         self.seed = None
-        if "seed" in self.subconfig.keys():
-            self.seed = int(self.subconfig["seed"])
-            self.logger.warning(f'   Updated seed to {self.seed}')
+        if "seed" in self.config.keys():
+            self.seed = int(self.config["seed"])
+            self.logger.warning(f"Updated seed to {self.seed}")
         # Get experiment data
-        self.logger.info(f"   Experiment {self.subconfig['experiment_id']} of type {self.subconfig['type']} has been set up.")
+        self.logger.info(f"Experiment {self.config['experiment_id']} has been set up.")
 
         # Get device name
-        self.device = self.subconfig['inputs']['device']
+        self.device = self.config['inputs']['device']
 
     def run(self) -> None:
         pass
 
     def reset(self,metadata:bool=False) -> None:
-        self.logger.info(f'   Resetting experimental results to release memory.')
+        self.logger.info(f"Resetting experimental results to release memory.")
         
         # Get shapes 
         theta_shape = deepcopy(np.shape(self.thetas[-1])[0] if hasattr(self,'thetas') and self.thetas is not None else (2))
@@ -175,8 +187,8 @@ class Experiment(object):
         safe_delete(deep_call(self,'results',None))
         
         if metadata:
-            safe_delete(self.subconfig)
-            self.subconfig = Config(settings={})
+            safe_delete(self.config)
+            self.config = Config(settings={})
 
         # Run garbage collector
         gc.collect()
@@ -212,12 +224,12 @@ class Experiment(object):
     def initialise_parameters(self):
         # Get batch sizes
         batch_sizes = self.define_sample_batch_sizes()
-        self.subconfig['n_batches'] = len(batch_sizes)
+        self.config['n_batches'] = len(batch_sizes)
 
         # Load last sample
-        if str_in_list('load_experiment',self.subconfig['inputs']) and len(self.subconfig['inputs']['load_experiment']) > 0:
+        if str_in_list('load_experiment',self.config['inputs']) and len(self.config['inputs']['load_experiment']) > 0:
             # Read last batch of experiments
-            outputs = Outputs(self,self.subconfig)
+            outputs = Outputs(self,self.config)
             # All parameter initialisations
             parameter_inits = dict(zip(self.sample_names,[0]*len(self.sample_names)))
             parameter_acceptances = dict(zip(self.sample_names,[0]*len(self.sample_names)))
@@ -250,7 +262,7 @@ class Experiment(object):
                     # Extract number of iterations
                     parameter_inits['N0'] = int(total_samples//(K*M*L))
                     # Store acceptance rate
-                    parameter_acceptances[sample_name] = self.subconfig.get((f"{sample_name}_acceptance"),0)*total_samples
+                    parameter_acceptances[sample_name] = self.config.get((f"{sample_name}_acceptance"),0)*total_samples
                 else:
                     raise Exception(f'Failed tried loading experiment {self.experiment_id}')
         # Initialise parameters
@@ -265,13 +277,13 @@ class Experiment(object):
                         None
                     )
                 except:
-                    self.logger.warning('   Unconstrained margins could not be sampled.')
+                    self.logger.warning("Unconstrained margins could not be sampled.")
                 
                 try:
                     parameter_inits['table'] = deep_call(self,'.od_mcmc.initialise_table()',None)
                 except:
                     parameter_inits['table'] = None
-                    self.logger.warning('   Table could not be initialised.')
+                    self.logger.warning("Table could not be initialised.")
             
             if hasattr(self,'sim_mcmc'):
                 # Parameter values
@@ -289,7 +301,7 @@ class Experiment(object):
             parameter_acceptances = dict(zip(list(parameter_inits.keys()),[0]*len(parameter_inits.keys())))
         
         if parameter_inits['batch_counter'] == (len(batch_sizes) - 1):
-            self.logger.warning('   Experiment cannot be resumed.')
+            self.logger.warning("Experiment cannot be resumed.")
 
         # Update metadata initially
         self.update_metadata(
@@ -303,10 +315,10 @@ class Experiment(object):
     def initialise_data_structures(self):
         # Count the number of gradient descent steps
         self._time = 0
-        self._write_every = self.subconfig['outputs'].get('write_every',1)
-        self._write_start = self.subconfig['outputs'].get('write_start',1)
+        self._write_every = self.config['outputs'].get('write_every',1)
+        self._write_start = self.config['outputs'].get('write_start',1)
         # Get dimensions
-        dims = self.subconfig['inputs']['dims']
+        dims = self.config['inputs']['dims']
         
         # Setup neural net loss
         if str_in_list('loss',self.sample_names):
@@ -412,7 +424,7 @@ class Experiment(object):
         M = self.sim_mcmc.theta_steps if hasattr(self,'sim_mcmc') else 1
         L = self.sim_mcmc.log_destination_attraction_steps if hasattr(self,'sim_mcmc') else 1
         # Update batch counter
-        self.subconfig['batch_counter'] = batch_counter
+        self.config['batch_counter'] = batch_counter
 
         if batch_counter == 0 or N <= 1:
             if hasattr(self,'sim_mcmc'):
@@ -424,9 +436,9 @@ class Experiment(object):
         if update_flag:
             if hasattr(self,'od_mcmc'):
                 # Get dims from table
-                self.subconfig['table_dim'] = 'x'.join(map(str,deep_call(self,'.od_mcmc.ct.dims',defaults=None)))
+                self.config['table_dim'] = 'x'.join(map(str,deep_call(self,'.od_mcmc.ct.dims',defaults=None)))
                 # Get total from table
-                self.subconfig['table_total'] = int(deep_call(
+                self.config['table_total'] = int(deep_call(
                     input=self,
                     expressions='.od_mcmc.ct.margins[args1]',
                     defaults=-1,
@@ -434,29 +446,29 @@ class Experiment(object):
                 ))
                 # Get markov basis length from table mcmc
                 if isinstance(deep_call(self,'.od_mcmc.table_mb',None),MarkovBasis):
-                    self.subconfig['markov_basis_len'] = int(len(self.od_mcmc.table_mb))
+                    self.config['markov_basis_len'] = int(len(self.od_mcmc.table_mb))
             elif hasattr(self,'sim_mcmc'):
                 # Compute total sum of squares for r2 computation
                 self.w_data = np.exp(self.sim_mcmc.sim.log_destination_attraction)
                 w_data_centred = self.w_data - np.mean(self.w_data)
                 self.ss_tot = np.dot(w_data_centred, w_data_centred)
                 # Get dims from sim
-                self.subconfig['table_dim'] = 'x'.join(map(str,deep_call(self,'.sim_mcmc.sim.dims',defaults=None)))
+                self.config['table_dim'] = 'x'.join(map(str,deep_call(self,'.sim_mcmc.sim.dims',defaults=None)))
                 # Get sim auxiliary params
-                self.subconfig['auxiliary_parameters'] = deep_call(
+                self.config['auxiliary_parameters'] = deep_call(
                     input=self,
                     expressions=[f'.sim_mcmc.sim.{param}' for param in ['delta','gamma','kappa','epsilon']],
                     defaults=[0.0,1.0,1.0,1.0]
                 )
-                self.subconfig['noise_regime'] = deep_call(self,'.sim_mcmc.sim.noise_regime','undefined')
+                self.config['noise_regime'] = deep_call(self,'.sim_mcmc.sim.noise_regime','undefined')
                 # Store ground truth parameters
                 if self.sim_mcmc.sim.ground_truth_known:
-                    self.subconfig['true_parameters'] = [str(self.sim_mcmc.sim.alpha_true),str(self.sim_mcmc.sim.beta_true)]
+                    self.config['true_parameters'] = [str(self.sim_mcmc.sim.alpha_true),str(self.sim_mcmc.sim.beta_true)]
             elif hasattr(self,'ct'):
                 # Get dims from table
-                self.subconfig['table_dim'] = 'x'.join(map(str,deep_call(self,'.ct.dims',defaults=None)))
+                self.config['table_dim'] = 'x'.join(map(str,deep_call(self,'.ct.dims',defaults=None)))
                 # Get total from table
-                self.subconfig['table_total'] = int(deep_call(
+                self.config['table_total'] = int(deep_call(
                     input=self,
                     expressions='.ct.margins[args1]',
                     defaults=-1,
@@ -464,29 +476,29 @@ class Experiment(object):
                 ))
             elif hasattr(self,'sim'):
                 # Get dims from sim
-                self.subconfig['table_dim'] = 'x'.join(map(str,deep_call(self,'.sim.dims',defaults=None)))
+                self.config['table_dim'] = 'x'.join(map(str,deep_call(self,'.sim.dims',defaults=None)))
                 # Get sim auxiliary params
-                self.subconfig['auxiliary_parameters'] = deep_call(
+                self.config['auxiliary_parameters'] = deep_call(
                     input=self,
                     expressions=[f'.sim.{param}' for param in ['delta','gamma','kappa','epsilon']],
                     defaults=[0.0,1.0,1.0,1.0]
                 )
-                self.subconfig['noise_regime'] = deep_call(self,'.sim.noise_regime','undefined')
+                self.config['noise_regime'] = deep_call(self,'.sim.noise_regime','undefined')
                 # Store ground truth parameters
                 if self.sim.ground_truth_known:
-                    self.subconfig['true_parameters'] = [str(self.sim.alpha_true),str(self.sim.beta_true)]
+                    self.config['true_parameters'] = [str(self.sim.alpha_true),str(self.sim.beta_true)]
             else:
-                self.subconfig['table_dim'] = [None,None]
-                self.subconfig['table_total'] = None
-                self.subconfig['noise_regime'] = None
+                self.config['table_dim'] = [None,None]
+                self.config['table_total'] = None
+                self.config['noise_regime'] = None
 
 
         if hasattr(self,'signs') and hasattr(self,'thetas'):
             mu_theta = np.dot(self.signs.T,self.thetas)/np.sum(self.signs)
             std_theta = np.dot(self.signs.T,np.power(self.thetas,2))/np.sum(self.signs) - np.power(mu_theta,2)
             if update_flag:
-                self.subconfig['theta_mu'] = mu_theta.tolist()
-                self.subconfig['theta_sd'] = std_theta.tolist()
+                self.config['theta_mu'] = mu_theta.tolist()
+                self.config['theta_sd'] = std_theta.tolist()
         if hasattr(self,'signs') and hasattr(self,'log_destination_attractions'):
             mu_x = np.dot(self.signs.T,self.log_destination_attractions)/np.sum(self.signs)
             # Compute R2
@@ -497,23 +509,23 @@ class Experiment(object):
             # Regression sum squares
             r2 = 1. - ss_res/self.ss_tot
             if update_flag:
-                self.subconfig['log_destination_attraction_r2'] = r2
+                self.config['log_destination_attraction_r2'] = r2
         
         if update_flag:
-            self.subconfig['execution_time'] = (time.time() - self.start_time)
+            self.config['execution_time'] = (time.time() - self.start_time)
             if hasattr(self,'theta_acceptance') and (M*N) > 0:
-                self.subconfig['theta_acceptance'] = int(100*getattr(self,'theta_acceptance',0)/(M*N))
+                self.config['theta_acceptance'] = int(100*getattr(self,'theta_acceptance',0)/(M*N))
             if hasattr(self,'total_signs') and (M*N) > 0:
-                self.subconfig['positives_percentage'] = int(100*getattr(self,'total_signs',0)/(M*N))
+                self.config['positives_percentage'] = int(100*getattr(self,'total_signs',0)/(M*N))
             if hasattr(self,'log_destination_attraction_acceptance') and (L*N) > 0:
-                self.subconfig['log_destination_attraction_acceptance'] = int(100*getattr(self,'log_destination_attraction_acceptance',0)/(L*N))
+                self.config['log_destination_attraction_acceptance'] = int(100*getattr(self,'log_destination_attraction_acceptance',0)/(L*N))
             if hasattr(self,'table_acceptance') and (K*N) > 0:
-                self.subconfig['table_acceptance'] = int(100*(getattr(self,'table_acceptance',0)/(K*N)))
+                self.config['table_acceptance'] = int(100*(getattr(self,'table_acceptance',0)/(K*N)))
             if hasattr(self,'total_signs') and (K*N) > 0:
-                self.subconfig['total_signs'] = int(100*(getattr(self,'total_signs',0)/(K*N)))
+                self.config['total_signs'] = int(100*(getattr(self,'total_signs',0)/(K*N)))
 
         if print_flag:
-            print('Iteration',N,'batch',f"{batch_counter+1}/{self.subconfig.get('n_batches',1)}")
+            print('Iteration',N,'batch',f"{batch_counter+1}/{self.config.get('n_batches',1)}")
             if hasattr(self,'total_signs') and (M*N) > 0:
                 print('Positives %',int(100*(M*self.total_signs/(M*N))))
             if hasattr(self,'theta_acceptance') and (M*N) > 0:
@@ -530,15 +542,15 @@ class Experiment(object):
 
 class RSquaredAnalysis(Experiment):
 
-    def __init__(self, subconfig:Config, disable_logger:bool=False):
+    def __init__(self, config:Config, **kwargs):
         # Initalise superclass
-        super().__init__(subconfig,disable_logger)
+        super().__init__(config,**kwargs)
         # Build spatial interaction model
         self.sim = instantiate_sim(self.config)
 
-        self.grid_size = subconfig['grid_size']
-        self.amin,self.amax = subconfig['a_range']
-        self.bmin,self.bmax = subconfig['b_range']
+        self.grid_size = config['grid_size']
+        self.amin,self.amax = config['a_range']
+        self.bmin,self.bmax = config['b_range']
 
     def run(self) -> None:
         
@@ -599,7 +611,7 @@ class RSquaredAnalysis(Experiment):
         # Output results
         idx = np.unravel_index(r2_values.argmax(), r2_values.shape)
 
-        if self.subconfig['print_statements']:
+        if self.config['print_statements']:
             print("Fitted alpha, beta and scaled beta values:")
             print(alpha_values[idx[1]],beta_values[idx[0]], beta_values[idx[0]]*self.sim.bmax)
             print("R^2 value:")
@@ -613,27 +625,27 @@ class RSquaredAnalysis(Experiment):
                 print(self.sim.alpha_true,self.sim.beta_true)
 
         # Save fitted values to parameters
-        self.subconfig['noise_regime'] = self.sim.noise_regime
-        self.subconfig['fitted_alpha'] = alpha_values[idx[1]]
-        self.subconfig['fitted_beta'] = beta_values[idx[0]]
-        self.subconfig['fitted_scaled_beta'] = beta_values[idx[0]]*self.sim.bmax
-        self.subconfig['R^2'] = float(r2_values[idx])
-        self.subconfig['predicted_w'] = max_w_prediction.tolist()
+        self.config['noise_regime'] = self.sim.noise_regime
+        self.config['fitted_alpha'] = alpha_values[idx[1]]
+        self.config['fitted_beta'] = beta_values[idx[0]]
+        self.config['fitted_scaled_beta'] = beta_values[idx[0]]*self.sim.bmax
+        self.config['R^2'] = float(r2_values[idx])
+        self.config['predicted_w'] = max_w_prediction.tolist()
 
         # Append to result array
         self.results = [{"samples":{"r2":r2_values}}]
 
 class RSquaredAnalysisGridSearch(Experiment):
 
-    def __init__(self, subconfig:Config, disable_logger:bool=False):
+    def __init__(self, config:Config, **kwargs):
         # Initalise superclass
-        super().__init__(subconfig,disable_logger)
+        super().__init__(config,**kwargs)
         # Build spatial interaction model
         self.sim = instantiate_sim(self.config)
         
-        self.grid_size = subconfig['grid_size']
-        self.amin,self.amax = subconfig['a_range']
-        self.bmin,self.bmax = subconfig['b_range']
+        self.grid_size = config['grid_size']
+        self.amin,self.amax = config['a_range']
+        self.bmin,self.bmax = config['b_range']
 
 
     def run(self) -> None:
@@ -729,7 +741,7 @@ class RSquaredAnalysisGridSearch(Experiment):
                             r2_values[i,j,bi,ki,di] = last_r2
                             
                 
-                if self.subconfig['print_statements']:
+                if self.config['print_statements']:
                     print(f'kappa = {argmax_theta[4]}, delta = {argmax_theta[2]}, beta_max = {argmax_beta_scale}')
                     print("Fitted alpha, beta and scaled beta values:")
                     print(argmax_theta[0],argmax_theta[1]*1/(argmax_beta_scale), argmax_theta[1])
@@ -750,21 +762,21 @@ class RSquaredAnalysisGridSearch(Experiment):
         print('\n')
 
         # Save fitted values to parameters
-        self.subconfig['fitted_alpha'] = argmax_theta[0]
-        self.subconfig['fitted_scaled_beta'] = argmax_theta[1]/(argmax_beta_scale)
-        self.subconfig['fitted_beta_scaling_factor'] = argmax_beta_scale
-        self.subconfig['fitted_beta'] = argmax_theta[1]
-        self.subconfig['fitted_kappa'] = kappa_from_delta(argmax_theta[2])
-        self.subconfig['fitted_delta'] = argmax_theta[2]
-        self.subconfig['kappa_min'] = kappa_from_delta(delta_min)#kappa_min
-        self.subconfig['kappa_max'] = kappa_from_delta(delta_max)#kappa_max
-        self.subconfig['delta_min'] = delta_min
-        self.subconfig['delta_max'] = delta_max
-        self.subconfig['beta_scale_min'] = beta_scale_min
-        self.subconfig['beta_scale_max'] = beta_scale_max
-        self.subconfig['R^2'] = float(max_r2)
-        self.subconfig['noise_regime'] = self.sim.noise_regime
-        self.subconfig['predicted_w'] = argmax_w_prediction.tolist()
+        self.config['fitted_alpha'] = argmax_theta[0]
+        self.config['fitted_scaled_beta'] = argmax_theta[1]/(argmax_beta_scale)
+        self.config['fitted_beta_scaling_factor'] = argmax_beta_scale
+        self.config['fitted_beta'] = argmax_theta[1]
+        self.config['fitted_kappa'] = kappa_from_delta(argmax_theta[2])
+        self.config['fitted_delta'] = argmax_theta[2]
+        self.config['kappa_min'] = kappa_from_delta(delta_min)#kappa_min
+        self.config['kappa_max'] = kappa_from_delta(delta_max)#kappa_max
+        self.config['delta_min'] = delta_min
+        self.config['delta_max'] = delta_max
+        self.config['beta_scale_min'] = beta_scale_min
+        self.config['beta_scale_max'] = beta_scale_max
+        self.config['R^2'] = float(max_r2)
+        self.config['noise_regime'] = self.sim.noise_regime
+        self.config['predicted_w'] = argmax_w_prediction.tolist()
 
         # Append to result array
         self.results = [{"samples":{"r2":r2_values}}]
@@ -772,15 +784,15 @@ class RSquaredAnalysisGridSearch(Experiment):
 
 class LogTargetAnalysis(Experiment):
 
-    def __init__(self, subconfig:Config, disable_logger:bool=False):
+    def __init__(self, config:Config, **kwargs):
         # Initalise superclass
-        super().__init__(subconfig,disable_logger)
+        super().__init__(config,**kwargs)
         # Build spatial interaction model
         sim = instantiate_sim(self.config)
 
-        self.grid_size = subconfig['grid_size']
-        self.amin,self.amax = subconfig['a_range']
-        self.bmin,self.bmax = subconfig['b_range']
+        self.grid_size = config['grid_size']
+        self.amin,self.amax = config['a_range']
+        self.bmin,self.bmax = config['b_range']
 
         # Spatial interaction model MCMC
         self.sim_mcmc = instantiate_spatial_interaction_mcmc(sim)
@@ -834,7 +846,7 @@ class LogTargetAnalysis(Experiment):
                     print(e)
                     None
 
-        if self.subconfig['print_statements']:
+        if self.config['print_statements']:
             print("Fitted alpha, beta and scaled beta values:")
             print(XX[argmax_index],YY[argmax_index]*self.amax/(self.bmax), YY[argmax_index])
             print("Log target:")
@@ -845,12 +857,12 @@ class LogTargetAnalysis(Experiment):
         theta[1] = YY[argmax_index]
 
         # Save fitted values to parameters
-        self.subconfig['fitted_alpha'] = XX[argmax_index]
-        self.subconfig['fitted_scaled_beta'] = YY[argmax_index]*self.amax/(self.bmax)
-        self.subconfig['fitted_beta'] = YY[argmax_index]
-        self.subconfig['kappa'] = self.sim.kappa
-        self.subconfig['log_target'] = log_targets[argmax_index]
-        self.subconfig['noise_regime'] = self.sim.noise_regime
+        self.config['fitted_alpha'] = XX[argmax_index]
+        self.config['fitted_scaled_beta'] = YY[argmax_index]*self.amax/(self.bmax)
+        self.config['fitted_beta'] = YY[argmax_index]
+        self.config['kappa'] = self.sim.kappa
+        self.config['log_target'] = log_targets[argmax_index]
+        self.config['noise_regime'] = self.sim.noise_regime
 
         # Append to result array
         self.results = [{"samples":{"log_target":log_targets}}]
@@ -858,16 +870,16 @@ class LogTargetAnalysis(Experiment):
         
 class LogTargetAnalysisGridSearch(Experiment):
 
-    def __init__(self, subconfig:Config, disable_logger:bool=False):
+    def __init__(self, config:Config, **kwargs):
         # Initalise superclass
-        super().__init__(subconfig,disable_logger)
+        super().__init__(config,**kwargs)
         
         # Build spatial interaction model
         sim = instantiate_sim(self.config)
 
-        self.grid_size = subconfig['grid_size']
-        self.amin,self.amax = subconfig['a_range']
-        self.bmin,self.bmax = subconfig['b_range']
+        self.grid_size = config['grid_size']
+        self.amin,self.amax = config['a_range']
+        self.bmin,self.bmax = config['b_range']
 
         # Spatial interaction model MCMC
         self.sim_mcmc = instantiate_spatial_interaction_mcmc(sim)
@@ -948,7 +960,7 @@ class LogTargetAnalysisGridSearch(Experiment):
                                 None
 
 
-                if self.subconfig['print_statements']:
+                if self.config['print_statements']:
                     print("Fitted alpha, beta and scaled beta values:")
                     print(argmax_theta[0],argmax_theta[1]*self.amax/(argmax_beta_scale), argmax_theta[1])
                     print("Log target:")
@@ -974,19 +986,19 @@ class LogTargetAnalysisGridSearch(Experiment):
         print('\n')
 
         # Save fitted values to parameters
-        self.subconfig['fitted_alpha'] = argmax_theta[0]
-        self.subconfig['fitted_scaled_beta'] = argmax_theta[1]*1/(argmax_beta_scale)
-        self.subconfig['fitted_beta'] = argmax_theta[1]
-        self.subconfig['fitted_kappa'] = argmax_theta[4]
-        self.subconfig['fitted_delta'] = argmax_theta[2]
-        self.subconfig['kappa_min'] = self.kappa_min
-        self.subconfig['kappa_max'] = self.kappa_max
-        self.subconfig['delta_min'] = self.delta_min
-        self.subconfig['delta_max'] = self.delta_max
-        self.subconfig['beta_scale_min'] = self.beta_scale_min
-        self.subconfig['beta_scale_max'] = self.beta_scale_max
-        self.subconfig['log_target'] = max_target
-        self.subconfig['noise_regime'] = self.sim.noise_regime
+        self.config['fitted_alpha'] = argmax_theta[0]
+        self.config['fitted_scaled_beta'] = argmax_theta[1]*1/(argmax_beta_scale)
+        self.config['fitted_beta'] = argmax_theta[1]
+        self.config['fitted_kappa'] = argmax_theta[4]
+        self.config['fitted_delta'] = argmax_theta[2]
+        self.config['kappa_min'] = self.kappa_min
+        self.config['kappa_max'] = self.kappa_max
+        self.config['delta_min'] = self.delta_min
+        self.config['delta_max'] = self.delta_max
+        self.config['beta_scale_min'] = self.beta_scale_min
+        self.config['beta_scale_max'] = self.beta_scale_max
+        self.config['log_target'] = max_target
+        self.config['noise_regime'] = self.sim.noise_regime
 
         # Append to result array
         self.results = [{"samples":{"log_target":log_targets}}]
@@ -994,9 +1006,9 @@ class LogTargetAnalysisGridSearch(Experiment):
 
 
 class SIM_MCMC(Experiment):
-    def __init__(self, subconfig:Config, disable_logger:bool=False):
+    def __init__(self, config:Config, **kwargs):
         # Initalise superclass
-        super().__init__(subconfig,disable_logger)
+        super().__init__(config,**kwargs)
 
         # Build spatial interaction model
         sim = instantiate_sim(self.config)
@@ -1014,7 +1026,7 @@ class SIM_MCMC(Experiment):
         
     def run(self) -> None:
 
-        self.logger.info(f'   Running MCMC inference of {self.sim_mcmc.sim.noise_regime} noise SpatialInteraction.')
+        self.logger.info(f"Running MCMC inference of {self.sim_mcmc.sim.noise_regime} noise SpatialInteraction.")
 
         # Time run
         self.start_time = time.time()
@@ -1086,7 +1098,7 @@ class SIM_MCMC(Experiment):
             print('destination_attraction_prev',np.exp(log_destination_attraction_sample))
             print('\n')
 
-        for i in tqdm(range(parameter_inits['N0'],N),disable=self.subconfig['disable_tqdm']):
+        for i in tqdm(range(parameter_inits['N0'],N),disable=self.config['disable_tqdm']):
         
             # Run theta sampling
             for j in tqdm(
@@ -1182,7 +1194,7 @@ class SIM_MCMC(Experiment):
         # Unfix random seed
         set_seed(None)
 
-        self.logger.info(f'   Experimental results have been compiled.')
+        self.logger.info(f"Experimental results have been compiled.")
 
         # Append to result array
         self.results.append({"samples":{"log_destination_attraction":self.log_destination_attractions,
@@ -1192,9 +1204,9 @@ class SIM_MCMC(Experiment):
 
 class JointTableSIM_MCMC(Experiment):
 
-    def __init__(self, subconfig:Config, disable_logger:bool=False):
+    def __init__(self, config:Config, **kwargs):
         # Initalise superclass
-        super().__init__(subconfig,disable_logger)
+        super().__init__(config,**kwargs)
         
         # Setup table
         ct = instantiate_ct(table=None,config=self.config)
@@ -1206,13 +1218,13 @@ class JointTableSIM_MCMC(Experiment):
         # Spatial interaction model MCMC
         self.sim_mcmc = instantiate_spatial_interaction_mcmc(
             sim,
-            disable_logger
+            disable_logger=kwargs.get('disable_logger',False)
         )
         # Contingency Table mcmc
         self.od_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct,
             table_mb=None,
-            disable_logger=disable_logger
+            disable_logger=kwargs.get('disable_logger',False)
         )
 
         # Delete duplicate of contingency table and spatial interaction model
@@ -1223,13 +1235,13 @@ class JointTableSIM_MCMC(Experiment):
 
         self.sample_names = ['table','log_destination_attraction','theta','sign']
 
-        # print_json(self.subconfig)
+        # print_json(self.config)
         print(self.sim_mcmc)
         print(self.od_mcmc)
 
     def run(self) -> None:
 
-        self.logger.info(f'   Running joint MCMC inference of contingency tables and {self.sim_mcmc.sim.noise_regime} noise SpatialInteraction.')
+        self.logger.info(f"Running joint MCMC inference of contingency tables and {self.sim_mcmc.sim.noise_regime} noise SpatialInteraction.")
 
         # Time run
         self.start_time = time.time()
@@ -1315,7 +1327,7 @@ class JointTableSIM_MCMC(Experiment):
             print('destination_attraction_prev',np.exp(log_destination_attraction_sample))
             print('\n')
 
-        for i in tqdm(range(parameter_inits['N0'],N),disable=self.subconfig['disable_tqdm']):
+        for i in tqdm(range(parameter_inits['N0'],N),disable=self.config['disable_tqdm']):
             
             # Run theta sampling
             for j in tqdm(
@@ -1444,7 +1456,7 @@ class JointTableSIM_MCMC(Experiment):
         # Unfix random seed
         set_seed(None)
 
-        self.logger.info(f'   Experimental results have been compiled.')
+        self.logger.info(f"Experimental results have been compiled.")
 
         # Append to result array
         self.results.append({"samples":{"log_destination_attraction":self.log_destination_attractions,
@@ -1453,9 +1465,9 @@ class JointTableSIM_MCMC(Experiment):
                                         "table":self.tables}})
 
 class Table_MCMC(Experiment):
-    def __init__(self, subconfig:Config, disable_logger:bool=False):
+    def __init__(self, config:Config, **kwargs):
         # Initalise superclass
-        super().__init__(subconfig,disable_logger)
+        super().__init__(config,**kwargs)
 
         # Setup table
         ct = instantiate_ct(table=None,config=self.config)
@@ -1465,11 +1477,11 @@ class Table_MCMC(Experiment):
         sim = instantiate_sim(self.config)
         
         # Update config with table dimension
-        # self.subconfig['table_dim'] = 'x'.join(map(str,ct.dims))
-        # self.subconfig['table_total'] = int(ct.margins[tuplize(range(ct.ndims()))])
+        # self.config['table_dim'] = 'x'.join(map(str,ct.dims))
+        # self.config['table_total'] = int(ct.margins[tuplize(range(ct.ndims()))])
         # Initialise intensities at ground truths
         if (ct is not None) and (ct.table is not None):
-            self.logger.info('   Using table as ground truth intensity')
+            self.logger.info("Using table as ground truth intensity")
             # Use true table to construct intensities
             with np.errstate(invalid='ignore',divide='ignore'):
                 self.true_log_intensities = np.log(
@@ -1478,7 +1490,7 @@ class Table_MCMC(Experiment):
                                             )
             
         elif (sim is not None) and (sim.ground_truth_known):
-            self.logger.info('   Using SIM model as ground truth intensity')
+            self.logger.info("Using SIM model as ground truth intensity")
             # Spatial interaction model MCMC
             # Compute intensities
             self.true_log_intensities = sim.log_intensity(
@@ -1493,7 +1505,7 @@ class Table_MCMC(Experiment):
         self.od_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct,
             table_mb=None,
-            disable_logger=disable_logger
+            disable_logger=kwargs.get('disable_logger',False)
         )
         # Set table steps to 1
         self.od_mcmc.table_steps = 1
@@ -1506,10 +1518,10 @@ class Table_MCMC(Experiment):
         self.sample_names = ['table']
 
     def initialise_parameters(self):
-        if str_in_list('load_experiment',self.subconfig['inputs']) and \
-            len(self.subconfig['inputs']['load_experiment']) > 0:
+        if str_in_list('load_experiment',self.config['inputs']) and \
+            len(self.config['inputs']['load_experiment']) > 0:
             # Read last batch of experiments 
-            outputs = Outputs(self,self.subconfig)
+            outputs = Outputs(self,self.config)
             # Parameter initialisations
             parameter_inits = {}
             # Total samples for joint posterior
@@ -1574,7 +1586,7 @@ class Table_MCMC(Experiment):
         batch_counter = parameter_inits['batch_counter']
 
         # Loop through each sample batch
-        for i in tqdm(range(parameter_inits['N0'],N),disable=self.subconfig['disable_tqdm']):
+        for i in tqdm(range(parameter_inits['N0'],N),disable=self.config['disable_tqdm']):
                 
             # Take step
             table_sample, table_accepted = self.od_mcmc.table_gibbs_step(
@@ -1621,16 +1633,16 @@ class Table_MCMC(Experiment):
         # Unfix random seed
         set_seed(None)
 
-        self.logger.info(f'   Experimental results have been compiled.')
+        self.logger.info(f"Experimental results have been compiled.")
 
         # Append to result array
         self.results.append({"samples":{"table":self.tables}})
 
 
 class TableSummariesMCMCConvergence(Experiment):
-    def __init__(self, subconfig:Config, disable_logger:bool=False):
+    def __init__(self, config:Config, **kwargs):
         # Initalise superclass
-        super().__init__(subconfig,disable_logger)
+        super().__init__(config,**kwargs)
 
         # Setup table
         ct = instantiate_ct(table=None,config=self.config)
@@ -1644,11 +1656,11 @@ class TableSummariesMCMCConvergence(Experiment):
             assert len(self.ct.config.settings['inputs']['contingency_table']['constraints'].get('cells',[])) == 0
         except:
             self.logger.error(self.ct.config.settings['inputs']['contingency_table']['constraints'].get('cells',[]))
-            self.logger.error('   Cell constraints found in config.')
+            self.logger.error("Cell constraints found in config.")
             raise Exception('TableSummariesMCMCConvergence cannot handle cell constraints due to the different margins generated')
         # Initialise intensities at ground truths
         if (ct is not None) and (ct.table is not None):
-            self.logger.info('   Using table as ground truth intensity')
+            self.logger.info("Using table as ground truth intensity")
             # Use true table to construct intensities
             # with np.errstate(invalid='ignore',divide='ignore'):
             self.true_log_intensities = np.log(
@@ -1657,7 +1669,7 @@ class TableSummariesMCMCConvergence(Experiment):
                                         )
             # np.log(ct.table,out=np.ones(np.shape(ct.table),dtype='float32')*(-1e10),where=(ct.table!=0),dtype='float32')
         elif (sim is not None) and (sim.ground_truth_known):
-            self.logger.info('   Using SIM model as ground truth intensity')
+            self.logger.info("Using SIM model as ground truth intensity")
             # Spatial interaction model MCMC
             # Compute intensities
             self.true_log_intensities = sim.log_intensity(
@@ -1672,7 +1684,7 @@ class TableSummariesMCMCConvergence(Experiment):
         self.true_log_intensities[np.isinf(self.true_log_intensities) & (self.true_log_intensities > 0) ] = 1e6
 
         # Store number of copies of MCMC sampler to run
-        self.K = self.subconfig['K']
+        self.K = self.config['K']
         # Create K different margins (data) for each MCMC sampler
         self.samplers = {}
 
@@ -1681,7 +1693,7 @@ class TableSummariesMCMCConvergence(Experiment):
         self.samplers['0'] = ContingencyTableMarkovChainMonteCarlo(
             ct,
             table_mb=None,
-            disable_logger=disable_logger
+            disable_logger=kwargs.get('disable_logger',False)
         )
         self.samplers['0'].table_steps = 1
         if self.K > 1:
@@ -1744,8 +1756,8 @@ class TableSummariesMCMCConvergence(Experiment):
         table_norm = apply_norm(
             tab=table_mean[np.newaxis,:],
             tab0=np.exp(self.true_log_intensities,dtype='float32'),
-            name=self.subconfig['norm'],
-            **self.subconfig
+            name=self.config['norm'],
+            **self.config
         )
         
         
@@ -1754,7 +1766,7 @@ class TableSummariesMCMCConvergence(Experiment):
         N = self.samplers['0'].ct.config.settings['mcmc']['N']
 
         print('Running MCMC')
-        for i in tqdm(range(1,N),disable=self.subconfig['disable_tqdm'],leave=False):
+        for i in tqdm(range(1,N),disable=self.config['disable_tqdm'],leave=False):
             # Run MCMC for one step in all chains in ensemble
             # Do it in parallel
             if self.samplers['0'].n_workers > 1:
@@ -1790,22 +1802,13 @@ class TableSummariesMCMCConvergence(Experiment):
                 apply_norm(
                     tab=table_mean[np.newaxis,:],
                     tab0=np.exp(self.true_log_intensities,dtype='float32'),
-                    name=self.subconfig['norm'],
-                    **self.subconfig
+                    name=self.config['norm'],
+                    **self.config
                 )), 
                 axis=0
             )
-            # print('after')
-            # print(table_mean)
-            # print('error')
-            # print(np.sum(table_norm[-1]))
-            # print('\n')
 
-            if (self.subconfig['print_statements']) and (i in [int(p*N) for p in np.arange(0,1,0.1)]):
-                # print('table mean')
-            #     print(table_mean)
-            #     print('ground truth')
-            #     print(np.exp(self.true_log_intensities,dtype='float32'))
+            if (self.config['print_statements']) and (i in [int(p*N) for p in np.arange(0,1,0.1)]):
                 print('norm')
                 print(table_norm[-1])
 
@@ -1820,7 +1823,7 @@ class TableSummariesMCMCConvergence(Experiment):
         # Unfix random seed
         set_seed(None)
 
-        self.logger.info(f'   Experimental results have been compiled.')
+        self.logger.info(f"Experimental results have been compiled.")
 
         self.results = [{
             "samples":{
@@ -1831,53 +1834,51 @@ class TableSummariesMCMCConvergence(Experiment):
         return self.results[-1]
 
 class SIM_NN(Experiment):
-    def __init__(self, subconfig:Config, disable_logger:bool=False):
+    def __init__(self, config:Config, **kwargs):
         
         # Initalise superclass
-        super().__init__(subconfig,disable_logger)
+        super().__init__(config,**kwargs)
 
         # Fix random seed
         rng = set_seed(self.seed)
-        # Store 
-        self.subconfig['inputs']['seed'] = str(self.seed)
 
         # Prepare inputs
         self.inputs = Inputs(
-            config=subconfig,
+            config=config,
             synthetic_data = False
         )
 
         # Set up the neural net
-        self.logger.info("   Initializing the neural net ...")
+        self.logger.info("Initializing the neural net ...")
         neural_network = NeuralNet(
             input_size=self.inputs.destination_attraction_ts.shape[1],
-            output_size=len(subconfig['neural_network']['to_learn']),
-            **subconfig['neural_network']['hyperparameters'],
+            output_size=len(config['neural_network']['to_learn']),
+            **config['neural_network']['hyperparameters'],
         ).to(self.device)
 
         # Pass inputs to device
         self.inputs.pass_to_device()
 
         # Instantiate Spatial Interaction Model
-        self.logger.info("   Initializing the spatial interaction model ...")
+        self.logger.info("Initializing the spatial interaction model ...")
         sim = instantiate_sim(
-            sim_type=subconfig['spatial_interaction_model']['sim_type'],
-            config=subconfig,
+            sim_type=config['spatial_interaction_model']['sim_type'],
+            config=config,
             origin_demand=self.inputs.origin_demand,
             log_destination_attraction=np.log(self.inputs.destination_attraction_ts[:,-1].flatten()),
             cost_matrix=self.inputs.cost_matrix,
-            true_parameters=subconfig['spatial_interaction_model']['parameters'],
+            true_parameters=config['spatial_interaction_model']['parameters'],
             device = self.device
         )
         # Get and remove config
         config = pop_variable(sim,'config')
 
         # Build Harris Wilson model
-        self.logger.info("   Initializing the Harris Wilson physics model ...")
+        self.logger.info("Initializing the Harris Wilson physics model ...")
         harris_wilson_model = HarrisWilson(
             sim=sim,
             config=config,
-            dt = subconfig['harris_wilson_model'].get('dt',0.001),
+            dt = config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
             device = self.device
         )
@@ -1885,43 +1886,42 @@ class SIM_NN(Experiment):
         config = pop_variable(harris_wilson_model,'config')
 
         # Instantiate harris and wilson neural network model
-        self.logger.info("   Initializing the Harris Wilson Neural Network model ...")
+        self.logger.info("Initializing the Harris Wilson Neural Network model ...")
         self.harris_wilson_nn = HarrisWilson_NN(
             rng=rng,
             config=config,
             neural_net=neural_network,
-            loss_function=subconfig['neural_network'].pop('loss_function'),
+            loss_function=config['neural_network'].pop('loss_function'),
             physics_model=harris_wilson_model,
-            to_learn=subconfig['neural_network']['to_learn'],
-            write_every=subconfig['outputs']['write_every'],
-            write_start=subconfig['outputs']['write_start']
+            to_learn=config['neural_network']['to_learn'],
+            write_every=config['outputs']['write_every'],
+            write_start=config['outputs']['write_start']
         )
         # Get config
         config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else None
 
-        # Update subconfig
+        # Update config
         if config is not None:
-            self.subconfig = config
+            self.config = config
 
         # Create outputs
-        self.outputs = Outputs(self)
+        self.outputs = Outputs(self,name_params=kwargs.get('name_params',{}))
 
         # Write metadata
-        if self.subconfig.get('export_metadata',True):
+        if self.config.get('export_metadata',True):
             self.outputs.write_metadata()
         
-        print(self.harris_wilson_nn.physics_model.sim)
-        self.logger.info(f"   {self.harris_wilson_nn}")
+        self.logger.info(f"{self.harris_wilson_nn}")
         
         # Run garbage collector
         gc.collect()
 
         self.sample_names = ['log_destination_attraction','theta','loss']
-        self.theta_names = subconfig['neural_network']['to_learn']
+        self.theta_names = config['neural_network']['to_learn']
         
     def run(self) -> None:
 
-        self.logger.info(f'   Running Neural Network training of Harris Wilson model.')
+        self.logger.info(f"Running Neural Network training of Harris Wilson model.")
 
         # Time run
         start_time = time.time()
@@ -1930,7 +1930,7 @@ class SIM_NN(Experiment):
         self.initialise_data_structures()
         
         # Train the neural net
-        num_epochs = self.subconfig['neural_network']['N']
+        num_epochs = self.config['neural_network']['N']
 
         # For each epoch
         for e in range(num_epochs):
@@ -1942,7 +1942,7 @@ class SIM_NN(Experiment):
             theta_sample, log_destination_attraction_sample = self.harris_wilson_nn.epoch(
                 training_data=self.inputs.destination_attraction_ts, 
                 experiment=self,
-                **self.subconfig['neural_network']
+                **self.config['neural_network']
             )
             
             # Add axis to every sample to ensure compatibility 
@@ -1958,7 +1958,7 @@ class SIM_NN(Experiment):
             #     #self.harris_wilson_nn._physics_model.sim.grand_total
             # )
             # intensity = np.exp(log_intensity.cpu().detach().numpy())
-            self.logger.progress(f"   Completed epoch {e+1} / {num_epochs}.")
+            self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -1967,8 +1967,104 @@ class SIM_NN(Experiment):
 
         
         # Write metadata
-        if self.subconfig.get('export_metadata',True):
+        if self.config.get('export_metadata',True):
             self.outputs.write_metadata()
             
         self.outputs.h5file.close()
-        self.logger.info("   Simulation run finished.")
+        self.logger.info("Simulation run finished.")
+
+
+class ExperimentSweep():
+
+    def __init__(self,config:Config,sweep_key_paths:list,**kwargs):
+        # Import logger
+        self.logger = logging.getLogger(__name__)
+        numba_logger = logging.getLogger('numba')
+        numba_logger.setLevel(logging.WARNING)
+
+        self.logger.info(f"Performing parameter sweep")
+        
+        # Get config
+        self.config = config
+
+        # Load schema
+        self.config.load_schema()
+
+        # Initialise experiments 
+        # (each one corresponds to one parameter sweep)
+        self.experiments = []
+
+        # Parse sweep configurations
+        self.sweep_params = {}
+        for key_path in sweep_key_paths:
+            # Get sweep configuration
+            sweep_input,_ = self.config.path_get(
+                settings=self.config.settings,
+                path=(key_path+["sweep","range"])
+            )
+            # Parse values
+            sweep_vals = self.config.parse_data(sweep_input,(key_path+["sweep","range"]))
+            self.sweep_params[">".join(key_path)] = {
+                "var":key_path[-1],
+                "path": key_path,
+                "values": sweep_vals
+            }
+    
+    def __repr__(self) -> str:
+        return "ParameterSweep("+(self.experiment.__repr__())+")"
+
+    def __str__(self) -> str:
+        return f"""
+            Sweep key paths: {self.sweep_key_paths}
+        """
+
+    def run(self):
+        # Compute all combinations of sweep parameters
+        sweep_configurations = list(itertools.product(*[val['values'] for val in self.sweep_params.values()]))
+        # Pring parameter space size
+        param_sizes_str = " x ".join([f"{v['var']} ({len(v['values'])})" for k,v in self.sweep_params.items()])
+        total_size_str = np.product([len(v['values']) for v in self.sweep_params.values()])
+        self.logger.info(f"Parameter space size: {param_sizes_str}. Total = {total_size_str}.")
+        self.logger.info(f"Preparing configs...")
+        
+        # For each configuration update experiment config 
+        # and instantiate new experiment
+        for sval in tqdm(sweep_configurations):
+            # Create new config
+            new_config = deepcopy(self.config)
+            # Deactivate sweep             
+            new_config.settings["sweep_mode"] = False
+            # Update config
+            for i,key in enumerate(self.sweep_params.keys()):
+                new_config.path_set(
+                    new_config,
+                    sval[i],
+                    self.sweep_params[key]['path']
+                )
+                # new_val = get_value_from_path(new_config.settings,self.sweep_params[key]['path'])
+                # print(key,new_val,type(new_val),get_value_from_path(new_config.settings,['sweep_mode']))
+            # Create new experiment
+            new_experiment = instantiate_experiment(
+                experiment_type=new_config.settings['experiments'][0]['name'],
+                config=new_config,
+                name_params={val['var']:sval[i] for i,val in enumerate(self.sweep_params.values())},
+                disable_logger=True
+            )
+            # sys.exit()
+            # Append to experiments
+            self.experiments.append(new_experiment)
+
+        # Decide whether to run sweeps in parallel or not
+        if self.config.settings['inputs'].get("n_workers",1) > 1:
+            # self.run_parallel()
+            self.run_sequential()
+        else:
+            self.run_sequential()
+    
+    def run_sequential(self):
+        self.logger.info("Running Parameter Sweep in sequence...")
+        for exp in tqdm(self.experiments,total=len(self.experiments)):
+            exp.run()
+    
+    def run_parallel(self):
+        return
