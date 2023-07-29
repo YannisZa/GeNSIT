@@ -12,8 +12,8 @@ from typing import List, Union, Callable
 
 from multiresticodm.config import Config
 from multiresticodm.global_variables import *
-from multiresticodm.utils import str_in_list, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth
-from multiresticodm.math_utils import logsumexp, powerset
+from multiresticodm.utils import update_logger_settings, str_in_list, update_logger_settings, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth
+from multiresticodm.math_utils import powerset
 
 # -> Union[ContingencyTable,None]:
 def instantiate_ct(table, config: Config, **kwargs):
@@ -21,7 +21,8 @@ def instantiate_ct(table, config: Config, **kwargs):
         return getattr(sys.modules[__name__], config.settings['inputs']['contingency_table']['ct_type'])(
                 table=table, 
                 config=config, 
-                disable_logger=kwargs.get('disable_logger',False), 
+                log_to_console=kwargs.get('log_to_console',True), 
+                level=config.level(),
                 **kwargs
         )
     else:
@@ -33,10 +34,14 @@ class ContingencyTable(object):
 
     def __init__(self, table=None, config: Config = None, **kwargs: dict):
         # Import logger
-        self.logger = logging.getLogger(__name__)
-        self.logger.disabled = kwargs.get('disable_logger',False)
-        numba_logger = logging.getLogger('numba')
-        numba_logger.setLevel(logging.WARNING)
+        # Setup logger
+        self.logger = update_logger_settings(
+            __name__,
+            new_level=config.level(),
+            log_to_file=False,
+            log_to_console=kwargs.get('log_to_console',True),
+            level=config.level() if config else kwargs.get('level','INFO')
+        )
         # Config
         self.config = None
         # Update Markov basis class
@@ -799,20 +804,20 @@ class ContingencyTable(object):
 class ContingencyTableIndependenceModel(ContingencyTable):
     def __init__(self, table=None, config: Config = None, **kwargs: dict):
         # Set configuration file
-        super().__init__(table, config, disable_logger = kwargs.get('disable_logger',False), **kwargs)
+        super().__init__(table, config, log_to_console = kwargs.get('log_to_console',True), **kwargs)
 
 
 class ContingencyTableDependenceModel(ContingencyTable):
     def __init__(self, table=None, config: Config = None, **kwargs: dict):
         # Set configuration file
-        super().__init__(table, config, disable_logger = kwargs.get('disable_logger',False), **kwargs)
+        super().__init__(table, config, log_to_console = kwargs.get('log_to_console',True), **kwargs)
 
 
 class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDependenceModel):
 
     def __init__(self, table=None, config: Config = None, **kwargs: dict):
         # Set configuration file
-        super().__init__(table, config, disable_logger = kwargs.get('disable_logger',False), **kwargs)
+        super().__init__(table, config, log_to_console = kwargs.get('log_to_console',True), **kwargs)
         # Build
         self.build(table=table, config=config, **kwargs)        
 

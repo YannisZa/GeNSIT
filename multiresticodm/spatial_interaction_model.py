@@ -9,7 +9,7 @@ from typing import Union
 from multiresticodm.config import Config
 from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
 from multiresticodm.global_variables import SIM_DATA_TYPES, PARAMETER_DEFAULTS
-from multiresticodm.utils import write_txt,makedir
+from multiresticodm.utils import update_logger_settings, write_txt,makedir
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
 
 
@@ -65,12 +65,13 @@ class SpatialInteraction2D():
             **kwargs
     ):
         '''  Constructor '''
-
-        # Import logger
-        self.logger = logging.getLogger(__name__)
-        self.logger.disabled = kwargs.get('disable_logger',False)
-        numba_logger = logging.getLogger('numba')
-        numba_logger.setLevel(logging.WARNING)
+        # Setup logger
+        self.logger = update_logger_settings(
+            __name__,
+            new_level=kwargs.get('level','INFO'),
+            log_to_file=False,
+            log_to_console=config.level() if config else kwargs.get('log_to_console',True)
+        )
 
         # SIM name
         self.sim_name = 'SpatialInteraction2D'
@@ -88,13 +89,7 @@ class SpatialInteraction2D():
         all_parameter_names = self.free_param_names + self.aux_param_names
 
         # Grand total
-        if hasattr(self,'config'):
-            self.grand_total = torch.tensor(self.config['spatial_interaction_model'].get('grand_total',1.0)).float()
-
-        # Dimensions
-        self.dims = None
-        if dims is not None:
-            self.dims = torch.tensor(dims)
+        self.grand_total = kwargs.get('grand_total',torch.tensor(1).int().to(self.device))
 
         # True and auxiliary parameters
         for param in all_parameter_names:
@@ -104,6 +99,11 @@ class SpatialInteraction2D():
                 torch.tensor(true_parameters.get(param,PARAMETER_DEFAULTS[param])).float().to(self.device)
             )
             self.config.settings['spatial_interaction_model']['parameters'][param] = true_parameters.get(param,PARAMETER_DEFAULTS[param])
+
+        # Dimensions
+        self.dims = None
+        if dims is not None:
+            self.dims = dims
 
         # Origin demand
         self.origin_demand = None
@@ -132,10 +132,8 @@ class SpatialInteraction2D():
 
         # Update dims
         if self.dims is None and self.cost_matrix is not None:
-            self.dims = torch.tensor(self.cost_matrix.size())
-
-        # Update config
-        if hasattr(self,'config'):
+            self.dims = torch.tensor(self.cost_matrix.size()).int()
+            # Update config
             self.config.settings['inputs']['dims'] = self.dims.cpu().detach().numpy().tolist()
 
         # Determine if true data exists

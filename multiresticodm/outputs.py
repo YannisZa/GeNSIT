@@ -36,7 +36,7 @@ class OutputSummary(object):
         self.logger = logging.getLogger(__name__)
         numba_logger = logging.getLogger('numba')
         numba_logger.setLevel(logging.WARNING)
-        # Get contingency table
+        # Get command line settings
         self.settings = settings
         # Instatiate list of experiments
         self.experiment_metadata = {}
@@ -446,8 +446,8 @@ class OutputSummary(object):
         metric_arguments = {}
         settings_copy = deepcopy(settings)
         if metric.lower() == 'shannon_entropy':
-            dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True) 
+            dummy_config = Namespace(**{'settings':outputs.config})
+            ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False) 
             try:
                 settings_copy['distribution_name'] = f"log_{ct.distribution_name}_pmf_normalised"
                 assert hasattr(ProbabilityUtils,settings_copy['distribution_name'])
@@ -471,14 +471,19 @@ class OutputSummary(object):
 class Outputs(object):
 
     def __init__(self, 
-                 experiment, 
+                 config, 
                  settings:dict={}, 
                  sample_names:list=['ground_truth_table'], 
                  slice_samples:bool=True,
                  **kwargs):
-        # Import logger
-        self.logger = logging.getLogger(__name__)
-        self.logger.disabled = kwargs.get('disable_logger',False)
+        # Setup logger
+        self.logger = update_logger_settings(
+            __name__,
+            new_level=kwargs.get('level','INFO'),
+            log_to_file=False,
+            log_to_console=kwargs.get('log_to_console',True),
+            level=config.level() if config else kwargs.get('level','INFO')
+        )
 
         # Sample names must be a subset of all data names
         try:
@@ -493,17 +498,17 @@ class Outputs(object):
         self.settings = settings
         # Enable garbage collector
         gc.enable()
-        if isinstance(experiment,str):
+        if isinstance(config,str):
             # Load metadata
-            assert os.path.exists(experiment)
-            self.experiment_id = os.path.basename(os.path.normpath(experiment))
-            metadata = read_json(os.path.join(experiment,self.experiment_id+"_metadata.json"))
+            assert os.path.exists(config)
+            self.experiment_id = os.path.basename(os.path.normpath(config))
+            metadata = read_json(os.path.join(config,self.experiment_id+"_metadata.json"))
             # Store experiment id
-            self.experiment = Namespace(**{'config':metadata,'results':{}})
+            self.config = metadata
             # Get intensity model class
-            self.intensity_model_class = [input_name for input_name in self.experiment.config.keys() if input_name != 'contingency_table' and isinstance(self.experiment.config[input_name],dict)][0]
-            # Define output experiment path to directory
-            self.outputs_path = experiment
+            self.intensity_model_class = [input_name for input_name in self.config.keys() if input_name != 'contingency_table' and isinstance(self.config[input_name],dict)][0]
+            # Define config experiment path to directory
+            self.outputs_path = config
             assert str_in_list('input_path',list(metadata['inputs'].keys()))
             self.inputs_path = metadata['inputs'].get('input_path',None)
             # Try to load ground truth table
@@ -513,7 +518,7 @@ class Outputs(object):
                 try:
                     self.ground_truth_table = np.loadtxt(
                         os.path.join(
-                            self.experiment.config['inputs']['dataset'],
+                            self.config['inputs']['dataset'],
                             self.settings['table']
                         )
                     ).astype('int32')
@@ -521,8 +526,8 @@ class Outputs(object):
                     try:
                         self.ground_truth_table = np.loadtxt(
                             os.path.join(
-                                self.experiment.config['inputs']['dataset'],
-                                self.experiment.config['inputs']['data_files']['table']
+                                self.config['inputs']['dataset'],
+                                self.config['inputs']['data_files']['table']
                             )
                         ).astype('int32')
                     except:
@@ -556,96 +561,109 @@ class Outputs(object):
                 self.logger.warning('Ground truth missing')
 
             
-        elif hasattr(experiment,'config'):
-            # Store experiment
-            self.experiment = experiment
+        elif isinstance(config,Config):
+            # Store config
+            self.config = config
             # Remove unnecessary data
-            for attr in ['inputs','harris_wilson_nn','sim_mcmc','sim','ct']:
-                if hasattr(self.experiment,attr):
-                    safe_delete(getattr(self.experiment,attr))
-
+            # for attr in ['inputs','harris_wilson_nn','sim_mcmc','sim','ct']:
+            #     if hasattr(self.experiment,attr):
+            #         safe_delete(getattr(self.experiment,attr))
+            # gc.collect()
             # Get intensity model class
-            self.intensity_model_class = [input_name for input_name in self.experiment.config.keys() if input_name != 'contingency_table' and isinstance(self.experiment.config[input_name],dict)][0]
+            self.intensity_model_class = [input_name for input_name in self.config.keys() if input_name != 'contingency_table' and isinstance(self.config[input_name],dict)][0]
             # Define output experiment directory
             self.experiment_id = self.update_experiment_directory_id()
             # Define output experiment path to directory
             self.outputs_path = os.path.join(
-                    self.experiment.config['outputs']['directory'],
-                    self.experiment.config['experiment_data'],
+                    self.config['outputs']['directory'],
+                    self.config['experiment_data'],
                     self.experiment_id
             )
             # Try to load ground truth table
-            try:
-                self.ground_truth_table = self.experiment.ct.table
-            except:
-                pass
-
+            # try:
+            #     self.ground_truth_table = self.experiment.ct.table
+            # except:
+            #     pass
             # Name output sample directory according 
             # to sweep params (if they are provided)
-            name_params = kwargs.get('name_params',{'seed':str(self.experiment.seed)})
-            samples_dir = ">".join([str(k)+"_"+str(v) for k,v in name_params.items()])
+            name_params = kwargs.get('name_params',{})
+            self.samples_stamp = ''
+            if len(name_params) > 0 and isinstance(name_params,dict):
+                self.samples_stamp = os.path.join(*[str(k)+"_"+str(v) for k,v in name_params.items()])
 
             # Create output directories
-            self.create_output_subdirectories(samples_dir=samples_dir)
+            self.create_output_subdirectories(self.samples_stamp)
 
             self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
-            self.h5file = h5.File(os.path.join(self.outputs_path,'samples',samples_dir,'data.h5'), mode="w")
-            self.h5group = self.h5file.create_group(self.experiment.config['experiment_id'])
+            self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.samples_stamp}","data.h5"), mode="w")
+            self.h5group = self.h5file.create_group(self.config['experiment_id'])
+            # Store sweep configurations as attributes 
+            for k,v in name_params.items():
+                self.h5group.attrs.create(name=k,data=v)
         
         else:
-            raise Exception(f'Experiment {experiment} of type {type(experiment)} not recognised')
-        # self.logger.info(f"Output directory is set to {self.outputs_path}")
+            raise Exception(f'Config {config} of type {type(config)} not recognised.')
 
     def update_experiment_directory_id(self):
 
-        noise_level = list(deep_get('noise_regime',self.experiment.config.settings))
+        noise_level = list(deep_get('noise_regime',self.config.settings))
         if len(noise_level) <= 0: 
             noise_level = 'unknown'
         else:
             noise_level = noise_level[0]
         noise_level = noise_level.capitalize()
         
-        if not str_in_list('experiment_title',self.experiment.config['outputs'].keys()):
-            self.experiment.config['outputs']['experiment_title'] = ""
+        if not str_in_list('experiment_title',self.config['outputs'].keys()):
+            self.config['outputs']['experiment_title'] = ""
 
-        if str_in_list(self.experiment.config['experiment_id'].lower(),['tablesummariesmcmcconvergence','table_mcmc_convergence']):
-            return self.experiment.config['experiment_id']+'_K'+\
-                    str(self.experiment.config['K'])+'_'+\
-                    self.experiment.config['mcmc']['contingency_table']['proposal']+'_'+\
-                    self.experiment.config['outputs']['experiment_title']+'_'+\
-                    self.experiment.config['datetime']
-        elif self.experiment.config['experiment_id'].lower() == 'table_mcmc':
-            return self.experiment.config['experiment_id']+'_'+\
-                    self.experiment.config['mcmc']['contingency_table']['proposal']+'_'+\
-                    self.experiment.config['outputs']['experiment_title']+'_'+\
-                    self.experiment.config['datetime']
+        if str_in_list(self.config['experiment_id'].lower(),['tablesummariesmcmcconvergence','table_mcmc_convergence']):
+            return self.config['experiment_id']+'_K'+\
+                    str(self.config['K'])+'_'+\
+                    self.config['mcmc']['contingency_table']['proposal']+'_'+\
+                    self.config['outputs']['experiment_title']+'_'+\
+                    self.config['datetime']
+        elif self.config['experiment_id'].lower() == 'table_mcmc':
+            return self.config['experiment_id']+'_'+\
+                    self.config['mcmc']['contingency_table']['proposal']+'_'+\
+                    self.config['outputs']['experiment_title']+'_'+\
+                    self.config['datetime']
         else:
-            return self.experiment.config['experiment_id']+'_'+\
+            return self.config['experiment_id']+'_'+\
                     noise_level+'Noise_'+\
-                    self.experiment.config['outputs']['experiment_title']+'_'+\
-                    self.experiment.config['datetime']
+                    self.config['outputs']['experiment_title']+'_'+\
+                    self.config['datetime']
 
-    def create_output_subdirectories(self,samples_dir) -> None:
+    def create_output_subdirectories(self,sample_stamp:str='') -> None:
         
         makedir(os.path.join(self.outputs_path,'samples'))
-        makedir(os.path.join(self.outputs_path,'samples',samples_dir))
+        if len(sample_stamp) > 0 and isinstance(sample_stamp,str):
+            makedir(os.path.join(self.outputs_path,'samples',sample_stamp))
         makedir(os.path.join(self.outputs_path,'figures'))
         makedir(os.path.join(self.outputs_path,'sample_derivatives'))
 
-
-    def write_metadata(self) -> None:
+    def write_log(self,logger,dir_path:str):
         # Define filepath
-        filepath = os.path.join(self.outputs_path,f"{self.experiment_id}_metadata.json")
-        if (os.path.exists(filepath) and self.experiment.config['experiments'][0]['overwrite']) or (not os.path.exists(filepath)):
-            if isinstance(self.experiment.config,Config):
-                write_json(self.experiment.config.settings,filepath,indent=2)
-            elif isinstance(self.experiment.config,dict):
-                write_json(self.experiment.config,filepath,indent=2)
+        filepath = os.path.join(self.outputs_path,dir_path,f"outputs.log")
+        if (os.path.exists(filepath) and self.config['experiments'][0]['overwrite']) or (not os.path.exists(filepath)):
+            if isinstance(logger,logging.Logger):
+                write_stream_handler_log(logger, filepath)
             else:
-                raise Exception(f'Cannot write metadata of invalid type {type(self.experiment.config)}')
+                raise Exception(f'Cannot write outputs of invalid type logger {type(logger)}')
+
+
+    def write_metadata(self,dir_path:str,filename:str) -> None:
+        # Define filepath
+        filepath = os.path.join(self.outputs_path,dir_path,f"{filename.split('.')[0]}.json")
+        if (os.path.exists(filepath) and self.config['experiments'][0]['overwrite']) or (not os.path.exists(filepath)):
+            if isinstance(self.config,Config):
+                write_json(self.config.settings,filepath,indent=2)
+            elif isinstance(self.config,dict):
+                write_json(self.config,filepath,indent=2)
+            else:
+                raise Exception(f'Cannot write metadata of invalid type {type(self.config)}')
 
     def print_metadata(self) -> None:
-        print_json(self.experiment.config,indent=2)
+        print_json(self.config,indent=2)
 
     def write_samples(self, vector_names:List[str]=None) -> None:
 
@@ -681,7 +699,7 @@ class Outputs(object):
                         filename = f"{k}_samples.npy"
 
                     # Write function samples (list of dictionaries) in compress json format
-                    if (os.path.exists(os.path.join(dirpath,filename)) and self.experiment.config['overwrite']) or (not os.path.exists(os.path.join(dirpath,filename))):
+                    if (os.path.exists(os.path.join(dirpath,filename)) and self.config['overwrite']) or (not os.path.exists(os.path.join(dirpath,filename))):
                         write_npy(res['samples'][k],os.path.join(dirpath,filename))
 
     # def instantiate_plotting_function(self,pid:str):# -> Union[Outputs,None]:
@@ -726,14 +744,14 @@ class Outputs(object):
             # Get total number of samples
             N = theta_samples.shape[0]
             # Scale beta
-            theta_samples[:,1] *= self.experiment.config[self.intensity_model_class]['beta_max']
+            theta_samples[:,1] *= self.config[self.intensity_model_class]['beta_max']
 
             # Compute intensities for all samples
             table_total = self.settings.get('table_total') if self.settings.get('table_total',-1.0) > 0 else 1.0
 
             # Instantiate ct
             sim = instantiate_sim({
-                'sim_type':next(deep_get('sim_type',self.experiment.config.settings), None),
+                'sim_type':next(deep_get('sim_type',self.config.settings), None),
                 'cost_matrix':cost_matrix,
                 'origin_demand':origin_demand,
                 'log_destination_attraction':self.log_destination_attraction
@@ -759,8 +777,12 @@ class Outputs(object):
                 raise
         elif sample_name == 'ground_truth_table':
             # Get config and sim
-            dummy_config = Namespace(**{'settings':self.experiment.config})
-            ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True)
+            dummy_config = Namespace(**{'settings':self.config})
+            ct = instantiate_ct(
+                table=None,
+                config=dummy_config,
+                log_to_console=False
+            )
             samples = ct.table#[np.newaxis,:]
         elif str_in_list(sample_name, INPUT_TYPES.keys()):
             samples = self.load_input_data(
@@ -793,11 +815,11 @@ class Outputs(object):
     
     def load_input_data(self,input_name):
         # Define path to input files
-        path_dir = Path(self.experiment.config['inputs']['dataset'])
+        path_dir = Path(self.config['inputs']['dataset'])
         filepath = os.path.join(
             self.inputs_path,
             os.path.basename(path_dir),
-            self.experiment.config['inputs']
+            self.config['inputs']
                 .get(self.intensity_model_class,'')['import']
                 .get(input_name,'')
         )
@@ -819,12 +841,12 @@ class Outputs(object):
             filename = f"{sample}"
         if str_in_list('statistic',self.settings.keys()):
             filename += f"_{','.join([str(stat) for stat in list(flatten(self.settings['statistic'][0]))])}"
-        if str_in_list('table_dim',self.experiment.config.keys()):
-            filename += f"_{self.experiment.config['table_dim']}"
-        if str_in_list('table_total',self.experiment.config.keys()):
-            filename += f"_{self.experiment.config['table_total']}"
-        if str_in_list('name',self.experiment.config.keys()) and len(self.experiment.config['name']) > 0:
-            filename += f"_{self.experiment.config['name']}"
+        if str_in_list('table_dim',self.config.keys()):
+            filename += f"_{self.config['table_dim']}"
+        if str_in_list('table_total',self.config.keys()):
+            filename += f"_{self.config['table_total']}"
+        if str_in_list('name',self.config.keys()) and len(self.config['name']) > 0:
+            filename += f"_{self.config['name']}"
         if str_in_list('experiment_title',self.settings.keys()) and len(self.settings['experiment_title']) > 0:
             filename += f"_{self.settings['experiment_title']}"
         if str_in_list('viz_type',self.settings.keys()):
@@ -835,7 +857,7 @@ class Outputs(object):
             filename += f"_thinning{self.settings['thinning']}"
         if str_in_list('N',self.settings.keys()):
             filename += f"_N{self.settings['N']}"
-        # filename += f"_N{self.experiment.config['mcmc']['N']}"
+        # filename += f"_N{self.config['mcmc']['N']}"
         return filename
 
     def compute_sample_statistics(self,data,sample_name,statistic,axis:int=0):

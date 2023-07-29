@@ -1,6 +1,6 @@
 {
   "sweep_mode": true,
-  "logging_mode": true,
+  "log_level": true,
   "inputs": {
     "seed": {
       "sweep": {

@@ -5,7 +5,7 @@
     "dtype": "bool",
     "default-value": false
   },
-  "logging_mode": {
+  "log_level": {
     "sweepable": false,
     "optional": false,
     "dtype": "str",

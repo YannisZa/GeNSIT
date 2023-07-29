@@ -386,7 +386,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
             if not valid_experiment_type(outputs.experiment_id,['tablesummariesmcmcconvergence','table_mcmc_convergence']):
                 self.logger.info(f'Experiment {outputs.experiment_id} is not of type Table(Summaries)MCMCConvergence')
@@ -425,7 +425,7 @@ class Plot(object):
                     output_directory,
                     self.settings,
                     sample_names=['tableerror'],
-                    disable_logger=True
+                    log_to_console=False
                 )
                 # Apply statistic to error norm
                 table_error_statistic = outputs.compute_sample_statistics(
@@ -481,7 +481,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
             if not valid_experiment_type(outputs.experiment_id,['jointtablesim_mcmc']):
                 self.logger.info(f'Experiment {outputs.experiment_id} is not of type JointTableSIM_MCMC')
@@ -490,7 +490,7 @@ class Plot(object):
 
             # Load contingency table
             dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True)
+            ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False)
             # If no table is provided
             if ct.table is None:
                 # Remove experiment from output directories
@@ -515,12 +515,12 @@ class Plot(object):
                     self.settings,
                     sample_names=['intensity','table','sign'],
                     slice_samples=False,
-                    disable_logger=True
+                    log_to_console=False
                 )
                 
                 # Instantiate contingency table
                 dummy_config = Namespace(**{'settings':outputs.experiment.config})
-                ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True)
+                ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False)
                 
                 # Load samples and apply moving averages
                 table_rolling_mean = running_average(outputs.experiment.results['table'])
@@ -595,7 +595,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
             # If experiment is not of the right type
             if 'tablesummariesmcmcconvergence' not in outputs.experiment_id.lower():
@@ -654,7 +654,7 @@ class Plot(object):
             self.settings,
             ['ground_truth_table'],
             slice_samples=False,
-            disable_logger=True
+            log_to_console=False
         )
         # Store sample name, the actual sample (y), and its size (x)
         dims = np.shape(np.squeeze(outputs.ground_truth_table))
@@ -676,7 +676,7 @@ class Plot(object):
                 self.settings,
                 list(self.settings.get('sample')),
                 slice_samples=True,
-                disable_logger=False
+                log_to_console=True
             )
             # Make sure the right experiments are provided
             try:
@@ -795,7 +795,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
 
             self.parameter_grid_plot(i,outputs.experiment_id,'r2',r'$R^2$')
@@ -809,7 +809,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
 
             if not valid_experiment_type(outputs.experiment_id,["logtargetanalysis"]):
@@ -825,7 +825,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
 
             if not valid_experiment_type(outputs.experiment_id,["absoluteerroranalysis"]):
@@ -853,7 +853,7 @@ class Plot(object):
         outputs = Outputs(
             output_directory,
             self.settings,
-            disable_logger=True
+            log_to_console=False
         )
         dummy_config = Namespace(**{'settings':outputs.experiment.config})
         sim = instantiate_sim(dummy_config)
@@ -957,7 +957,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
             # Convert to path object
             output_directory = Path(output_directory)
@@ -1045,7 +1045,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
 
             # Get only first n_samples as specified by settings
@@ -1105,7 +1105,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
             # dummy_config = Namespace(**{'settings':outputs.experiment.config})
             # sim = instantiate_sim(dummy_config)
@@ -1208,7 +1208,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
             dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
@@ -1300,7 +1300,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
             dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
@@ -1468,7 +1468,7 @@ class Plot(object):
                 sample_names=['log_destination_attraction','sign'],
                 settings=self.settings,
                 slice_samples=True,
-                disable_logger=True
+                log_to_console=False
             )
             dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
@@ -1522,7 +1522,7 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                disable_logger=True
+                log_to_console=False
             )
             dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
@@ -1605,7 +1605,7 @@ class Plot(object):
     #         outputs = Outputs(
     #             output_directory,
     #             self.settings,
-    #             disable_logger=True
+    #             log_to_console=False
     #         )
 
     #         # Load geometry 
@@ -1998,7 +1998,7 @@ class Plot(object):
                 # order is important in sample_names
                 sample_names = (['ground_truth_table']+list(self.settings['sample'])),
                 slice_samples=True,
-                disable_logger=True
+                log_to_console=False
             )
 
             for sample in self.settings['sample']:
@@ -2315,7 +2315,7 @@ class Plot(object):
                         self.logger.error(f"Annotation by coverage probabilities omitted")
                         continue
                     # dummy_config = Namespace(**{'settings':outputs.experiment.config})
-                    # ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True)
+                    # ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False)
                     # print('\n')
                     for (i,j),label in np.ndenumerate(coverage_probabilities):
                         # lower_bound_hpdr,upper_bound_hpdr =     calculate_min_interval(np.sort(outputs.experiment.results.get(sample,None)[(...,i,j)]),0.01)
@@ -2539,7 +2539,7 @@ class Plot(object):
                     )
                 if sample == 'table':
                     dummy_config = Namespace(**{'settings':outputs.experiment.config})
-                    ct = instantiate_ct(table=None,config=dummy_config,disable_logger=True)  
+                    ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False)  
                     # for cell in ct.constraints['cells']:
                         # print('ground truth', ct.table[cell[0],cell[1]])
                         # print('min',min(outputs.experiment.results['table'][:,cell[0],cell[1]]))
@@ -2583,7 +2583,7 @@ class Plot(object):
     #         outputs = Outputs(
     #             output_directory,
     #             self.settings,
-    #             disable_logger=True
+    #             log_to_console=False
     #         )
     
     #         # Define filepath

@@ -7,7 +7,7 @@ import pandas as pd
 from tqdm.auto import tqdm
 from typing import Dict,Tuple,List
 
-from multiresticodm.utils import f_to_df,df_to_f,f_to_array,makedir,write_compressed_string,read_compressed_string,str_in_list
+from multiresticodm.utils import f_to_df,df_to_f,f_to_array, update_logger_settings,makedir,write_compressed_string,read_compressed_string,str_in_list
 from multiresticodm.contingency_table import ContingencyTable
 
 def instantiate_markov_basis(ct:ContingencyTable,**kwargs): #-> Union[MarkovBasis,None]:
@@ -18,11 +18,13 @@ def instantiate_markov_basis(ct:ContingencyTable,**kwargs): #-> Union[MarkovBasi
 
 class MarkovBasis(object):
     def __init__(self, ct:ContingencyTable,**kwargs):
-        # Import logger
-        self.logger = logging.getLogger(__name__)
-        self.logger.disabled = kwargs.get('disable_logger',False)
-        numba_logger = logging.getLogger('numba')
-        numba_logger.setLevel(logging.WARNING)
+        # Setup logger
+        self.logger = update_logger_settings(
+            __name__,
+            log_to_file=False,
+            log_to_console=kwargs.get('log_to_console',True),
+            level=ct.config.level() if ct.config else kwargs.get('level','INFO')
+        )
 
         # Get contingency table
         self.ct = ct

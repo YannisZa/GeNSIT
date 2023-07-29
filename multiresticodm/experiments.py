@@ -11,6 +11,7 @@ from copy import deepcopy
 from datetime import datetime
 from scipy.optimize import minimize
 from joblib import Parallel, delayed
+from multiprocessing.pool import Pool
 
 from multiresticodm.utils import *
 from multiresticodm.config import Config
@@ -28,7 +29,6 @@ from multiresticodm.spatial_interaction_model_mcmc import instantiate_spatial_in
 
 # Suppress scientific notation
 np.set_printoptions(suppress=True)
-
 
 def instantiate_experiment(experiment_type:str,config:Config,**kwargs):
     # Get whether sweep is active and its settings available
@@ -136,14 +136,14 @@ class Experiment(object):
             settings_flattened = deep_flatten(settings,parent_key='',sep='')
             # Remove load experiment 
             del settings_flattened['load_experiment']
-            deep_updates(self.config,settings_flattened,overwrite=True)
+            deep_updates(self.config.settings,settings_flattened,overwrite=True)
             # Merge settings to config
             self.config = Config(settings={**self.config, **settings_flattened})
         
         # Update config with current timestamp ( but do not overwrite)
         datetime_results = list(deep_get(key='datetime',value=self.config.settings))
         if len(datetime_results) > 0:
-            deep_update(self.config, key='datetime', val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), overwrite=False)
+            deep_update(self.config.settings, key='datetime', val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), overwrite=False)
         else:
             self.config['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
         # Initialise empty results
@@ -185,7 +185,7 @@ class Experiment(object):
         safe_delete(deep_call(self,'log_destination_attractions',None))
         safe_delete(deep_call(self,'signs',None))
         safe_delete(deep_call(self,'results',None))
-        
+
         if metadata:
             safe_delete(self.config)
             self.config = Config(settings={})
@@ -229,7 +229,9 @@ class Experiment(object):
         # Load last sample
         if str_in_list('load_experiment',self.config['inputs']) and len(self.config['inputs']['load_experiment']) > 0:
             # Read last batch of experiments
-            outputs = Outputs(self,self.config)
+            outputs = Outputs(
+                self.config
+            )
             # All parameter initialisations
             parameter_inits = dict(zip(self.sample_names,[0]*len(self.sample_names)))
             parameter_acceptances = dict(zip(self.sample_names,[0]*len(self.sample_names)))
@@ -1014,7 +1016,7 @@ class SIM_MCMC(Experiment):
         sim = instantiate_sim(self.config)
 
         # Spatial interaction model MCMC
-        self.sim_mcmc = instantiate_spatial_interaction_mcmc(sim,disable_logger)
+        self.sim_mcmc = instantiate_spatial_interaction_mcmc(sim,kwargs.get('log_to_console',True))
 
         # Delete duplicate of spatial interaction model
         safe_delete(self.sim)
@@ -1218,13 +1220,13 @@ class JointTableSIM_MCMC(Experiment):
         # Spatial interaction model MCMC
         self.sim_mcmc = instantiate_spatial_interaction_mcmc(
             sim,
-            disable_logger=kwargs.get('disable_logger',False)
+            log_to_console=kwargs.get('log_to_console',True)
         )
         # Contingency Table mcmc
         self.od_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct,
             table_mb=None,
-            disable_logger=kwargs.get('disable_logger',False)
+            log_to_console=kwargs.get('log_to_console',True)
         )
 
         # Delete duplicate of contingency table and spatial interaction model
@@ -1505,7 +1507,7 @@ class Table_MCMC(Experiment):
         self.od_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct,
             table_mb=None,
-            disable_logger=kwargs.get('disable_logger',False)
+            log_to_console=kwargs.get('log_to_console',True)
         )
         # Set table steps to 1
         self.od_mcmc.table_steps = 1
@@ -1521,7 +1523,9 @@ class Table_MCMC(Experiment):
         if str_in_list('load_experiment',self.config['inputs']) and \
             len(self.config['inputs']['load_experiment']) > 0:
             # Read last batch of experiments 
-            outputs = Outputs(self,self.config)
+            outputs = Outputs(
+                self.config
+            )
             # Parameter initialisations
             parameter_inits = {}
             # Total samples for joint posterior
@@ -1693,7 +1697,7 @@ class TableSummariesMCMCConvergence(Experiment):
         self.samplers['0'] = ContingencyTableMarkovChainMonteCarlo(
             ct,
             table_mb=None,
-            disable_logger=kwargs.get('disable_logger',False)
+            log_to_console=kwargs.get('log_to_console',True)
         )
         self.samplers['0'].table_steps = 1
         if self.K > 1:
@@ -1706,7 +1710,7 @@ class TableSummariesMCMCConvergence(Experiment):
                 self.samplers[str(k)] = ContingencyTableMarkovChainMonteCarlo(
                     ct_copy,
                     table_mb=self.samplers['0'].table_mb,
-                    disable_logger=False
+                    log_to_console=True
                 )
                 # Initialise fixed margins
                 self.samplers[str(k)].sample_constrained_margins(np.exp(self.true_log_intensities))
@@ -1842,6 +1846,9 @@ class SIM_NN(Experiment):
         # Fix random seed
         rng = set_seed(self.seed)
 
+        # Enable garbage collections
+        gc.enable()
+
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
@@ -1908,20 +1915,22 @@ class SIM_NN(Experiment):
         self.outputs = Outputs(self,name_params=kwargs.get('name_params',{}))
 
         # Write metadata
+        self.logger.debug("Writing metadata ...")
         if self.config.get('export_metadata',True):
-            self.outputs.write_metadata()
+            dir_path = os.path.join("samples",self.outputs.samples_stamp)
+            self.outputs.write_metadata(
+                dir_path=dir_path,
+                filename=f"{dir_path.replace('/','_').replace('.','')}_metadata"
+            )
         
-        self.logger.info(f"{self.harris_wilson_nn}")
-        
-        # Run garbage collector
-        gc.collect()
+        self.logger.note(f"{self.harris_wilson_nn}")
 
         self.sample_names = ['log_destination_attraction','theta','loss']
         self.theta_names = config['neural_network']['to_learn']
         
     def run(self) -> None:
 
-        self.logger.info(f"Running Neural Network training of Harris Wilson model.")
+        self.logger.note(f"Running Neural Network training of Harris Wilson model.")
 
         # Time run
         start_time = time.time()
@@ -1968,24 +1977,41 @@ class SIM_NN(Experiment):
         
         # Write metadata
         if self.config.get('export_metadata',True):
-            self.outputs.write_metadata()
+            dir_path = os.path.join("samples",self.outputs.samples_stamp)
+            self.outputs.write_metadata(
+                dir_path=dir_path,
+                filename=f"{dir_path.replace('/','_').replace('.','')}_metadata"
+            )
             
         self.outputs.h5file.close()
         self.logger.info("Simulation run finished.")
+
+        # Write log file
+        self.outputs.write_log(self.logger,dir_path=dir_path)
 
 
 class ExperimentSweep():
 
     def __init__(self,config:Config,sweep_key_paths:list,**kwargs):
-        # Import logger
-        self.logger = logging.getLogger(__name__)
-        numba_logger = logging.getLogger('numba')
-        numba_logger.setLevel(logging.WARNING)
+
+        logger = logging.getLogger(__name__)
+
+        # Setup logger
+        self.logger = update_logger_settings(
+            logger,
+            log_to_file=False,
+            log_to_console=True,
+            level=config.level()
+        )
 
         self.logger.info(f"Performing parameter sweep")
         
         # Get config
         self.config = config
+
+        # Store one datetime
+        # for all sweeps
+        self.config.settings['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
 
         # Load schema
         self.config.load_schema()
@@ -1993,6 +2019,9 @@ class ExperimentSweep():
         # Initialise experiments 
         # (each one corresponds to one parameter sweep)
         self.experiments = []
+
+        # Store number of workers
+        self.n_workers = self.config.settings['inputs'].get("n_workers",1)
 
         # Parse sweep configurations
         self.sweep_params = {}
@@ -2009,6 +2038,17 @@ class ExperimentSweep():
                 "path": key_path,
                 "values": sweep_vals
             }
+
+        self.outputs = Outputs(
+            self.config,
+            name_params=kwargs.get('name_params',{})
+        )
+        # Write metadata
+        if self.config.get('export_metadata',True):
+            self.outputs.write_metadata(
+                dir_path='',
+                filename=f"config"
+            )
     
     def __repr__(self) -> str:
         return "ParameterSweep("+(self.experiment.__repr__())+")"
@@ -2029,6 +2069,20 @@ class ExperimentSweep():
         
         # For each configuration update experiment config 
         # and instantiate new experiment
+        # Decide whether to prepare sweeps in parallel or not
+        if self.config.settings['inputs'].get("n_workers",1) > 1:
+            # self.prepare_experiments_parallel(sweep_configurations)
+            self.prepare_experiments_sequential(sweep_configurations)
+        else:
+            self.prepare_experiments_sequential(sweep_configurations)
+
+        # Decide whether to run sweeps in parallel or not
+        if self.n_workers > 1:
+            self.run_parallel()
+        else:
+            self.run_sequential()
+    
+    def prepare_experiments_sequential(self,sweep_configurations):
         for sval in tqdm(sweep_configurations):
             # Create new config
             new_config = deepcopy(self.config)
@@ -2048,23 +2102,27 @@ class ExperimentSweep():
                 experiment_type=new_config.settings['experiments'][0]['name'],
                 config=new_config,
                 name_params={val['var']:sval[i] for i,val in enumerate(self.sweep_params.values())},
-                disable_logger=True
+                log_to_file=True,
+                log_to_console=True
             )
-            # sys.exit()
             # Append to experiments
             self.experiments.append(new_experiment)
+        
+    def prepare_experiments_parallel(self,sweep_configurations):
+        return
 
-        # Decide whether to run sweeps in parallel or not
-        if self.config.settings['inputs'].get("n_workers",1) > 1:
-            # self.run_parallel()
-            self.run_sequential()
-        else:
-            self.run_sequential()
-    
     def run_sequential(self):
         self.logger.info("Running Parameter Sweep in sequence...")
         for exp in tqdm(self.experiments,total=len(self.experiments)):
             exp.run()
     
     def run_parallel(self):
-        return
+        # Run experiments in parallel
+        p = Pool(self.n_workers)
+        result = [p.apply_async(exp.run()) for exp in tqdm(self.experiments)]
+        p.close()
+        p.join()
+    
+    def run_process(self,process):
+        process.run()
+        return True

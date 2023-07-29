@@ -5,6 +5,7 @@ import h5py as h5
 import numpy as np
 
 from pathlib import Path
+from pandas import read_csv
 
 from multiresticodm.config import Config
 from multiresticodm.utils import str_in_list
@@ -23,9 +24,30 @@ class Inputs:
         # Store config
         self.config = config
 
+        # Store attributes and their associated dims
+        self.schema = {
+            "origin_demand":{"axes":[0],"dtype":"float32", "ndmin":1},
+            "destination_demand":{"axes":[1],"dtype":"float32", "ndmin":1},
+            "origin_attraction":{"axes":[0],"dtype":"float32", "ndmin":1},
+            "destination_attraction_ts":{"axes":[1],"dtype":"float32", "ndmin":2},
+            "cost_matrix":{"axes":[0,1],"dtype":"float32", "ndmin":2},
+            "table":{"axes":[0,1],"dtype":"int32", "ndmin":1},
+            "dims":{},
+            "grand_total":{}
+        }
+
         if not synthetic_data:
             self.read_data()
 
+    def validate_dims(self):
+        for attr,schema in self.schema.items():
+            if len(schema) > 0:
+                for ax in schema["axes"]:
+                    if getattr(self,attr) is not None:
+                        try:
+                            assert np.shape(getattr(self,attr))[ax] == self.dims[ax]
+                        except:
+                            raise Exception(f"{attr.replace('_',' ').capitalize()} has dim {np.shape(getattr(self,attr))[ax]} instead of {self.dims[ax]}.")
     
     def read_data(
         self,
@@ -33,57 +55,49 @@ class Inputs:
         self.logger.note("Loading Harris Wilson data ...")
         if not str_in_list('dataset',self.config.settings['inputs']):
             raise Exception('Input dataset NOT provided. Harris Wilson model cannot be created.')
+
+        # Initialise all
+        for attr in self.schema.keys():
+            setattr(self,attr,None)
+
+        # Import dims
+        self.dims = tuple(self.config.settings['inputs'].get('dims',[None,None]))
+        self.time_dim = (1,)
         
-        if str_in_list('origin_demand',self.config.settings['inputs']['data_files'].keys()):
-            origin_demand_filepath = os.path.join(
-                self.config.settings['inputs']['dataset'],
-                self.config.settings['inputs']['data_files']['origin_demand']
-            )
-            if os.path.isfile(origin_demand_filepath):
-                # Import origin demand
-                origin_demand = np.loadtxt(origin_demand_filepath,dtype='float32')
-                # Check to see see that they are all positive
-                if (origin_demand <= 0).any():
-                    raise Exception(f'Origin demand {origin_demand} are NOT strictly positive')
-            else:
-                raise Exception(f"Origin demand file {origin_demand_filepath} NOT found")
-        else:
-            raise Exception(f"Origin demand filepath NOT provided")
+        # Import all data
+        for attr,schema in self.schema.items():
+            if len(schema) > 0:
+                if str_in_list(attr,self.config.settings['inputs']['data_files'].keys()):
+                    filepath = os.path.join(
+                        self.config.settings['inputs']['dataset'],
+                        self.config.settings['inputs']['data_files'][attr]
+                    )
+                    if os.path.isfile(filepath):
+                        # Import data
+                        data = np.loadtxt(filepath,dtype=schema['dtype'], ndmin=schema['ndmin'])
+                        setattr(self,attr,data)
+                        # Check to see see that they are all positive
+                        if (getattr(self,attr) <= 0).any():
+                            raise Exception(f"{attr.replace('_',' ').capitalize()} {self.origin_demand} are NOT strictly positive")
+                        # Update dims
+                        for subax in schema['axes']:
+                            if getattr(self,attr) is not None and self.dims[subax] is None:
+                                self.dims[subax] = int(np.shape(getattr(self,attr)))[subax]
+                    else:
+                        raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
+                # else:
+                    # raise Exception(f"{attr.replace('_',' ').capitalize()} filepath NOT provided")
 
-        if len(self.config.settings['inputs']['data_files'].get('destination_attraction_ts',[])) >= 0:
-            destination_attraction_ts_filepath = os.path.join(self.config.settings['inputs']['dataset'],self.config.settings['inputs']['data_files']['destination_attraction_ts'])
-            if os.path.isfile(destination_attraction_ts_filepath):
-                # Import destination attraction time series
-                destination_attraction_ts = np.loadtxt(destination_attraction_ts_filepath,dtype='float32', ndmin=2)
-            else:
-                raise Exception(f"Destination attraction time series file {destination_attraction_ts_filepath} NOT found")
+        # Validate dimensions
+        self.validate_dims()
 
-            # Check to see see that they are all positive
-            if (destination_attraction_ts < 0).any():
-                raise Exception(f'Destination attraction time series {destination_attraction_ts} is NOT non-negative.')
-        else:
-            raise Exception(f"Destination attraction filepath NOT provided")
+        # Update grand total if it is not specified
+        if self.grand_total is None:
+            # Compute grand total
+            self.grand_total = np.sum(self.table)
+            self.grand_total = self.config.settings['spatial_interaction_model'].get('grand_total',1.0)
+            
 
-        if str_in_list('cost_matrix',self.config.settings['inputs']['data_files'].keys()):
-            cost_matrix_filepath = os.path.join(self.config.settings['inputs']['dataset'],self.config.settings['inputs']['data_files']['cost_matrix'])
-            if os.path.isfile(cost_matrix_filepath):
-                # Import rowsums
-                cost_matrix = np.loadtxt(os.path.join(self.config.settings['inputs']['dataset'],self.config.settings['inputs']['data_files']['cost_matrix']),dtype='float32',ndmin=2)
-            else:
-                raise Exception(f"Cost matrix file {cost_matrix_filepath} NOT found")
-
-            # Check to see see that they are all positive
-            if (cost_matrix < 0).any():
-                raise Exception(f'Cost matrix {cost_matrix} is NOT non-negative.')
-        else:
-            raise Exception(f"Cost matrix filepath NOT provided")
-
-        # Read dimensions
-        self.dims = [np.shape(origin_demand)[0],np.shape(destination_attraction_ts)[0]]
-        # Store necessary quantities
-        self.origin_demand = origin_demand
-        self.destination_attraction_ts = destination_attraction_ts
-        self.cost_matrix = cost_matrix
         # Extract parameters to learn
         if self.config.settings.get('neural_network',None) is not None:
             params_to_learn = self.config.settings['neural_network']['to_learn']
@@ -97,28 +111,46 @@ class Inputs:
                 if not k in params_to_learn
         }
 
+        self.data_in_device = False
+
     def pass_to_device(self):
         # Define device to set 
         device = self.config.settings['inputs']['device']
 
-        self.origin_demand = torch.from_numpy(self.origin_demand).float().to(device)
-        self.destination_attraction_ts = torch.unsqueeze(
-            torch.from_numpy(self.destination_attraction_ts).float(),
-            -1
-        ).to(device)
-        self.cost_matrix = torch.reshape(
-            torch.from_numpy(self.cost_matrix).float(),
-            (self.dims)
-        ).to(device)
-        
+        if not self.data_in_device:
+            if self.origin_demand is not None:
+                self.origin_demand = torch.from_numpy(self.origin_demand).float().to(device)
+            if self.destination_attraction_ts is not None:
+                self.destination_attraction_ts = torch.unsqueeze(
+                    torch.from_numpy(self.destination_attraction_ts).float(),
+                    -1
+                ).to(device)
+            if self.cost_matrix is not None:
+                self.cost_matrix = torch.reshape(
+                    torch.from_numpy(self.cost_matrix).float(),
+                    (self.dims)
+                ).to(device)
+            if self.table is not None:
+                self.cost_matrix = torch.reshape(
+                    torch.from_numpy(self.cost_matrix).int(),
+                    (self.dims)
+                ).to(device)
+            if self.dims is not None:
+                self.dims = torch.tensor(self.dims).int().to(device)
+            if self.grand_total is not None:
+                self.grand_total = torch.tensor(self.grand_total).int().to(device)
+
         self.data_in_device = True
     
     def receive_from_device(self):
-
-        self.origin_demand = self.origin_demand.cpu().detach().numpy()
-        self.destination_attraction_ts = self.destination_attraction_ts.cpu().detach().numpy()
-        self.cost_matrix = self.cost_matrix.cpu().detach().numpy().reshape(self.dims)
         
+        if self.data_in_device:
+            self.origin_demand = self.origin_demand.cpu().detach().numpy() if hasattr(self,'origin_demand') else None
+            self.destination_attraction_ts = self.destination_attraction_ts.cpu().detach().numpy() if hasattr(self,'destination_attraction_ts') else None
+            self.cost_matrix = self.cost_matrix.cpu().detach().numpy().reshape(self.dims) if hasattr(self,'cost_matrix') else None
+            self.dims = self.dims.cpu().detach().numpy() if hasattr(self,'dims') else None
+            self.grand_total = self.grand_total.cpu().detach().numpy() if hasattr(self,'grand_total') else None
+
         self.data_in_device = False
 
     def prepare_neural_net_outputs(

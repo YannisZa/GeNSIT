@@ -1,3 +1,5 @@
+import sys
+from io import StringIO
 import os
 import re
 import gc
@@ -8,7 +10,9 @@ import json
 import torch
 import numba
 import numexpr
+import logging
 import operator
+import coloredlogs
 import tikzplotlib
 import numpy as np
 import pandas as pd
@@ -169,6 +173,37 @@ def write_json(data:Dict,filepath:str,**kwargs:Dict) -> None:
     with open(filepath, 'w') as f:
         json.dump(data,f,**kwargs)
 
+def write_stream_handler_log(logger, filepath):
+    
+    if not filepath.endswith('.log'):
+        filepath = filepath.split('.')[0] + '.log'
+
+    # Find the StreamHandler in the logger's handlers list
+    # stream_handler = None
+    # for handler in logger.handlers:
+    #     if isinstance(handler, logging.StreamHandler):
+    #         stream_handler = handler
+    #         break
+    stream_handler = logger.handlers[0]
+
+    if stream_handler is None:
+        print ("No StreamHandler found in the logger's handlers list.")
+        return
+
+    # Create a FileHandler and set the log level and formatter to match the StreamHandler
+    file_handler = logging.FileHandler(filepath)
+    file_handler.setLevel(stream_handler.level)
+    file_handler.setFormatter(stream_handler.formatter)
+
+    outputs_logged = get_stream(stream_handler.stream)
+    # Copy the data from StreamHandler to list
+    # for record in stream_handler.stream.getvalue():
+    #     outputs_logged.append(record)
+    sys.exit()
+    # Write list to log file
+    f = open(filepath,"w+")
+    f.writelines([i + '\n' for i in outputs_logged])
+    f.close()
 
 def print_json(data:Dict,**kwargs:Dict):
     print(json.dumps(data,cls=NumpyEncoder,**kwargs))
@@ -410,7 +445,6 @@ def pop_variable(_self,var):
     if hasattr(_self,var):
         res = getattr(_self,var)
         delattr(_self,var)
-        gc.collect()
         return res
     else:
         return None
@@ -437,7 +471,6 @@ def safe_delete(variable,instance=None):
         del variable
     except:
         None
-    gc.collect()
 
 
 def unpack_statistics(settings):
@@ -785,3 +818,27 @@ def string_to_numeric(s):
     i = int(f)
     return i if i == f else f
 
+
+def update_logger_settings(logger,level,log_to_file:bool=False,log_to_console=False):
+    # Silence warnings from other packages
+    numba_logger = logging.getLogger('numba')
+    numba_logger.setLevel(logging.WARNING)
+    # Update level if required 
+    if not log_to_file:
+        # Temporarily disable the file handler
+        logger.handlers[0].setLevel(logging.NOTSET)
+    else:
+        if logger.handlers[0].level == logging.NOTSET:
+            logger.handlers[0].setLevel(logging.DEBUG)
+
+    if not log_to_console:
+        # Temporarily disable the file handler
+        logger.handlers[1].setLevel(logging.NOTSET)
+    else:
+        if logger.handlers[1].level == logging.NOTSET:
+            logger.handlers[1].setLevel(level.upper())
+    return logger
+
+def get_stream(stream):
+    stream.seek(0)
+    return stream.read().strip().split('\n')

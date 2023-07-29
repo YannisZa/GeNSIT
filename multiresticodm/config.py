@@ -4,8 +4,10 @@ import toml
 import logging
 
 from copy import deepcopy
-from multiresticodm.utils import deep_apply, str_in_list
+from multiresticodm.utils import deep_apply, str_in_list, update_logger_settings
 from multiresticodm.config_data_structures import instantiate_data_type
+
+logger = logging.getLogger(__name__)
 
 class Config:
 
@@ -14,11 +16,9 @@ class Config:
         Config object constructor.
         :param path: Path to configuration TOML file
         """
-        self.logger = logging.getLogger(__name__)
-
         # Load config
         if path:
-            self.logger.debug(f' Loading config from {path}')
+            logger.debug(f' Loading config from {path}')
             self.settings = toml.load(path, _dict=dict)
 
             # Load schema
@@ -31,6 +31,9 @@ class Config:
         else:
             self.settings = None
             raise Exception(f'Config not found in {path}')
+
+    def level(self):
+        return self.settings['log_level'].upper()
 
     def __str__(self,settings=None):
         if settings is not None:
@@ -70,7 +73,7 @@ class Config:
         :param root: root path
         :param dump_log: (bool) optionally dump overriden config to disk
         """
-        # self.logger.warning(f"""
+        # logger.warning(f"""
            # All input paths, output path and data paths being 'rooted' with {}
             # This requires that all configured paths are relative.
             # """)

@@ -13,7 +13,7 @@ import multiresticodm.probability_utils as ProbabilityUtils
 
 from multiresticodm.math_utils import scipy_optimize
 from multiresticodm.spatial_interaction_model import SpatialInteraction
-from multiresticodm.utils import str_in_list,makedir,set_seed,deep_get,set_numba_torch_threads
+from multiresticodm.utils import update_logger_settings, str_in_list,makedir,set_seed,deep_get,set_numba_torch_threads
 
 def instantiate_spatial_interaction_mcmc(sim:SpatialInteraction,**kwargs):
     if hasattr(sys.modules[__name__], (sim.sim_name+'MarkovChainMonteCarlo')):
@@ -24,10 +24,13 @@ def instantiate_spatial_interaction_mcmc(sim:SpatialInteraction,**kwargs):
 class SpatialInteractionMarkovChainMonteCarlo():
 
     def __init__(self, sim:SpatialInteraction,**kwargs):
-        self.logger = logging.getLogger(__name__)
-        self.logger.disabled = kwargs.get('disable_logger',False)
-        numba_logger = logging.getLogger('numba')
-        numba_logger.setLevel(logging.WARNING)
+        # Setup logger
+        self.logger = update_logger_settings(
+            __name__,
+            log_to_file=False,
+            log_to_console=kwargs.get('log_to_console',True),
+            level=sim.config.level() if sim.config else kwargs.get('level','INFO')
+        )
         # Store sim model
         self.sim = sim
 
