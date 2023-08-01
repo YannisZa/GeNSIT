@@ -339,6 +339,7 @@ class HarrisWilson:
         init_destination_attraction,
         n_iterations: int,
         dt: float = None,
+        free_parameters=None,
         requires_grad: bool = True,
         generate_time_series: bool = False
     ) -> torch.tensor:

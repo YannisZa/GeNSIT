@@ -116,7 +116,6 @@ class Inputs:
                 for k,v in PARAMETER_DEFAULTS.items() \
                 if not k in params_to_learn
         }
-        print(self.true_parameters)
 
         self.data_in_device = False
 
