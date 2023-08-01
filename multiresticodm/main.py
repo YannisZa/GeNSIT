@@ -2,15 +2,18 @@ from copy import deepcopy
 import os
 
 import ast
+import sys
 import warnings
+
+from multiresticodm.utils import setup_logger
 warnings.simplefilter("ignore")
 
 import json
 import click
-import logging
 import psutil
 import coloredlogs
 
+import logging
 from multiresticodm.config import Config
 from multiresticodm.global_variables import TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS
 
@@ -126,7 +129,7 @@ _common_options = [
     click.option('--n_threads','-nt', type=click.IntRange(min=1,max=AVAILABLE_CORES), multiple=True, 
                  default = ['1','1'],help = '''Overwrites number of threads (per worker) used in multithreading.
             If many are provided first is set as the numpy threads and the second as the numba threads'''),
-    click.option('--logging_mode','-log', type=click.Choice(['debug', 'info', 'warning']), default='info', 
+    click.option('--logging_mode','-log', type=click.Choice(['debug', 'info', 'warning', 'critical']), default='info', 
             help=f'Type of logging mode used.'),
     click.option('--n','-n', type=click.IntRange(min=1), help = 'Overwrites number of MCMC samples'),
     click.option('--table','-tab', type=click.STRING,default=None, help = 'Overwrites input table filename in config')
@@ -188,69 +191,52 @@ def common_run_options(func):
         func = option(func)
     return func
 
-def run(settings,config_path,**kwargs):
+def run(logger,settings,config_path,**kwargs):
     # Import all modules
     from multiresticodm.experiments import ExperimentHandler
     from multiresticodm.utils import deep_updates,set_numba_torch_threads,update_device
 
-    def make_run(_settings,_config_path,**_kwargs):
-        # Read config
-        config = Config(_config_path)
+    # Read config
+    config = Config(config_path,logging_mode=settings.get('logging_mode','info'))
 
-        # Update settings with overwritten values
-        deep_updates(config.settings,_settings,overwrite=True)
+    # Update settings with overwritten values
+    deep_updates(config.settings,settings,overwrite=True)
 
-        # Set device to run code on
-        config.settings['inputs']['device'] = update_device(
-            config.settings['inputs'].get('device','cpu')
-        )
+    # Set device to run code on
+    config.settings['inputs']['device'] = update_device(
+        config.settings['inputs'].get('device','cpu')
+    )
 
-        # Set number of cores used (numba package)
-        set_numba_torch_threads(_settings['n_threads'])
+    # Set number of cores used (numba package)
+    set_numba_torch_threads(settings['n_threads'])
 
-        # Update root
-        config.path_sets_root()
-        # Maintain a dictionary of available experiments and their list index
-        available_experiments = {exp.get("name",""):i for i,exp in enumerate(config.settings['experiments']) if len(exp.get("name","")) > 0}
-        config.settings.setdefault("available_experiments",available_experiments)
-        # Keep experiment ids argument
-        if len(_kwargs.get("run_experiments",[])) > 0:
-            config.settings.setdefault("run_experiments", list(_kwargs.get("run_experiments",[])))
-        else:
-            config.settings.setdefault("run_experiments", available_experiments)
+    # Update root
+    config.path_sets_root()
+    # Maintain a dictionary of available experiments and their list index
+    available_experiments = {exp.get("name",""):i for i,exp in enumerate(config.settings['experiments']) if len(exp.get("name","")) > 0}
+    config.settings.setdefault("available_experiments",available_experiments)
+    # Keep experiment ids argument
+    if len(kwargs.get("run_experiments",[])) > 0:
+        config.settings.setdefault("run_experiments", list(kwargs.get("run_experiments",[])))
+    else:
+        config.settings.setdefault("run_experiments", available_experiments)
 
-        logging.basicConfig(
-            level=logging.getLevelName(_settings.get('logging_mode','info').upper()),
-            # format='%(asctime)s %(name)-12s %(levelname)-3s %(message)s',
-            # datefmt='%m-%d %H:%M:%S'
-            format='%(asctime)s.%(msecs)03d %(levelname)-3s %(message)s',
-            datefmt='%M:%S'
-        )
-        logger = logging.getLogger(__name__)
-        coloredlogs.install(
-            fmt="%(module)s %(levelname)s %(message)s", 
-            level=_settings.get('logging_mode','info').upper(), 
-            logger=logger
-        )
+    # Create output folder if it does not exist
+    if not os.path.exists(config.settings['outputs']['output_path']):
+        logger.info(f"Creating new output directory {config.settings['outputs']['output_path']}")
+        os.makedirs(config.settings['outputs']['output_path'])
 
-        # Create output folder if it does not exist
-        if not os.path.exists(config.settings['outputs']['output_path']):
-            logger.info(f"Creating new output directory {config.settings['outputs']['output_path']}")
-            os.makedirs(config.settings['outputs']['output_path'])
+    # logger.info(f"Validating config provided...")
+    # Validate config
+    config.validate_config()
+    
+    # Intialise experiment handler
+    eh = ExperimentHandler(config)
 
-        logger.info(f"Validating config provided...")
-        # Validate config
-        config.validate_config()
-        
-        # Intialise experiment handler
-        eh = ExperimentHandler(config)
+    # Run experiments
+    eh.run_and_write_experiments_sequentially()
 
-        # Run experiments
-        eh.run_and_write_experiments_sequentially()
-
-        logger.success('Done')
-
-    return make_run(_settings=settings,_config_path=config_path,**kwargs)
+    logger.success('Done')
 
 
 @cli.command('run-mcmc')
@@ -411,13 +397,68 @@ def run_nn(
     # Update number of workers
     set_numpy_threads(settings['n_threads'][0])
 
-    # Import was here
-
     # Capitalise all single-letter arguments
     settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
+    
+    # Setup logger
+    logger = setup_logger(
+        __name__,
+        settings.get('logging_mode','info').upper(),
+        log_to_file=True,
+        log_to_console=True
+    )
 
     # Run
-    run(settings,config_path,run_experiments=run_experiments)
+    # run(logger,settings=settings,config_path=config_path,run_experiments=run_experiments)
+    # Import all modules
+    from multiresticodm.experiments import ExperimentHandler
+    from multiresticodm.utils import deep_updates,set_numba_torch_threads,update_device
+
+    # Read config
+    config = Config(
+        path=config_path,
+        settings=None,
+        level=settings.get('logging_mode','info').upper()
+    )
+
+    # Update settings with overwritten values
+    deep_updates(config.settings,settings,overwrite=True)
+
+    # Set device to run code on
+    config.settings['inputs']['device'] = update_device(
+        config.settings['inputs'].get('device','cpu')
+    )
+
+    # Set number of cores used (numba package)
+    set_numba_torch_threads(settings['n_threads'])
+
+    # Update root
+    config.path_sets_root()
+    # Maintain a dictionary of available experiments and their list index
+    available_experiments = {exp.get("name",""):i for i,exp in enumerate(config.settings['experiments']) if len(exp.get("name","")) > 0}
+    config.settings.setdefault("available_experiments",available_experiments)
+    # Keep experiment ids argument
+    if len(run_experiments) > 0:
+    # if len(kwargs.get("run_experiments",[])) > 0:
+        config.settings.setdefault("run_experiments", list(run_experiments))
+    else:
+        config.settings.setdefault("run_experiments", available_experiments)
+
+    # Create output folder if it does not exist
+    if not os.path.exists(config.settings['outputs']['output_path']):
+        logger.info(f"Creating new output directory {config.settings['outputs']['output_path']}")
+        os.makedirs(config.settings['outputs']['output_path'])
+
+    logger.info(f"Validating config provided...")
+
+    # Validate config
+    config.validate_config()
+    
+    # Intialise experiment handler
+    eh = ExperimentHandler(config)
+
+    # Run experiments
+    eh.run_and_write_experiments_sequentially()
 
 
 _output_options = [
@@ -656,8 +697,6 @@ def plot(
 
     logging.basicConfig(
         level=logging.getLevelName(settings.get('logging_mode','info').upper()),
-        # format='%(asctime)s %(name)-12s %(levelname)-3s %(message)s',
-        # datefmt='%m-%d %H:%M:%S'
         format='%(asctime)s.%(msecs)03d %(levelname)-3s %(message)s',
         datefmt='%M:%S'
     )
@@ -760,8 +799,6 @@ def summarise(
 
     logging.basicConfig(
         level=logging.getLevelName(settings.get('logging_mode','info').upper()),
-        # format='%(asctime)s %(name)-12s %(levelname)-3s %(message)s',
-        # datefmt='%m-%d %H:%M:%S'
         format='%(asctime)s.%(msecs)03d %(levelname)-3s %(message)s',
         datefmt='%M:%S'
     )
@@ -772,6 +809,7 @@ def summarise(
         logger=logger
     )
 
+
     logger.info('Gathering data')
 
     # Run output handler
@@ -780,3 +818,6 @@ def summarise(
     )
 
     logger.info('Done')
+
+if __name__ == '__main__':
+    run_nn()

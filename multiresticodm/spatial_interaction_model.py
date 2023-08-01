@@ -9,7 +9,7 @@ from typing import Union
 from multiresticodm.config import Config
 from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
 from multiresticodm.global_variables import SIM_DATA_TYPES, PARAMETER_DEFAULTS
-from multiresticodm.utils import update_logger_settings, write_txt,makedir
+from multiresticodm.utils import setup_logger, write_txt,makedir
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
 
 
@@ -54,23 +54,18 @@ class SpatialInteraction2D():
     def __init__(
             self,
             config:Config=None,
-            origin_demand=None,
-            destination_demand=None,
-            log_origin_attraction=None,
-            log_destination_attraction=None,
-            cost_matrix=None,
-            dims=None,
             true_parameters: dict = None,
             device: str = None,
             **kwargs
     ):
         '''  Constructor '''
         # Setup logger
-        self.logger = update_logger_settings(
-            __name__,
-            new_level=kwargs.get('level','INFO'),
-            log_to_file=False,
-            log_to_console=config.level() if config else kwargs.get('log_to_console',True)
+        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        self.logger = setup_logger(
+            __name__+kwargs.get('instance',''),
+            level=self.level,
+            log_to_file=kwargs.get('log_to_file',True),
+            log_to_console=kwargs.get('log_to_console',True),
         )
 
         # SIM name
@@ -88,6 +83,10 @@ class SpatialInteraction2D():
         self.free_param_names = ['alpha','beta']
         all_parameter_names = self.free_param_names + self.aux_param_names
 
+        # Get data names
+        self.data_names = ['origin_demand','destination_demand','dims',
+                           'log_origin_attraction','log_destination_attraction','cost_matrix']
+
         # Grand total
         self.grand_total = kwargs.get('grand_total',torch.tensor(1).int().to(self.device))
 
@@ -100,35 +99,11 @@ class SpatialInteraction2D():
             )
             self.config.settings['spatial_interaction_model']['parameters'][param] = true_parameters.get(param,PARAMETER_DEFAULTS[param])
 
-        # Dimensions
-        self.dims = None
-        if dims is not None:
-            self.dims = dims
-
-        # Origin demand
-        self.origin_demand = None
-        if origin_demand is not None:
-            self.origin_demand = origin_demand
-
-        # Destination demand
-        self.destination_demand = None
-        if destination_demand is not None:
-            self.destination_demand = destination_demand
-
-        # Origin attraction
-        self.log_origin_attraction = None
-        if log_origin_attraction is not None:
-            self.log_origin_attraction = log_origin_attraction
-
-        # Destination attraction
-        self.log_destination_attraction = None
-        if log_destination_attraction is not None:
-            self.log_destination_attraction = log_destination_attraction
-
-        # Cost matrix
-        self.cost_matrix = None
-        if cost_matrix is not None:
-            self.cost_matrix = cost_matrix
+        # Read data passed
+        for attr in self.data_names:
+            setattr(self,attr,None)
+            if kwargs.get(attr,None) is not None:
+                setattr(self,attr,kwargs.get(attr,None))
 
         # Update dims
         if self.dims is None and self.cost_matrix is not None:
@@ -142,6 +117,10 @@ class SpatialInteraction2D():
         else:
             self.ground_truth_known = False
 
+    def update(self,**kwargs):
+        for k,v in kwargs.items():
+            if hasattr(self,k) and k in self.data_names:
+                setattr(self,k,v)
 
     def export(self,dirpath:str='./synthetic_dummy',overwrite:bool=False) -> None:
         

@@ -8,7 +8,7 @@ from typing import Union, Tuple, Dict, List
 from scipy.stats import nchypergeom_fisher
 
 
-from multiresticodm.utils import  str_in_list, tuplize, flatten, set_numba_torch_threads,update_logger_settings
+from multiresticodm.utils import  setup_logger, str_in_list, tuplize, flatten, set_numba_torch_threads
 from multiresticodm.math_utils import logsumexp, log_factorial
 from multiresticodm.probability_utils import uniform_binary_choice, log_odds_cross_ratio
 from multiresticodm.markov_basis import instantiate_markov_basis,MarkovBasis
@@ -23,12 +23,12 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
     def __init__(self, ct: ContingencyTable, table_mb:MarkovBasis=None, **kwargs):
         # Setup logger
-        self.logger = update_logger_settings(
+        self.level = ct.config.level if hasattr(ct.config,'level') else kwargs.get('level','INFO')
+        self.logger = setup_logger(
             __name__,
-            new_level=kwargs.get('level','INFO'),
+            level=self.level,
             log_to_file=False,
             log_to_console=kwargs.get('log_to_console',True),
-            level=ct.config.level() if ct.config else kwargs.get('level','INFO')
         )
 
         if isinstance(ct, ContingencyTable2D):

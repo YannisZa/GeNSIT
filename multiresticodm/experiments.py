@@ -53,11 +53,15 @@ def instantiate_experiment(experiment_type:str,config:Config,**kwargs):
 
 class ExperimentHandler(object):
 
-    def __init__(self, config:Config):
+    def __init__(self, config:Config, **kwargs):
         # Import logger
-        self.logger = logging.getLogger(__name__)
-        numba_logger = logging.getLogger('numba')
-        numba_logger.setLevel(logging.WARNING)
+        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        self.logger = setup_logger(
+            __name__,
+            level = self.level,
+            log_to_console = kwargs.get('log_to_console',False),
+            log_to_file = kwargs.get('log_to_file',False),
+        )
         
         # Get configuration
         self.config = config
@@ -67,9 +71,9 @@ class ExperimentHandler(object):
         self.experiments = []
 
         # Setup experiments
-        self.setup_experiments()
+        self.setup_experiments(**kwargs)
 
-    def setup_experiments(self):
+    def setup_experiments(self,**kwargs):
 
         self.experiments = {}
 
@@ -79,7 +83,8 @@ class ExperimentHandler(object):
             if experiment_id in self.avail_experiments.keys():
                 # Construct sub-config with only data relevant for experiment
                 experiment_config = Config(
-                    settings=deepcopy(self.config.settings)
+                    settings=deepcopy(self.config.settings),
+                    level=self.level
                 )
                 # Store one experiment
                 experiment_config['experiments'] = [
@@ -94,7 +99,10 @@ class ExperimentHandler(object):
                 # Instatiate new experiment
                 experiment = instantiate_experiment(
                     experiment_type=experiment_config.settings['experiments'][0]['name'],
-                    config=experiment_config
+                    config=experiment_config,
+                    log_to_file=True,
+                    log_to_console=False,
+                    instance=kwargs.get('instance','')
                 )
                 # Append it to list of experiments
                 self.experiments[experiment_id] = experiment
@@ -110,18 +118,24 @@ class ExperimentHandler(object):
                 experiment.reset()
             except:
                 pass
-
+        
 class Experiment(object):
     def __init__(self, config:Config, **kwargs):
         # Create logger
-        self.logger = logging.getLogger(__name__)
-        self.logger.disabled = kwargs.get('disable_logger',False)
-        numba_logger = logging.getLogger('numba')
-        numba_logger.setLevel(logging.WARNING)
+        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        self.logger = setup_logger(
+            __name__+kwargs.get('instance',''),
+            level = self.level,
+            log_to_console = kwargs.get('log_to_console',True),
+            log_to_file = kwargs.get('log_to_file',True),
+        )
         
         # Make sure you are reading a config
         if isinstance(config,dict):
-            config = Config(settings=config)
+            config = Config(
+                settings=config,
+                level=self.level
+            )
         elif not isinstance(config,Config):
             raise Exception(f'config provided has invalid type {type(config)}')
 
@@ -138,7 +152,10 @@ class Experiment(object):
             del settings_flattened['load_experiment']
             deep_updates(self.config.settings,settings_flattened,overwrite=True)
             # Merge settings to config
-            self.config = Config(settings={**self.config, **settings_flattened})
+            self.config = Config(
+                settings={**self.config, **settings_flattened},
+                level=self.level
+            )
         
         # Update config with current timestamp ( but do not overwrite)
         datetime_results = list(deep_get(key='datetime',value=self.config.settings))
@@ -188,7 +205,10 @@ class Experiment(object):
 
         if metadata:
             safe_delete(self.config)
-            self.config = Config(settings={})
+            self.config = Config(
+                settings={},
+                level=self.level
+            )
 
         # Run garbage collector
         gc.collect()
@@ -463,9 +483,6 @@ class Experiment(object):
                     defaults=[0.0,1.0,1.0,1.0]
                 )
                 self.config['noise_regime'] = deep_call(self,'.sim_mcmc.sim.noise_regime','undefined')
-                # Store ground truth parameters
-                if self.sim_mcmc.sim.ground_truth_known:
-                    self.config['true_parameters'] = [str(self.sim_mcmc.sim.alpha_true),str(self.sim_mcmc.sim.beta_true)]
             elif hasattr(self,'ct'):
                 # Get dims from table
                 self.config['table_dim'] = 'x'.join(map(str,deep_call(self,'.ct.dims',defaults=None)))
@@ -476,19 +493,14 @@ class Experiment(object):
                     defaults=-1,
                     args1=tuplize(range(deep_call(self,'.ct.ndims()',0)))
                 ))
+            elif hasattr(self,'harris_wilson_nn') and hasattr(self.harris_wilson_nn,'physics_model'):
+                model_str = '.harris_wilson_nn.physics_model'
+                # Get dims from sim
+                self.config['table_dim'] = 'x'.join(map(str,deep_call(self,f'{model_str}.sim.dims',defaults=None)))
+                self.config['noise_regime'] = deep_call(self,f'{model_str}.noise_regime','unknown')
             elif hasattr(self,'sim'):
                 # Get dims from sim
                 self.config['table_dim'] = 'x'.join(map(str,deep_call(self,'.sim.dims',defaults=None)))
-                # Get sim auxiliary params
-                self.config['auxiliary_parameters'] = deep_call(
-                    input=self,
-                    expressions=[f'.sim.{param}' for param in ['delta','gamma','kappa','epsilon']],
-                    defaults=[0.0,1.0,1.0,1.0]
-                )
-                self.config['noise_regime'] = deep_call(self,'.sim.noise_regime','undefined')
-                # Store ground truth parameters
-                if self.sim.ground_truth_known:
-                    self.config['true_parameters'] = [str(self.sim.alpha_true),str(self.sim.beta_true)]
             else:
                 self.config['table_dim'] = [None,None]
                 self.config['table_total'] = None
@@ -1738,7 +1750,6 @@ class TableSummariesMCMCConvergence(Experiment):
             print_flag=False,
             update_flag=True
         )
-        # sys.exit()
         return tables0
 
     
@@ -1852,14 +1863,14 @@ class SIM_NN(Experiment):
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
-            synthetic_data = False
+            synthetic_data = False,
+            instance = kwargs.get('instance','')
         )
-
         # Set up the neural net
-        self.logger.info("Initializing the neural net ...")
+        self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
             input_size=self.inputs.destination_attraction_ts.shape[1],
-            output_size=len(config['neural_network']['to_learn']),
+            output_size=len(config['inputs']['to_learn']),
             **config['neural_network']['hyperparameters'],
         ).to(self.device)
 
@@ -1867,42 +1878,45 @@ class SIM_NN(Experiment):
         self.inputs.pass_to_device()
 
         # Instantiate Spatial Interaction Model
-        self.logger.info("Initializing the spatial interaction model ...")
+        self.logger.note("Initializing the spatial interaction model ...")
         sim = instantiate_sim(
-            sim_type=config['spatial_interaction_model']['sim_type'],
-            config=config,
-            origin_demand=self.inputs.origin_demand,
-            log_destination_attraction=np.log(self.inputs.destination_attraction_ts[:,-1].flatten()),
-            cost_matrix=self.inputs.cost_matrix,
-            true_parameters=config['spatial_interaction_model']['parameters'],
-            device = self.device
+            sim_type= config['spatial_interaction_model']['sim_type'],
+            config = config,
+            origin_demand = self.inputs.origin_demand,
+            log_destination_attraction = np.log(self.inputs.destination_attraction_ts[:,-1].flatten()), 
+            cost_matrix = self.inputs.cost_matrix,
+            true_parameters = config['spatial_interaction_model']['parameters'],
+            device = self.device,
+            instance = kwargs.get('instance','')
         )
         # Get and remove config
         config = pop_variable(sim,'config')
 
         # Build Harris Wilson model
-        self.logger.info("Initializing the Harris Wilson physics model ...")
+        self.logger.note("Initializing the Harris Wilson physics model ...")
         harris_wilson_model = HarrisWilson(
-            sim=sim,
-            config=config,
+            sim = sim,
+            config = config,
             dt = config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
-            device = self.device
+            device = self.device,
+            instance = kwargs.get('instance','')
         )
         # Get and remove config
         config = pop_variable(harris_wilson_model,'config')
 
         # Instantiate harris and wilson neural network model
-        self.logger.info("Initializing the Harris Wilson Neural Network model ...")
+        self.logger.note("Initializing the Harris Wilson Neural Network model ...")
         self.harris_wilson_nn = HarrisWilson_NN(
-            rng=rng,
-            config=config,
-            neural_net=neural_network,
-            loss_function=config['neural_network'].pop('loss_function'),
-            physics_model=harris_wilson_model,
-            to_learn=config['neural_network']['to_learn'],
-            write_every=config['outputs']['write_every'],
-            write_start=config['outputs']['write_start']
+            rng = rng,
+            config = config,
+            neural_net = neural_network,
+            loss_function = config['neural_network'].pop('loss_function'),
+            physics_model = harris_wilson_model,
+            to_learn = config['inputs']['to_learn'],
+            write_every = config['outputs']['write_every'],
+            write_start = config['outputs']['write_start'],
+            instance = kwargs.get('instance','')
         )
         # Get config
         config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else None
@@ -1912,21 +1926,27 @@ class SIM_NN(Experiment):
             self.config = config
 
         # Create outputs
-        self.outputs = Outputs(self,name_params=kwargs.get('name_params',{}))
+        self.outputs = Outputs(
+            self.config,
+            module=__name__+kwargs.get('instance',''),
+            name_params=kwargs.get('name_params',{}),
+            log_to_file=True,
+            log_to_console=True,
+        )
 
         # Write metadata
-        self.logger.debug("Writing metadata ...")
-        if self.config.get('export_metadata',True):
+        if self.config.settings.get('export_metadata',True):
+            self.logger.debug("Writing metadata ...")
             dir_path = os.path.join("samples",self.outputs.samples_stamp)
             self.outputs.write_metadata(
                 dir_path=dir_path,
-                filename=f"{dir_path.replace('/','_').replace('.','')}_metadata"
+                filename=f"metadata"
             )
         
         self.logger.note(f"{self.harris_wilson_nn}")
 
         self.sample_names = ['log_destination_attraction','theta','loss']
-        self.theta_names = config['neural_network']['to_learn']
+        self.theta_names = config['inputs']['to_learn']
         
     def run(self) -> None:
 
@@ -1975,33 +1995,32 @@ class SIM_NN(Experiment):
                 self.compute_time[-1] = time.time() - start_time
 
         
-        # Write metadata
-        if self.config.get('export_metadata',True):
+        if self.config.settings.get('export_metadata',True):
+            # Write metadata
             dir_path = os.path.join("samples",self.outputs.samples_stamp)
             self.outputs.write_metadata(
                 dir_path=dir_path,
-                filename=f"{dir_path.replace('/','_').replace('.','')}_metadata"
+                filename=f"metadata"
             )
-            
-        self.outputs.h5file.close()
-        self.logger.info("Simulation run finished.")
-
-        # Write log file
-        self.outputs.write_log(self.logger,dir_path=dir_path)
-
+        if self.config.settings.get('export_samples',True):
+            # Close h5 data file
+            self.outputs.h5file.close()
+            self.logger.note("Simulation run finished.")
+            # Write log file
+            self.outputs.write_log(self.logger)
+        else:
+            self.logger.note("Simulation run finished.")
 
 class ExperimentSweep():
 
     def __init__(self,config:Config,sweep_key_paths:list,**kwargs):
 
-        logger = logging.getLogger(__name__)
-
         # Setup logger
-        self.logger = update_logger_settings(
-            logger,
-            log_to_file=False,
-            log_to_console=True,
-            level=config.level()
+        self.logger = setup_logger(
+            __name__,
+            level = config.level,
+            log_to_file = True,
+            log_to_console = True,
         )
 
         self.logger.info(f"Performing parameter sweep")
@@ -2039,10 +2058,15 @@ class ExperimentSweep():
                 "values": sweep_vals
             }
 
+        # Temporarily disable sample output writing
+        deep_update(self.config.settings,'export_samples',False)
         self.outputs = Outputs(
             self.config,
             name_params=kwargs.get('name_params',{})
         )
+        # Enable it again
+        deep_updates(self.config.settings,{'export_samples':True})
+
         # Write metadata
         if self.config.get('export_metadata',True):
             self.outputs.write_metadata(
@@ -2069,12 +2093,7 @@ class ExperimentSweep():
         
         # For each configuration update experiment config 
         # and instantiate new experiment
-        # Decide whether to prepare sweeps in parallel or not
-        if self.config.settings['inputs'].get("n_workers",1) > 1:
-            # self.prepare_experiments_parallel(sweep_configurations)
-            self.prepare_experiments_sequential(sweep_configurations)
-        else:
-            self.prepare_experiments_sequential(sweep_configurations)
+        self.prepare_experiments_sequential(sweep_configurations)
 
         # Decide whether to run sweeps in parallel or not
         if self.n_workers > 1:
@@ -2083,7 +2102,7 @@ class ExperimentSweep():
             self.run_sequential()
     
     def prepare_experiments_sequential(self,sweep_configurations):
-        for sval in tqdm(sweep_configurations):
+        for j,sval in tqdm(enumerate(sweep_configurations),total=len(sweep_configurations)):
             # Create new config
             new_config = deepcopy(self.config)
             # Deactivate sweep             
@@ -2103,7 +2122,8 @@ class ExperimentSweep():
                 config=new_config,
                 name_params={val['var']:sval[i] for i,val in enumerate(self.sweep_params.values())},
                 log_to_file=True,
-                log_to_console=True
+                log_to_console=False,
+                instance=str(j)
             )
             # Append to experiments
             self.experiments.append(new_experiment)

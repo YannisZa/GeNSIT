@@ -44,7 +44,13 @@ mpl.rcParams['text.latex.preamble'] = latex_preamble
 class Plot(object):
 
     def __init__(self,plot_ids:List[str],outputs_directories:List[str],settings:dict):
-        self.logger = logging.getLogger(__name__)
+        # Setup logger
+        self.logger = setup_logger(
+            __name__,
+            settings.get('logging_mode','info').upper(),
+            log_to_file=True,
+            log_to_console=True
+        )
 
         # Enable garbage collector
         gc.enable()

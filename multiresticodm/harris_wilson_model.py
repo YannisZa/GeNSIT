@@ -9,10 +9,9 @@ from multiresticodm.config import Config
 # from multiresticodm.utils import safe_delete,str_in_list
 from multiresticodm.global_variables import PARAMETER_DEFAULTS
 from multiresticodm.spatial_interaction_model import SpatialInteraction2D
+from multiresticodm.utils import setup_logger, sigma_to_noise_regime
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
-
-log = logging.getLogger(__name__)
 
 
 class HarrisWilson:
@@ -23,17 +22,26 @@ class HarrisWilson:
         config: Config = None,
         dt: float = 0.001,
         true_parameters: dict = None,
-        device: str = None
+        device: str = None,
+        **kwargs
     ):
-
         """The Harris and Wilson model of economic activity.
 
         :param sim: the Spatial interaction model with all necessary data
-        :param learnable_parameters: (optional) the names of free parameters to learn
+        :param params_to_learn: (optional) the names of free parameters to learn
         :param dt: (optional) the time differential to use for the solver
         :param true_parameters: (optional) a dictionary of the true parameters
         :param device: the training device to use
         """
+
+        # Setup logger
+        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        self.logger = setup_logger(
+            __name__+kwargs.get('instance',''),
+            level=self.level,
+            log_to_file=kwargs.get('log_to_file',True),
+            log_to_console=kwargs.get('log_to_console',True),
+        )
 
         # Store SIM and its config separately
         self.sim = sim
@@ -46,21 +54,24 @@ class HarrisWilson:
 
         # Model parameters
         self.aux_param_names = ['noise_var','epsilon']
-        self.learned_param_names = ['alpha','beta','kappa','sigma','delta']
+        self.main_param_names = ['alpha','beta','kappa','sigma','delta']
         self.true_parameters = true_parameters
+
+        try:
+            assert set(self.config.settings['inputs']['to_learn']).issubset(set(self.main_param_names))
+        except:
+            self.logger.error(f"Some parameters in {','.join(self.config.settings['inputs']['to_learn'])} cannot be learned.")
+            self.logger.error(f"Acceptable parameters are {','.join(self.main_param_names)}.")
+            raise Exception('Cannot instantiate Harris Wilson Model.')
         
-        learnable_parameters = (
-            {}
-            if true_parameters is not None
-            else {k:PARAMETER_DEFAULTS[k] for k in self.learned_param_names}
-        )
+        params_to_learn = {}
         if true_parameters is not None:
             idx = 0
-            for param in self.learned_param_names:
+            for param in self.config.settings['inputs']['to_learn']:
                 if param not in true_parameters.keys():
-                    learnable_parameters[param] = idx
+                    params_to_learn[param] = idx
                     idx += 1
-        self.learnable_parameters = learnable_parameters
+        self.params_to_learn = params_to_learn
 
         # Auxiliary hyperparameters
         for param in PARAMETER_DEFAULTS.keys():
@@ -78,6 +89,14 @@ class HarrisWilson:
         self.noise_var = torch.pow(((noise_percentage/torch.tensor(100).float())*torch.log(self.sim.dims[1])),2)
         if hasattr(self,'config'):
             self.config.settings['harris_wilson_model']['noise_percentage'] = noise_percentage
+
+        # Update noise regime
+        if 'sigma' in self.params_to_learn:
+            self.noise_regime = 'variable'
+        else:
+            # Get true sigma
+            self.noise_regime = sigma_to_noise_regime(self.true_parameters['sigma'])
+        self.config.settings['noise_regime'] = self.noise_regime
 
     
     def elicit_delta_and_kappa(self):
@@ -254,28 +273,28 @@ class HarrisWilson:
         # Parameters to learn
         alpha = (
             self.true_parameters["alpha"]
-            if 'alpha' not in self.learnable_parameters.keys()
-            else free_parameters[self.learnable_parameters["alpha"]]
+            if 'alpha' not in self.params_to_learn.keys()
+            else free_parameters[self.params_to_learn["alpha"]]
         )
         beta = (
             self.true_parameters["beta"]
-            if "beta" not in self.learnable_parameters.keys()
-            else free_parameters[self.learnable_parameters["beta"]]
+            if "beta" not in self.params_to_learn.keys()
+            else free_parameters[self.params_to_learn["beta"]]
         )
         kappa = (
             self.true_parameters["kappa"]
-            if "kappa" not in self.learnable_parameters.keys()
-            else free_parameters[self.learnable_parameters["kappa"]]
+            if "kappa" not in self.params_to_learn.keys()
+            else free_parameters[self.params_to_learn["kappa"]]
         )
         delta = (
             self.true_parameters["delta"]
-            if "delta" not in self.learnable_parameters.keys()
-            else free_parameters[self.learnable_parameters["delta"]]
+            if "delta" not in self.params_to_learn.keys()
+            else free_parameters[self.params_to_learn["delta"]]
         )
         sigma = (
             self.true_parameters["sigma"]
-            if "sigma" not in self.learnable_parameters.keys()
-            else free_parameters[self.learnable_parameters["sigma"]]
+            if "sigma" not in self.params_to_learn.keys()
+            else free_parameters[self.params_to_learn["sigma"]]
         )
 
         # Training parameters
@@ -318,7 +337,6 @@ class HarrisWilson:
         self,
         *,
         init_destination_attraction,
-        free_parameters=None,
         n_iterations: int,
         dt: float = None,
         requires_grad: bool = True,
@@ -328,7 +346,6 @@ class HarrisWilson:
         """Runs the model for n_iterations.
 
         :param init_destination_attraction: the initial destination zone size values
-        :param free_parameters: (optional) the parameters to use during training. Defaults to the model defaults.
         :param n_iterations: the number of iteration steps.
         :param dt: (optional) the time differential to use. Defaults to the model default.
         :param requires_grad: (optional) whether the calculated values require differentiation
@@ -390,7 +407,7 @@ class HarrisWilson:
 
         return f"""
             {'x'.join([str(d.cpu().detach().numpy()) for d in self.sim.dims])} Harris Wilson model using {self.sim.sim_type} Constrained Spatial Interaction Model
-            Learned parameters: {', '.join(self.learnable_parameters.keys())}
+            Learned parameters: {', '.join(self.params_to_learn.keys())}
             Epsilon: {self.epsilon}
             Kappa: {self.kappa}
             Delta: {self.delta}

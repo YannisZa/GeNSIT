@@ -27,7 +27,8 @@ from typing import Dict, List, Union, Tuple
 from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
 
-from multiresticodm.global_variables import NUMPY_TYPE_TO_DAT_TYPE#,UTILS_CACHED
+from multiresticodm.logger_class import *
+from multiresticodm.global_variables import NUMPY_TYPE_TO_DAT_TYPE
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -413,6 +414,10 @@ def deep_update(d,key,val,**kwargs):
             d[key] = val
         elif isinstance(dict_val, dict):
             deep_update(dict_val,key,val,**kwargs)
+        elif isinstance(dict_val, list):
+            for v in dict_val:
+                if isinstance(v,dict):
+                    deep_update(v,key,val,**kwargs)
         
 
 def deep_updates(main_dict,update_dict,**kwargs):
@@ -818,27 +823,78 @@ def string_to_numeric(s):
     i = int(f)
     return i if i == f else f
 
-
-def update_logger_settings(logger,level,log_to_file:bool=False,log_to_console=False):
-    # Silence warnings from other packages
-    numba_logger = logging.getLogger('numba')
-    numba_logger.setLevel(logging.WARNING)
-    # Update level if required 
-    if not log_to_file:
-        # Temporarily disable the file handler
-        logger.handlers[0].setLevel(logging.NOTSET)
-    else:
-        if logger.handlers[0].level == logging.NOTSET:
-            logger.handlers[0].setLevel(logging.DEBUG)
-
-    if not log_to_console:
-        # Temporarily disable the file handler
-        logger.handlers[1].setLevel(logging.NOTSET)
-    else:
-        if logger.handlers[1].level == logging.NOTSET:
-            logger.handlers[1].setLevel(level.upper())
-    return logger
-
 def get_stream(stream):
     stream.seek(0)
     return stream.read().strip().split('\n')
+
+def setup_logger(name,level,log_to_file:bool=False,log_to_console:bool=False):
+    
+    # Set logger class
+    logging.setLoggerClass(CustomLogger)
+
+    # Silence warnings from other packages
+    numba_logger = logging.getLogger('numba')
+    numba_logger.setLevel(logging.WARNING)
+        
+    # Get root logger
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+
+    # Formatter
+    string_formatter = logging.Formatter(
+        fmt='%(asctime)s.%(msecs)03d %(module)-s %(levelname)-s %(message)s',
+        datefmt='%M:%S',
+    )   
+
+    # Setup coloring
+    coloredlogs.install(
+        fmt='%(asctime)s.%(msecs)03d %(module)-s %(levelname)-3s %(message)s',
+        datefmt='%M:%S',
+        logger=logger
+    )
+    
+    
+    if len(logger.handlers) > 1:
+        # print(name)
+        # Update handler levels
+        for i,hand in enumerate(logger.handlers):
+            if isinstance(hand,CustomFileHandler):
+                if log_to_file:
+                    logger.handlers[i].setLevel(logging.DEBUG)
+                else:
+                    logger.handlers[i].setLevel(logging.CRITICAL)
+            else:
+                if log_to_console:
+                    logger.handlers[i].setLevel(level.upper())
+                else:
+                    logger.handlers[i].setLevel(logging.CRITICAL)
+            # print(type(hand),logging.getLevelName(logger.handlers[i].level))
+    else:
+
+        # Configure standard error handler
+        if log_to_console:
+            logger.handlers[0].setLevel(level.upper())
+        else:
+            logger.handlers[0].setLevel(logging.CRITICAL)
+
+        # Setup file handler
+        string_handler = CustomFileHandler('temp.log',name=name)
+        if log_to_file:
+            string_handler.setLevel(logging.DEBUG)
+        else:
+            string_handler.setLevel(logging.CRITICAL)
+        string_handler.setFormatter(string_formatter)
+
+        logger.addHandler(string_handler)
+
+
+    return logger
+
+def sigma_to_noise_regime(sigma=None):
+    if sigma:
+        if (2/sigma**2) >= 10000:
+            return 'low'
+        else:
+            return 'high'
+    else:
+        return 'variable'

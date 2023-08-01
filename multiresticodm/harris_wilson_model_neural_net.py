@@ -6,22 +6,16 @@
 import sys
 import time
 import torch
-import coloredlogs
-import h5py as h5
 import numpy as np
 import torch
 
 from torch import nn
-from dantro import logging
 from typing import Any, List, Union
 
 from multiresticodm.config import Config
-from multiresticodm.utils import str_in_list
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS
 
-log = logging.getLogger(__name__)
-coloredlogs.install(fmt='%(levelname)s %(message)s', level='INFO', logger=log)
 
 def get_architecture(
     input_size: int, output_size: int, n_layers: int, cfg: dict
@@ -259,17 +253,6 @@ class HarrisWilson_NN:
         self._write_every = write_every
         self._write_start = write_start
 
-        # Determine noise regime
-        if str_in_list('sigma',to_learn):
-            self.physics_model.noise_regime = 'variable'
-        else:
-            self.physics_model.gamma = 2/torch.pow(self.physics_model.sigma,2)
-            if self.physics_model.gamma >= 10000:
-                self.physics_model.noise_regime = 'low'
-            else:
-                self.physics_model.noise_regime = 'high'
-        if hasattr(self,'config'):
-            self.config.settings['harris_wilson_model']['noise_regime'] = self.physics_model.noise_regime
 
     def epoch(
         self,
@@ -355,7 +338,7 @@ class HarrisWilson_NN:
 
 
     def __repr__(self):
-        return f"{self.noise_regime}Noise HarrisWilson NeuralNet( {self.sim.sim_type}(SpatialInteraction2D) )"
+        return f"{self.physics_model.noise_regime}Noise HarrisWilson NeuralNet( {self.sim.sim_type}(SpatialInteraction2D) )"
 
     def __str__(self):
 

@@ -12,7 +12,7 @@ from typing import List, Union, Callable
 
 from multiresticodm.config import Config
 from multiresticodm.global_variables import *
-from multiresticodm.utils import update_logger_settings, str_in_list, update_logger_settings, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth
+from multiresticodm.utils import setup_logger, str_in_list, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth
 from multiresticodm.math_utils import powerset
 
 # -> Union[ContingencyTable,None]:
@@ -22,7 +22,7 @@ def instantiate_ct(table, config: Config, **kwargs):
                 table=table, 
                 config=config, 
                 log_to_console=kwargs.get('log_to_console',True), 
-                level=config.level(),
+                level=config.level,
                 **kwargs
         )
     else:
@@ -33,14 +33,13 @@ def instantiate_ct(table, config: Config, **kwargs):
 class ContingencyTable(object):
 
     def __init__(self, table=None, config: Config = None, **kwargs: dict):
-        # Import logger
         # Setup logger
-        self.logger = update_logger_settings(
+        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        self.logger = setup_logger(
             __name__,
-            new_level=config.level(),
+            level=self.level,
             log_to_file=False,
             log_to_console=kwargs.get('log_to_console',True),
-            level=config.level() if config else kwargs.get('level','INFO')
         )
         # Config
         self.config = None

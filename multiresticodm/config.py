@@ -4,21 +4,28 @@ import toml
 import logging
 
 from copy import deepcopy
-from multiresticodm.utils import deep_apply, str_in_list, update_logger_settings
+from multiresticodm.utils import deep_apply, setup_logger, str_in_list
 from multiresticodm.config_data_structures import instantiate_data_type
-
-logger = logging.getLogger(__name__)
 
 class Config:
 
-    def __init__(self, path:str=None, settings:dict=None):
+    def __init__(self, path:str=None, settings:dict=None, **kwargs):
         """
         Config object constructor.
         :param path: Path to configuration TOML file
         """
+        # Setup logger
+        self.level = kwargs.get('level','info').upper()
+        self.logger = setup_logger(
+            __name__,
+            level=self.level,
+            log_to_file=True,
+            log_to_console=True
+        )
+
         # Load config
         if path:
-            logger.debug(f' Loading config from {path}')
+            self.logger.debug(f' Loading config from {path}')
             self.settings = toml.load(path, _dict=dict)
 
             # Load schema
@@ -32,8 +39,6 @@ class Config:
             self.settings = None
             raise Exception(f'Config not found in {path}')
 
-    def level(self):
-        return self.settings['log_level'].upper()
 
     def __str__(self,settings=None):
         if settings is not None:

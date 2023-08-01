@@ -32,10 +32,13 @@ OUTPUTS_MODULE = sys.modules[__name__]
 class OutputSummary(object):
 
     def __init__(self, settings):
-        # Import logger
-        self.logger = logging.getLogger(__name__)
-        numba_logger = logging.getLogger('numba')
-        numba_logger.setLevel(logging.WARNING)
+        # Setup logger
+        self.logger = setup_logger(
+            __name__,
+            settings.get('logging_mode','info').upper(),
+            log_to_file=True,
+            log_to_console=True
+        )
         # Get command line settings
         self.settings = settings
         # Instatiate list of experiments
@@ -470,19 +473,19 @@ class OutputSummary(object):
 
 class Outputs(object):
 
-    def __init__(self, 
+    def __init__(self,
                  config, 
+                 module:str=__name__,
                  settings:dict={}, 
                  sample_names:list=['ground_truth_table'], 
                  slice_samples:bool=True,
                  **kwargs):
         # Setup logger
-        self.logger = update_logger_settings(
-            __name__,
-            new_level=kwargs.get('level','INFO'),
-            log_to_file=False,
+        self.logger = setup_logger(
+            module,
+            level=config.level if hasattr(config,'level') else kwargs.get('level','INFO'),
+            log_to_file=kwargs.get('log_to_file',True),
             log_to_console=kwargs.get('log_to_console',True),
-            level=config.level() if config else kwargs.get('level','INFO')
         )
 
         # Sample names must be a subset of all data names
@@ -506,7 +509,7 @@ class Outputs(object):
             # Store experiment id
             self.config = metadata
             # Get intensity model class
-            self.intensity_model_class = [input_name for input_name in self.config.keys() if input_name != 'contingency_table' and isinstance(self.config[input_name],dict)][0]
+            self.intensity_model_class = [k for k in self.config.keys() if k != 'contingency_table' and isinstance(self.config[k],dict)][0]
             # Define config experiment path to directory
             self.outputs_path = config
             assert str_in_list('input_path',list(metadata['inputs'].keys()))
@@ -591,24 +594,51 @@ class Outputs(object):
             if len(name_params) > 0 and isinstance(name_params,dict):
                 self.samples_stamp = os.path.join(*[str(k)+"_"+str(v) for k,v in name_params.items()])
 
-            # Create output directories
-            self.create_output_subdirectories(self.samples_stamp)
-
-            self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
-            self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.samples_stamp}","data.h5"), mode="w")
-            self.h5group = self.h5file.create_group(self.config['experiment_id'])
-            # Store sweep configurations as attributes 
-            for k,v in name_params.items():
-                self.h5group.attrs.create(name=k,data=v)
+            export_samples = list(deep_get(key='export_samples',value=self.config.settings))
+            export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
+            export_samples = export_samples[0] if len(export_samples) > 0 else True
+            export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
+            
+            if export_samples or export_metadata:
+                # Create output directories
+                self.create_output_subdirectories(self.samples_stamp)
+            # Write to file
+            if export_samples:
+                self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
+                self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.samples_stamp}","data.h5"), mode="w")
+                self.h5group = self.h5file.create_group(self.config['experiment_id'])
+                # Store sweep configurations as attributes 
+                for k,v in name_params.items():
+                    self.h5group.attrs.create(name=k,data=v)
+                # Update log filename
+                if isinstance(self.logger,logging.Logger):
+                    for i,hand in enumerate(self.logger.handlers):
+                        if isinstance(hand,logging.FileHandler):
+                            # Make directory
+                            makedir(os.path.join(self.outputs_path,'samples',self.samples_stamp))
+                            # Define filename
+                            self.logger.handlers[i].filename = os.path.join(
+                                self.outputs_path,
+                                'samples',
+                                self.samples_stamp,
+                                f"outputs.log"
+                            )
         
         else:
             raise Exception(f'Config {config} of type {type(config)} not recognised.')
 
     def update_experiment_directory_id(self):
 
-        noise_level = list(deep_get('noise_regime',self.config.settings))
-        if len(noise_level) <= 0: 
-            noise_level = 'unknown'
+        noise_level = list(deep_get(key='noise_regime',value=self.config.settings))
+        if len(noise_level) <= 0:
+            if 'sigma' in self.config.settings['inputs']['to_learn']:
+                noise_level = 'variable'
+            else:
+                sigma = list(deep_get(key='sigma',value=self.config.settings))
+                if len(sigma) > 0:
+                    noise_level = sigma_to_noise_regime(sigma=sigma[0])
+                else:
+                    noise_level = 'unknown'
         else:
             noise_level = noise_level[0]
         noise_level = noise_level.capitalize()
@@ -641,15 +671,18 @@ class Outputs(object):
         makedir(os.path.join(self.outputs_path,'figures'))
         makedir(os.path.join(self.outputs_path,'sample_derivatives'))
 
-    def write_log(self,logger,dir_path:str):
-        # Define filepath
-        filepath = os.path.join(self.outputs_path,dir_path,f"outputs.log")
-        if (os.path.exists(filepath) and self.config['experiments'][0]['overwrite']) or (not os.path.exists(filepath)):
-            if isinstance(logger,logging.Logger):
-                write_stream_handler_log(logger, filepath)
-            else:
-                raise Exception(f'Cannot write outputs of invalid type logger {type(logger)}')
-
+    def write_log(self,logger):
+        if isinstance(logger,logging.Logger):
+            for i,hand in enumerate(logger.handlers):
+                if isinstance(hand,logging.FileHandler):
+                    # Do not write to temporary filename
+                    if hand.filename != 'temp.log':
+                        # Close handler
+                        logger.handlers[i].flush()
+                        logger.handlers[i].close()
+        else:
+            raise Exception(f'Cannot write outputs of invalid type logger {type(logger)}')
+        
 
     def write_metadata(self,dir_path:str,filename:str) -> None:
         # Define filepath
@@ -751,7 +784,7 @@ class Outputs(object):
 
             # Instantiate ct
             sim = instantiate_sim({
-                'sim_type':next(deep_get('sim_type',self.config.settings), None),
+                'sim_type':next(deep_get(key='sim_type',value=self.config.settings), None),
                 'cost_matrix':cost_matrix,
                 'origin_demand':origin_demand,
                 'log_destination_attraction':self.log_destination_attraction

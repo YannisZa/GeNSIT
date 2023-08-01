@@ -8,7 +8,7 @@ from pathlib import Path
 from pandas import read_csv
 
 from multiresticodm.config import Config
-from multiresticodm.utils import str_in_list
+from multiresticodm.utils import setup_logger, str_in_list
 from multiresticodm.probability_utils import random_tensor
 from multiresticodm.global_variables import PARAMETER_DEFAULTS
 
@@ -16,10 +16,16 @@ class Inputs:
     def __init__(
             self,
             config:Config,
-            synthetic_data:bool = False
-    ):
-        # Read logging
-        self.logger = logging.getLogger(__name__)
+            synthetic_data:bool = False,
+            **kwargs
+    ):  
+        # Setup logger
+        self.logger = setup_logger(
+            __name__+kwargs.get('instance',''),
+            config.level,
+            log_to_file=True,
+            log_to_console=True
+        )
 
         # Store config
         self.config = config
@@ -100,7 +106,7 @@ class Inputs:
 
         # Extract parameters to learn
         if self.config.settings.get('neural_network',None) is not None:
-            params_to_learn = self.config.settings['neural_network']['to_learn']
+            params_to_learn = self.config.settings['inputs']['to_learn']
         else:
             params_to_learn = ['alpha','beta']
         # Extract the underlying parameters from the config
