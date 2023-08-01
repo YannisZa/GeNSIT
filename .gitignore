@@ -13,6 +13,7 @@ data/inputs/**/google/**
 tests/test_outputs/**
 
 # Files
+*temp.log
 *._*.txt
 *._*.geojson
 *.so

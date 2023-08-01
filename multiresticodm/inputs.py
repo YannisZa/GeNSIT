@@ -105,7 +105,7 @@ class Inputs:
             
 
         # Extract parameters to learn
-        if self.config.settings.get('neural_network',None) is not None:
+        if hasattr(self.config.settings['inputs'],'to_learn'):
             params_to_learn = self.config.settings['inputs']['to_learn']
         else:
             params_to_learn = ['alpha','beta']
@@ -116,6 +116,7 @@ class Inputs:
                 for k,v in PARAMETER_DEFAULTS.items() \
                 if not k in params_to_learn
         }
+        print(self.true_parameters)
 
         self.data_in_device = False
 
