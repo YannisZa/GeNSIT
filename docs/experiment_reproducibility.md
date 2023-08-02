@@ -597,7 +597,7 @@ clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_ls
 
 ### Coverage probability
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIM_MCMC -e \SIM_MCMC -e NeuralABM -m coverage_probability -r 0.99 -s table -s intensity -stat '|mean' '|1_2' -b 10000 -t 80 -n 100000 -k noise_regime -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe coverage_probabilities
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e SIM_NN -m coverage_probability -r 0.99 -s table -s intensity -stat '|mean' '|1_2' -b 10 -t 2 -n 100000 -k noise_regime -k experiment_title -k name -tab table_lsoas_to_msoas.txt -fe coverage_probabilities
 
 ### Edit distances
 
