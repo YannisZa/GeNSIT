@@ -9,7 +9,7 @@ from scipy.stats import nchypergeom_fisher
 
 
 from multiresticodm.utils import  setup_logger, str_in_list, tuplize, flatten, set_numba_torch_threads
-from multiresticodm.math_utils import logsumexp, log_factorial
+from multiresticodm.math_utils import log_factorial
 from multiresticodm.probability_utils import uniform_binary_choice, log_odds_cross_ratio
 from multiresticodm.markov_basis import instantiate_markov_basis,MarkovBasis
 from multiresticodm.contingency_table import ContingencyTable, ContingencyTable2D

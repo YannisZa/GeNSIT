@@ -306,7 +306,7 @@ class HarrisWilson_NN:
                     loss.clone().detach().cpu().numpy().item() / n_processed_steps
                 )
                 self._theta_sample = predicted_theta.clone().detach().cpu()
-                self._log_destination_attraction_sample = predicted_dest_attraction.clone().detach().cpu()
+                self._log_destination_attraction_sample = np.log(predicted_dest_attraction.clone().detach().cpu())
                 self.write_data(experiment)
                 del loss
                 loss = torch.tensor(0.0, requires_grad=True)
@@ -324,8 +324,8 @@ class HarrisWilson_NN:
         if self._time >= self._write_start and (self._time % self._write_every == 0):
 
             if 'loss' in experiment.sample_names:
-                experiment.losses.resize(experiment.losses.shape[0] + 1, axis=0)
-                experiment.losses[-1] = self._current_loss
+                experiment.loss.resize(experiment.loss.shape[0] + 1, axis=0)
+                experiment.loss[-1] = self._current_loss
 
             if 'theta' in experiment.sample_names:
                 for idx, dset in enumerate(experiment.thetas):
@@ -333,8 +333,8 @@ class HarrisWilson_NN:
                     dset[-1] = self._theta_sample[idx]
             
             if 'log_destination_attraction' in experiment.sample_names:
-                experiment.log_destination_attractions.resize(experiment.log_destination_attractions.shape[1] + 1, axis=1)
-                experiment.log_destination_attractions[:,-1] = np.log(self._log_destination_attraction_sample.flatten())
+                experiment.log_destination_attraction.resize(experiment.log_destination_attraction.shape[1] + 1, axis=1)
+                experiment.log_destination_attraction[:,-1] = self._log_destination_attraction_sample.flatten()
 
 
     def __repr__(self):

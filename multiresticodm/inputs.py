@@ -10,7 +10,7 @@ from pandas import read_csv
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger, str_in_list
 from multiresticodm.probability_utils import random_tensor
-from multiresticodm.global_variables import PARAMETER_DEFAULTS
+from multiresticodm.global_variables import PARAMETER_DEFAULTS,Dataset
 
 class Inputs:
     def __init__(
@@ -30,11 +30,14 @@ class Inputs:
         # Store config
         self.config = config
 
+        # Create data
+        self.data = Dataset()
+
         # Store attributes and their associated dims
         self.schema = {
             "origin_demand":{"axes":[0],"dtype":"float32", "ndmin":1},
             "destination_demand":{"axes":[1],"dtype":"float32", "ndmin":1},
-            "origin_attraction":{"axes":[0],"dtype":"float32", "ndmin":1},
+            "origin_attraction_ts":{"axes":[0],"dtype":"float32", "ndmin":1},
             "destination_attraction_ts":{"axes":[1],"dtype":"float32", "ndmin":2},
             "cost_matrix":{"axes":[0,1],"dtype":"float32", "ndmin":2},
             "table":{"axes":[0,1],"dtype":"int32", "ndmin":1},
@@ -49,11 +52,11 @@ class Inputs:
         for attr,schema in self.schema.items():
             if len(schema) > 0:
                 for ax in schema["axes"]:
-                    if getattr(self,attr) is not None:
+                    if hasattr(self.data,attr) and getattr(self.data,attr) is not None:
                         try:
-                            assert np.shape(getattr(self,attr))[ax] == self.dims[ax]
+                            assert np.shape(getattr(self.data,attr))[ax] == getattr(self.data,'dims')[ax]
                         except:
-                            raise Exception(f"{attr.replace('_',' ').capitalize()} has dim {np.shape(getattr(self,attr))[ax]} instead of {self.dims[ax]}.")
+                            raise Exception(f"{attr.replace('_',' ').capitalize()} has dim {np.shape(getattr(self.data,attr))[ax]} instead of {getattr(self.data,'dims')[ax]}.")
     
     def read_data(
         self,
@@ -63,12 +66,12 @@ class Inputs:
             raise Exception('Input dataset NOT provided. Harris Wilson model cannot be created.')
 
         # Initialise all
-        for attr in self.schema.keys():
-            setattr(self,attr,None)
+        # for attr in self.schema.keys():
+            # setattr(self.data,attr,None)
 
         # Import dims
-        self.dims = tuple(self.config.settings['inputs'].get('dims',[None,None]))
-        self.time_dim = (1,)
+        setattr(self.data,'dims',tuple(self.config.settings['inputs'].get('dims',[None,None])))
+        setattr(self.data,'time_dim',(1,))
         
         # Import all data
         for attr,schema in self.schema.items():
@@ -81,27 +84,27 @@ class Inputs:
                     if os.path.isfile(filepath):
                         # Import data
                         data = np.loadtxt(filepath,dtype=schema['dtype'], ndmin=schema['ndmin'])
-                        setattr(self,attr,data)
+                        setattr(self.data,attr,data)
                         # Check to see see that they are all positive
-                        if (getattr(self,attr) <= 0).any():
+                        if (getattr(self.data,attr) <= 0).any():
                             raise Exception(f"{attr.replace('_',' ').capitalize()} {self.origin_demand} are NOT strictly positive")
                         # Update dims
                         for subax in schema['axes']:
-                            if getattr(self,attr) is not None and self.dims[subax] is None:
-                                self.dims[subax] = int(np.shape(getattr(self,attr)))[subax]
+                            if getattr(self.data,attr) is not None and getattr(self.data,'dims')[subax] is None:
+                                setattr(self.data,'dims')[subax] = int(np.shape(getattr(self.data,attr)))[subax]
                     else:
                         raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
                 # else:
                     # raise Exception(f"{attr.replace('_',' ').capitalize()} filepath NOT provided")
-
+        # print(vars(self.data).keys())
         # Validate dimensions
         self.validate_dims()
 
         # Update grand total if it is not specified
-        if self.grand_total is None:
+        if hasattr(self.data,'grand_total') and self.data.grand_total is None:
             # Compute grand total
-            self.grand_total = np.sum(self.table)
-            self.grand_total = self.config.settings['spatial_interaction_model'].get('grand_total',1.0)
+            self.data.grand_total = np.sum(self.data.table)
+            self.data.grand_total = self.config.settings['spatial_interaction_model'].get('grand_total',1.0)
             
 
         # Extract parameters to learn
@@ -124,38 +127,41 @@ class Inputs:
         device = self.config.settings['inputs']['device']
 
         if not self.data_in_device:
-            if self.origin_demand is not None:
-                self.origin_demand = torch.from_numpy(self.origin_demand).float().to(device)
-            if self.destination_attraction_ts is not None:
-                self.destination_attraction_ts = torch.unsqueeze(
-                    torch.from_numpy(self.destination_attraction_ts).float(),
+            if hasattr(self.data,'origin_demand') and getattr(self.data,'origin_demand') is not None:
+                self.data.origin_demand = torch.from_numpy(self.data.origin_demand).float().to(device)
+            if hasattr(self.data,'destination_attraction_ts') and getattr(self.data,'destination_attraction_ts') is not None:
+                self.data.destination_attraction_ts = torch.unsqueeze(
+                    torch.from_numpy(self.data.destination_attraction_ts).float(),
                     -1
                 ).to(device)
-            if self.cost_matrix is not None:
-                self.cost_matrix = torch.reshape(
-                    torch.from_numpy(self.cost_matrix).float(),
-                    (self.dims)
+            if hasattr(self.data,'origin_attraction_ts') and getattr(self.data,'origin_attraction_ts') is not None:
+                self.data.origin_attraction_ts = torch.unsqueeze(
+                    torch.from_numpy(self.data.origin_attraction_ts).float(),
+                    -1
                 ).to(device)
-            if self.table is not None:
-                self.cost_matrix = torch.reshape(
-                    torch.from_numpy(self.cost_matrix).int(),
-                    (self.dims)
+            if hasattr(self.data,'cost_matrix') and getattr(self.data,'cost_matrix') is not None:
+                self.data.cost_matrix = torch.reshape(
+                    torch.from_numpy(self.data.cost_matrix).float(),
+                    (self.data.dims)
                 ).to(device)
-            if self.dims is not None:
-                self.dims = torch.tensor(self.dims).int().to(device)
-            if self.grand_total is not None:
-                self.grand_total = torch.tensor(self.grand_total).int().to(device)
+            if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
+                self.data.grand_total = torch.tensor(self.data.grand_total).int().to(device)
 
         self.data_in_device = True
     
     def receive_from_device(self):
         
         if self.data_in_device:
-            self.origin_demand = self.origin_demand.cpu().detach().numpy() if hasattr(self,'origin_demand') else None
-            self.destination_attraction_ts = self.destination_attraction_ts.cpu().detach().numpy() if hasattr(self,'destination_attraction_ts') else None
-            self.cost_matrix = self.cost_matrix.cpu().detach().numpy().reshape(self.dims) if hasattr(self,'cost_matrix') else None
-            self.dims = self.dims.cpu().detach().numpy() if hasattr(self,'dims') else None
-            self.grand_total = self.grand_total.cpu().detach().numpy() if hasattr(self,'grand_total') else None
+            if hasattr(self.data,'origin_demand') and getattr(self.data,'origin_demand') is not None:
+                self.data.origin_demand = self.data.origin_demand.cpu().detach().numpy()
+            if hasattr(self.data,'destination_attraction_ts') and getattr(self.data,'destination_attraction_ts') is not None:
+                self.data.destination_attraction_ts = self.data.destination_attraction_ts.cpu().detach().numpy()
+            if hasattr(self.data,'origin_attraction_ts') and getattr(self.data,'origin_attraction_ts') is not None:
+                self.data.origin_attraction_ts = self.data.origin_attraction_ts.cpu().detach().numpy()
+            if hasattr(self.data,'cost_matrix') and getattr(self.data,'cost_matrix') is not None:
+                self.data.cost_matrix = self.data.cost_matrix.cpu().detach().numpy().reshape(self.data.dims)
+            if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
+                self.data.grand_total = self.data.grand_total.cpu().detach().numpy()
 
         self.data_in_device = False
 
@@ -358,15 +364,13 @@ class Inputs:
     def __str__(self):
         od = Path(self.config.settings['inputs']['data_files'].get('origin_demand',''))
         dd = Path(self.config.settings['inputs']['data_files'].get('destination_demand',''))
-        loa = Path(self.config.settings['inputs']['data_files'].get('log_origin_attraction',''))
-        lda = Path(self.config.settings['inputs']['data_files'].get('log_destination_attraction',''))
+        oats = Path(self.config.settings['inputs']['data_files'].get('origin_attraction_time_series',''))
         dats = Path(self.config.settings['inputs']['data_files'].get('destination_attraction_time_series',''))
         return f"""
             Dataset: {Path(self.config.settings['inputs']['dataset']).stem}
             Cost matrix: {Path(self.config.settings['inputs']['data_files']['cost_matrix']).stem}
             Origin demand: {od.stem if len(od) > 0 else ''}
             Destination demand: {dd.stem if len(dd) > 0 else ''}
-            Log origin attraction: {loa.stem if len(loa) > 0 else ''}
-            Log destination attraction: {lda.stem if len(lda) > 0 else ''}
+            Origin attraction time series: {oats.stem if len(oats) > 0 else ''}
             Destination attraction time series: {dats.stem if len(dats) > 0 else ''}
         """

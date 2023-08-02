@@ -494,16 +494,3 @@ def test_logsumexp():
     assert abs(np.exp(den)-11)<=1e-8
     assert len(my_lse) == len(lse)
     assert all([abs(a-b)<=1e-9 for a, b in zip(my_lse, lse)])
-
-def test_normalise():
-    c = [2,3,1]
-
-    normalised_c = normalise(c)
-    true_normalised_c = [2./6,3./6,1./6]
-
-    assert all([a == b for a, b in zip(normalised_c, true_normalised_c)])
-
-    log_normalised_c = normalise(c,take_logs=True)
-    true_log_normalised_c = [-1.09861229,-0.69314718,-1.79175947]
-
-    assert all([abs(a-b)<=1e-5 for a, b in zip(log_normalised_c, true_log_normalised_c)])

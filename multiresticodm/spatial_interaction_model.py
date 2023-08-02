@@ -16,12 +16,6 @@ from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
 def instantiate_sim(
         sim_type:str,
         config:Config=None,
-        origin_demand=None,
-        destination_demand=None,
-        log_origin_attraction=None,
-        log_destination_attraction=None,
-        cost_matrix=None,
-        dims=None,
         true_parameters=None,
         device=None,
         **kwargs
@@ -34,12 +28,6 @@ def instantiate_sim(
     
     return getattr(sys.modules[__name__], sim_type)(
         config=config,
-        origin_demand=origin_demand,
-        destination_demand=destination_demand,
-        log_origin_attraction=log_origin_attraction,
-        log_destination_attraction=log_destination_attraction,
-        cost_matrix=cost_matrix,
-        dims=dims,
         true_parameters=true_parameters,
         device=device,
         **kwargs
@@ -81,23 +69,23 @@ class SpatialInteraction2D():
         # Parameters names
         self.aux_param_names = ['bmax']
         self.free_param_names = ['alpha','beta']
-        all_parameter_names = self.free_param_names + self.aux_param_names
+        self.all_parameter_names = self.free_param_names + self.aux_param_names
 
         # Get data names
-        self.data_names = ['origin_demand','destination_demand','dims',
-                           'log_origin_attraction','log_destination_attraction','cost_matrix']
+        self.data_names = ['origin_demand','destination_demand','cost_matrix','dims']
 
         # Grand total
         self.grand_total = kwargs.get('grand_total',torch.tensor(1).int().to(self.device))
 
         # True and auxiliary parameters
-        for param in all_parameter_names:
-            setattr(
-                self,
-                param,
-                torch.tensor(true_parameters.get(param,PARAMETER_DEFAULTS[param])).float().to(self.device)
-            )
-            self.config.settings['spatial_interaction_model']['parameters'][param] = true_parameters.get(param,PARAMETER_DEFAULTS[param])
+        if true_parameters is not None:
+            for param in self.all_parameter_names:
+                setattr(
+                    self,
+                    param,
+                    torch.tensor(true_parameters.get(param,PARAMETER_DEFAULTS[param])).float().to(self.device)
+                )
+                self.config.settings['spatial_interaction_model']['parameters'][param] = true_parameters.get(param,PARAMETER_DEFAULTS[param])
 
         # Read data passed
         for attr in self.data_names:
@@ -107,12 +95,13 @@ class SpatialInteraction2D():
 
         # Update dims
         if self.dims is None and self.cost_matrix is not None:
-            self.dims = torch.tensor(self.cost_matrix.size()).int()
+            self.dims = list(self.cost_matrix.size())
             # Update config
-            self.config.settings['inputs']['dims'] = self.dims.cpu().detach().numpy().tolist()
+            if hasattr(self,'config'):
+                self.config.settings['inputs']['dims'] = self.dims
 
         # Determine if true data exists
-        if np.all([hasattr(self,attr) and getattr(self,attr) is not None for attr in all_parameter_names]):
+        if np.all([hasattr(self,attr) and getattr(self,attr) is not None for attr in self.all_parameter_names]):
             self.ground_truth_known = True
         else:
             self.ground_truth_known = False
@@ -206,38 +195,27 @@ class SpatialInteraction2D():
 
 class ProductionConstrainedSIM(SpatialInteraction2D):
     """ Object including flow (O/D) matrix inference routines of singly constrained SIM. """
-
+    REQUIRED_INPUTS = ['cost_matrix','origin_demand']
+    REQUIRED_OUTPUTS = ['alpha','beta','log_destination_attraction']
     def __init__(
         self,
         config:Config=None,
-        origin_demand=None,
-        destination_demand=None,
-        log_origin_attraction=None,
-        log_destination_attraction=None,
-        cost_matrix=None,
-        dims=None,
         true_parameters=None,
         device=None,
         **kwargs
     ):
         '''  Constructor '''
-        # Define type of spatial interaction model
-        self.sim_type = "ProductionConstrained"
         # Initialise constructor
         super().__init__(
             config=config,
-            origin_demand=origin_demand,
-            destination_demand=destination_demand,
-            log_origin_attraction=log_origin_attraction,
-            log_destination_attraction=log_destination_attraction,
-            cost_matrix=cost_matrix,
-            dims=dims,
             true_parameters=true_parameters,
             device=device,
             **kwargs
         )
+        # Define type of spatial interaction model
+        self.sim_type = "ProductionConstrained"
         # Make sure you have the necessary data
-        for attr in ['origin_demand','log_destination_attraction','cost_matrix']:
+        for attr in self.REQUIRED_INPUTS:
             try:
                 assert hasattr(self,attr)
             except:
@@ -271,7 +249,7 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
             theta,
             self.origin_demand,
             self.cost_matrix,
-            grand_total
+            self.grand_total if hasattr(self,'grand_total') else grand_total
         )
     
     def intensity_gradient(self,theta:np.ndarray,log_intensity:np.ndarray):
@@ -308,38 +286,27 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
 
 class TotallyConstrainedSIM(SpatialInteraction2D):
     """ Object including flow (O/D) matrix inference routines of SIM with only total constrained. """
-
+    REQUIRED_INPUTS = ['cost_matrix','origin_demand']
+    REQUIRED_OUTPUTS = ['alpha','beta','log_destination_attraction']
     def __init__(
-            self,
-            config:Config=None,
-            origin_demand=None,
-            destination_demand=None,
-            log_origin_attraction=None,
-            log_destination_attraction=None,
-            cost_matrix=None,
-            dims=None,
-            true_parameters=None,
-            device=None,
-            **kwargs
+        self,
+        config:Config=None,
+        true_parameters=None,
+        device=None,
+        **kwargs
     ):
         '''  Constructor '''
-        # Define type of spatial interaction model
-        self.sim_type = "TotallyConstrained"
-        # Initiliase constructor
+        # Initialise constructor
         super().__init__(
             config=config,
-            origin_demand=origin_demand,
-            destination_demand=destination_demand,
-            log_origin_attraction=log_origin_attraction,
-            log_destination_attraction=log_destination_attraction,
-            cost_matrix=cost_matrix,
-            dims=dims,
             true_parameters=true_parameters,
             device=device,
             **kwargs
         )
+        # Define type of spatial interaction model
+        self.sim_type = "TotallyConstrained"
         # Make sure you have the necessary data
-        for attr in ['log_destination_attraction','cost_matrix']:
+        for attr in self.REQUIRED_INPUTS:
             try:
                 assert hasattr(self,attr)
             except:
@@ -351,8 +318,18 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
 
     def __repr__(self):
         return "TotallyConstrained(SpatialInteraction2D)"
+
+    def check_sample_availability(self,sample_names:list,data:dict):
+        available = True
+        for sample in sample_names:
+            try:
+                assert sample in list(data.keys())
+            except:
+                available = False
+                self.logger.error(f"Sample {sample} is required but does not exist in {','.join(data.keys())}")
+        return available
     
-    def log_intensity(self,xx:Union[np.ndarray,torch.tensor],theta:Union[np.ndarray,torch.tensor],grand_total:torch.float32):
+    def log_intensity(self,grand_total:torch.float32,**kwargs):
         """ Reconstruct expected flow matrices (intensity function)
 
         Parameters
@@ -368,13 +345,13 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
             Expected flow matrix (non-integer).
 
         """
+        self.check_sample_availability(self.REQUIRED_OUTPUTS,kwargs)
 
         return self._log_flow_matrix(
-                xx,
-                theta,
-                self.origin_demand,
-                self.cost_matrix,
-                grand_total
+                origin_demand = kwargs.get('origin_demand',self.origin_demand),
+                cost_matrix = kwargs.get('cost_matrix',self.cost_matrix),
+                total_flow = grand_total,
+                **kwargs
         )
 
     def intensity_demand(self,W_alpha,C_beta):

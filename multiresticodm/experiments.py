@@ -87,11 +87,11 @@ class ExperimentHandler(object):
                     level=self.level
                 )
                 # Store one experiment
-                experiment_config['experiments'] = [
+                experiment_config.settings['experiments'] = [
                     self.config.settings['experiments'][self.avail_experiments[experiment_id]]
                 ]
                 # Update id, seed and logging detail
-                experiment_config['experiment_id'] = experiment_id
+                experiment_config.settings['experiment_id'] = experiment_id
                 if self.config.settings['inputs'].get('dataset',None) is not None:
                     experiment_config['experiment_data'] = path.basename(path.normpath(self.config.settings['inputs']['dataset']))
                 else:
@@ -1869,7 +1869,7 @@ class SIM_NN(Experiment):
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
-            input_size=self.inputs.destination_attraction_ts.shape[1],
+            input_size=self.inputs.data.destination_attraction_ts.shape[1],
             output_size=len(config['inputs']['to_learn']),
             **config['neural_network']['hyperparameters'],
         ).to(self.device)
@@ -1882,9 +1882,9 @@ class SIM_NN(Experiment):
         sim = instantiate_sim(
             sim_type= config['spatial_interaction_model']['sim_type'],
             config = config,
-            origin_demand = self.inputs.origin_demand,
-            log_destination_attraction = np.log(self.inputs.destination_attraction_ts[:,-1].flatten()), 
-            cost_matrix = self.inputs.cost_matrix,
+            origin_demand = self.inputs.data.origin_demand,
+            log_destination_attraction = np.log(self.inputs.data.destination_attraction_ts[:,-1].flatten()), 
+            cost_matrix = self.inputs.data.cost_matrix,
             true_parameters = config['spatial_interaction_model']['parameters'],
             device = self.device,
             instance = kwargs.get('instance','')
@@ -1969,7 +1969,7 @@ class SIM_NN(Experiment):
             
             # Train neural net
             theta_sample, log_destination_attraction_sample = self.harris_wilson_nn.epoch(
-                training_data=self.inputs.destination_attraction_ts, 
+                training_data=self.inputs.data.destination_attraction_ts, 
                 experiment=self,
                 **self.config['neural_network']
             )
@@ -2031,6 +2031,9 @@ class ExperimentSweep():
         # Store one datetime
         # for all sweeps
         self.config.settings['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+
+        # Store all sweeped parameter names
+        self.config.settings['sweeped_params_paths'] = sweep_key_paths
 
         # Load schema
         self.config.load_schema()

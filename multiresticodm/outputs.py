@@ -5,6 +5,8 @@ import sys
 import logging
 import traceback
 import h5py as h5
+import numpy as np
+import xarray as xr
 import pandas as pd
 import geopandas as gpd
 
@@ -16,6 +18,7 @@ from itertools import product,chain
 from argparse import Namespace
 from datetime import datetime
 from typing import Union,List,Tuple
+from multiresticodm.inputs import Inputs
 # from numba_progress import ProgressBar
 
 import multiresticodm.probability_utils as ProbabilityUtils
@@ -25,7 +28,7 @@ from multiresticodm.math_utils import *
 from multiresticodm.config import Config
 from multiresticodm.global_variables import *
 from multiresticodm.contingency_table import instantiate_ct
-from multiresticodm.spatial_interaction_model import instantiate_sim
+from multiresticodm.spatial_interaction_model import *
 
 OUTPUTS_MODULE = sys.modules[__name__]
 
@@ -35,7 +38,7 @@ class OutputSummary(object):
         # Setup logger
         self.logger = setup_logger(
             __name__,
-            settings.get('logging_mode','info').upper(),
+            level=settings.get('logging_mode','info').upper(),
             log_to_file=True,
             log_to_console=True
         )
@@ -102,7 +105,7 @@ class OutputSummary(object):
                                 os.path.join(
                                     output_directory,
                                     data_name,
-                                    (f"exp.*{(exp_type+'.*') if len(exp_type) > 0 else exp_type}"+
+                                    (f"{(exp_type+'.*') if len(exp_type) > 0 else exp_type}"+
                                     f"{('_'+exp_title+'.*') if len(exp_title) > 0 else ''}"+
                                     f"{(dt+'*') if len(dt) > 0 else ''}")
                                 )
@@ -130,11 +133,14 @@ class OutputSummary(object):
         # Find matching directories
         output_dirs = self.find_matching_output_folders(self)
         for i,output_folder in tqdm(enumerate(output_dirs),total=len(output_dirs)):
+            
             self.logger.info(f'Collecting metadata from {output_folder}')
+            
             # Get name of folder
             folder_name = Path(output_folder).stem
-            # Read metadata
-            experiment_metadata = read_json(os.path.join(output_folder,f"{folder_name}_metadata.json"))
+            
+            # Read metadata config
+            experiment_metadata = read_json(os.path.join(output_folder,"config.json"))
 
             # Extract useful data
             useful_metadata = {}
@@ -143,29 +149,79 @@ class OutputSummary(object):
                     # Get first instance of key
                     useful_metadata[key] = list(deep_get(key=key,value=experiment_metadata))[0]
                 except:
-                    self.logger.error(f'No "{key}" found in experiment metadata)')
-            # Get outputs and unpack its statistics
-            outputs = Outputs(output_folder,self.settings,(list(self.settings['sample'])+['ground_truth_table']))
+                    self.logger.error(f"{key} not found in experiment metadata.")
 
-            # Apply these metrics to the data 
-            metric_data = self.apply_metrics(
-                experiment_id=output_folder,
-                outputs=outputs
-            )
-            for j in range(len(metric_data)):
-                metric_data[j]['folder'] = folder_name
-                for k,v in useful_metadata.items():
-                    metric_data[j][k] = v
-            # Store useful metadata
-            if not str_in_list(output_folder,self.experiment_metadata.keys()):
-                self.experiment_metadata[output_folder] = metric_data
+            if 'sweeped_params_paths' in list(experiment_metadata.keys()) and len(experiment_metadata['sweeped_params_paths']) > 0:
+                coordinate_slice = {}
+                input_slice = []
+                # Loop through key-value pairs used
+                # to subset the output samples
+                for param_tup in self.settings['slice_by']:
+                    name,value = param_tup
+                    # Loop through experiment's sweeped parameters
+                    for key_path in experiment_metadata['sweeped_params_paths']:
+                        # If there is a much between the two
+                        if name == key_path[-1]:
+                            # If is a coordinate add to the coordinate slice
+                            # This slices the xarray created from the outputs samples
+                            if SWEEPABLE_PARAMS[name]['is_coord']:
+                                if name in list(coordinate_slice.keys()):
+                                    coordinate_slice[name]['value'] = np.append(coordinate_slice[name]['value'],[value])
+                                else:
+                                    coordinate_slice[name] = {"path": key_path, "value": [value]}
+                            # If is NOT a coordinate add to the input slice
+                            # This slices the input data and requires reinstantiating outputs
+                            else:
+                                input_slice.append({"value":value,"key_path":key_path})
+
+                if len(input_slice) == 0:
+                    input_slice = [None]
             else:
-                self.experiment_metadata[output_folder] = np.append(
-                    self.experiment_metadata[output_folder],
-                    metric_data,
-                    axis=0
+                coordinate_slice = {}
+                input_slice = [None]
+            
+            for path_value in input_slice:
+                
+                # Get outputs and unpack its statistics
+                # This is the case where there are NO input slices provided
+                if path_value is None:
+                    outputs = Outputs(
+                        config=output_folder,
+                        settings=self.settings,
+                        sample_names=(list(self.settings['sample'])+['ground_truth_table']),
+                        coordinate_slice=coordinate_slice
+                    )
+                # This is the case where there are SOME input slices provided
+                else:
+                    outputs = Outputs(
+                        config=output_folder,
+                        settings=self.settings,
+                        sample_names=(list(self.settings['sample'])+['ground_truth_table']),
+                        coordinate_slice=coordinate_slice,
+                        input_slice=path_value
+                    )
+
+                # Apply these metrics to the data 
+                metric_data = self.apply_metrics(
+                    experiment_id=output_folder,
+                    outputs=outputs
                 )
-            print('\n')
+                for j in range(len(metric_data)):
+                    metric_data[j]['folder'] = folder_name
+                    for k,v in useful_metadata.items():
+                        metric_data[j][k] = v
+                
+                # Store useful metadata
+                if not str_in_list(output_folder,self.experiment_metadata.keys()):
+                    self.experiment_metadata[output_folder] = metric_data
+                else:
+                    self.experiment_metadata[output_folder] = np.append(
+                        self.experiment_metadata[output_folder],
+                        metric_data,
+                        axis=0
+                    )
+
+                print('\n')
 
     def write_metadata_summaries(self):
         if len(self.experiment_metadata.keys()) > 0:
@@ -229,10 +285,9 @@ class OutputSummary(object):
 
         for sample_name in self.settings['sample']:
             # Read samples
-            samples = None
             try:
-                samples = outputs.experiment.results.get(sample_name,None)
-                assert samples is not None
+                assert hasattr(outputs.data,sample_name)
+                samples = getattr(outputs.data,sample_name)
             except Exception as e:
                 self.logger.error(f'Experiment {experiment_id} does not have sample {sample_name}')
                 continue
@@ -479,6 +534,8 @@ class Outputs(object):
                  settings:dict={}, 
                  sample_names:list=['ground_truth_table'], 
                  slice_samples:bool=True,
+                 coordinate_slice:dict={},
+                 input_slice:dict={},
                  **kwargs):
         # Setup logger
         self.logger = setup_logger(
@@ -499,25 +556,62 @@ class Outputs(object):
 
         # Store settings
         self.settings = settings
+        # Store coordinate slice
+        self.coordinate_slice = coordinate_slice
+        # Create semi-private xarray data 
+        self._data = Dataset()
+        # Create public xarray data 
+        self.data = Dataset()
         # Enable garbage collector
         gc.enable()
         if isinstance(config,str):
+            # Store experiment id
+            self.experiment_id = os.path.basename(os.path.normpath(config))
+            
             # Load metadata
             assert os.path.exists(config)
-            self.experiment_id = os.path.basename(os.path.normpath(config))
-            metadata = read_json(os.path.join(config,self.experiment_id+"_metadata.json"))
-            # Store experiment id
-            self.config = metadata
+            self.config = Config(
+                path=os.path.join(config,"config.json"),
+                level='info'
+            )
+
+            # Update config based on slice of coordinate-like sweeped params
+            # affecting only the outputs of the model
+            if self.coordinate_slice:
+                for param in self.coordinate_slice.keys():
+                    self.config.path_set(
+                        settings = self.config.settings,
+                        value = self.coordinate_slice[param]['value'], 
+                        path = self.coordinate_slice[param]['path']
+                    )
+            # Update config based on slice of NON-coordinate-like sweeped params
+            # affecting only the inputs of the model
+            if input_slice:
+                self.config.path_set(
+                    settings = self.config.settings,
+                    value = input_slice['value'], 
+                    path = input_slice['path']
+                )
+            
             # Get intensity model class
-            self.intensity_model_class = [k for k in self.config.keys() if k != 'contingency_table' and isinstance(self.config[k],dict)][0]
+            self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
+            
             # Define config experiment path to directory
             self.outputs_path = config
-            assert str_in_list('input_path',list(metadata['inputs'].keys()))
-            self.inputs_path = metadata['inputs'].get('input_path',None)
+            assert str_in_list('input_path',list(self.config['inputs'].keys()))
+            self.inputs_path = self.config['inputs'].get('input_path',None)
+
+            # Import all input data
+            self.inputs = Inputs(
+                config = self.config,
+                synthetic_data = False,
+            )
+
             # Try to load ground truth table
             self.ground_truth_table = None
             self.settings['table_total'] = self.settings.get('table_total',1)
             if 'ground_truth_table' in sample_names:
+                # Try reading it from settings path
                 try:
                     self.ground_truth_table = np.loadtxt(
                         os.path.join(
@@ -526,15 +620,12 @@ class Outputs(object):
                         )
                     ).astype('int32')
                 except:
+                    # Try reading it from inputs
                     try:
-                        self.ground_truth_table = np.loadtxt(
-                            os.path.join(
-                                self.config['inputs']['dataset'],
-                                self.config['inputs']['data_files']['table']
-                            )
-                        ).astype('int32')
+                        self.ground_truth_table = self.inputs.table
                     except:
                         pass
+            
             # Try to get table total (number of agents)
             if self.ground_truth_table is not None:
                 # Remove it from sample names
@@ -546,47 +637,64 @@ class Outputs(object):
                 self.settings['dims'] = list(np.shape(self.ground_truth_table))
                 self.logger.info(f'Ground truth table loaded')
 
-            # Try to load all results
+            # Load output h5 file to xarrays
+            self.load_h5_data(config,coordinate_slice=self.coordinate_slice)
+            
+            # Store required samples
+            sample_names = ['intensity']
+            # Try to load all output data
             for sample_name in sample_names:
-                try:
-                    self.experiment.results[sample_name] = self.load_samples(
+                # try:
+                setattr(
+                    self.data,
+                    sample_name, 
+                    self.get_sample(
                         sample_name,
-                        slice_samples=slice_samples
+                        slice_samples = slice_samples
                     )
-                    if sample_name == 'table' and self.settings['table_total'] != 1:
-                        self.settings['table_total'] = self.experiment.results[sample_name][0].ravel().sum()
-                    self.logger.info(f'Sample {sample_name} loaded with shape {np.shape(self.experiment.results[sample_name])}')
-                except:
-                    self.logger.debug(traceback.format_exc())
-                    self.logger.warning(f'Sample {sample_name} could not be loaded')
+                )
+                print(self.data.intensity.shape)
+                    # if sample_name == 'table' and self.settings['table_total'] != 1:
+                    #     self.settings['table_total'] = self.experiment.results[sample_name][0].ravel().sum()
+                #     self.logger.info(f'Sample {sample_name} loaded with shape {self.samples[sample_name].shape}')
+                # except:
+                #     self.logger.debug(traceback.format_exc())
+                #     self.logger.warning(f'Sample {sample_name} could not be loaded')
+                #     sys.exit()
 
             if self.settings['table_total'] == 0:
                 self.logger.warning('Ground truth missing')
-
+            
             
         elif isinstance(config,Config):
             # Store config
             self.config = config
+            
             # Remove unnecessary data
             # for attr in ['inputs','harris_wilson_nn','sim_mcmc','sim','ct']:
             #     if hasattr(self.experiment,attr):
             #         safe_delete(getattr(self.experiment,attr))
             # gc.collect()
+            
             # Get intensity model class
-            self.intensity_model_class = [input_name for input_name in self.config.keys() if input_name != 'contingency_table' and isinstance(self.config[input_name],dict)][0]
-            # Define output experiment directory
+            self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
+            
+            # Update experiment id
             self.experiment_id = self.update_experiment_directory_id()
+            
             # Define output experiment path to directory
             self.outputs_path = os.path.join(
                     self.config['outputs']['directory'],
                     self.config['experiment_data'],
                     self.experiment_id
             )
+            
             # Try to load ground truth table
             # try:
             #     self.ground_truth_table = self.experiment.ct.table
             # except:
             #     pass
+            
             # Name output sample directory according 
             # to sweep params (if they are provided)
             name_params = kwargs.get('name_params',{})
@@ -602,11 +710,12 @@ class Outputs(object):
             if export_samples or export_metadata:
                 # Create output directories
                 self.create_output_subdirectories(self.samples_stamp)
+            
             # Write to file
             if export_samples:
                 self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
                 self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.samples_stamp}","data.h5"), mode="w")
-                self.h5group = self.h5file.create_group(self.config['experiment_id'])
+                self.h5group = self.h5file.create_group(self.experiment_id)
                 # Store sweep configurations as attributes 
                 for k,v in name_params.items():
                     self.h5group.attrs.create(name=k,data=v)
@@ -635,7 +744,7 @@ class Outputs(object):
                 noise_level = 'variable'
             else:
                 sigma = list(deep_get(key='sigma',value=self.config.settings))
-                if len(sigma) > 0:
+                if len(sigma) == 1:
                     noise_level = sigma_to_noise_regime(sigma=sigma[0])
                 else:
                     noise_level = 'unknown'
@@ -741,73 +850,169 @@ class Outputs(object):
     #     else:
     #         raise Exception(f"Input class {self.settings['name']} not found")
 
-    def slice_samples(self,samples):
+    def slice_sample_iterations(self,samples):
 
         # Get burnin parameter
-        burnin = min(self.settings.get('burnin',0),np.shape(samples)[0])
+        burnin = min(self.settings.get('burnin',1),samples.shape[0])
+
         # Get thinning parameter
         thinning = list(deep_get(key='thinning',value=self.settings))
         thinning = thinning[0] if len(thinning) > 0 else 1
+
         # Apply burnin and thinning
-        samples = samples[burnin:None:thinning,...]
+        samples = samples.isel(iter=slice(burnin,None,thinning))
+
         # Get total number of samples
-        N = self.settings.get('N',samples.shape[0])
-        N = N if N is not None else samples.shape[0]
-        N = min(N,samples.shape[0])
-        # Trim total number of samples
-        samples = samples[:N,...]
+        N = self.settings.get('N',samples['iter'].shape[0])
+        N = min(N,samples['iter'].shape[0])
+        
+        # Apply stop
+        samples = samples.isel(iter=slice(None,N,None))
 
         return samples
 
-    def load_samples(self,sample_name,slice_samples:bool=True):
+    def load_h5_data(self,output_path,coordinate_slice:dict={}):
+        self.logger.info('Loading h5 data into xarrays...')
+
+        # Get all h5 files
+        h5files = list(Path(os.path.join(output_path,'samples')).rglob("*.h5"))
+
+        # Sort them by seed
+        h5files = sorted(h5files, key = lambda x: int(str(x).replace("/data.h5","").split('seed_')[1]) if 'seed' in str(x) else str(x))
+
+        # Store data attributes for xarray
+        coords,coordinates,data_vars = {},{},{}
+
+        # Get each file and add it to the new dataset
+        for filename in h5files:
+
+            with h5.File(filename) as h5data:
+
+                # Collect attributes as coordinates
+                for k,v in h5data[self.experiment_id].attrs.items():
+                    if k in list(coords.keys()):
+                        coords[k].append(v)
+                    else:
+                        coords[k] = [v]
+                
+                # Store all datasets
+                for sample_name,sample_data in h5data[self.experiment_id].items():
+                    if sample_name in list(data_vars.keys()):
+                        data_vars[sample_name] = np.append(
+                            data_vars[sample_name],
+                            np.array([sample_data[:]]),
+                            axis=0
+                        )
+                    else:
+                        data_vars[sample_name] = np.array([sample_data[:]])
+        
+        # Create an xarray dataset for each sample
+        for sample_name,sample_data in data_vars.items():
+            # For each coordinate name
+            # get data variable
+            data_vars = {}
+            for coord_name in coords.keys():
+                data_vars[sample_name] = (
+                    ([coord_name]+XARRAY_SCHEMA[sample_name]['coords']),
+                    sample_data
+                )
+                # print(sample_name,[coord_name]+XARRAY_SCHEMA[sample_name]['coords'],np.shape(sample_data))
+            
+            # Get data dims
+            dims = np.shape(sample_data)[1:]
+            # For each dim create coordinate
+            for i,d in enumerate(dims):
+                obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
+                coordinates[XARRAY_SCHEMA[sample_name]['coords'][i]] = deep_call(
+                    globals()[obj],
+                    func,
+                    None,
+                    start=1,
+                    stop=d+1,
+                    step=1
+                ).astype(XARRAY_SCHEMA[sample_name]['args_dtype'][i])
+
+            # Create xarray dataset
+            xr_data = xr.Dataset(
+                attrs = dict(
+                    experiment_id = self.experiment_id
+                ),
+                data_vars = data_vars,
+                coords = coordinates
+            )
+            # Slice according to coordinate slice
+            xr_data = xr_data.isel(**coordinate_slice)
+            # Store samples
+            setattr(self._data,sample_name,xr_data)
+
+    def check_data_availability(self,sample_name:str,input_names:list=[],output_names:list=[]):
+        available = True
+        for input in input_names:
+            try:
+                assert hasattr(self.inputs.data,input)
+            except:
+                available = False
+                self.logger.error(f"Sample {sample_name} requires input {input} which does not exist in {','.join(self.inputs.data.vars())}")
+        for output in output_names:
+            try:
+                assert hasattr(self._data,output)
+            except:
+                available = False
+                self.logger.error(f"Sample {sample_name} requires output {output} which does not exist in {','.join(vars(self._data))}")
+        return available
+
+    def get_sample(self,sample_name:str,slice_samples:bool=True):
         if sample_name == 'intensity':
-            # Load all samples
-            theta_samples = self.load_samples('theta',slice_samples)
-            log_destination_attraction_samples = self.load_samples('log_destination_attraction',slice_samples)
-            # Load inputs
-            origin_demand = self.load_input_data(
-                'origin_demand'
-            ).astype('float32')
-            cost_matrix = self.load_input_data(
-                'cost_matrix'
-            ).astype('float32')
-            self.log_destination_attraction = self.load_input_data(
-                'log_destination_attraction'
-            ).astype('float32')
+            # Get sim model 
+            sim_model = globals()[self.config.settings['spatial_interaction_model']['sim_type']+'SIM']
+            # Check that required data is available
+            self.check_data_availability(
+                sample_name=sample_name,
+                input_names=sim_model.REQUIRED_INPUTS,
+                output_names=sim_model.REQUIRED_OUTPUTS,
+            )
             # Get total number of samples
-            N = theta_samples.shape[0]
-            # Scale beta
-            theta_samples[:,1] *= self.config[self.intensity_model_class]['beta_max']
+            # N = getattr(self._data,'iter').shape[0]
+
+            # Prepare input arguments 
+            data = {}
+            for input in sim_model.REQUIRED_INPUTS:
+                data[input] = self.get_sample(input,slice_samples)
 
             # Compute intensities for all samples
             table_total = self.settings.get('table_total') if self.settings.get('table_total',-1.0) > 0 else 1.0
 
             # Instantiate ct
-            sim = instantiate_sim({
-                'sim_type':next(deep_get(key='sim_type',value=self.config.settings), None),
-                'cost_matrix':cost_matrix,
-                'origin_demand':origin_demand,
-                'log_destination_attraction':self.log_destination_attraction
-            })
-            # with ProgressBar(total=N) as progress_bar:
-            log_flow = sim.log_flow_matrix_vectorised(
-                log_destination_attraction_samples,
-                theta_samples,
-                origin_demand,
-                cost_matrix,
-                table_total,
-                None
+            sim = instantiate_sim(
+                sim_type = next(deep_get(key='sim_type',value=self.config.settings), None),
+            **data
             )
-            samples = np.exp(log_flow,dtype='float32')
-        elif sample_name.endswith("__error"):
-            # Load all samples
-            samples = self.load_samples(sample_name.replace("__error",""),slice_samples)
-            # Make sure you have ground truth
-            try:
-                assert self.ground_truth_table is not None
-            except:
-                self.logger.error('Ground truth table missing. Sample error cannot be computed.')
-                raise
+            
+            data = {}
+            # Prepare output arguments
+            for output in sim_model.REQUIRED_OUTPUTS:
+                data[output] = torch.tensor(
+                    self.get_sample(output,slice_samples),
+                    dtype=NUMPY_TO_TORCH_DTYPE[SAMPLE_TYPES[output]]
+                )
+
+            # with ProgressBar(total=N) as progress_bar:
+            samples = sim.log_intensity(
+                grand_total=torch.tensor(table_total,dtype=torch.int32),
+                **data
+            )
+            # Convert back to numpy
+            samples = np.exp(samples.cpu().detach().numpy(),dtype='float32')
+
+        # elif sample_name.endswith("__error"):
+        #     # Load all samples
+        #     samples = self.load_samples(sample_name.replace("__error",""),slice_samples)
+        #     # Make sure you have ground truth
+        #     try:
+        #         assert self.ground_truth_table is not None
+        #     except:
+        #         self.logger.error('Ground truth table missing. Sample error cannot be computed.')
+        #         raise
         elif sample_name == 'ground_truth_table':
             # Get config and sim
             dummy_config = Namespace(**{'settings':self.config})
@@ -816,28 +1021,53 @@ class Outputs(object):
                 config=dummy_config,
                 log_to_console=False
             )
-            samples = ct.table#[np.newaxis,:]
+            samples = torch.tensor(ct.table).int()
         elif str_in_list(sample_name, INPUT_TYPES.keys()):
-            samples = self.load_input_data(
-                sample_name
-            ).astype(INPUT_TYPES[sample_name])
+            # Get sim model 
+            sim_model = globals()[self.config.settings['spatial_interaction_model']['sim_type']+'SIM']
+            self.check_data_availability(
+                sample_name=sample_name,
+                input_names=sim_model.REQUIRED_INPUTS
+            )
+            # Convert data to torch tensors
+            if not self.inputs.data_in_device:
+                self.inputs.pass_to_device()
+            # Get samples and cast them to appropriate type
+            samples = torch.clone(getattr(self.inputs.data,sample_name).to(dtype=NUMPY_TO_TORCH_DTYPE[INPUT_TYPES[sample_name]]))
+            # Convert back to numpy
+            if self.inputs.data_in_device:
+                self.inputs.receive_from_device()
         else:
-            # Load samples
-            filenames = sorted(glob(os.path.join(self.outputs_path,f'samples/{sample_name}*.npy')))
-            if len(filenames) <= 0:
-                raise Exception(f"No {sample_name} files found in {os.path.join(self.outputs_path,'samples')}")
-            samples = read_npy(filenames[0])
-            for filename in filenames[1:]:
-                # Read new batch
-                sample_batch = read_npy(filename)
-                # Append it to batches
-                samples = np.append(samples,sample_batch,axis=0)
+            if not hasattr(self._data,sample_name):
+                raise Exception(f"{sample_name} not found in output data {','.join(vars(self._data).keys())}")
             
+            # Get xarray
+            samples = getattr(self._data,sample_name)[sample_name]
+            # print(sample_name,samples.shape)
             # Apply burning, thinning and trimming
             if slice_samples:
-                samples = self.slice_samples(samples)
+                samples = self.slice_sample_iterations(samples)
+            # print(sample_name,samples.shape)
+            # Remove non-core coordinates
+            noncore_coords = list(set(samples.dims) - set(XARRAY_SCHEMA[sample_name]['coords']))
+            # Stack all non-core coordinates into new coordinate
+            samples = samples.stack(new_iter=(noncore_coords+['iter']))
+            # Get number of samples
+            N = samples['new_iter'].shape[0]
+            # Convert to numpy
+            samples = samples.values.astype(dtype=SAMPLE_TYPES[sample_name])
+            # Reshape
+            dims = {"N":N,"I":self.inputs.data.dims[0],"J":self.inputs.data.dims[1]}
+            # print(sample_name,samples.shape)
+            samples = samples.reshape(*[string_to_numeric(var) if var.isnumeric() else dims.get(var,None) for var in XARRAY_SCHEMA[sample_name]['new_shape']])
+            # print(sample_name,samples.shape)
+            # print('\n')
+
+            # If parameter is beta, scale it by bmax
+            if sample_name == 'beta' and self.intensity_model_class == 'spatial_interaction_model':
+                samples *= self.config.settings[self.intensity_model_class]['parameters']['bmax']
             
-        return samples.astype(DATA_TYPES[sample_name])
+        return samples#.astype(SAMPLE_TYPES[sample_name])
 
     def load_geometry(self,geometry_filename,default_crs:str='epsg:27700'):
         # Load geometry from file
@@ -845,25 +1075,6 @@ class Outputs(object):
         geometry = geometry.set_crs(default_crs,allow_override=True)
         
         return geometry
-    
-    def load_input_data(self,input_name):
-        # Define path to input files
-        path_dir = Path(self.config['inputs']['dataset'])
-        filepath = os.path.join(
-            self.inputs_path,
-            os.path.basename(path_dir),
-            self.config['inputs']
-                .get(self.intensity_model_class,'')['import']
-                .get(input_name,'')
-        )
-        # Sort 
-        input_files_matched = sorted(glob(filepath))
-        if len(input_files_matched) <= 0:
-            raise Exception(f"No {input_name} files found in {filepath}")
-        else:
-            # Return first file matching input name
-            return read_file(input_files_matched[0])
-
 
 
     def create_filename(self,sample=None):

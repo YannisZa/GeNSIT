@@ -6,7 +6,7 @@ from typing import Union, Tuple
 from numba import njit, prange
 
 from multiresticodm.global_variables import PROBABILITY_UTILS_CACHED
-from multiresticodm.math_utils import log_factorial_vectorised,logsumexp,log_factorial
+from multiresticodm.math_utils import log_factorial_vectorised,log_factorial
 
 def uniform_binary_choice(n:int=1,choices:list=[-1,1]):
     x = np.random.rand(n)

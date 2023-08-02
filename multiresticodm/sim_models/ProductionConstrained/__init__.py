@@ -1,7 +1,5 @@
 import torch
 
-from multiresticodm.math_utils import logsumexp
-
 CACHED = True
 
 # @njit(cache=CACHED)

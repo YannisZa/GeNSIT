@@ -7,6 +7,7 @@ import ast
 import zlib
 import gzip
 import json
+import h5py
 import torch
 import numba
 import numexpr
@@ -898,3 +899,37 @@ def sigma_to_noise_regime(sigma=None):
             return 'high'
     else:
         return 'variable'
+
+
+def h5_tree(val, pre=''):
+    items = len(val)
+    for key, val in val.items():
+        items -= 1
+        if items == 0:
+            # the last item
+            if type(val) == h5py._hl.group.Group:
+                print(pre + '└── ' + key)
+                h5_tree(val, pre+'    ')
+            else:
+                print(pre + '└── ' + key + ' (%d)' % len(val))
+        else:
+            if type(val) == h5py._hl.group.Group:
+                print(pre + '├── ' + key)
+                h5_tree(val, pre+'│   ')
+            else:
+                print(pre + '├── ' + key + ' (%d)' % len(val))
+
+def h5_deep_get(name,group,prefix=''):
+    for key, val in group.items() if isinstance(group,h5py.Group) \
+        else enumerate(group) if isinstance(group,h5py.Dataset) else []:
+            path = f'{prefix}/{key}'
+            print(path)
+            if name == key:
+                yield path
+            elif isinstance(val, h5py.Group):
+                gpath = h5_deep_get(key, val, path)
+                if gpath:
+                    yield gpath
+            elif isinstance(val, h5py.Dataset):
+                if name == key:
+                    yield path

@@ -1,13 +1,11 @@
-import torch 
+import torch
 import numpy as np
 
 from tqdm import tqdm
-from typing import Union
 from itertools import product
-from scipy.optimize import minimize
 from itertools import chain, combinations
 
-# from numba_progress import ProgressBar
+from numba_progress import ProgressBar
 from numba import njit, vectorize, float32, int32, int64, int8, prange, guvectorize
 
 from multiresticodm.utils import flatten
@@ -23,15 +21,8 @@ def log_factorial_vectorised(start:np.ndarray,end:np.ndarray):
     return sum([np.log(x) for x in prange(start+1,end+1)])
 
 @njit(cache=MATH_UTILS_CACHED)
-def logsumexp(xx:np.ndarray) -> float:
-    max_x = np.max(xx)
-    array_normalised = np.exp(xx-max_x)
-    return max_x + np.log(np.sum(array_normalised))
-
-@njit(cache=MATH_UTILS_CACHED)
 def positive_sigmoid(x,scale:float=1.0):
     return 2/(1+np.exp(-x/scale)) - 1
-
 
 def powerset(iterable):
     # Flatten list
@@ -40,69 +31,6 @@ def powerset(iterable):
     s = list(set(s))
     return chain.from_iterable(combinations(s, r) for r in range(1,len(s)+1))
 
-@njit
-def running_average_univariate(sample:np.float32,prev_mean:np.float32,prev_N:int):
-    return np.float32(((prev_N)/(prev_N+1)) * prev_mean + (1/(prev_N+1)) * sample)
-
-def running_average_multivariate(new_sample,latest_mean,prev_N):
-    if len(new_sample.shape) == 1:
-        return running_average_multivariate_1d(new_sample,latest_mean,prev_N)
-    elif len(new_sample.shape) == 2:
-        return running_average_multivariate_2d(new_sample,latest_mean,prev_N)
-    else:
-        raise ValueError(f'Dimension {new_sample.shape} could not be handled')
-
-@guvectorize([(int32[:,:], int32[:,:], int32, float32[:,:]),
-              (int32[:,:], float32[:,:], float32, float32[:,:]),
-              (int32[:,:], int32[:,:], float32, float32[:,:]),
-              (int32[:,:], float32[:,:], int32, float32[:,:]),
-              (float32[:,:], int32[:,:], int32, float32[:,:]),
-              (float32[:,:], float32[:,:], float32, float32[:,:]),
-              (float32[:,:], int32[:,:], float32, float32[:,:]),
-              (float32[:,:], float32[:,:], int32, float32[:,:])
-             ], '(n1,n2),(n1,n2),()->(n1,n2)')
-def running_average_multivariate_2d(new_sample,latest_mean,prev_N,new_running_mean):
-    for i in range(new_sample.shape[0]):
-        for j in range(new_sample.shape[1]):
-            new_running_mean[i,j] = running_average_univariate(
-                                            sample=new_sample[i,j],
-                                            prev_mean=latest_mean[i,j],
-                                            prev_N=prev_N
-                                        )
-            
-@guvectorize([(int32[:], int32[:], int32, float32[:]),
-              (int32[:], float32[:], float32, float32[:]),
-              (int32[:], int32[:], float32, float32[:]),
-              (int32[:], float32[:], int32, float32[:]),
-              (float32[:], int32[:], int32, float32[:]),
-              (float32[:], float32[:], float32, float32[:]),
-              (float32[:], int32[:], float32, float32[:]),
-              (float32[:], float32[:], int32, float32[:])
-             ], '(n1),(n1),()->(n1)')
-def running_average_multivariate_1d(new_sample,latest_mean,prev_N,new_running_mean):
-    for i in range(new_sample.shape[0]):
-        new_running_mean[i] = running_average_univariate(
-                                    sample=new_sample[i],
-                                    prev_mean=latest_mean[i],
-                                    prev_N=prev_N
-                                )
-# https://stackoverflow.com/questions/14313510/how-to-calculate-rolling-moving-average-using-python-numpy-scipy
-def running_average(arr,signs=None):
-    if signs is None:
-        # Compute simple running mean
-        ret = np.cumsum(arr, axis=0,dtype='float32')
-        return (ret / np.broadcast_to(np.arange(1,len(arr)+1,1)[:, np.newaxis, np.newaxis], arr.shape)).astype('float32')
-    else:
-        new_shape = np.array( ( [signs.shape[0]]+[1]*len(arr.shape[1:]) ) )
-        # Compute signed running mean
-        ret = np.cumsum(arr*signs.reshape(new_shape), axis=0, dtype='float32')
-        # Compute normalisation
-        normalisation = np.cumsum(signs.reshape(new_shape), axis=0, dtype='float32')
-        # Make sure that signs do not sum to zero - this will give Infs
-        if not all(normalisation):
-            normalisation[normalisation == 0] = 0.001
-            print("Zeros found in signed rolling mean. Consider increasing burnin or thinning.")
-        return (ret / normalisation).astype('float32')
 
 def normalised_manhattan_distance(tab:np.ndarray,tab0:np.ndarray):
 
@@ -304,7 +232,6 @@ def edit_degree_one_error(tab:np.ndarray,tab0:np.ndarray,**kwargs):
     
     return error
 
-# @njit
 def edit_distance_degree_higher(tab:np.ndarray,tab0:np.ndarray,**kwargs):
     dims = kwargs.get('dims',None)
     if dims is not None:
@@ -573,29 +500,3 @@ def calculate_min_interval(x, alpha):
     hdi_min = x[min_idx]
     hdi_max = x[min_idx+interval_index0]
     return hdi_min, hdi_max
-
-# @njit
-def normalise(data:Union[np.array,np.ndarray],by_max:bool=False,by_min:bool=False,take_logs:bool=False) -> Union[np.array,np.ndarray]:
-
-    # Normalise vector to sum up to 1
-    if by_max:
-        if by_min:
-            normalised_vector = (data-np.min(data))/np.max(data)
-        else:
-            normalised_vector = data/np.max(data)
-    else:
-        normalised_vector = data/np.sum(data)
-
-    # If take logs is selected, take logs
-    if take_logs:
-        return np.log(normalised_vector)
-    else:
-        return normalised_vector
-    
-def scipy_optimize(init,function,method,theta):
-    try: 
-        f = minimize(function, init, method=method, args=(theta), jac=True, options={'disp': False})
-    except:
-        return None
-
-    return f.x

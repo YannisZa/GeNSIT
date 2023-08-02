@@ -133,23 +133,24 @@ from multiresticodm.global_variables import NUMBA_PARALLELISE
 #     return hessian
 
 
-def _log_flow_matrix(xx,theta,origin_demand,cost_matrix,total_flow):
+def _log_flow_matrix(log_destination_attraction,alpha,beta,origin_demand,cost_matrix,total_flow):
     # Extract dimensions
     nrows,ncols = cost_matrix.size(dim=0), cost_matrix.size(dim=1)
-    N = xx.size(dim=0)
+    N = log_destination_attraction.size(dim=0)
     log_flow = torch.zeros((N,nrows,ncols),dtype=float32)
-    # Get first two parameters
-    alpha = theta[:,0]
-    beta = theta[:,1]
-    # Get log total
-    log_total = torch.log(torch.sum(origin_demand.float()))
+    # Reshape tensors to ensure operations are possible
+    log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,ncols))
+    cost_matrix = torch.reshape(cost_matrix,(1,nrows,ncols))
+    alpha = torch.reshape(alpha,(N,1,1))
+    beta = torch.reshape(beta,(N,1,1))
+
     # Compute log unnormalised expected flow
     # Compute log utility
-    log_utility = xx.float()*alpha - cost_matrix.float()*beta
+    log_utility = log_destination_attraction.float()*alpha - cost_matrix.float()*beta
     # Compute log normalisation factor
     normalisation = torch.logsumexp(torch.ravel(log_utility),dim=(0))
     # Evaluate log flow scaled
-    log_flow = log_utility - normalisation + log_total + torch.log(total_flow.float())
+    log_flow = log_utility - normalisation + torch.log(total_flow).float()
     return log_flow
 
 def _destination_demand(W_alpha,C_beta,origin_demand,total_flow):

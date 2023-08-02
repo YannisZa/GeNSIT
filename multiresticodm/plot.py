@@ -30,7 +30,7 @@ from multiresticodm.outputs import Outputs,OutputSummary
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.spatial_interaction_model import instantiate_sim
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
-from multiresticodm.math_utils import running_average,apply_norm,positive_sigmoid,logsumexp,map_distance_name_to_function,coverage_probability,calculate_min_interval
+from multiresticodm.math_utils import running_average,apply_norm,positive_sigmoid,map_distance_name_to_function,coverage_probability,calculate_min_interval
 
 latex_preamble = r'''
 \usepackage{amsmath}

@@ -4,7 +4,7 @@ import toml
 import logging
 
 from copy import deepcopy
-from multiresticodm.utils import deep_apply, setup_logger, str_in_list
+from multiresticodm.utils import deep_apply, setup_logger, str_in_list, read_json
 from multiresticodm.config_data_structures import instantiate_data_type
 
 class Config:
@@ -25,8 +25,13 @@ class Config:
 
         # Load config
         if path:
+
             self.logger.debug(f' Loading config from {path}')
-            self.settings = toml.load(path, _dict=dict)
+
+            if path.endswith('.toml'):
+                self.settings = toml.load(path, _dict=dict)
+            elif path.endswith('.json'):
+                self.settings = read_json(path)
 
             # Load schema
             self.load_schema()

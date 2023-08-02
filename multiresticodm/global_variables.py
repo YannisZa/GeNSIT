@@ -12,6 +12,57 @@ PARAMETER_DEFAULTS = {
     'noise_percentage': 3,
 }
 
+XARRAY_SCHEMA = {
+    'alpha': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    }, 
+    'beta': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    }, 
+    'kappa': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    }, 
+    'delta': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    }, 
+    'sigma': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    }, 
+    'log_destination_attraction': {
+        "coords":["destination","iter"],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "new_shape":["N","J"]
+    },
+    'loss': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    },
+    'log_target': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    },
+}
+
 SIM_DATA_TYPES = {
     'origin_demand':'float32',
     'destination_demand':'float32',
@@ -34,7 +85,21 @@ DISTANCE_FUNCTIONS = [
 
 INPUT_TYPES = {
     'cost_matrix':'float32',
-    'origin_demand':'float32'
+    'origin_demand':'float32',
+    'destination_demand':'float32',
+    'origin_attraction_ts':'float32',
+    'destination_attraction_ts':'float32',
+}
+
+NUMPY_TO_TORCH_DTYPE = {
+    'float32':torch.float32,
+    'float64':torch.float64,
+    'uint8':torch.uint8,
+    'int8':torch.int8,
+    'int16':torch.int16,
+    'int32':torch.int32,
+    'int64':torch.int64,
+    'bool':torch.bool
 }
 
 SAMPLE_TYPES = {
@@ -45,7 +110,14 @@ SAMPLE_TYPES = {
     'intensity':'float32',
     'intensityerror':'float32',
     'log_destination_attraction':'float32',
-    'theta':'float32',
+    'log_origin_attraction':'float32',
+    'loss':'float32',
+    'log_target':'float32',
+    'alpha':'float32',
+    'beta':'float32',
+    'delta':'float32',
+    'kappa':'float32',
+    'sigma':'float32',
     'sign':'int8'
 }
 
@@ -53,7 +125,7 @@ DATA_TYPES = {**INPUT_TYPES,**SAMPLE_TYPES}
 
 NUMPY_TYPE_TO_DAT_TYPE = {
     'float':'%f',
-    'int':'%d',
+    'int':'start,stop,step',
 }
 
 SIM_TYPE_CONSTRAINTS = {
@@ -119,7 +191,66 @@ PLOT_HASHMAP = {
         '42':'origin_destination_table_colorbars'
 }
 
-DATE_FORMATS = ['%d-%m-%Y','%d_%m_%Y','%d_%m', '%d-%m']
+SWEEPABLE_PARAMS = {
+    "seed": {
+        "is_coord":True        
+    },
+    "origin_demand": {
+        "is_coord":False
+    },
+    "destination_attraction_ts": {
+        "is_coord":False
+    },
+    "cost_matrix": {
+        "is_coord":False
+    },
+    "sim_type": {
+        "is_coord":False
+    },
+    "alpha": {
+        "is_coord":True
+    },
+    "beta": {
+        "is_coord":True
+    },
+    "bmax": {
+        "is_coord":False
+    },
+    "dt": {
+        "is_coord":True
+    },
+    "delta": {
+        "is_coord":True
+    },
+    "kappa": {
+        "is_coord":True
+    },
+    "sigma": {
+        "is_coord":True
+    },
+    "epsilon": {
+        "is_coord":True
+    },
+    "N": {
+        "is_coord":False
+    },
+    "to_learn": {
+        "is_coord":False
+    },
+    "num_layers": {
+        "is_coord":True
+    },
+    "optimizer": {
+        "is_coord":True
+    },
+    "learning_rate": {
+        "is_coord":True
+    }
+}
+
+INTENSITY_MODELS = ['spatial_interaction_model']
+
+DATE_FORMATS = ['start,stop,step-%m-%Y','start,stop,step_%m_%Y','start,stop,step_%m', 'start,stop,step-%m']
 
 # Caching numba functions
 UTILS_CACHED =  True
@@ -207,3 +338,8 @@ OPTIMIZERS = {
     'Rprop': torch.optim.Rprop,
     'SGD': torch.optim.SGD,
 }
+
+
+class Dataset(object):
+    pass
+
