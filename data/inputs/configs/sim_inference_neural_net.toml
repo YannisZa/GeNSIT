@@ -18,8 +18,6 @@ to_learn = ['alpha', 'beta', 'kappa']
     origin_demand = 'rowsums.txt'
     destination_attraction_ts='destination_attraction_time_series.txt'
     cost_matrix = 'cost_matrix.txt'
-    # log_destination_attraction= 'log_destination_attraction.txt'
-    # true_log_destination_attraction = 'true_log_destination_attraction.txt'
 
 [spatial_interaction_model]
   # sim_type = 'ProductionConstrained','TotallyConstrained'
