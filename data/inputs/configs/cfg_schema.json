@@ -142,27 +142,6 @@
             "default-value": ["cost_matrix.txt"]
           }
         }
-      },
-      "log_destination_attraction": {
-        "sweepable": true,
-        "optional": false,
-
-        "sweep": {
-          "default": {
-            "dtype": "file",
-            "file-exists": false,
-            "file-extension": "txt",
-            "default-value": "log_destination_attraction.txt"
-          },
-          "range": {
-            "dtype": "list",
-            "list-length": [1, null],
-            "list-dtype": "file",
-            "file-exists": false,
-            "file-extension": "txt",
-            "default-value": ["log_destination_attraction.txt"]
-          }
-        }
       }
     }
   },
