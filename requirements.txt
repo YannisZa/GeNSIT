@@ -23,8 +23,6 @@ coverage==4.5.4
 cryptography==2.8
 cycler==0.11.0
 Cython==0.29.32
-dantro==0.18.10
-dask==2022.9.1
 data==0.4
 decorator==5.1.1
 defusedxml==0.7.1
@@ -32,7 +30,7 @@ deprecation==2.1.0
 descartes==1.1.0
 dictdiffer==0.8.1
 dill==0.3.5.1
-distributed==2022.9.1
+distributed==2023.3.2
 distro==1.4.0
 docutils==0.15.2
 entrypoints==0.3
@@ -244,7 +242,6 @@ webencodings==0.5.1
 websocket-client==1.4.2
 Werkzeug==1.0.1
 widgetsnbextension==3.6.0
-xarray==2022.12.0
 xmltodict==0.12.0
 xyzservices==2022.9.0
 zict==2.2.0
@@ -254,4 +251,6 @@ numba_progress==1.0.0
 tabulate==0.9.0
 numexpr==2.8.4
 torch==2.0.1
-pathos
+pathos==0.2.9
+dask==2023.3.2
+xarray==2023.1.0
