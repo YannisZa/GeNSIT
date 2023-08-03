@@ -86,7 +86,14 @@ class HarrisWilson:
 
         # Error noise on log destination attraction
         noise_percentage = true_parameters.get('noise_percentage',PARAMETER_DEFAULTS['noise_percentage'])
-        self.noise_var = torch.pow(((noise_percentage/torch.tensor(100).float())*torch.log(self.sim.dims[1])),2)
+        self.noise_var = torch.pow(
+            (
+                torch.tensor(noise_percentage).float() / \
+                torch.tensor(100).float()
+            ) * \
+            torch.log(torch.tensor(self.sim.dims[1]).float()),
+            2
+        )
         if hasattr(self,'config'):
             self.config.settings['harris_wilson_model']['noise_percentage'] = noise_percentage
 
@@ -303,16 +310,12 @@ class HarrisWilson:
         new_sizes = curr_destination_attractions.clone()
         new_sizes.requires_grad = requires_grad
 
-        # Calculate the weight matrix C^beta
-        C_beta = torch.pow(self.sim.cost_matrix, beta)
-
-        # Calculate the exponential sizes W_j^alpha
-        W_alpha = torch.pow(curr_destination_attractions, alpha)
-
         # Calculate the vector of demands
         demand = self.sim.intensity_demand(
-            W_alpha,
-            C_beta
+            alpha = alpha,
+            beta = beta,
+            log_destination_attraction = torch.log(new_sizes),
+            grand_total = torch.tensor(1.)
         )
 
         # Update the current values
@@ -380,26 +383,6 @@ class HarrisWilson:
             sizes = torch.stack(sizes)
             return torch.reshape(sizes, (sizes.shape[0], sizes.shape[1], 1))
 
-
-# def destination_demand(self,W_alpha,weights):
-
-#     # Calculate the normalisations sum_{k,m} W_m^alpha exp(-beta * c_km)
-#     normalisation = torch.sum(
-#         torch.mul(W_alpha, torch.transpose(weights, 0, 1))
-#     )
-
-#     # Calculate the vector of demands
-#     return torch.mul(
-#         W_alpha,
-#         torch.reshape(
-#             torch.sum(
-#                 torch.div(torch.mul(torch.sum(self.or_sizes), weights), normalisation),
-#                 dim=0,
-#                 keepdim=True,
-#             ),
-#             (self.M, 1),
-#         ),
-#     )
 
     def __repr__(self):
         return f"HarrisWilson( {self.sim.sim_type}(SpatialInteraction2D) )"

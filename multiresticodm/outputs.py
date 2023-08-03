@@ -173,7 +173,6 @@ class OutputSummary(object):
                             # This slices the input data and requires reinstantiating outputs
                             else:
                                 input_slice.append({"value":value,"key_path":key_path})
-
                 if len(input_slice) == 0:
                     input_slice = [None]
             else:
@@ -289,7 +288,7 @@ class OutputSummary(object):
                 assert hasattr(outputs.data,sample_name)
                 samples = getattr(outputs.data,sample_name)
             except Exception as e:
-                self.logger.error(f'Experiment {experiment_id} does not have sample {sample_name}')
+                self.logger.error(f'Experiment {os.path.basename(experiment_id)} does not have sample {sample_name}')
                 continue
             self.logger.debug(f"samples {np.shape(samples)}, {samples.dtype}")
             for statistics in outputs.settings['statistic']:
@@ -297,18 +296,18 @@ class OutputSummary(object):
                 sample_statistics_axes = statistics[0]
                 metric_statistics_axes = statistics[1]
                 # Compute statistic before applying metric
-                samples_summarised = None
-                try:
-                    samples_summarised = outputs.apply_sample_statistics(samples,sample_name,sample_statistics_axes)
-                except Exception as e:
-                    self.logger.debug(traceback.format_exc())
-                    self.logger.error(f"samples {np.shape(samples)}, {samples.dtype}")
-                    self.logger.error(f"Applying statistic {' over axes '.join([str(s) for s in sample_statistics_axes])} \
-                                    for sample {sample_name} of experiment {experiment_id} failed")
-                    print('\n')
-                    continue
-                if not np.array_equal(samples_summarised.ndim,samples.ndim):
-                    samples_summarised = samples_summarised[np.newaxis,:]
+                # samples_summarised = None
+                # try:
+                samples_summarised = outputs.apply_sample_statistics(samples,sample_name,sample_statistics_axes)
+                # except Exception as e:
+                #     self.logger.debug(traceback.format_exc())
+                #     self.logger.error(f"samples {np.shape(samples)}, {samples.dtype}")
+                #     self.logger.error(f"Applying statistic {' over axes '.join([str(s) for s in sample_statistics_axes])} \
+                #                     for sample {sample_name} of experiment {experiment_id} failed")
+                #     print('\n')
+                #     continue
+                if samples_summarised.dim() !=  samples.dim():
+                    samples_summarised = samples_summarised.unsqueeze(dim=0)
                 self.logger.debug(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
                 
                 # Get shape of samples
@@ -369,14 +368,14 @@ class OutputSummary(object):
                                                   for experiment {experiment_id} failed')
                                 print('\n')
                                 continue
-                            print(sample_name,metric,samples_metric)
+                            # print(sample_name,metric,samples_metric)
                             self.logger.debug(f"Samples metric is {np.shape(samples_metric)}")
                             # Apply statistics after metric
                             try:
                                 self.settings['axis'] = METRICS[metric]['apply_axis']
                                 metric_summarised = outputs.apply_sample_statistics(
                                                         samples=samples_metric,
-                                                        sample_name='metric',
+                                                        sample_name=metric,
                                                         statistic_axes=metric_statistics_axes
                                 )
                             except Exception as e:
@@ -390,7 +389,7 @@ class OutputSummary(object):
                             # Squeeze output
                             metric_summarised = np.squeeze(metric_summarised)
                             # Make sure metric summarised is not multidimensional
-                            if np.size(metric_summarised) > 1:
+                            if metric_summarised.dim() > 1:
                                 self.logger.warning(f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}>"+
                                                     f"{sample_name}>"+
                                                     f"{metric}>"+
@@ -437,7 +436,7 @@ class OutputSummary(object):
                         except Exception as e:
                             self.logger.debug(traceback.format_exc())
                             self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
-                            self.logger.error(f"tab0 {np.shape(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}")
+                            self.logger.error(f"tab0 {metric_kwargs['tab0'].shape}, {metric_kwargs['tab0'].dtype}")
                             self.logger.error(f'Applying metric {metric} over sample {sample_name} for experiment {experiment_id} failed')
                             print('\n')
                             continue
@@ -455,7 +454,7 @@ class OutputSummary(object):
                         
                         # Apply statistics after metric
                         try:
-                            metric_summarised = outputs.apply_sample_statistics(samples_metric,'metric',metric_statistics_axes)
+                            metric_summarised = outputs.apply_sample_statistics(samples_metric,metric,metric_statistics_axes)
                         except Exception as e:
                             self.logger.debug(traceback.format_exc())
                             self.logger.error(f"Shape of metric is {np.shape(samples_metric)}")
@@ -465,8 +464,8 @@ class OutputSummary(object):
                             continue
                         self.logger.debug(f"Summarised metric is {np.shape(metric_summarised)}")
                         # Squeeze output
-                        metric_summarised = np.squeeze(metric_summarised)
-                        if np.size(metric_summarised) > 1:
+                        metric_summarised = torch.squeeze(metric_summarised)
+                        if metric_summarised.dim() > 1:
                             self.logger.debug(traceback.format_exc())
                             # Make sure metric summarised is not multidimensional
                             self.logger.warning(f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}>"+
@@ -606,6 +605,8 @@ class Outputs(object):
                 config = self.config,
                 synthetic_data = False,
             )
+            # Convert all inputs to tensors
+            self.inputs.pass_to_device()
 
             # Try to load ground truth table
             self.ground_truth_table = None
@@ -618,7 +619,9 @@ class Outputs(object):
                             self.config['inputs']['dataset'],
                             self.settings['table']
                         )
-                    ).astype('int32')
+                    )
+                    # Convert to tensor
+                    self.ground_truth_table = torch.tensor(self.ground_truth_table,dtype=torch.int32)
                 except:
                     # Try reading it from inputs
                     try:
@@ -640,27 +643,25 @@ class Outputs(object):
             # Load output h5 file to xarrays
             self.load_h5_data(config,coordinate_slice=self.coordinate_slice)
             
-            # Store required samples
-            sample_names = ['intensity']
             # Try to load all output data
             for sample_name in sample_names:
-                # try:
-                setattr(
-                    self.data,
-                    sample_name, 
-                    self.get_sample(
-                        sample_name,
-                        slice_samples = slice_samples
+                try:
+                    setattr(
+                        self.data,
+                        sample_name, 
+                        self.get_sample(
+                            sample_name,
+                            slice_samples = slice_samples
+                        )
                     )
-                )
-                print(self.data.intensity.shape)
-                    # if sample_name == 'table' and self.settings['table_total'] != 1:
-                    #     self.settings['table_total'] = self.experiment.results[sample_name][0].ravel().sum()
-                #     self.logger.info(f'Sample {sample_name} loaded with shape {self.samples[sample_name].shape}')
-                # except:
-                #     self.logger.debug(traceback.format_exc())
-                #     self.logger.warning(f'Sample {sample_name} could not be loaded')
-                #     sys.exit()
+
+                    if sample_name == 'table' and self.settings['table_total'] != 1:
+                        self.settings['table_total'] = list(torch.sum(torch.ravel(self.data.table)))[0]
+                    self.logger.info(f'Sample {sample_name} loaded with shape {list(getattr(self.data,sample_name).shape)}')
+                except:
+                    self.logger.debug(traceback.format_exc())
+                    self.logger.warning(f'Sample {sample_name} could not be loaded')
+                    # sys.exit()
 
             if self.settings['table_total'] == 0:
                 self.logger.warning('Ground truth missing')
@@ -689,12 +690,7 @@ class Outputs(object):
                     self.experiment_id
             )
             
-            # Try to load ground truth table
-            # try:
-            #     self.ground_truth_table = self.experiment.ct.table
-            # except:
-            #     pass
-            
+    
             # Name output sample directory according 
             # to sweep params (if they are provided)
             name_params = kwargs.get('name_params',{})
@@ -794,6 +790,9 @@ class Outputs(object):
         
 
     def write_metadata(self,dir_path:str,filename:str) -> None:
+        # settings_copy = deepcopy(self.config.settings)
+        # settings_copy = deep_apply(settings_copy, type)
+        # print(settings_copy)
         # Define filepath
         filepath = os.path.join(self.outputs_path,dir_path,f"{filename.split('.')[0]}.json")
         if (os.path.exists(filepath) and self.config['experiments'][0]['overwrite']) or (not os.path.exists(filepath)):
@@ -844,11 +843,6 @@ class Outputs(object):
                     if (os.path.exists(os.path.join(dirpath,filename)) and self.config['overwrite']) or (not os.path.exists(os.path.join(dirpath,filename))):
                         write_npy(res['samples'][k],os.path.join(dirpath,filename))
 
-    # def instantiate_plotting_function(self,pid:str):# -> Union[Outputs,None]:
-    #     if hasattr(self, self.settings['name']):
-    #         return getattr(self, self.settings['name'])(pid)
-    #     else:
-    #         raise Exception(f"Input class {self.settings['name']} not found")
 
     def slice_sample_iterations(self,samples):
 
@@ -952,7 +946,8 @@ class Outputs(object):
                 assert hasattr(self.inputs.data,input)
             except:
                 available = False
-                self.logger.error(f"Sample {sample_name} requires input {input} which does not exist in {','.join(self.inputs.data.vars())}")
+                self.logger.error(f"Sample {sample_name} requires input {input} \
+                                  which does not exist in {','.join(self.inputs.data.vars())}")
         for output in output_names:
             try:
                 assert hasattr(self._data,output)
@@ -962,6 +957,7 @@ class Outputs(object):
         return available
 
     def get_sample(self,sample_name:str,slice_samples:bool=True):
+
         if sample_name == 'intensity':
             # Get sim model 
             sim_model = globals()[self.config.settings['spatial_interaction_model']['sim_type']+'SIM']
@@ -971,8 +967,6 @@ class Outputs(object):
                 input_names=sim_model.REQUIRED_INPUTS,
                 output_names=sim_model.REQUIRED_OUTPUTS,
             )
-            # Get total number of samples
-            # N = getattr(self._data,'iter').shape[0]
 
             # Prepare input arguments 
             data = {}
@@ -993,26 +987,28 @@ class Outputs(object):
             for output in sim_model.REQUIRED_OUTPUTS:
                 data[output] = torch.tensor(
                     self.get_sample(output,slice_samples),
-                    dtype=NUMPY_TO_TORCH_DTYPE[SAMPLE_TYPES[output]]
+                    dtype=NUMPY_TO_TORCH_DTYPE[OUTPUT_TYPES[output]]
                 )
 
-            # with ProgressBar(total=N) as progress_bar:
+            # Compute log intensity function
             samples = sim.log_intensity(
                 grand_total=torch.tensor(table_total,dtype=torch.int32),
                 **data
             )
-            # Convert back to numpy
-            samples = np.exp(samples.cpu().detach().numpy(),dtype='float32')
 
-        # elif sample_name.endswith("__error"):
-        #     # Load all samples
-        #     samples = self.load_samples(sample_name.replace("__error",""),slice_samples)
-        #     # Make sure you have ground truth
-        #     try:
-        #         assert self.ground_truth_table is not None
-        #     except:
-        #         self.logger.error('Ground truth table missing. Sample error cannot be computed.')
-        #         raise
+            # Exponentiate
+            samples = torch.exp(samples).to(dtype=torch.float32)
+
+        elif sample_name.endswith("__error"):
+            # Load all samples
+            samples = self.get_sample(sample_name.replace("__error",""),slice_samples)
+            # Make sure you have ground truth
+            try:
+                assert self.ground_truth_table is not None
+            except:
+                self.logger.error('Ground truth table missing. Sample error cannot be computed.')
+                raise
+        
         elif sample_name == 'ground_truth_table':
             # Get config and sim
             dummy_config = Namespace(**{'settings':self.config})
@@ -1021,7 +1017,8 @@ class Outputs(object):
                 config=dummy_config,
                 log_to_console=False
             )
-            samples = torch.tensor(ct.table).int()
+            samples = torch.tensor(ct.table).int().reshape((1,*ct.dims))
+        
         elif str_in_list(sample_name, INPUT_TYPES.keys()):
             # Get sim model 
             sim_model = globals()[self.config.settings['spatial_interaction_model']['sim_type']+'SIM']
@@ -1029,14 +1026,13 @@ class Outputs(object):
                 sample_name=sample_name,
                 input_names=sim_model.REQUIRED_INPUTS
             )
-            # Convert data to torch tensors
-            if not self.inputs.data_in_device:
-                self.inputs.pass_to_device()
             # Get samples and cast them to appropriate type
-            samples = torch.clone(getattr(self.inputs.data,sample_name).to(dtype=NUMPY_TO_TORCH_DTYPE[INPUT_TYPES[sample_name]]))
-            # Convert back to numpy
-            if self.inputs.data_in_device:
-                self.inputs.receive_from_device()
+            samples = torch.clone(
+                getattr(self.inputs.data,sample_name).to(
+                    dtype=NUMPY_TO_TORCH_DTYPE[INPUT_TYPES[sample_name]]
+                )
+            )
+
         else:
             if not hasattr(self._data,sample_name):
                 raise Exception(f"{sample_name} not found in output data {','.join(vars(self._data).keys())}")
@@ -1055,7 +1051,7 @@ class Outputs(object):
             # Get number of samples
             N = samples['new_iter'].shape[0]
             # Convert to numpy
-            samples = samples.values.astype(dtype=SAMPLE_TYPES[sample_name])
+            samples = samples.values.astype(dtype=OUTPUT_TYPES[sample_name])
             # Reshape
             dims = {"N":N,"I":self.inputs.data.dims[0],"J":self.inputs.data.dims[1]}
             # print(sample_name,samples.shape)
@@ -1067,7 +1063,7 @@ class Outputs(object):
             if sample_name == 'beta' and self.intensity_model_class == 'spatial_interaction_model':
                 samples *= self.config.settings[self.intensity_model_class]['parameters']['bmax']
             
-        return samples#.astype(SAMPLE_TYPES[sample_name])
+        return samples
 
     def load_geometry(self,geometry_filename,default_crs:str='epsg:27700'):
         # Load geometry from file
@@ -1089,8 +1085,8 @@ class Outputs(object):
             filename += f"_{self.config['table_dim']}"
         if str_in_list('table_total',self.config.keys()):
             filename += f"_{self.config['table_total']}"
-        if str_in_list('name',self.config.keys()) and len(self.config['name']) > 0:
-            filename += f"_{self.config['name']}"
+        if str_in_list('type',self.config.keys()) and len(self.config['type']) > 0:
+            filename += f"_{self.config['type']}"
         if str_in_list('experiment_title',self.settings.keys()) and len(self.settings['experiment_title']) > 0:
             filename += f"_{self.settings['experiment_title']}"
         if str_in_list('viz_type',self.settings.keys()):
@@ -1105,38 +1101,38 @@ class Outputs(object):
         return filename
 
     def compute_sample_statistics(self,data,sample_name,statistic,axis:int=0):
+        # print('compute_sample_statistics',sample_name,statistic,axis)
         if statistic is None or statistic.lower() == '' or 'sample' in statistic.lower():
             return data
-        elif not str_in_list(sample_name,SAMPLE_TYPES.keys()):
-            return convert_string_to_numpy_function(statistic)(data,axis=axis).astype('float32')#[np.newaxis,:]
+        
+        elif not str_in_list(sample_name,OUTPUT_TYPES.keys()):
+            return convert_string_to_torch_function(statistic)(data.float(),dim=axis).to(dtype=torch.float32)
+        
         elif statistic.lower() == 'signedmean' and \
-            str_in_list(sample_name,['table','intensity','theta','log_destination_attraction']):
-            if sample_name == 'table':
-                # Compute mean,var
-                return np.mean(data,keepdims=True,axis=axis).astype('float32')#[np.newaxis,:]
-            elif str_in_list(sample_name,['intensity','theta','log_destination_attraction']):
-                sign_samples = self.load_samples('sign',slice_samples=True)
-                sign_samples = sign_samples.reshape((np.shape(sign_samples)[0],1))
+            str_in_list(sample_name,OUTPUT_TYPES.keys()): 
+            if str_in_list(sample_name,INTENSITY_TYPES.keys()) \
+                and hasattr(self.data,'sign'):
+                signs = self.data.sign.unsqueeze(1)
                 # Compute moments
-                return ( np.einsum('nk,n...->k...',sign_samples,data) / np.sum(sign_samples.ravel())).astype('float32')#[np.newaxis,:]
+                return ( torch.einsum('nk,n...->k...',signs.float(),data.float()) / torch.sum(torch.ravel(signs.float()))).to(dtype=torch.float32)
             else:
-                raise Exception(f'Signed mean could not be computed for sample {sample_name}')
+                return self.compute_sample_statistics(data,sample_name,'mean',axis)
+       
         elif (statistic.lower() == 'signedvariance' or statistic.lower() == 'signedvar') and \
-            str_in_list(sample_name,['table','intensity','theta','log_destination_attraction']):
-            if sample_name == 'table':
-                # Compute table variance
-                return (np.var(data,axis=axis)).astype('float32')#[np.newaxis,:]
-            elif str_in_list(sample_name,['intensity','theta','log_destination_attraction']):
-                sign_samples = self.load_samples('sign',slice_samples=True)
-                sign_samples = sign_samples.reshape((np.shape(sign_samples)[0],1))
+            str_in_list(sample_name,OUTPUT_TYPES.keys()):
+
+            if str_in_list(sample_name,INTENSITY_TYPES.keys()) \
+                and hasattr(self.data,'sign'):
+                signs = self.data.sign.unsqueeze(1)
                 # Compute intensity variance
-                samples_mean = np.einsum('nk,n...->k...',sign_samples,data) / np.sum(sign_samples.ravel())
-                samples_squared_mean = np.einsum('nk,n...->k...',sign_samples,data**2) / np.sum(sign_samples.ravel())
-                return (samples_squared_mean - samples_mean**2).astype('float32')#[np.newaxis,:]
+                samples_mean = self.compute_sample_statistics(data,sample_name,'signedmean',axis)
+                samples_squared_mean = np.einsum('nk,n...->k...',signs,torch.pow(data.float(),2)) / torch.sum(torch.ravel(signs.float()))
+                return (samples_squared_mean.float() - torch.pow(samples_mean.float(),2)).to(dtype=torch.float32)
             else:
-                raise Exception('Signed variance could not be computed')
+                return self.compute_sample_statistics(data,sample_name,'var',axis)
+        
         elif statistic.lower() == 'error' and \
-            str_in_list(sample_name,['table','intensity','theta','log_destination_attraction']):
+            str_in_list(sample_name,[param for param in OUTPUT_TYPES.keys() if 'error' not in param]):
             # Apply error norm
             return apply_norm(
                 tab=data,
@@ -1144,15 +1140,17 @@ class Outputs(object):
                 name=self.settings['norm'],
                 **self.settings
             )
+       
         else:
-            return convert_string_to_numpy_function(statistic)(data,axis=axis).astype('float32')
+            return convert_string_to_torch_function(statistic)(data.float(),dim=axis).to(dtype=torch.float32)
 
     def apply_sample_statistics(self,samples,sample_name,statistic_axes:Union[List,Tuple]=[]):
+        # print('apply_sample_statistics',sample_name,statistic_axes)
         
         if isinstance(statistic_axes,Tuple):
             statistic_axes = [statistic_axes]
         sample_statistic = samples
-        # print('statistic_axes',statistic_axes)
+        
         # For every collection of statistic-axes
         for stats,axes in statistic_axes:
             # print('stats',type(stats),stats)
@@ -1178,7 +1176,7 @@ class Outputs(object):
                 stat,ax = stats_list[i],axes_list[i]
                 
                 # Skip computation if no statistic is provided
-                if len(stat) == 0:
+                if isinstance(stat,str) and len(stat) == 0:
                     continue
 
                 # print('stat',type(stat),stat)
@@ -1195,6 +1193,6 @@ class Outputs(object):
                                         statistic=stat,
                                         axis=tuplize(ax)
                                     )
+                # print(sample_statistic.shape)
 
-        # print('\n')
         return sample_statistic

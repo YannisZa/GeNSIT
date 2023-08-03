@@ -133,11 +133,20 @@ from multiresticodm.global_variables import NUMBA_PARALLELISE
 #     return hessian
 
 
-def _log_flow_matrix(log_destination_attraction,alpha,beta,origin_demand,cost_matrix,total_flow):
+def _log_flow_matrix(**kwargs):
+
+    # Get parameters
+    log_destination_attraction = kwargs['log_destination_attraction']
+    cost_matrix = kwargs['cost_matrix']
+    alpha = kwargs['alpha']
+    beta = kwargs['beta']
+    grand_total = kwargs.get('grand_total',None)
+
     # Extract dimensions
     nrows,ncols = cost_matrix.size(dim=0), cost_matrix.size(dim=1)
-    N = log_destination_attraction.size(dim=0)
+    N = log_destination_attraction.size(dim=1)
     log_flow = torch.zeros((N,nrows,ncols),dtype=float32)
+    
     # Reshape tensors to ensure operations are possible
     log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,ncols))
     cost_matrix = torch.reshape(cost_matrix,(1,nrows,ncols))
@@ -148,32 +157,26 @@ def _log_flow_matrix(log_destination_attraction,alpha,beta,origin_demand,cost_ma
     # Compute log utility
     log_utility = log_destination_attraction.float()*alpha - cost_matrix.float()*beta
     # Compute log normalisation factor
-    normalisation = torch.logsumexp(torch.ravel(log_utility),dim=(0))
+    normalisation = torch.logsumexp(log_utility,dim=(1,2))
+    # and reshape it
+    normalisation = torch.reshape(normalisation,(N,1,1))
     # Evaluate log flow scaled
-    log_flow = log_utility - normalisation + torch.log(total_flow).float()
+    log_flow = log_utility - normalisation + torch.log(grand_total).float()
+
     return log_flow
 
-def _destination_demand(W_alpha,C_beta,origin_demand,total_flow):
-    nrows,ncols = C_beta.size(dim=0),C_beta.size(dim=1)
-    # Calculate the normalisations sum_k W_k^alpha exp(-beta * c_ik) (double transposition of weight matrix
-    # necessary for this step)
-    normalisations = torch.sum(
-        torch.transpose(torch.mul(W_alpha, torch.transpose(C_beta, 0, 1)), 0, 1),
-        dim=1,
-        keepdim=True,
+def _destination_demand(**kwargs):
+    # Compute log flow
+    log_flow = _log_flow_matrix(
+        **kwargs
     )
+    # Squeeze output
+    log_flow = torch.squeeze(log_flow)
 
-    return torch.mul(
-        W_alpha,
-        torch.reshape(
-            torch.sum(
-                torch.div(torch.mul(total_flow, C_beta), normalisations),
-                dim=0,
-                keepdim=True,
-            ),
-            (ncols, 1),
-        ),
-    )
+    # Compute destination demand
+    log_destination_demand = torch.logsumexp(log_flow,dim=0,keepdim=True)
+
+    return torch.t(torch.exp(log_destination_demand))
 
 # @njit(cache=CACHED,parallel=NUMBA_PARALLELISE)
 # def flow_matrix_jacobian(theta,log_intensity):

@@ -686,9 +686,9 @@ class Plot(object):
             )
             # Make sure the right experiments are provided
             try:
-                assert np.any([exp_type in outputs.experiment.config['name'].lower() for exp_type in valid_experiment_types])
+                assert np.any([exp_type in outputs.experiment.config['type'].lower() for exp_type in valid_experiment_types])
             except:
-                self.logger.warning(f"Skipping invalid experiment {outputs.experiment.config['name'].lower()}")
+                self.logger.warning(f"Skipping invalid experiment {outputs.experiment.config['type'].lower()}")
                 continue
             
             # Read label(s) from settings
@@ -906,7 +906,7 @@ class Plot(object):
                 "figures",
                 f"table_{'x'.join([str(s) for s in sim.shape()])}_" + \
                 f"total_{sim.total_flow}_" + \
-                f"{outputs.experiment.config['name']}" + \
+                f"{outputs.experiment.config['type']}" + \
                 f"{self.settings['experiment_title']}" + \
                 f"{sim.noise_regime.title()}Noise"
         )
@@ -976,7 +976,7 @@ class Plot(object):
 
             # Get filename
             filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_parameter_mixing_thinning_{self.settings['thinning']}_"+\
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_mixing_thinning_{self.settings['thinning']}_"+\
                     f"N_{outputs.experiment.config['mcmc']['N']}" 
 
             # Define filepath
@@ -1059,7 +1059,7 @@ class Plot(object):
 
             # Get filename
             filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_" + \
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_" + \
                     f"parameter_acf_thinning_{self.settings['thinning']}_"+\
                     f"N_{outputs.experiment.config['mcmc']['N']}"
 
@@ -1124,7 +1124,7 @@ class Plot(object):
             
             # Get filename
             filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_parameter_contours_thinning_{self.settings['thinning']}_"+\
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_contours_thinning_{self.settings['thinning']}_"+\
                     f"N_{outputs.experiment.config['mcmc']['N']}"
 
             # Define filepath
@@ -1225,7 +1225,7 @@ class Plot(object):
 
             # Get filename
             filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_parameter_histogram_thinning_{self.settings['thinning']}_"+\
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_histogram_thinning_{self.settings['thinning']}_"+\
                     f"N_{outputs.experiment.config['mcmc']['N']}"
 
             # Define filepath
@@ -1317,7 +1317,7 @@ class Plot(object):
 
             # Get filename
             filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_log_destination_attraction_mixing_thinning_{self.settings['thinning']}_"+\
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_log_destination_attraction_mixing_thinning_{self.settings['thinning']}_"+\
                     f"N_{outputs.experiment.config['mcmc']['N']}"
 
             # Define filepath
@@ -1437,7 +1437,7 @@ class Plot(object):
             # Get filename
             filename = f"table_{prediction_data[experiment_id]['config']['table_dim']}_" + \
                     f"gamma_{prediction_data[experiment_id]['config']['spatial_interaction_model']['gamma']}" + \
-                    f"{prediction_data[experiment_id]['config']['name']}_{self.settings['experiment_title']}_log_destination_attraction_predictions_"+\
+                    f"{prediction_data[experiment_id]['config']['type']}_{self.settings['experiment_title']}_log_destination_attraction_predictions_"+\
                     f"burnin_{self.settings['burnin']}_" + \
                     f"thinning_{self.settings['thinning']}_" + \
                     f"N_{prediction_data[experiment_id]['config']['mcmc']['N']}"
@@ -1540,7 +1540,7 @@ class Plot(object):
             # Get filename
             filename = f"table_{outputs.experiment.config['table_dim']}_" + \
                     f"gamma_{outputs.experiment.config['spatial_interaction_model']['gamma']}" + \
-                    f"{outputs.experiment.config['name']}_{self.settings['experiment_title']}_log_destination_attraction_residuals_thinning_{self.settings['thinning']}_"+\
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_log_destination_attraction_residuals_thinning_{self.settings['thinning']}_"+\
                     f"N_{outputs.experiment.config['mcmc']['N']}"
 
             # Define filepath

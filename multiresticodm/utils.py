@@ -603,31 +603,31 @@ def format_bytes(size):
     return size, power_labels[n]+'bytes'
 
 
-def convert_string_to_numpy_function(s:str=''):
+def convert_string_to_torch_function(s:str=''):
     if 'mean' == s.lower():
-        return np.mean
+        return torch.mean
     elif 'var' == s.lower() or 'variance' == s.lower():
-        return np.var
+        return torch.var
     elif 'std' == s.lower():
-        return np.std
+        return torch.std
     elif 'sum' == s.lower():
-        return np.sum
+        return torch.sum
     elif 'max' == s.lower():
-        return np.max
+        return torch.max
     elif 'min' == s.lower():
-        return np.min
+        return torch.min
     elif 'median' == s.lower():
-        return np.median
+        return torch.median
     elif 'sumnorm' == s.lower():
         def sum_normalise(x,axis=None):
             if axis != (None,):
-                return x/np.sum(x,axis)
+                return x/torch.sum(x,axis)
             else:
-                return x/np.sum(x)
+                return x/torch.sum(x)
         return sum_normalise
     elif 'X' in s:
+        raise NotImplementedError('Evaluating expressions has not been implemented for torch')
         # Remove dangerous key words
-        
         # Prepare evaluation of mathematical expression
         s = s.replace("^","**").replace("\\","").strip()
         # Define the corresponding function
@@ -638,7 +638,7 @@ def convert_string_to_numpy_function(s:str=''):
                 return numexpr.evaluate(s.replace("X", "data").replace("axis",""))
         return np.vectorize(evaluate_expression)
     else:
-        raise Exception(f"Function name {s} not match to numpy function")
+        raise Exception(f"Function name {s} not match to torch function")
 
 
 def valid_experiment_type(experiment_id,experiment_types):
@@ -824,9 +824,6 @@ def string_to_numeric(s):
     i = int(f)
     return i if i == f else f
 
-def get_stream(stream):
-    stream.seek(0)
-    return stream.read().strip().split('\n')
 
 def setup_logger(name,level,log_to_file:bool=False,log_to_console:bool=False):
     

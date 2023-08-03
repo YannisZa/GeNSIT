@@ -8,8 +8,8 @@ from typing import Union
 
 from multiresticodm.config import Config
 from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
-from multiresticodm.global_variables import SIM_DATA_TYPES, PARAMETER_DEFAULTS
-from multiresticodm.utils import setup_logger, write_txt,makedir
+from multiresticodm.global_variables import INPUT_TYPES, PARAMETER_DEFAULTS, Dataset
+from multiresticodm.utils import deep_apply, deep_call, setup_logger, write_txt,makedir
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
 
 
@@ -39,6 +39,8 @@ class SpatialInteraction():
         pass
 
 class SpatialInteraction2D():
+    REQUIRED_INPUTS = []
+    REQUIRED_OUTPUTS = []
     def __init__(
             self,
             config:Config=None,
@@ -66,16 +68,17 @@ class SpatialInteraction2D():
         # Device name
         self.device = device
 
+        # Instantiate dataset 
+        self.data = Dataset()
+
         # Parameters names
         self.aux_param_names = ['bmax']
         self.free_param_names = ['alpha','beta']
         self.all_parameter_names = self.free_param_names + self.aux_param_names
 
-        # Get data names
-        self.data_names = ['origin_demand','destination_demand','cost_matrix','dims']
+        # Attribute names
+        self.attribute_names = ['dims','grand_total']
 
-        # Grand total
-        self.grand_total = kwargs.get('grand_total',torch.tensor(1).int().to(self.device))
 
         # True and auxiliary parameters
         if true_parameters is not None:
@@ -89,16 +92,23 @@ class SpatialInteraction2D():
 
         # Read data passed
         for attr in self.data_names:
-            setattr(self,attr,None)
+            setattr(self.data,attr,None)
             if kwargs.get(attr,None) is not None:
-                setattr(self,attr,kwargs.get(attr,None))
+                setattr(self.data,attr,kwargs.get(attr,None))
+        
+        # Grand total
+        self.grand_total = kwargs.get('grand_total',torch.tensor(1).int().to(self.device))
 
-        # Update dims
-        if self.dims is None and self.cost_matrix is not None:
-            self.dims = list(self.cost_matrix.size())
-            # Update config
-            if hasattr(self,'config'):
-                self.config.settings['inputs']['dims'] = self.dims
+        # Get dimensions
+        self.dims = kwargs.get('dims',None)
+        if self.dims is None and \
+            hasattr(self.data,'cost_matrix') and \
+            self.data.cost_matrix is not None:
+            
+            self.dims = list(self.data.cost_matrix.size())
+        # Update config
+        if hasattr(self,'config'):
+            self.config.settings['inputs']['dims'] = self.dims
 
         # Determine if true data exists
         if np.all([hasattr(self,attr) and getattr(self,attr) is not None for attr in self.all_parameter_names]):
@@ -108,22 +118,22 @@ class SpatialInteraction2D():
 
     def update(self,**kwargs):
         for k,v in kwargs.items():
-            if hasattr(self,k) and k in self.data_names:
-                setattr(self,k,v)
+            if hasattr(self.data,k) and k in self.data_names:
+                setattr(self.data,k,v)
 
     def export(self,dirpath:str='./synthetic_dummy',overwrite:bool=False) -> None:
         
         # Make directory if it does not exist
         makedir(dirpath)
 
-        for attr in SIM_DATA_TYPES.keys():
-            if hasattr(self,attr) and getattr(self,attr) is not None:
+        for attr in INPUT_TYPES.keys():
+            if hasattr(self.data,attr) and getattr(self.data,attr) is not None:
                 # Get filepath experiment filepath
                 filepath = os.path.join(dirpath,f'{attr}.txt')
 
                 # Write experiment summaries to file
                 if (not os.path.exists(filepath)) or overwrite:
-                    write_txt((getattr(self,attr)).astype('int32'),filepath)
+                    write_txt((getattr(self.data,attr)).astype('int32'),filepath)
 
         self.logger.info(f'Spatial interaction model data successfully exported to {dirpath}')
     
@@ -161,6 +171,37 @@ class SpatialInteraction2D():
             Beta: {self.beta}
             Beta scaling: {self.bmax}
         """
+
+    def check_sample_availability(self,sample_names:list,data:dict):
+        available = True
+        for sample in sample_names:
+            try:
+                assert sample in list(data.keys())
+            except:
+                available = False
+                self.logger.error(f"Sample {sample} is required but does not exist in {','.join(data.keys())}")
+        
+        return available
+
+    def get_input_kwargs(self,passed_kwargs):
+        
+        kwargs = {}
+
+        for key in self.data_names:
+            # Try to read data from passed kwargs
+            # Then try to read stored data
+            # else return None
+            kwargs[key] = passed_kwargs.pop(key,getattr(self.data,key,None))
+        
+        for key in self.attribute_names:
+            # Try to read attribute from passed kwargs
+            # Then try to read stored attribute
+            # else return None
+            kwargs[key] = passed_kwargs.pop(key,getattr(self,key,None))
+        
+        kwargs = {**kwargs,**passed_kwargs}
+
+        return kwargs
     
     def log_odds_ratio(self,log_intensity:np.ndarray):
         """ Reconstruct log odds ratio of intensity function
@@ -181,15 +222,49 @@ class SpatialInteraction2D():
         return log_odds_ratio_wrt_intensity(
             log_intensity
         )
+    
 
-    def log_intensity(self):
-        pass
+    def log_intensity(self,**kwargs):
+        """ Reconstruct expected flow matrices (intensity function)
 
+        Parameters
+        ----------
+        grand_total : torch tensor
+            Total intensity (equal to table total).
+
+        Returns
+        -------
+        torch tensor
+            Continuous intensity matrix (non-integer).
+
+        """
+        
+        # Update input kwargs if required
+        updated_kwargs = self.get_input_kwargs(kwargs)
+
+        self.check_sample_availability(self.REQUIRED_OUTPUTS+self.REQUIRED_INPUTS,updated_kwargs)
+
+        return self._log_flow_matrix(
+                **updated_kwargs
+        )
+
+    def intensity_demand(self,**kwargs):
+        
+        # Update input kwargs if required
+        updated_kwargs = self.get_input_kwargs(kwargs)
+
+        self.check_sample_availability(self.REQUIRED_OUTPUTS+self.REQUIRED_INPUTS,updated_kwargs)
+
+        return self._destination_demand(
+                **updated_kwargs
+        )
+    
     def intensity_gradient(self):
         pass
 
     def log_intensity_and_gradient(self):
         pass
+    
 
 
 
@@ -205,6 +280,9 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
         **kwargs
     ):
         '''  Constructor '''
+        # Get data names
+        self.data_names = ['origin_demand','destination_demand','cost_matrix']
+        
         # Initialise constructor
         super().__init__(
             config=config,
@@ -217,7 +295,7 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
         # Make sure you have the necessary data
         for attr in self.REQUIRED_INPUTS:
             try:
-                assert hasattr(self,attr)
+                assert hasattr(self.data,attr)
             except:
                 raise Exception(f"{self.sim_type} requires {attr} but it is missing!")
         # Inherit numba functions
@@ -227,30 +305,6 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
 
     def __repr__(self):
         return "ProductionConstrained(SpatialInteraction2D)"
-
-    def log_intensity(self,xx:torch.tensor,theta:torch.tensor,grand_total:torch.float32):
-        """ Reconstruct expected flow matrices (intensity function)
-
-        Parameters
-        ----------
-        xx : np.array
-            Log destination attraction.
-        theta : np.array
-            Fitted parameters.
-
-        Returns
-        -------
-        np.array
-            Expected flow matrix (non-integer).
-
-        """
-        return self.log_flow_matrix(
-            xx,
-            theta,
-            self.origin_demand,
-            self.cost_matrix,
-            self.grand_total if hasattr(self,'grand_total') else grand_total
-        )
     
     def intensity_gradient(self,theta:np.ndarray,log_intensity:np.ndarray):
         """ Reconstruct gradient of intensity with respect to xx
@@ -275,10 +329,10 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
 
     
 
-    def log_intensity_and_gradient(self,xx:np.ndarray,theta:np.ndarray,total_flow:float):
+    def log_intensity_and_gradient(self,xx:np.ndarray,theta:np.ndarray,grand_total:float):
         
         # Compute log intensity
-        log_intensity = self.log_intensity(xx,theta,total_flow)
+        log_intensity = self.log_intensity(xx,theta,grand_total)
         # Pack gradient
         intensity_gradient = self.intensity_gradient(theta,log_intensity)
         return log_intensity, intensity_gradient
@@ -296,6 +350,9 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
         **kwargs
     ):
         '''  Constructor '''
+        # Get data names
+        self.data_names = ['origin_demand','destination_demand','cost_matrix']
+
         # Initialise constructor
         super().__init__(
             config=config,
@@ -308,7 +365,7 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
         # Make sure you have the necessary data
         for attr in self.REQUIRED_INPUTS:
             try:
-                assert hasattr(self,attr)
+                assert hasattr(self.data,attr)
             except:
                 raise Exception(f"{self.sim_type} requires {attr} but it is missing!")
         # Inherit numba functions
@@ -319,43 +376,6 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
     def __repr__(self):
         return "TotallyConstrained(SpatialInteraction2D)"
 
-    def check_sample_availability(self,sample_names:list,data:dict):
-        available = True
-        for sample in sample_names:
-            try:
-                assert sample in list(data.keys())
-            except:
-                available = False
-                self.logger.error(f"Sample {sample} is required but does not exist in {','.join(data.keys())}")
-        return available
-    
-    def log_intensity(self,grand_total:torch.float32,**kwargs):
-        """ Reconstruct expected flow matrices (intensity function)
-
-        Parameters
-        ----------
-        xx : np.array or torch tensor
-            Log destination attraction.
-        theta : np.array or torch tensor
-            Fitted parameters.
-
-        Returns
-        -------
-        np.array or torch tensor
-            Expected flow matrix (non-integer).
-
-        """
-        self.check_sample_availability(self.REQUIRED_OUTPUTS,kwargs)
-
-        return self._log_flow_matrix(
-                origin_demand = kwargs.get('origin_demand',self.origin_demand),
-                cost_matrix = kwargs.get('cost_matrix',self.cost_matrix),
-                total_flow = grand_total,
-                **kwargs
-        )
-
-    def intensity_demand(self,W_alpha,C_beta):
-        return self._destination_demand(W_alpha,C_beta,self.origin_demand,self.grand_total)
     
     def intensity_gradient(self,theta:np.ndarray,log_intensity:np.ndarray):
         """ Reconstruct gradient of intensity with respect to xx
@@ -378,10 +398,10 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
             log_intensity
         )
 
-    def log_intensity_and_gradient(self,xx:np.ndarray,theta:np.ndarray,total_flow:float):
+    def log_intensity_and_gradient(self,xx:np.ndarray,theta:np.ndarray,grand_total:float):
         
         # Compute log intensity
-        log_intensity = self.log_intensity(xx,theta,total_flow)
+        log_intensity = self.log_intensity(xx,theta,grand_total)
         # Pack gradient
         intensity_gradient = self.intensity_gradient(theta,log_intensity)
         return log_intensity, intensity_gradient

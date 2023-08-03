@@ -5,7 +5,7 @@ import ast
 import sys
 import warnings
 
-from multiresticodm.utils import setup_logger
+from multiresticodm.utils import print_json, setup_logger
 warnings.simplefilter('ignore')
 
 import json
@@ -132,8 +132,12 @@ _common_options = [
     click.option('--logging_mode','-log', type=click.Choice(['debug', 'info', 'warning', 'critical']), default='info', 
             help=f'Type of logging mode used.'),
     click.option('--n','-n', type=click.IntRange(min=1), help = 'Overwrites number of MCMC samples'),
-    click.option('--table','-tab', type=click.STRING,default=None, help = 'Overwrites input table filename in config')
+    click.option('--table','-tab', type=click.STRING,default=None, help = 'Overwrites input table filename in config'),
+    click.option('--device','-dev', type=click.Choice(['cpu', 'cuda', 'mps']), default='cpu', 
+            help=f'Type of device used for torch operations.'),
+    
 ]
+
 
 _common_run_options = [
     click.argument('config_path', type=click.Path(exists=True), required=True),
@@ -208,7 +212,7 @@ def run(logger,settings,config_path,**kwargs):
 
     # Set device to run code on
     config.settings['inputs']['device'] = update_device(
-        config.settings['inputs'].get('device','cpu')
+        settings.get('device','cpu')
     )
 
     # Set number of cores used (numba package)
@@ -217,7 +221,7 @@ def run(logger,settings,config_path,**kwargs):
     # Update root
     config.path_sets_root()
     # Maintain a dictionary of available experiments and their list index
-    available_experiments = {exp.get('name',''):i for i,exp in enumerate(config.settings['experiments']) if len(exp.get('name','')) > 0}
+    available_experiments = {exp.get('type',''):i for i,exp in enumerate(config.settings['experiments']) if len(exp.get('type','')) > 0}
     config.settings.setdefault('available_experiments',available_experiments)
     # Keep experiment ids argument
     if len(kwargs.get('run_experiments',[])) > 0:
@@ -311,6 +315,7 @@ def run_mcmc(
             experiment_title,
             sweep_mode,
             table,
+            device,
             table0,
             margins,
             margin0,
@@ -381,6 +386,7 @@ def run_nn(
     experiment_title,
     sweep_mode,
     table,
+    device,
     table0,
     margins,
     margin0,
@@ -449,7 +455,6 @@ _output_options = [
     click.option('--epsilon_threshold', '-eps', default=0.001, show_default=True,
         type=click.FLOAT, help=f'Sets error norm threshold below which convergence is achieved. Used only in convergence plots.')
 ]
-
 
 def output_options(func):
     for option in reversed(_output_options):
@@ -564,23 +569,24 @@ def plot(
         output_directory,
         dataset_name,
         experiment_type,
-        dates,
-        epsilon_threshold,
+        experiment_title,
+        exclude,
         filename_ending,
-        thinning,
         burnin,
+        thinning,
         sample,
         statistic,
         slice_by,
         metric,
-        table,
-        experiment_title,
-        exclude,
-        logging_mode,
+        dates,
+        epsilon_threshold,
+        norm,
         n_workers,
         n_threads,
-        norm,
+        logging_mode,
         n,
+        table,
+        device,
         plots,
         geometry,
         origin_geometry_type,
@@ -704,23 +710,24 @@ def summarise(
         output_directory,
         dataset_name,
         experiment_type,
-        epsilon_threshold,
-        dates,
-        filename_ending,
-        thinning,
-        burnin,
-        sample,
-        slice_by,
-        metric,
-        statistic,
-        table,
         experiment_title,
         exclude,
-        logging_mode,
+        filename_ending,
+        burnin,
+        thinning,
+        sample,
+        statistic,
+        slice_by,
+        metric,
+        dates,
+        epsilon_threshold,
+        norm,
         n_workers,
         n_threads,
-        norm,
+        logging_mode,
         n,
+        table,
+        device,
         metadata_keys,
         region_mass,
         algorithm,

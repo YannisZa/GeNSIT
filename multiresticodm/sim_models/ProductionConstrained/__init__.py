@@ -1,5 +1,7 @@
 import torch
 
+from torch import int8,float32,int32,float64,int64,bool
+
 CACHED = True
 
 # @njit(cache=CACHED)
@@ -130,35 +132,53 @@ CACHED = True
 #     return hessian
 
 
-# @njit(cache=CACHED)
-# def log_flow_matrix(xx,theta,origin_demand,cost_matrix,total_flow):
-#     # Extract dimensions
-#     nrows,ncols = np.shape(cost_matrix)
-#     log_flow = np.zeros((nrows,ncols),dtype='float32')
-#     # Get first two parameters
-#     alpha = theta[0]
-#     beta = theta[1]
-#     # Compute log unnormalised expected flow
-#     wksp = alpha*xx - beta*cost_matrix
-#     log_normalisation = np.array([logsumexp(wksp[i,]) for i in range(nrows)])
-#     # Compute log flow
-#     log_flow = np.log(origin_demand).reshape((nrows,1)) + wksp - log_normalisation.reshape((nrows,1)) + np.log(total_flow)
-#     return log_flow
+def _log_flow_matrix(**kwargs):
+    
+    # Get parameters
+    log_destination_attraction = kwargs['log_destination_attraction']
+    origin_demand = kwargs['origin_demand']
+    cost_matrix = kwargs['cost_matrix']
+    alpha = kwargs['alpha']
+    beta = kwargs['beta']
+    grand_total = kwargs.get('grand_total',None)
 
-# # @njit(cache=CACHED,parallel=True)
-# def log_flow_matrix_vectorised(xxs,thetas,origin_demand,cost_matrix,total_flow,progress_proxy):
-#     # Extract dimensions
-#     N = np.shape(xxs)[0]
-#     nrows,ncols = np.shape(cost_matrix)
-#     log_flow = np.zeros((N,nrows,ncols),dtype='float32')
-#     # Compute log unnormalised expected flow
-#     for n in prange(N):
-#         log_flow[n,:] =  log_flow_matrix(xxs[n,:],thetas[n,:],origin_demand,cost_matrix,total_flow)
-#         # Update progress bar
-#         if progress_proxy is not None:
-#             progress_proxy.update(1)
+    # Extract dimensions
+    nrows,ncols = list(cost_matrix.size())
+    N = log_destination_attraction.size(dim=1)
+    log_flow = torch.zeros((N,nrows,ncols),dtype=float32)
+    
+    # Reshape tensors to ensure operations are possible
+    log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,ncols))
+    origin_demand = torch.reshape(origin_demand,(1,nrows,1))
+    cost_matrix = torch.reshape(cost_matrix,(1,nrows,ncols))
+    alpha = torch.reshape(alpha,(N,1,1))
+    beta = torch.reshape(beta,(N,1,1))
 
-#     return log_flow
+    # Compute log unnormalised expected flow
+    # Compute log utility
+    log_utility = torch.log(origin_demand).float() + log_destination_attraction.float()*alpha - cost_matrix.float()*beta
+    # Compute log normalisation factor
+    normalisation = torch.logsumexp(log_utility,dim=(1,2))
+    # and reshape it
+    normalisation = torch.reshape(normalisation,(N,1,1))
+    # Evaluate log flow scaled
+    log_flow = log_utility - normalisation + torch.log(grand_total).float()
+
+    return log_flow
+
+
+def _destination_demand(**kwargs):
+    # Compute log flow
+    log_flow = _log_flow_matrix(
+        **kwargs
+    )
+    # Squeeze output
+    log_flow = torch.squeeze(log_flow)
+
+    # Compute destination demand
+    log_destination_demand = torch.logsumexp(log_flow,dim=0,keepdim=True)
+
+    return torch.t(torch.exp(log_destination_demand))
 
 # @njit(cache=CACHED,parallel=True)
 # def flow_matrix_jacobian(theta,log_intensity):

@@ -20,7 +20,7 @@ from multiresticodm.outputs import Outputs
 from multiresticodm.global_variables import *
 from multiresticodm.markov_basis import MarkovBasis
 from multiresticodm.contingency_table import ContingencyTable,instantiate_ct
-from multiresticodm.math_utils import apply_norm,running_average_multivariate
+from multiresticodm.math_utils import apply_norm
 from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
@@ -98,7 +98,7 @@ class ExperimentHandler(object):
                     raise Exception(f'No dataset found for experiment id {experiment_id}')
                 # Instatiate new experiment
                 experiment = instantiate_experiment(
-                    experiment_type=experiment_config.settings['experiments'][0]['name'],
+                    experiment_type=experiment_config.settings['experiments'][0]['type'],
                     config=experiment_config,
                     log_to_file=True,
                     log_to_console=False,
@@ -130,6 +130,7 @@ class Experiment(object):
             log_to_file = kwargs.get('log_to_file',True),
         )
         
+        self.logger.debug(f"{self}")
         # Make sure you are reading a config
         if isinstance(config,dict):
             config = Config(
@@ -357,8 +358,7 @@ class Experiment(object):
             self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
         
         # Setup sampled/predicted log destination attractions
-        if str_in_list('log_destination_attraction',self.sample_names) or \
-            str_in_list('destination_attraction_ts',self.sample_names):
+        if str_in_list('log_destination_attraction',self.sample_names):
             self.log_destination_attractions = self.outputs.h5group.create_dataset(
                 "log_destination_attraction",
                 (dims[1],0),
@@ -1879,15 +1879,14 @@ class SIM_NN(Experiment):
 
         # Instantiate Spatial Interaction Model
         self.logger.note("Initializing the spatial interaction model ...")
+
         sim = instantiate_sim(
             sim_type= config['spatial_interaction_model']['sim_type'],
             config = config,
-            origin_demand = self.inputs.data.origin_demand,
-            log_destination_attraction = np.log(self.inputs.data.destination_attraction_ts[:,-1].flatten()), 
-            cost_matrix = self.inputs.data.cost_matrix,
             true_parameters = config['spatial_interaction_model']['parameters'],
             device = self.device,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            **vars(self.inputs.data)
         )
         # Get and remove config
         config = pop_variable(sim,'config')
@@ -2121,7 +2120,7 @@ class ExperimentSweep():
                 # print(key,new_val,type(new_val),get_value_from_path(new_config.settings,['sweep_mode']))
             # Create new experiment
             new_experiment = instantiate_experiment(
-                experiment_type=new_config.settings['experiments'][0]['name'],
+                experiment_type=new_config.settings['experiments'][0]['type'],
                 config=new_config,
                 name_params={val['var']:sval[i] for i,val in enumerate(self.sweep_params.values())},
                 log_to_file=True,

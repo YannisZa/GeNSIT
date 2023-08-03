@@ -324,8 +324,8 @@ class HarrisWilson_NN:
         if self._time >= self._write_start and (self._time % self._write_every == 0):
 
             if 'loss' in experiment.sample_names:
-                experiment.loss.resize(experiment.loss.shape[0] + 1, axis=0)
-                experiment.loss[-1] = self._current_loss
+                experiment.losses.resize(experiment.losses.shape[0] + 1, axis=0)
+                experiment.losses[-1] = self._current_loss
 
             if 'theta' in experiment.sample_names:
                 for idx, dset in enumerate(experiment.thetas):
@@ -333,8 +333,8 @@ class HarrisWilson_NN:
                     dset[-1] = self._theta_sample[idx]
             
             if 'log_destination_attraction' in experiment.sample_names:
-                experiment.log_destination_attraction.resize(experiment.log_destination_attraction.shape[1] + 1, axis=1)
-                experiment.log_destination_attraction[:,-1] = self._log_destination_attraction_sample.flatten()
+                experiment.log_destination_attractions.resize(experiment.log_destination_attractions.shape[1] + 1, axis=1)
+                experiment.log_destination_attractions[:,-1] = self._log_destination_attraction_sample.flatten()
 
 
     def __repr__(self):
@@ -343,7 +343,7 @@ class HarrisWilson_NN:
     def __str__(self):
 
         return f"""
-            {'x'.join([str(d.cpu().detach().numpy()) for d in self.physics_model.sim.dims])} Harris Wilson Neural Network using {self.physics_model.sim.sim_type} Constrained Spatial Interaction Model
+            {'x'.join([str(d) for d in self.physics_model.sim.dims])} Harris Wilson Neural Network using {self.physics_model.sim.sim_type} Constrained Spatial Interaction Model
             Learned parameters: {', '.join(self.parameters_to_learn)}
             dt: {self.config['harris_wilson_model'].get('dt',0.001) if hasattr(self,'config') else ''}
             Noise regime: {self.physics_model.noise_regime}

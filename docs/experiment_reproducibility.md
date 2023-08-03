@@ -462,13 +462,12 @@ multiresticodm run ./data/inputs/configs/joint_table_sim_inference_high_noise_mc
 
 ## Neural Network SIM
 
-multiresticodm run-nn ./data/inputs/configs/sim_inference_neural_net.toml \
+clear; multiresticodm run-nn ./data/inputs/configs/sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
  -od origin_demand_sum_normalised.txt \
  -dats destination_attraction_time_series_sum_normalised.txt \
 -cm cost_matrices/clustered_facilities_sample_20x20_20_01_2023_sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%\_prob_origin_destination_adjusted_normalised_boundary_only_edge_corrected_cost_matrix_sum_normalised.txt \
- -re exp7 -nw 16 -nt 1 -nt 8 -et test \
- -n 100000
+ -re SIM_NN -nw 16 -nt 1 -nt 8 -et test
 
 ## Plots
 
@@ -593,31 +592,31 @@ multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp
 
 ### SRMSE
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIM_MCMC -e \SIM_MCMC -e NeuralABM -m SRMSE -s table -s intensity -stat 'signedmean|' '0|' -stat 'mean|' '0|' -b 10000 -t 80 -n 1000 -k noise_regime -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' '0&' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs
+
+### SSI
+
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -m SSI -s table -s intensity -stat 'mean&' '0&' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SSIs
 
 ### Coverage probability
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e SIM_NN -m coverage_probability -r 0.99 -s table -s intensity -stat '|mean' '|1_2' -b 10 -t 2 -n 100000 -k noise_regime -k experiment_title -k name -tab table_lsoas_to_msoas.txt -fe coverage_probabilities
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -m coverage_probability -r 0.99 -s table -s intensity -stat '&mean' '&1_2' -b 10 -t 2 -n 100000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe coverage_probabilities
 
-### Edit distances
+### Markov Basis Distance (POSSIBLE SYNTAX ERRORS)
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIM_MCMC -m edit_degree_higher_error -m edit_degree_one_error -s table -stat '|mean' '|0' -b 10000 -t 80 -n 1000 -k noise_regime -k experiment_title -tab table_lsoas_to_msoas.txt -fe edit_distances
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -m edit_degree_higher_error -m edit_degree_one_error -s table -stat '&mean' '&0' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -tab table_lsoas_to_msoas.txt -fe edit_distances
 
-### Cell variance average
+### Bias
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIM_MCMC -e \SIM_MCMC -s table -s intensity -m 'none' -stat 'variance|mean' '0|1_2' -b 10000 -t 80 -n 1000 -k noise_regime -k experiment_title -tab table_lsoas_to_msoas.txt -fe cell_variance_average
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -m p_distance -s table -s intensity -stat 'mean&X^2|sum' '0&|1_2' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe Bias2 --p_norm 0
 
-### Entropy calculations
+### Variance
 
-#### Shannon
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -s table -s intensity -m 'none' -stat 'var&sum' '0&1_2' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -tab table_lsoas_to_msoas.txt -fe variance
 
-clear; multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIM_MCMC \
--m shannon_entropy -s table -stat 'sample|' '|' -b 10000 -t 80 -n 1000 -nw 16 -k noise_regime -k experiment_title -fe shannon_entropies
+### MSE
 
-#### Von Neumann
-
-clear; multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIM_MCMC -e \SIM_MCMC \
--m von_neumann_entropy -s table -s intensity -stat '|mean' '|0' -stat '|variance' '|0' -b 10000 -t 80 -n 1000 -nw 16 -k noise_regime -k N -fe von_neumann_entropies
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -s table -s intensity -m p_distance -stat '&mean|sum' '&0|0_1' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -tab table_lsoas_to_msoas.txt -fe expected_error --p_norm 2
 
 # Competitive methods
 

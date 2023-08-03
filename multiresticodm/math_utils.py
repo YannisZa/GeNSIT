@@ -2,10 +2,10 @@ import torch
 import numpy as np
 
 from tqdm import tqdm
+from scipy import optimize
 from itertools import product
-from itertools import chain, combinations
-
 from numba_progress import ProgressBar
+from itertools import chain, combinations
 from numba import njit, vectorize, float32, int32, int64, int8, prange, guvectorize
 
 from multiresticodm.utils import flatten
@@ -154,21 +154,25 @@ def l_2(tab:np.ndarray,tab0:np.ndarray,progress_proxy):
                 progress_proxy.update(1)
     return res
 
-def _p_distance(tab,p):
-    if p == 0:
-        return tab
-    else:
-        return np.abs(tab)**p
-
 
 def p_distance(tab:np.array,tab0:np.array,**kwargs:dict):
     # Type of norm
     p = float(kwargs['kwargs'].get('p_norm',2))
+    # Get dimensions
     dims = np.shape(tab)
-    if len(dims) > 2:
-        return np.array([_p_distance(tab[n]-tab0,p=p) for n in range(dims[0])],dtype='float32').reshape(dims)
-    else:
-        return _p_distance(tab[0]-tab0,p=p).reshape(dims)
+    # Return difference in case of 0-norm
+    if p == 0:
+        return tab-tab0
+    
+    return torch.pow(torch.abs(tab-tab0),p).float().reshape(dims)
+
+def scipy_optimize(init,function,method,theta):
+    try: 
+        f = minimize(function, init, method=method, args=(theta), jac=True, options={'disp': False})
+    except:
+        return None
+
+    return f.x
 
 @njit()
 def relative_l_2(tab:np.ndarray,tab0:np.ndarray,normalisation_constant:float=None,progress_proxy=None):
@@ -305,25 +309,14 @@ def SRMSE(tab:np.array,tab0:np.array,**kwargs:dict):
         Standardised root mean square error of t_hat.
 
     """
-    res = np.zeros((np.shape(tab)[0]),dtype='float32')
-    @guvectorize([(int32[:,:,:], int32[:,:,:], float32[:]),
-            (float32[:,:,:], int32[:,:,:], float32[:]),
-            (int32[:,:,:], float32[:,:,:], float32[:]),
-            (float32[:,:,:], float32[:,:,:], float32[:])], '(n,d1,d2),(k,d1,d2)->(n)')
-    def _SRMSE(tab:np.array,tab0:np.array,res:np.array):
-        N = np.shape(tab)[0]
-        dims = np.shape(tab)[1:]
-        for n in range(N):
-            res[n] = (((np.sum((tab0[0] - tab[n])**2) / (np.prod(dims)))**.5) / (np.sum(tab0[0].ravel()) / (np.prod(dims)))).astype('float32')
-    # print('\n')
-    # print(tab[0])
-    # print(np.shape(tab))
-    # print(tab0[0].sum())
-    # sys.exit()
+    # Get dimensions
+    dims = np.shape(tab)[1:]
     # Compute SRMSE
-    _SRMSE(tab,tab0,res)
+    numerator = torch.pow( torch.sum(torch.pow(tab0-tab,2),dim=(1,2)) / torch.tensor((np.prod(dims)),dtype=torch.float32), 0.5)
+    denominator = ( torch.sum(torch.ravel(tab0)) / torch.tensor(np.prod(dims)) ).to(dtype=torch.float32)
+    srmse = numerator / denominator
 
-    return res
+    return srmse
 
 def SSI(tab:np.array,tab0:np.array,**kwargs:dict):
     """ Computes Sorensen similarity index. See equation (23) of
@@ -343,28 +336,14 @@ def SSI(tab:np.array,tab0:np.array,**kwargs:dict):
         Standardised root mean square error of t_hat.
 
     """
-    res = np.zeros((np.shape(tab)[0]),dtype='float32')
-    @guvectorize([(int32[:,:,:], int32[:,:,:], float32[:]),
-            (float32[:,:,:], int32[:,:,:], float32[:]),
-            (int32[:,:,:], float32[:,:,:], float32[:]),
-            (float32[:,:,:], float32[:,:,:], float32[:])], '(n,d1,d2),(k,d1,d2)->(n)')
-    def _SSI(tab:np.array,tab0:np.array,res:np.array):
-        N = np.shape(tab)[0]
-        dims = np.shape(tab)[1:]
-        for n in range(N):
-            denominator = (tab0[0]+tab[n])
-            denominator[denominator<=0] = 1
-            ratio = ((2*np.minimum(tab0[0],tab[n]))/denominator)
-            res[n] = ( np.sum(ratio) / (np.prod(dims))).astype('float32')
-    # print('\n')
-    # print(tab[0])
-    # print(np.shape(tab))
-    # print(tab0[0].sum())
-    # sys.exit()
-    # Compute SRMSE
-    _SSI(tab,tab0,res)
-
-    return res
+    # Compute denominator
+    denominator = (tab0 + tab)
+    denominator[denominator<=0] = torch.tensor(1.)
+    # Compute numerator
+    numerator = 2*torch.minimum(tab0,tab)
+    # Compute SSI
+    ssi = torch.mean(torch.divide(numerator,denominator))
+    return ssi
 
 def shannon_entropy(tab:np.array,tab0:np.array,**kwargs:dict):
     """Computes entropy for a table X
@@ -453,29 +432,25 @@ def _sparsity(tab:np.array,tab0:np.array,**kwargs:dict):
     return res
 
 
-# @guvectorize([(int32[:,:], int32[:,:,:], float32[:,:,:]),
-#             (float32[:,:], int32[:,:,:], float32[:,:,:]),
-#             (int32[:,:], float32[:,:,:], float32[:,:,:]),
-#             (float32[:,:], float32[:,:,:], float32[:,:,:])], '(i,j),(n,i,j)->(n,i,j)')
 def coverage_probability(tab:np.array,tab0:np.array,**kwargs:dict):
     # High posterior density mass
     alpha = 1-kwargs['kwargs'].get('region_mass',0.95)
-    # Get dimensions of table
-    dims = np.shape(tab)[1:]
-    # Ground truth table coverage flags
-    cell_coverage = np.zeros((*tuple(dims),1),dtype='float32')
-    # Get all cells of table
-    cells = sorted([tuple(cell) for cell in product(*[range(dim) for dim in dims])])
-    # Compute coverage prob
-    for table_index in tqdm(cells,leave=False):
-        # Get cell of table and sort all samples
-        table_cell_value = np.sort(tab[(...,*table_index)])
-        # Get lower and upper bound high posterior density regions
-        lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(table_cell_value,alpha)
-        # Compute flag for whether ground truth table is covered
-        cell_covered = (tab0[(0,*table_index)] >= lower_bound_hpdr) and (tab0[(0,*table_index)] <= upper_bound_hpdr)
-        # Add that flag to a table of flags
-        cell_coverage[table_index] = cell_covered
+    # Get dimensions of tables
+    dims = list(tab.shape)[1:]
+    dims0 = list(tab0.shape)[1:]
+    N = list(tab.shape)[0]
+    # Reshape table to allow sorting
+    tab = tab.reshape((N,np.prod(dims)))
+    tab0 = tab0.reshape((np.prod(dims0)))
+
+    # Get cell of table and sort all samples
+    table_cell_value,_ = tab.sort(dim=1)
+    # Get lower and upper bound high posterior density regions
+    lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(table_cell_value,alpha)
+    # Compute flag for whether ground truth table is covered
+    cell_coverage = torch.logical_and(torch.ge(tab0,lower_bound_hpdr), torch.le(tab0,upper_bound_hpdr))
+    # Add that flag to a table of flags
+    cell_coverage = cell_coverage.reshape((1,*dims))
     return cell_coverage
 
 
@@ -488,15 +463,17 @@ def calculate_min_interval(x, alpha):
 
     N = len(x)
     credible_interval_mass = 1.0-alpha
-
+    # Get number of intervals within that bass
     interval_index0 = int(np.floor(credible_interval_mass*N))
     n_intervals = N - interval_index0
-    interval_width = x[interval_index0:] - x[:n_intervals]
+    # Get all possible credible_interval_mass% probability intervals
+    interval_width = x[interval_index0:,...] - x[:n_intervals,...]
 
     if len(interval_width) == 0:
         raise ValueError('Too few elements for interval calculation')
-
-    min_idx = np.argmin(interval_width)
-    hdi_min = x[min_idx]
-    hdi_max = x[min_idx+interval_index0]
-    return hdi_min, hdi_max
+    # Find index of smallest probability interval
+    min_idx = torch.argmin(interval_width,dim=0)
+    # Get hpd boundaries
+    hdi_min = x.gather(0, min_idx.unsqueeze(1))
+    hdi_max = x.gather(0, (min_idx+interval_index0).unsqueeze(1))
+    return hdi_min.squeeze(1), hdi_max.squeeze(1)

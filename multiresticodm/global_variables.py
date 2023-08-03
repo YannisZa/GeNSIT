@@ -63,13 +63,6 @@ XARRAY_SCHEMA = {
     },
 }
 
-SIM_DATA_TYPES = {
-    'origin_demand':'float32',
-    'destination_demand':'float32',
-    'log_origin_attraction':'float32',
-    'log_destination_attraction':'float32',
-    'cost_matrix':'float32'
-}
 
 NORMS = ['relative_l_0','relative_l_1','relative_l_2','l_0','l_1','l_2']
 
@@ -83,14 +76,6 @@ DISTANCE_FUNCTIONS = [
     'chi_squared_row_distance'
 ]
 
-INPUT_TYPES = {
-    'cost_matrix':'float32',
-    'origin_demand':'float32',
-    'destination_demand':'float32',
-    'origin_attraction_ts':'float32',
-    'destination_attraction_ts':'float32',
-}
-
 NUMPY_TO_TORCH_DTYPE = {
     'float32':torch.float32,
     'float64':torch.float64,
@@ -102,26 +87,42 @@ NUMPY_TO_TORCH_DTYPE = {
     'bool':torch.bool
 }
 
-SAMPLE_TYPES = {
-    'ground_truth_table':'int32',
+
+INPUT_TYPES = {
     'cost_matrix':'float32',
+    'origin_demand':'float32',
+    'destination_demand':'float32',
+    'origin_attraction_ts':'float32',
+    'destination_attraction_ts':'float32',
+    'ground_truth_table':'int32'
+}
+
+TABLE_TYPES = {
     'table':'int32',
     'tableerror':'float32',
+}
+    
+INTENSITY_TYPES = {
     'intensity':'float32',
     'intensityerror':'float32',
     'log_destination_attraction':'float32',
     'log_origin_attraction':'float32',
-    'loss':'float32',
-    'log_target':'float32',
     'alpha':'float32',
     'beta':'float32',
     'delta':'float32',
     'kappa':'float32',
     'sigma':'float32',
-    'sign':'int8'
 }
 
-DATA_TYPES = {**INPUT_TYPES,**SAMPLE_TYPES}
+OUTPUT_TYPES = {
+    'loss':'float32',
+    'log_target':'float32',
+    'sign':'int8',
+    **INTENSITY_TYPES,
+    **TABLE_TYPES
+}
+
+DATA_TYPES = {**INPUT_TYPES,**OUTPUT_TYPES}
 
 NUMPY_TYPE_TO_DAT_TYPE = {
     'float':'%f',
@@ -139,16 +140,16 @@ MARGINAL_SOLVERS = ['multinomial']
 
 
 METRICS = {
-    'SRMSE':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1)},
-    'p_distance':{'shape':'(N,dims)','loop_over':[],'apply_axis':(1,2)},
-    'SSI':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1)},
-    'sparsity':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1)},
-    'shannon_entropy':{'shape':'(1,1)','loop_over':[],'apply_axis':(0,1)},
-    'von_neumann_entropy':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1)},
-    'coverage_probability':{'shape':'(1,dims)','loop_over':['region_mass'],'apply_axis':(1,2)},
-    'edit_degree_higher_error':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1)},
-    'edit_degree_one_error':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1)},
-    'none':{'shape':'(N,dims)','loop_over':[],'apply_axis':(0,1,2)}
+    'SRMSE':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'p_distance':{'shape':'(N,dims)','loop_over':[],'apply_axis':(1,2),'dtype':'float32'},
+    'SSI':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'sparsity':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'shannon_entropy':{'shape':'(1,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'von_neumann_entropy':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'coverage_probability':{'shape':'(1,dims)','loop_over':['region_mass'],'apply_axis':(1,2),'dtype':'int32'},
+    'edit_degree_higher_error':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'edit_degree_one_error':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'none':{'shape':'(N,dims)','loop_over':[],'apply_axis':(0,1,2),'dtype':''},
 }
 
 COLORS = {'monte_carlo_sample_degree_one':'tab:blue',

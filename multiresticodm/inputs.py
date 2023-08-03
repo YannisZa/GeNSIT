@@ -40,7 +40,7 @@ class Inputs:
             "origin_attraction_ts":{"axes":[0],"dtype":"float32", "ndmin":1},
             "destination_attraction_ts":{"axes":[1],"dtype":"float32", "ndmin":2},
             "cost_matrix":{"axes":[0,1],"dtype":"float32", "ndmin":2},
-            "table":{"axes":[0,1],"dtype":"int32", "ndmin":1},
+            "ground_truth_table":{"axes":[0,1],"dtype":"int32", "ndmin":2},
             "dims":{},
             "grand_total":{}
         }
@@ -86,8 +86,8 @@ class Inputs:
                         data = np.loadtxt(filepath,dtype=schema['dtype'], ndmin=schema['ndmin'])
                         setattr(self.data,attr,data)
                         # Check to see see that they are all positive
-                        if (getattr(self.data,attr) <= 0).any():
-                            raise Exception(f"{attr.replace('_',' ').capitalize()} {self.origin_demand} are NOT strictly positive")
+                        if (getattr(self.data,attr) < 0).any():
+                            raise Exception(f"{attr.replace('_',' ').capitalize()} {getattr(self.data,attr)} are NOT positive")
                         # Update dims
                         for subax in schema['axes']:
                             if getattr(self.data,attr) is not None and getattr(self.data,'dims')[subax] is None:
@@ -101,9 +101,9 @@ class Inputs:
         self.validate_dims()
 
         # Update grand total if it is not specified
-        if hasattr(self.data,'grand_total') and self.data.grand_total is None:
+        if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:
             # Compute grand total
-            self.data.grand_total = np.sum(self.data.table)
+            self.data.grand_total = np.sum(self.data.ground_truth_table)
             self.data.grand_total = self.config.settings['spatial_interaction_model'].get('grand_total',1.0)
             
 
@@ -144,6 +144,11 @@ class Inputs:
                     torch.from_numpy(self.data.cost_matrix).float(),
                     (self.data.dims)
                 ).to(device)
+            if hasattr(self.data,'ground_truth_table') and getattr(self.data,'ground_truth_table') is not None:
+                self.data.ground_truth_table = torch.reshape(
+                    torch.from_numpy(self.data.ground_truth_table).int(),
+                    (self.data.dims)
+                ).to(device)
             if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
                 self.data.grand_total = torch.tensor(self.data.grand_total).int().to(device)
 
@@ -160,6 +165,8 @@ class Inputs:
                 self.data.origin_attraction_ts = self.data.origin_attraction_ts.cpu().detach().numpy()
             if hasattr(self.data,'cost_matrix') and getattr(self.data,'cost_matrix') is not None:
                 self.data.cost_matrix = self.data.cost_matrix.cpu().detach().numpy().reshape(self.data.dims)
+            if hasattr(self.data,'ground_truth_table') and getattr(self.data,'ground_truth_table') is not None:
+                self.data.ground_truth_table = self.data.ground_truth_table.cpu().detach().numpy().reshape(self.data.dims)
             if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
                 self.data.grand_total = self.data.grand_total.cpu().detach().numpy()
 
