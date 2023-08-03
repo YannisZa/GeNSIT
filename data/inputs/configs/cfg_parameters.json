@@ -32,12 +32,6 @@
           "default": true,
           "range": true
         }
-      },
-      "log_destination_attraction": {
-        "sweep": {
-          "default": true,
-          "range": true
-        }
       }
     }
   },
@@ -163,7 +157,7 @@
   },
   "experiments": [
     {
-      "name": true,
+      "type": true,
       "comment": true,
       "disable_tqdm": true,
       "print_statements": true,

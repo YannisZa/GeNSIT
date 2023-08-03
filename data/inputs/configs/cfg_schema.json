@@ -701,7 +701,7 @@
     "list-dtype": "customDict",
     "dict-key-dtype": "str",
     "dict-value-schema": {
-      "name": {
+      "type": {
         "sweepable": false,
         "optional": false,
         "dtype": "str",
@@ -709,6 +709,7 @@
         "is-any-of": [
           "SIM_NN",
           "SIM_MCMC",
+          "TableMCMC",
           "JointTableSIM_NN",
           "JointTableSIM_MCMC"
         ]
