@@ -4,6 +4,7 @@ import toml
 import logging
 
 from copy import deepcopy
+from multiresticodm import ROOT
 from multiresticodm.utils import deep_apply, setup_logger, str_in_list, read_json
 from multiresticodm.config_data_structures import instantiate_data_type
 
@@ -53,12 +54,24 @@ class Config:
 
     def load_schema(self):
         # Load schema
-        with open('./data/inputs/configs/cfg_schema.json', 'r') as f:
+        with open(
+            os.path.join(
+                ROOT,
+                'data/inputs/configs/cfg_schema.json'
+            ), 
+            'r'
+        ) as f:
             self.schema = json.load(f)
 
     def load_parameters(self):
         # Load all parameter positions
-        with open('./data/inputs/configs/cfg_parameters.json', 'r') as f:
+        with open(
+            os.path.join(
+                ROOT,
+                'data/inputs/configs/cfg_parameters.json'
+            ), 
+            'r'
+        ) as f:
             self.parameters = json.load(f)
 
     def keys(self):
@@ -124,11 +137,11 @@ class Config:
             if key == 'sweep':
                 if isinstance(settings_copy,dict):
                     if settings_copy.get(key,'not-found') == 'not-found':
-                        return settings_copy,False
+                        return None,False
                     else:
                         settings_copy = settings_copy.get(key,'not-found')
                 else:
-                    return settings_copy,(settings_copy!='not-found')
+                    return None,False
             else:
                 if isinstance(settings_copy,dict):
                     settings_copy = settings_copy.get(key,'not-found')
@@ -160,169 +173,160 @@ class Config:
             settings = self.settings
         
         for k, v in parameters.items():
-            try:
-                # Experiment settings are provided in list of dictionaries
-                # Special treatment is required
-                if isinstance(v,list) and k == 'experiment':
-                    # Append key to path
-                    key_path.append(k)
-                    # Get schema for key path
-                    schema,_ = self.path_get(self.schema,key_path)
-                    # Create dummy schema so that it can be found recursively
-                    dummy_schema = {}
-                    self.path_set(dummy_schema,{},key_path[:-1])
-                    self.path_set(dummy_schema,schema,[k])
-                    # Check if key was found in settings and schema
-                    settings_val, settings_found = self.path_get(settings,key_path)
-                    if settings_found:
-                        # For every entry in settings, 
-                        # validate using the same schema
-                        for entry in settings_val:
-                            # Create a dummy setting to validate dummy schema
-                            dummy_settings = {}
-                            self.path_set(dummy_settings,{},key_path[:-1])
-                            self.path_set(dummy_settings,entry,[k])
-                            # Print path to experiment keys
-                            # Remove it from path
-                            key_path.remove(k)
-                            # Validate config
-                            self.validate_config(dummy_schema,dummy_settings,key_path)
-                    else:
+            # print(key_path)
+            # Experiment settings are provided in list of dictionaries
+            # Special treatment is required
+            if isinstance(v,list) and k == 'experiment':
+                # Append key to path
+                key_path.append(k)
+                # Get schema for key path
+                schema,_ = self.path_get(self.schema,key_path)
+                # Create dummy schema so that it can be found recursively
+                dummy_schema = {}
+                self.path_set(dummy_schema,{},key_path[:-1])
+                self.path_set(dummy_schema,schema,[k])
+                # Check if key was found in settings and schema
+                settings_val, settings_found = self.path_get(settings,key_path)
+                if settings_found:
+                    # For every entry in settings, 
+                    # validate using the same schema
+                    for entry in settings_val:
+                        # Create a dummy setting to validate dummy schema
+                        dummy_settings = {}
+                        self.path_set(dummy_settings,{},key_path[:-1])
+                        self.path_set(dummy_settings,entry,[k])
+                        # Print path to experiment keys
                         # Remove it from path
                         key_path.remove(k)
-                # If settings are a dictionary, validate settings 
-                # against each key path
-                elif isinstance(v,dict):
-                    # Append key to path
-                    key_path.append(k)
-                    # Apply function recursively
-                    self.validate_config(v,settings,key_path)
+                        # Validate config
+                        self.validate_config(dummy_schema,dummy_settings,key_path)
+                else:
                     # Remove it from path
                     key_path.remove(k)
-                # If settings are any other (primitive of non-promitive) value,
-                # validate settings for given key path
-                # Special treament is required depending on:
-                # - whether parameter is optional or not (See 1:)
-                # - whether sweep parameters are passed or not (See 2:)
-                # - whether sweep mode is activated (See 3:)
-                # - all data type-specific checks (See 4:)
-                else:
-                    if v:
-                        # Append key to path
-                        key_path.append(k)
-                        # print('>'.join(key_path))
-                        
-                        # Check if key was found in settings and schema
-                        settings_val, settings_found = self.path_get(settings,key_path)
-                        schema_val, schema_found = self.path_get(self.schema,key_path)
+            # If settings are a dictionary, validate settings 
+            # against each key path
+            elif isinstance(v,dict):
+                # Append key to path
+                key_path.append(k)
+                # Apply function recursively
+                self.validate_config(v,settings,key_path)
+                # Remove it from path
+                key_path.remove(k)
+            # If settings are any other (primitive of non-promitive) value,
+            # validate settings for given key path
+            # Special treament is required depending on:
+            # - whether parameter is optional or not (See 1:)
+            # - whether sweep parameters are passed or not (See 2:)
+            # - whether sweep mode is activated (See 3:)
+            # - all data type-specific checks (See 4:)
+            else:
+                if v:
+                    # Append key to path
+                    key_path.append(k)
+                    # print('>'.join(key_path))
+                    
+                    # Check if key was found in settings and schema
+                    settings_val, settings_found = self.path_get(settings,key_path)
+                    schema_val, schema_found = self.path_get(self.schema,key_path)
 
-                        # key must exist in schema
-                        try: 
-                            assert schema_found
+                    # key must exist in schema
+                    try: 
+                        assert schema_found
+                    except:
+                        raise Exception(f"Key {'>'.join(key_path)} not found in schema.")
+                    
+                    # 1: Check if argument is optional in case it is not included in settings
+                    # and it is not part of a sweep
+                    if not str_in_list("sweep",key_path) and not settings_found:
+                        if isinstance(schema_val,dict) and not schema_val['optional']:
+                            raise Exception(f"""
+                                Key {'>'.join(key_path)} is compulsory but not included
+                            """)
+                    
+                    if key_path[-1] == "sweep" and settings_found:
+                        # 2: Check if argument is not sweepable but containts 
+                        # a sweep parameter in settings
+
+                        # Get schema of parameter configured for a sweep
+                        schema_parent_val, _ = self.path_get(self.schema,key_path[:-1])
+                        if not schema_parent_val["sweepable"]:
+                            raise Exception(f"""
+                                Key {'>'.join(key_path)} is not sweepable \
+                                but contains sweep configuration
+                            """)
+
+                        # 2: Check that argument that is sweepable containts 
+                        # a default and a range configuration
+                        try:
+                            assert isinstance(settings_val,dict) \
+                                and str_in_list("default",settings_val.keys()) \
+                                and str_in_list("range",settings_val.keys())
                         except:
-                            raise Exception(f"Key {'>'.join(key_path)} not found in schema.")
-                        
-                        # 1: Check if argument is optional in case it is not included in settings
-                        # and it is not part of a sweep
-                        if not str_in_list("sweep",key_path) and not settings_found:
-                            if isinstance(schema_val,dict) and not schema_val['optional']:
-                                raise Exception(f"""
-                                    Key {'>'.join(key_path)} is compulsory but not included
-                                """)
-                        
-                        if key_path[-1] == "sweep" and settings_found:
-                            # 2: Check if argument is not sweepable but containts 
-                            # a sweep parameter in settings
+                            raise Exception(f"""
+                                Key {'>'.join(key_path)} is not a dictionary \
+                                or does not have 'default' and 'range' configurations \
+                                for a sweep
+                            """)
 
-                            # Get schema of parameter configured for a sweep
-                            schema_parent_val, _ = self.path_get(self.schema,key_path[:-1])
-                            if not schema_parent_val["sweepable"]:
-                                raise Exception(f"""
-                                    Key {'>'.join(key_path)} is not sweepable \
-                                    but contains sweep configuration
-                                """)
+                    # 3: Check that if parameter sweep is activated
+                    sweep_active = False
+                    if key_path[-1] == 'sweep_mode':
+                        sweep_active = settings_val
+                    
+                    # 3: If sweep is deactivated and only sweep configuration
+                    # is provided then read the default sweep configuration
+                    if key_path[-1] == "sweep" and not sweep_active and settings_found:
+                        # Get parent key settings
+                        settings_parent_val, _ = self.path_get(settings,(key_path+['default']))
+                        # Update settings with sweep default
+                        try:
+                            assert self.path_set(settings,settings_parent_val,key_path[:-1])
+                        except:
+                            raise Exception(f"""
+                                Key {'>'.join(key_path)} could not be updated \
+                                with sweep default
+                            """)
+                        # If this is the case we have modified the config
+                        # Parse settings value into approapriate data structure
+                        entry = instantiate_data_type(
+                            data=settings_val,
+                            schema=schema_val
+                        )
+                        # Check that entry is valid
+                        entry.check(key_path=key_path)
+                    
+                    # 4: Check all data type-specific checks
+                    # according to the schema
+                    if settings_found:
+                        # If parameter is sweepable but settings 
+                        # do not contain a sweep configuration
+                        if str_in_list("sweep",key_path) and \
+                            (
+                                not isinstance(settings_val,dict) or \
+                                ( 
+                                    isinstance(settings_val,dict) and \
+                                    not str_in_list("sweep",settings_val.keys())
+                                ) 
+                            ):
+                            # Read schema
+                            schema_val, _ = self.path_get(self.schema,key_path)
 
-                            # 2: Check that argument that is sweepable containts 
-                            # a default and a range configuration
-                            try:
-                                assert isinstance(settings_val,dict) \
-                                    and str_in_list("default",settings_val.keys()) \
-                                    and str_in_list("range",settings_val.keys())
-                            except:
-                                raise Exception(f"""
-                                    Key {'>'.join(key_path)} is not a dictionary \
-                                    or does not have 'default' and 'range' configurations \
-                                    for a sweep
-                                """)
-
-                        # 3: Check that if parameter sweep is activated
-                        sweep_active = False
-                        if key_path[-1] == 'sweep_mode':
-                            sweep_active = settings_val
-                        
-                        # 3: If sweep is deactivated and only sweep configuration
-                        # is provided then read the default sweep configuration
-                        if key_path[-1] == "sweep" and not sweep_active and settings_found:
-                            # Get parent key settings
-                            settings_parent_val, _ = self.path_get(settings,(key_path+['default']))
-                            # Update settings with sweep default
-                            try:
-                                assert self.path_set(settings,settings_parent_val,key_path[:-1])
-                            except:
-                                raise Exception(f"""
-                                    Key {'>'.join(key_path)} could not be updated \
-                                    with sweep default
-                                """)
-                            # If this is the case we have modified the config
                             # Parse settings value into approapriate data structure
                             entry = instantiate_data_type(
                                 data=settings_val,
                                 schema=schema_val
                             )
-                            # Check that entry is valid
-                            entry.check(key_path=key_path)
-                        
-                        # 4: Check all data type-specific checks
-                        # according to the schema
-                        if settings_found:
-                            # If parameter is sweepable but settings 
-                            # do not contain a sweep configuration
-                            if str_in_list("sweep",key_path) and \
-                                (
-                                    not isinstance(settings_val,dict) or \
-                                    ( 
-                                        isinstance(settings_val,dict) and \
-                                        not str_in_list("sweep",settings_val.keys())
-                                    ) 
-                                ):
-                                # Read parent schema
-                                schema_val, _ = self.path_get(self.schema,key_path[:-1])
-                                # Extract schema from sweep's 'default' key 
-                                if key_path[-1] == 'range':
-                                    # Remove it from path
-                                    key_path.remove(k)
-                                    continue
-                                else:
-                                    schema_val = schema_val['default']
+                        else:
+                            try:
                                 # Parse settings value into approapriate data structure
                                 entry = instantiate_data_type(
                                     data=settings_val,
                                     schema=schema_val
                                 )
-                            else:
-                                try:
-                                    # Parse settings value into approapriate data structure
-                                    entry = instantiate_data_type(
-                                        data=settings_val,
-                                        schema=schema_val
-                                    )
-                                except:
-                                    raise Exception
-                            # Check that entry is valid
-                            entry.check(key_path=key_path)
+                            except:
+                                raise Exception
+                        # Check that entry is valid
+                        entry.check(key_path=key_path)
 
-                        # Remove it from path
-                        key_path.remove(k)
-            except:
-
-                raise Exception('Exception found in '+'>'.join(key_path))
+                    # Remove it from path
+                    key_path.remove(k)
