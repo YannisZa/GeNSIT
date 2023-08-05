@@ -7,6 +7,7 @@ import numpy as np
 from pathlib import Path
 from pandas import read_csv
 
+from multiresticodm import ROOT
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger, str_in_list
 from multiresticodm.probability_utils import random_tensor
@@ -54,9 +55,9 @@ class Inputs:
                 for ax in schema["axes"]:
                     if hasattr(self.data,attr) and getattr(self.data,attr) is not None:
                         try:
-                            assert np.shape(getattr(self.data,attr))[ax] == getattr(self.data,'dims')[ax]
+                            assert list(getattr(self.data,attr).shape)[ax] == getattr(self.data,'dims')[ax]
                         except:
-                            raise Exception(f"{attr.replace('_',' ').capitalize()} has dim {np.shape(getattr(self.data,attr))[ax]} instead of {getattr(self.data,'dims')[ax]}.")
+                            raise Exception(f"{attr.replace('_',' ').capitalize()} has dim {list(getattr(self.data,attr).shape)[ax]} instead of {getattr(self.data,'dims')[ax]}.")
     
     def read_data(
         self,
@@ -78,6 +79,7 @@ class Inputs:
             if len(schema) > 0:
                 if str_in_list(attr,self.config.settings['inputs']['data_files'].keys()):
                     filepath = os.path.join(
+                        ROOT,
                         self.config.settings['inputs']['dataset'],
                         self.config.settings['inputs']['data_files'][attr]
                     )
@@ -103,7 +105,7 @@ class Inputs:
         # Update grand total if it is not specified
         if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:
             # Compute grand total
-            self.data.grand_total = np.sum(self.data.ground_truth_table)
+            self.data.grand_total = sum(self.data.ground_truth_table)
             self.data.grand_total = self.config.settings['spatial_interaction_model'].get('grand_total',1.0)
             
 
