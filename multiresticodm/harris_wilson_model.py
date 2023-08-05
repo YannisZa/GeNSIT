@@ -123,21 +123,21 @@ class HarrisWilson:
     
 
 
-    # ... SDE Model variant stationary distribution
+    # ... Harris Wilson SDE drift potential and its gradients .....................................
 
     # def negative_destination_attraction_log_likelihood_and_gradient(self,xx,s2_inv:float=100.):
     #     """ Log of potential function of the likelihood =  log(pi(y|x)).
 
     #     Parameters
     #     ----------
-    #     xx : np.array
+    #     xx : torch.tensor
     #         Log destination sizes
     #     s2_inv : float
     #         Inverse sigma^2 where sigma is the noise of the observation model.
 
     #     Returns
     #     -------
-    #     float,np.array
+    #     float,torch.tensor
     #         log Likelihood value and log of its gradient with respect to xx
 
     #     """
@@ -154,16 +154,16 @@ class HarrisWilson:
 
     #     Parameters
     #     ----------
-    #     xx : np.array[Mx1]
+    #     xx : torch.tensor[Mx1]
     #         Log destination attraction
-    #     theta : np.array[]
+    #     theta : torch.tensor[]
     #         List of parameters (alpha,beta,delta,kappa,epsilon)
 
     #     Returns
     #     -------
     #     float
     #         Potential function value at xx.
-    #     np.array[Mx1]
+    #     torch.tensor[Mx1]
     #         Potential function Jacobian at xx.
 
     #     """
@@ -183,14 +183,14 @@ class HarrisWilson:
 
     #     Parameters
     #     ----------
-    #     xx : np.array
+    #     xx : torch.tensor
     #         Log destination attraction
-    #     theta : np.array
+    #     theta : torch.tensor
     #         List of parameters (alpha,beta,delta,kappa,epsilon)
 
     #     Returns
     #     -------
-    #     np.ndarray
+    #     torch.tensor
     #         Hessian matrix of potential function
 
     #     """
@@ -205,18 +205,18 @@ class HarrisWilson:
 
     #     Parameters
     #     ----------
-    #     xx : np.array
+    #     xx : torch.tensor
     #         Log destination sizes
-    #     theta : np.array
+    #     theta : torch.tensor
     #         List of parameters
 
     #     Returns
     #     -------
-    #     float, np.array
+    #     float, torch.tensor
     #         AIS potential value and its gradient
 
     #     """
-    #     return self.sde_ais_pot_and_jacobian(xx=xx,theta=np.array([self.delta,self.gamma,self.kappa]),J=self.dims[1])
+    #     return self.sde_ais_pot_and_jacobian(xx=xx,theta=torch.tensor([self.delta,self.gamma,self.kappa]),J=self.dims[1])
     # def ode_log_stationary_points_update(self,xx,theta):
 
     #     # Get dimensions of cost matrix
