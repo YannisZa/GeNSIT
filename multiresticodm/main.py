@@ -214,6 +214,7 @@ def run(logger,settings,config_path,**kwargs):
     config.settings['inputs']['device'] = update_device(
         settings.get('device','cpu')
     )
+    logger.warning(f"Device used: {config.settings['inputs']['device']}")
 
     # Set number of cores used (numba package)
     set_numba_torch_threads(settings['n_threads'])
