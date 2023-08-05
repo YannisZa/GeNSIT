@@ -2,7 +2,7 @@ import os
 import sys
 from typing import Any
 
-from numpy import arange
+from numpy import arange,isfinite,isnan
 from collections.abc import Iterable,Sequence
 
 from multiresticodm.utils import in_range, str_in_list,string_to_numeric
@@ -112,9 +112,21 @@ class Numeric(PrimitiveEntry):
             raise StringNotNumericException(f"String {self.data} is not numeric",key_path=key_path)
         return True
 
+    def check_finiteness(self,key_path=[]):
+        # Get whether data is allowed to be infinite or not
+        infinite = self.schema.get("is-infinite",False)
+        if not infinite:
+            # print(key_path,isfinite(self.data))
+            try:
+                assert isfinite(self.data)
+            except:
+                raise InfiniteNumericException(f"Infinite data {self.data} provided",key_path=key_path)
+
     def check(self,key_path=[]):
         # Check that correct type is used
         self.check_type(key_path=key_path)
+        # Check that data is finite (if that requirement is specified)
+        self.check_finiteness(key_path=key_path)
         # Check that correct range is used 
         self.check_range(key_path=key_path)
         # Check that input is in the scope of allowable inputs
@@ -217,6 +229,8 @@ class Path(Str):
                 raise InvalidExtensionException(f"File {self.data} does not have extension {extension}.",key_path=key_path)
         return True
 
+    def value(self):
+        return os.path.basename(self.data)
 
 
 class File(Path):
@@ -234,6 +248,7 @@ class File(Path):
         self.check_file_exists(key_path=key_path)
         # Check that file extension exists
         self.check_extension(key_path=key_path)
+
 
 class Directory(Path):
     def __init__(self,data,schema):
@@ -278,6 +293,24 @@ class NonPrimitiveEntry(Entry):
                 except:
                     raise InvalidLengthException(f"Length {len(self.data)} is not equal to {length}.",key_path=key_path)
         return True
+
+    def check_uniqueness(self,vals:Iterable,key_path=[]):
+        # Check that unique values are provided
+        unique_vals = self.schema.get("unique-vals",False)
+        if unique_vals:
+            # Express data in python primitive types
+            data = [v.value() for v in vals]
+            try: 
+                assert len(data) == len(set(data))
+            except:
+                raise DataUniquenessException(f"Data {data} is not unique",key_path=key_path)
+        return True
+
+    def check_elements(self,vals:Iterable,key_path=[]):
+        # Check that all keys of the dictionary are valid
+        for key in vals:
+            key.check(key_path=key_path)
+        return True
     
     def check(self,key_path=[]):
         pass
@@ -315,18 +348,15 @@ class List(NonPrimitiveEntry):
     def value(self) -> list:
         return [datum.value() for datum in self.data]
             
-    def check_elements(self,key_path=[]):
-        # Check that all elements of the list are valid
-        for elem in self.data:
-            elem.check(key_path=key_path)
-        return True
-            
+        
     def check(self,key_path=[]):
         # Check that correct length is provided
         self.check_length(key_path=key_path)
+        # Check that all values are unique
+        self.check_uniqueness(vals=self.data,key_path=key_path)
         # Check that each element of the list is valid 
         # by calling their respective check functions
-        self.check_elements(key_path=key_path)
+        self.check_elements(vals=self.data,key_path=key_path)
 
 class CustomList(NonPrimitiveEntry):
     def __init__(self,data,schema):
@@ -384,12 +414,6 @@ class CustomList(NonPrimitiveEntry):
             return [],False
 
 
-    def check_elements(self,key_path=[]):
-        # Check that all elements of the list are valid
-        for elem in self.data:
-            elem.check(key_path=key_path)
-        return True
-    
     def check_parsing(self,key_path=[]):
         try:
             assert self.parsing_success
@@ -404,7 +428,7 @@ class CustomList(NonPrimitiveEntry):
         self.check_length(key_path=key_path)
         # Check that each element of the list is valid 
         # by calling their respective check functions
-        self.check_elements(key_path=key_path)
+        self.check_elements(vals=self.data,key_path=key_path)
 
 class Dict(NonPrimitiveEntry):
     def __init__(self,data,schema):
@@ -441,22 +465,18 @@ class Dict(NonPrimitiveEntry):
     
     def value(self) -> dict:
         return {key.value():value.value() for key,value in self.data.items()}
-    
-    def check_elements(self,key_path=[]):
-        # Check that all keys of the dictionary are valid
-        for key in self.data.keys():
-            key.check(key_path=key_path)
-        # Check that all values of the dictionary are valid
-        for val in self.data.values():
-            val.check(key_path=key_path)
-        return True
 
     def check(self,key_path=[]):
         # Check that correct length is provided
         self.check_length(key_path=key_path)
-        # Check that each element of the list is valid 
-        # by calling their respective check functions
-        self.check_elements(key_path=key_path)
+        # Check that all keys are unique
+        self.check_uniqueness(vals=self.data.keys(),key_path=key_path)
+        # Check that all values are unique
+        self.check_uniqueness(vals=self.data.values(),key_path=key_path)
+        # Check that each key is valid
+        self.check_elements(vals=self.data.keys(),key_path=key_path)
+        # Check that each value is valid
+        self.check_elements(vals=self.data.values(),key_path=key_path)
 
 class CustomDict(NonPrimitiveEntry):
     def __init__(self,data,schema):
@@ -493,21 +513,14 @@ class CustomDict(NonPrimitiveEntry):
     def value(self) -> dict:
         return {key.value():value.value() for key,value in self.data.items()}
     
-    def check_elements(self,key_path=[]):
-        # Check that all keys of the dictionary are valid
-        for key in self.data.keys():
-            key.check(key_path=key_path)
-        # Check that all values of the dictionary are valid
-        for val in self.data.values():
-            val.check(key_path=key_path)
-        return True
 
     def check(self,key_path=[]):
         # Check that correct length is provided
         self.check_length(key_path=key_path)
-        # Check that each element of the list is valid 
-        # by calling their respective check functions
-        self.check_elements(key_path=key_path)
+        # Check that each key is valid
+        self.check_elements(vals=self.data.keys(),key_path=key_path)
+        # Check that each value is valid
+        self.check_elements(vals=self.data.values(),key_path=key_path)
 
 #--------------------------------------------------------------------
 #--------------------------------------------------------------------
@@ -532,6 +545,14 @@ class InvalidLengthException(EntryException):
         super().__init__(message,key_path=key_path,**kwargs)
 
 class InvalidRangeException(EntryException):
+    def __init__(self,message,key_path=[],**kwargs):
+        super().__init__(message,key_path=key_path,**kwargs)
+
+class DataUniquenessException(EntryException):
+    def __init__(self,message,key_path=[],**kwargs):
+        super().__init__(message,key_path=key_path,**kwargs)
+
+class InfiniteNumericException(EntryException):
     def __init__(self,message,key_path=[],**kwargs):
         super().__init__(message,key_path=key_path,**kwargs)
 
