@@ -166,9 +166,10 @@ class Experiment(object):
             deep_update(self.config.settings, key='datetime', val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), overwrite=False)
         else:
             self.config['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-        
-        # Initialise empty results
-        self.results = []
+
+        # Inherit experiment id from parameter sweep (if it exists)
+        # This will be used to create a unique output directory for every sweep
+        self.sweep_experiment_id = kwargs.get('experiment_id',None)
 
         # Update current config
         # self.config = self.sim.config.update_recursively(self.config,updated_config,overwrite=True)
@@ -1932,6 +1933,7 @@ class SIM_NN(Experiment):
             self.config,
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
+            experiment_id=self.sweep_experiment_id,
             log_to_file=True,
             log_to_console=True,
         )
