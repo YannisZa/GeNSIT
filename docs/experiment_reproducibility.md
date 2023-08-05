@@ -466,7 +466,6 @@ clear; multiresticodm run-nn ./data/inputs/configs/sim_inference_neural_net.toml
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
  -od origin_demand_sum_normalised.txt \
  -dats destination_attraction_time_series_sum_normalised.txt \
--cm cost_matrices/clustered_facilities_sample_20x20_20_01_2023_sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%\_prob_origin_destination_adjusted_normalised_boundary_only_edge_corrected_cost_matrix_sum_normalised.txt \
  -re SIM_NN -nw 16 -nt 1 -nt 8 -et test
 
 ## Plots
