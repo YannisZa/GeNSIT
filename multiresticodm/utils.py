@@ -175,37 +175,6 @@ def write_json(data:Dict,filepath:str,**kwargs:Dict) -> None:
     with open(filepath, 'w') as f:
         json.dump(data,f,**kwargs)
 
-def write_stream_handler_log(logger, filepath):
-    
-    if not filepath.endswith('.log'):
-        filepath = filepath.split('.')[0] + '.log'
-
-    # Find the StreamHandler in the logger's handlers list
-    # stream_handler = None
-    # for handler in logger.handlers:
-    #     if isinstance(handler, logging.StreamHandler):
-    #         stream_handler = handler
-    #         break
-    stream_handler = logger.handlers[0]
-
-    if stream_handler is None:
-        print ("No StreamHandler found in the logger's handlers list.")
-        return
-
-    # Create a FileHandler and set the log level and formatter to match the StreamHandler
-    file_handler = logging.FileHandler(filepath)
-    file_handler.setLevel(stream_handler.level)
-    file_handler.setFormatter(stream_handler.formatter)
-
-    outputs_logged = get_stream(stream_handler.stream)
-    # Copy the data from StreamHandler to list
-    # for record in stream_handler.stream.getvalue():
-    #     outputs_logged.append(record)
-    sys.exit()
-    # Write list to log file
-    f = open(filepath,"w+")
-    f.writelines([i + '\n' for i in outputs_logged])
-    f.close()
 
 def print_json(data:Dict,**kwargs:Dict):
     print(json.dumps(data,cls=NumpyEncoder,**kwargs))
@@ -796,16 +765,15 @@ def in_range(v,limits:list,inclusive:bool=False):
 def dict_inverse(d:dict):
     return {v:k for k,v in d.items()}
 
-def get_keys_in_path(d, target_keys, path=[]):
-    paths = []
+def get_keys_in_path(d, target_key, path=[], paths_found = []):
     for key, value in d.items():
         current_path = path + [key]
-        if key in target_keys:
-            paths.append(current_path[:-1])
+        if key == target_key:
+            # Add it to paths found
+            paths_found.append(current_path[:-1])
         if isinstance(value, dict):
-            nested_paths = get_keys_in_path(value, target_keys, current_path)
-            paths.extend(nested_paths)
-    return paths
+            _ = get_keys_in_path(value, target_key, current_path, paths_found)
+    return paths_found
 
 def get_value_from_path(d, path=[]):
     if len(path) <= 0:
