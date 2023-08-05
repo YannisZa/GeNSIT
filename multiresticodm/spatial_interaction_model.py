@@ -1,15 +1,12 @@
 import os
 import sys
-import logging
-import numpy as np
 import torch
-
-from typing import Union
+import logging
 
 from multiresticodm.config import Config
 from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
 from multiresticodm.global_variables import INPUT_TYPES, PARAMETER_DEFAULTS, Dataset
-from multiresticodm.utils import deep_apply, deep_call, setup_logger, write_txt,makedir
+from multiresticodm.utils import setup_logger, write_txt,makedir
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
 
 
@@ -111,7 +108,7 @@ class SpatialInteraction2D():
             self.config.settings['inputs']['dims'] = self.dims
 
         # Determine if true data exists
-        if np.all([hasattr(self,attr) and getattr(self,attr) is not None for attr in self.all_parameter_names]):
+        if all([hasattr(self,attr) and getattr(self,attr) is not None for attr in self.all_parameter_names]):
             self.ground_truth_known = True
         else:
             self.ground_truth_known = False
@@ -172,9 +169,9 @@ class SpatialInteraction2D():
             Beta scaling: {self.bmax}
         """
 
-    def check_sample_availability(self,sample_names:list,data:dict):
+    def check_sample_availability(self,output_names:list,data:dict):
         available = True
-        for sample in sample_names:
+        for sample in output_names:
             try:
                 assert sample in list(data.keys())
             except:
@@ -203,19 +200,19 @@ class SpatialInteraction2D():
 
         return kwargs
     
-    def log_odds_ratio(self,log_intensity:np.ndarray):
+    def log_odds_ratio(self,log_intensity:torch.tensor):
         """ Reconstruct log odds ratio of intensity function
 
         Parameters
         ----------
-        xx : np.array
+        xx : torch.tensor
             Log destination attraction.
-        theta : np.array
+        theta : torch.tensor
             Fitted parameters.
 
         Returns
         -------
-        np.array
+        torch.tensor
             Expected flow matrix (non-integer).
 
         """
@@ -306,19 +303,19 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
     def __repr__(self):
         return "ProductionConstrained(SpatialInteraction2D)"
     
-    def intensity_gradient(self,theta:np.ndarray,log_intensity:np.ndarray):
+    def intensity_gradient(self,theta:torch.tensor,log_intensity:torch.tensor):
         """ Reconstruct gradient of intensity with respect to xx
 
         Parameters
         ----------
-        xx : np.array
+        xx : torch.tensor
             Log destination attraction.
-        theta : np.array
+        theta : torch.tensor
             Fitted parameters.
 
         Returns
         -------
-        np.array
+        torch.tensor
             Expected flow matrix (non-integer).
 
         """
@@ -329,7 +326,7 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
 
     
 
-    def log_intensity_and_gradient(self,xx:np.ndarray,theta:np.ndarray,grand_total:float):
+    def log_intensity_and_gradient(self,xx:torch.tensor,theta:torch.tensor,grand_total:float):
         
         # Compute log intensity
         log_intensity = self.log_intensity(xx,theta,grand_total)
@@ -377,19 +374,19 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
         return "TotallyConstrained(SpatialInteraction2D)"
 
     
-    def intensity_gradient(self,theta:np.ndarray,log_intensity:np.ndarray):
+    def intensity_gradient(self,theta:torch.tensor,log_intensity:torch.tensor):
         """ Reconstruct gradient of intensity with respect to xx
 
         Parameters
         ----------
-        xx : np.array
+        xx : torch.tensor
             Log destination attraction.
-        theta : np.array
+        theta : torch.tensor
             Fitted parameters.
 
         Returns
         -------
-        np.array
+        torch.tensor
             Expected flow matrix (non-integer).
 
         """
@@ -398,7 +395,7 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
             log_intensity
         )
 
-    def log_intensity_and_gradient(self,xx:np.ndarray,theta:np.ndarray,grand_total:float):
+    def log_intensity_and_gradient(self,xx:torch.tensor,theta:torch.tensor,grand_total:float):
         
         # Compute log intensity
         log_intensity = self.log_intensity(xx,theta,grand_total)
