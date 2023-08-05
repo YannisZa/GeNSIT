@@ -17,55 +17,55 @@ XARRAY_SCHEMA = {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["N","1"]
+        "new_shape":["1","N"]
     }, 
     'beta': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["N","1"]
+        "new_shape":["1","N"]
     }, 
     'kappa': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["N","1"]
+        "new_shape":["1","N"]
     }, 
     'delta': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["N","1"]
+        "new_shape":["1","N"]
     }, 
     'sigma': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["N","1"]
+        "new_shape":["1","N"]
     }, 
     'log_destination_attraction': {
         "coords":["destination","iter"],
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "new_shape":["N","J"]
+        "new_shape":["J","N"]
     },
     'loss': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["N","1"]
+        "new_shape":["1","N"]
     },
     'log_target': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["N","1"]
+        "new_shape":["1","N"]
     },
     'computation_time': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["N","1"]
+        "new_shape":["1","N"]
     },
 }
 

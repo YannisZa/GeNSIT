@@ -681,7 +681,7 @@ class Outputs(object):
             self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
             
             # Update experiment id
-            self.experiment_id = self.update_experiment_directory_id()
+            self.experiment_id = self.update_experiment_directory_id(kwargs.get('experiment_id',None))
             
             # Define output experiment path to directory
             self.outputs_path = os.path.join(
@@ -703,7 +703,7 @@ class Outputs(object):
         else:
             raise Exception(f'Config {config} of type {type(config)} not recognised.')
 
-    def update_experiment_directory_id(self):
+    def update_experiment_directory_id(self,sweep_experiment_id:str=None):
 
         noise_level = list(deep_get(key='noise_regime',value=self.config.settings))
         if len(noise_level) <= 0:
@@ -723,22 +723,28 @@ class Outputs(object):
         if not str_in_list('experiment_title',self.config['outputs'].keys()):
             self.config['outputs']['experiment_title'] = ""
 
-        if str_in_list(self.config['experiment_type'].lower(),['tablesummariesmcmcconvergence','table_mcmc_convergence']):
-            return self.config['experiment_type']+'_K'+\
-                    str(self.config['K'])+'_'+\
-                    self.config['mcmc']['contingency_table']['proposal']+'_'+\
-                    self.config['outputs']['experiment_title']+'_'+\
-                    self.config['datetime']
-        elif self.config['experiment_type'].lower() == 'table_mcmc':
-            return self.config['experiment_type']+'_'+\
-                    self.config['mcmc']['contingency_table']['proposal']+'_'+\
-                    self.config['outputs']['experiment_title']+'_'+\
-                    self.config['datetime']
+        if sweep_experiment_id is None:
+            if str_in_list(self.config['experiment_type'].lower(),['tablesummariesmcmcconvergence','table_mcmc_convergence']):
+                return self.config['experiment_type']+'_K'+\
+                        str(self.config['K'])+'_'+\
+                        self.config['mcmc']['contingency_table']['proposal']+'_'+\
+                        self.config['outputs']['experiment_title']+'_'+\
+                        self.config['datetime']
+            elif self.config['experiment_type'].lower() == 'table_mcmc':
+                return self.config['experiment_type']+'_'+\
+                        self.config['mcmc']['contingency_table']['proposal']+'_'+\
+                        self.config['outputs']['experiment_title']+'_'+\
+                        self.config['datetime']
+            else:
+                return self.config['experiment_type']+'_'+\
+                        noise_level+'Noise_'+\
+                        self.config['outputs']['experiment_title']+'_'+\
+                        self.config['datetime']
         else:
-            return self.config['experiment_type']+'_'+\
-                    noise_level+'Noise_'+\
-                    self.config['outputs']['experiment_title']+'_'+\
-                    self.config['datetime']
+            # Return parameter sweep's experiment id
+            # This avoids creating new output directories 
+            # for sweeped sigma regimes
+            return sweep_experiment_id
 
     def create_output_subdirectories(self,sweep_id:str='') -> None:
         export_samples = list(deep_get(key='export_samples',value=self.config.settings))
@@ -841,11 +847,10 @@ class Outputs(object):
 
         # Get all h5 files
         h5files = list(Path(os.path.join(output_path,'samples')).rglob("*.h5"))
-        print(os.path.join(output_path,'samples'))
         # Sort them by seed
-        h5files = sorted(h5files, key = lambda x: int(str(x).replace("/data.h5","").split('seed_')[1]) if 'seed' in str(x) else str(x))
+        h5files = sorted(h5files, key = lambda x: int(str(x).split('seed_')[1].split('/',1)[0]) if 'seed' in str(x) else str(x))
         # Store data attributes for xarray
-        coords,coordinates,data_vars,data_variables = {},{},{},{}
+        coords,data_vars,data_variables = {},{},{}
         # print(len(h5files))
         # Get each file and add it to the new dataset
         for filename in h5files:
@@ -854,16 +859,16 @@ class Outputs(object):
 
                 # Collect group-level attributes as coordinates
                 # Group coordinates are file-dependent
-                if 'sweep_params' in list(h5data[self.experiment_id].keys()) and \
-                    'sweep_values' in list(h5data[self.experiment_id].keys()):
+                if 'sweep_params' in list(h5data[self.experiment_id].attrs.keys()) and \
+                    'sweep_values' in list(h5data[self.experiment_id].attrs.keys()):
                 
                     # Loop through each sweep parameters and add it as a coordinate
                     for (k,v) in zip(h5data[self.experiment_id].attrs['sweep_params'],
                                 h5data[self.experiment_id].attrs['sweep_values']):
                         if k in list(coords.keys()) and len(coords) > 0:
-                            coords[k].append(v)
+                            coords[k].add(v)
                         else:
-                            coords[k] = [v]
+                            coords[k] = {v}
                 
                 # Store dataset
                 for sample_name,sample_data in h5data[self.experiment_id].items():
@@ -876,24 +881,17 @@ class Outputs(object):
                     else:
                         data_vars[sample_name] = np.array([sample_data[:]])
         
+        # Convert set to list
+        coords = {k:np.array(list(v)) for k,v in coords.items()}
+
+        # print({k:np.shape(v) for k,v in data_vars.items()})
+        new_data_vars = {k:data_vars[k] for k in ['alpha','log_destination_attraction','beta','loss']}
         # Create an xarray dataset for each sample
-        for sample_name,sample_data in data_vars.items():
-            # For each coordinate name
-            # get data variable
-            print(coords)
-            if len(coords.keys()) > 0:
-                for coord_name in coords.keys():
-                    print(coord_name)
-                    data_variables[sample_name] = (
-                        ([coord_name]+XARRAY_SCHEMA[sample_name]['coords']),
-                        sample_data
-                    )
-                print(sample_name,[coord_name]+XARRAY_SCHEMA[sample_name]['coords'],np.shape(sample_data))
-            else:
-                data_variables[sample_name] = sample_data
+        for sample_name,sample_data in new_data_vars.items():
 
             # Get data dims
             dims = np.shape(sample_data)[1:]
+            coordinates = {}
             # For each dim create coordinate
             for i,d in enumerate(dims):
                 obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
@@ -906,26 +904,45 @@ class Outputs(object):
                     stop=d+1,
                     step=1
                 ).astype(XARRAY_SCHEMA[sample_name]['args_dtype'][i])
-
-            print(data_variables)
-            print(coordinates)
+            
+            # Update coordinates to include schema and sweep coordinates
+            # print('coordinates',coordinates.keys())
+            # print('coords',coords.keys())
+            all_coordinates = {**{k:v for k,v in coordinates.items()},**{k:v for k,v in coords.items()}}
+            
+            # For each coordinate name
+            # get data variable
+            # print(sample_name)
+            # print('coordinates')
+            # print({k:np.shape(v) for k,v in all_coordinates.items()})
+            # print('data')
+            # print(np.shape(sample_data.reshape(*[len(val) for val in all_coordinates.values()])))
+            # print(list(all_coordinates.keys()))
+            # if len(coordinates.keys()) > 0:
+            data_variables[sample_name] = (
+                list(all_coordinates.keys()),
+                sample_data.reshape(tuple([len(val) for val in all_coordinates.values()]))
+            )
+            # else:
+                # data_variables[sample_name] = sample_data
+            
             # Create xarray dataset
             xr_data = xr.Dataset(
+                data_vars = {sample_name:data_variables[sample_name]},
+                coords = all_coordinates,
                 attrs = dict(
                     experiment_id = self.experiment_id
                 ),
-                data_vars = data_variables,
-                coords = coordinates
             )
-
             # Slice according to coordinate slice
             if len(coordinate_slice) > 0:
                 xr_data = xr_data.isel(**coordinate_slice)
             
-            # Store samples
+            # Store dataset
             setattr(self._data,sample_name,xr_data)
-            # print(sample_name,data_variables)
-            # print(sample_name,getattr(self._data,sample_name).data_vars,xr_data.data_vars)
+            
+            
+            
 
     def check_data_availability(self,sample_name:str,input_names:list=[],output_names:list=[]):
         available = True
