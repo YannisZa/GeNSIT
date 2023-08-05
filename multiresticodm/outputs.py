@@ -187,7 +187,7 @@ class OutputSummary(object):
                     outputs = Outputs(
                         config=output_folder,
                         settings=self.settings,
-                        sample_names=(list(self.settings['sample'])+['ground_truth_table']),
+                        output_names=(list(self.settings['sample'])+['ground_truth_table']),
                         coordinate_slice=coordinate_slice
                     )
                 # This is the case where there are SOME input slices provided
@@ -195,7 +195,7 @@ class OutputSummary(object):
                     outputs = Outputs(
                         config=output_folder,
                         settings=self.settings,
-                        sample_names=(list(self.settings['sample'])+['ground_truth_table']),
+                        output_names=(list(self.settings['sample'])+['ground_truth_table']),
                         coordinate_slice=coordinate_slice,
                         input_slice=path_value
                     )
@@ -531,7 +531,7 @@ class Outputs(object):
                  config, 
                  module:str=__name__,
                  settings:dict={}, 
-                 sample_names:list=['ground_truth_table'], 
+                 output_names:list=['ground_truth_table'], 
                  slice_samples:bool=True,
                  coordinate_slice:dict={},
                  input_slice:dict={},
@@ -546,10 +546,10 @@ class Outputs(object):
 
         # Sample names must be a subset of all data names
         try:
-            assert set(sample_names).issubset(set(DATA_TYPES.keys()))
+            assert set(output_names).issubset(set(DATA_TYPES.keys()))
         except Exception as e:
             self.logger.error('Some sample names provided are not recognized')
-            self.logger.error(','.join(sample_names))
+            self.logger.error(','.join(output_names))
             self.logger.debug(traceback.format_exc())
             raise Exception('Cannot load outputs.')
 
@@ -611,7 +611,7 @@ class Outputs(object):
             # Try to load ground truth table
             self.ground_truth_table = None
             self.settings['table_total'] = self.settings.get('table_total',1)
-            if 'ground_truth_table' in sample_names:
+            if 'ground_truth_table' in output_names:
                 # Try reading it from settings path
                 try:
                     self.ground_truth_table = np.loadtxt(
@@ -632,7 +632,7 @@ class Outputs(object):
             # Try to get table total (number of agents)
             if self.ground_truth_table is not None:
                 # Remove it from sample names
-                sample_names.remove('ground_truth_table')
+                output_names.remove('ground_truth_table')
                 # Reshape it
                 self.ground_truth_table = self.ground_truth_table.reshape((1,*self.ground_truth_table.shape))
                 # Extract metadata
@@ -644,23 +644,23 @@ class Outputs(object):
             self.load_h5_data(config,coordinate_slice=self.coordinate_slice)
             
             # Try to load all output data
-            for sample_name in sample_names:
-                try:
-                    setattr(
-                        self.data,
-                        sample_name, 
-                        self.get_sample(
-                            sample_name,
-                            slice_samples = slice_samples
-                        )
+            for sample_name in output_names:
+                # try:
+                setattr(
+                    self.data,
+                    sample_name, 
+                    self.get_sample(
+                        sample_name,
+                        slice_samples = slice_samples
                     )
+                )
 
-                    if sample_name == 'table' and self.settings['table_total'] != 1:
-                        self.settings['table_total'] = list(torch.sum(torch.ravel(self.data.table)))[0]
-                    self.logger.info(f'Sample {sample_name} loaded with shape {list(getattr(self.data,sample_name).shape)}')
-                except:
-                    self.logger.debug(traceback.format_exc())
-                    self.logger.warning(f'Sample {sample_name} could not be loaded')
+                if sample_name == 'table' and self.settings['table_total'] != 1:
+                    self.settings['table_total'] = list(torch.sum(torch.ravel(self.data.table)))[0]
+                self.logger.info(f'Sample {sample_name} loaded with shape {list(getattr(self.data,sample_name).shape)}')
+                # except:
+                #     self.logger.debug(traceback.format_exc())
+                #     self.logger.warning(f'Sample {sample_name} could not be loaded')
                     # sys.exit()
 
             if self.settings['table_total'] == 0:
@@ -689,45 +689,16 @@ class Outputs(object):
                     self.config['experiment_data'],
                     self.experiment_id
             )
-            
     
             # Name output sample directory according 
             # to sweep params (if they are provided)
-            name_params = kwargs.get('name_params',{})
-            self.samples_stamp = ''
-            if len(name_params) > 0 and isinstance(name_params,dict):
-                self.samples_stamp = os.path.join(*[str(k)+"_"+str(v) for k,v in name_params.items()])
+            sweep_params = kwargs.get('sweep_params',{})
+            self.sweep_id = ''
+            if len(sweep_params) > 0 and isinstance(sweep_params,dict):
+                self.sweep_id = os.path.join(*[str(k)+"_"+str(v) for k,v in sweep_params.items()])
 
-            export_samples = list(deep_get(key='export_samples',value=self.config.settings))
-            export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
-            export_samples = export_samples[0] if len(export_samples) > 0 else True
-            export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
-            
-            if export_samples or export_metadata:
-                # Create output directories
-                self.create_output_subdirectories(self.samples_stamp)
-            
-            # Write to file
-            if export_samples:
-                self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
-                self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.samples_stamp}","data.h5"), mode="w")
-                self.h5group = self.h5file.create_group(self.experiment_id)
-                # Store sweep configurations as attributes 
-                for k,v in name_params.items():
-                    self.h5group.attrs.create(name=k,data=v)
-                # Update log filename
-                if isinstance(self.logger,logging.Logger):
-                    for i,hand in enumerate(self.logger.handlers):
-                        if isinstance(hand,logging.FileHandler):
-                            # Make directory
-                            makedir(os.path.join(self.outputs_path,'samples',self.samples_stamp))
-                            # Define filename
-                            self.logger.handlers[i].filename = os.path.join(
-                                self.outputs_path,
-                                'samples',
-                                self.samples_stamp,
-                                f"outputs.log"
-                            )
+            # Create output directories if necessary
+            self.create_output_subdirectories(sweep_id=self.sweep_id)
         
         else:
             raise Exception(f'Config {config} of type {type(config)} not recognised.')
@@ -737,13 +708,14 @@ class Outputs(object):
         noise_level = list(deep_get(key='noise_regime',value=self.config.settings))
         if len(noise_level) <= 0:
             if 'sigma' in self.config.settings['inputs']['to_learn']:
-                noise_level = 'variable'
+                noise_level = 'learned'
             else:
                 sigma = list(deep_get(key='sigma',value=self.config.settings))
                 if len(sigma) == 1:
-                    noise_level = sigma_to_noise_regime(sigma=sigma[0])
-                else:
-                    noise_level = 'unknown'
+                    if isinstance(sigma[0],dict) and 'sweep' in list(sigma[0].keys()):
+                        noise_level = 'sweeped'
+                    else:
+                        noise_level = sigma_to_noise_regime(sigma=sigma[0])
         else:
             noise_level = noise_level[0]
         noise_level = noise_level.capitalize()
@@ -751,30 +723,36 @@ class Outputs(object):
         if not str_in_list('experiment_title',self.config['outputs'].keys()):
             self.config['outputs']['experiment_title'] = ""
 
-        if str_in_list(self.config['experiment_id'].lower(),['tablesummariesmcmcconvergence','table_mcmc_convergence']):
-            return self.config['experiment_id']+'_K'+\
+        if str_in_list(self.config['experiment_type'].lower(),['tablesummariesmcmcconvergence','table_mcmc_convergence']):
+            return self.config['experiment_type']+'_K'+\
                     str(self.config['K'])+'_'+\
                     self.config['mcmc']['contingency_table']['proposal']+'_'+\
                     self.config['outputs']['experiment_title']+'_'+\
                     self.config['datetime']
-        elif self.config['experiment_id'].lower() == 'table_mcmc':
-            return self.config['experiment_id']+'_'+\
+        elif self.config['experiment_type'].lower() == 'table_mcmc':
+            return self.config['experiment_type']+'_'+\
                     self.config['mcmc']['contingency_table']['proposal']+'_'+\
                     self.config['outputs']['experiment_title']+'_'+\
                     self.config['datetime']
         else:
-            return self.config['experiment_id']+'_'+\
+            return self.config['experiment_type']+'_'+\
                     noise_level+'Noise_'+\
                     self.config['outputs']['experiment_title']+'_'+\
                     self.config['datetime']
 
-    def create_output_subdirectories(self,sample_stamp:str='') -> None:
+    def create_output_subdirectories(self,sweep_id:str='') -> None:
+        export_samples = list(deep_get(key='export_samples',value=self.config.settings))
+        export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
+        export_samples = export_samples[0] if len(export_samples) > 0 else True
+        export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
         
-        makedir(os.path.join(self.outputs_path,'samples'))
-        if len(sample_stamp) > 0 and isinstance(sample_stamp,str):
-            makedir(os.path.join(self.outputs_path,'samples',sample_stamp))
-        makedir(os.path.join(self.outputs_path,'figures'))
-        makedir(os.path.join(self.outputs_path,'sample_derivatives'))
+        if export_samples or export_metadata:
+            # Create output directories
+            makedir(os.path.join(self.outputs_path,'samples'))
+            if len(sweep_id) > 0 and isinstance(sweep_id,str):
+                makedir(os.path.join(self.outputs_path,'samples',sweep_id))
+            makedir(os.path.join(self.outputs_path,'figures'))
+            makedir(os.path.join(self.outputs_path,'sample_derivatives'))
 
     def write_log(self,logger):
         if isinstance(logger,logging.Logger):
@@ -795,6 +773,7 @@ class Outputs(object):
         # print(settings_copy)
         # Define filepath
         filepath = os.path.join(self.outputs_path,dir_path,f"{filename.split('.')[0]}.json")
+        # print('writing metadata',filepath)
         if (os.path.exists(filepath) and self.config['experiments'][0]['overwrite']) or (not os.path.exists(filepath)):
             if isinstance(self.config,Config):
                 write_json(self.config.settings,filepath,indent=2)
@@ -806,42 +785,34 @@ class Outputs(object):
     def print_metadata(self) -> None:
         print_json(self.config,indent=2)
 
-    def write_samples(self, vector_names:List[str]=None) -> None:
-
-        try:
-            assert len(self.experiment.results) > 0
-        except:
-            self.logger.error(f"No experimental tabular results found.")
-            return
-
-        # Get all vector names that have been stored in results and match the specified ones
-        existing_vector_names = list(set(vector_names).intersection(set(self.experiment.results[0]['samples'].keys())))
-        
-        try:
-            assert (vector_names is None) or (set(vector_names) <= set(self.experiment.results[0]['samples'].keys()))
-        except:
-            missing_vector_names = set(self.experiment.results[0]['samples'].keys()).difference(set(vector_names))
-            self.logger.warning(f"Vectors {','.join(missing_vector_names)} not found in {','.join(self.experiment.results[0]['samples'].keys())}")
-        
-        # Define filepath
-        dirpath = os.path.join(self.outputs_path,'samples')
-
-        # Only export samples if vector names are not null
-        if len(existing_vector_names) > 0:
-            # Loop through experimental results and write samples
-            for res in tqdm(self.experiment.results):
-
-                for k in existing_vector_names:
-
-                    # Add type of sample in filename
-                    if 'id' in res.keys():
-                        filename = f"{k}_samples_{res['id']}.npy"
-                    else:
-                        filename = f"{k}_samples.npy"
-
-                    # Write function samples (list of dictionaries) in compress json format
-                    if (os.path.exists(os.path.join(dirpath,filename)) and self.config['overwrite']) or (not os.path.exists(os.path.join(dirpath,filename))):
-                        write_npy(res['samples'][k],os.path.join(dirpath,filename))
+    def open_output_file(self,sweep_params:dict={}):
+        if hasattr(self,'config') and hasattr(self.config,'settings'):
+            export_samples = list(deep_get(key='export_samples',value=self.config.settings))
+            export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
+            export_samples = export_samples[0] if len(export_samples) > 0 else True
+            export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
+            
+            # Write to file
+            if export_samples:
+                self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
+                self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5"), mode="w")
+                self.h5group = self.h5file.create_group(self.experiment_id)
+                # Store sweep configurations as attributes 
+                self.h5group.attrs.create("sweep_params",list(sweep_params.keys()))
+                self.h5group.attrs.create("sweep_values",list(sweep_params.values()))
+                # Update log filename
+                if isinstance(self.logger,logging.Logger):
+                    for i,hand in enumerate(self.logger.handlers):
+                        if isinstance(hand,logging.FileHandler):
+                            # Make directory
+                            makedir(os.path.join(self.outputs_path,'samples',self.sweep_id))
+                            # Define filename
+                            self.logger.handlers[i].filename = os.path.join(
+                                self.outputs_path,
+                                'samples',
+                                self.sweep_id,
+                                f"outputs.log"
+                            )
 
 
     def slice_sample_iterations(self,samples):
@@ -870,26 +841,31 @@ class Outputs(object):
 
         # Get all h5 files
         h5files = list(Path(os.path.join(output_path,'samples')).rglob("*.h5"))
-
+        print(os.path.join(output_path,'samples'))
         # Sort them by seed
         h5files = sorted(h5files, key = lambda x: int(str(x).replace("/data.h5","").split('seed_')[1]) if 'seed' in str(x) else str(x))
-
         # Store data attributes for xarray
-        coords,coordinates,data_vars = {},{},{}
-
+        coords,coordinates,data_vars,data_variables = {},{},{},{}
+        # print(len(h5files))
         # Get each file and add it to the new dataset
         for filename in h5files:
-
+            
             with h5.File(filename) as h5data:
 
-                # Collect attributes as coordinates
-                for k,v in h5data[self.experiment_id].attrs.items():
-                    if k in list(coords.keys()):
-                        coords[k].append(v)
-                    else:
-                        coords[k] = [v]
+                # Collect group-level attributes as coordinates
+                # Group coordinates are file-dependent
+                if 'sweep_params' in list(h5data[self.experiment_id].keys()) and \
+                    'sweep_values' in list(h5data[self.experiment_id].keys()):
                 
-                # Store all datasets
+                    # Loop through each sweep parameters and add it as a coordinate
+                    for (k,v) in zip(h5data[self.experiment_id].attrs['sweep_params'],
+                                h5data[self.experiment_id].attrs['sweep_values']):
+                        if k in list(coords.keys()) and len(coords) > 0:
+                            coords[k].append(v)
+                        else:
+                            coords[k] = [v]
+                
+                # Store dataset
                 for sample_name,sample_data in h5data[self.experiment_id].items():
                     if sample_name in list(data_vars.keys()):
                         data_vars[sample_name] = np.append(
@@ -904,19 +880,24 @@ class Outputs(object):
         for sample_name,sample_data in data_vars.items():
             # For each coordinate name
             # get data variable
-            data_vars = {}
-            for coord_name in coords.keys():
-                data_vars[sample_name] = (
-                    ([coord_name]+XARRAY_SCHEMA[sample_name]['coords']),
-                    sample_data
-                )
-                # print(sample_name,[coord_name]+XARRAY_SCHEMA[sample_name]['coords'],np.shape(sample_data))
-            
+            print(coords)
+            if len(coords.keys()) > 0:
+                for coord_name in coords.keys():
+                    print(coord_name)
+                    data_variables[sample_name] = (
+                        ([coord_name]+XARRAY_SCHEMA[sample_name]['coords']),
+                        sample_data
+                    )
+                print(sample_name,[coord_name]+XARRAY_SCHEMA[sample_name]['coords'],np.shape(sample_data))
+            else:
+                data_variables[sample_name] = sample_data
+
             # Get data dims
             dims = np.shape(sample_data)[1:]
             # For each dim create coordinate
             for i,d in enumerate(dims):
                 obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
+                # Create coordinate ranges based on schema
                 coordinates[XARRAY_SCHEMA[sample_name]['coords'][i]] = deep_call(
                     globals()[obj],
                     func,
@@ -926,18 +907,25 @@ class Outputs(object):
                     step=1
                 ).astype(XARRAY_SCHEMA[sample_name]['args_dtype'][i])
 
+            print(data_variables)
+            print(coordinates)
             # Create xarray dataset
             xr_data = xr.Dataset(
                 attrs = dict(
                     experiment_id = self.experiment_id
                 ),
-                data_vars = data_vars,
+                data_vars = data_variables,
                 coords = coordinates
             )
+
             # Slice according to coordinate slice
-            xr_data = xr_data.isel(**coordinate_slice)
+            if len(coordinate_slice) > 0:
+                xr_data = xr_data.isel(**coordinate_slice)
+            
             # Store samples
             setattr(self._data,sample_name,xr_data)
+            # print(sample_name,data_variables)
+            # print(sample_name,getattr(self._data,sample_name).data_vars,xr_data.data_vars)
 
     def check_data_availability(self,sample_name:str,input_names:list=[],output_names:list=[]):
         available = True
@@ -1038,20 +1026,25 @@ class Outputs(object):
                 raise Exception(f"{sample_name} not found in output data {','.join(vars(self._data).keys())}")
             
             # Get xarray
-            samples = getattr(self._data,sample_name)[sample_name]
+            xr_samples = getattr(self._data,sample_name)#[sample_name]
             # print(sample_name,samples.shape)
+            print('first',xr_samples.data_vars)
             # Apply burning, thinning and trimming
             if slice_samples:
-                samples = self.slice_sample_iterations(samples)
+                xr_samples = self.slice_sample_iterations(xr_samples)
             # print(sample_name,samples.shape)
             # Remove non-core coordinates
-            noncore_coords = list(set(samples.dims) - set(XARRAY_SCHEMA[sample_name]['coords']))
+            noncore_coords = list(set(xr_samples.dims) - set(XARRAY_SCHEMA[sample_name]['coords']))
             # Stack all non-core coordinates into new coordinate
-            samples = samples.stack(new_iter=(noncore_coords+['iter']))
+            xr_samples = xr_samples.stack(new_iter=(noncore_coords+['iter']))
             # Get number of samples
-            N = samples['new_iter'].shape[0]
+            N = xr_samples['new_iter'].shape[0]
+            # Convert xarray DataSet to DataArray
+            xr_samples = xr_samples[sample_name]
             # Convert to numpy
-            samples = samples.values.astype(dtype=OUTPUT_TYPES[sample_name])
+            samples = xr_samples.values
+            # Cast to specific data type
+            samples = samples.astype(dtype=OUTPUT_TYPES[sample_name])
             # Reshape
             dims = {"N":N,"I":self.inputs.data.dims[0],"J":self.inputs.data.dims[1]}
             # print(sample_name,samples.shape)
