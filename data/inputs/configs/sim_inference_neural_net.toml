@@ -1,5 +1,5 @@
 log_level = 'info'
-sweep_mode = false
+sweep_mode = true
 
 [inputs]
 n_workers = +1
@@ -17,8 +17,11 @@ to_learn = ['alpha', 'beta', 'kappa']
 [inputs.data_files]
     origin_demand = 'rowsums.txt'
     destination_attraction_ts='destination_attraction_time_series.txt'
-    cost_matrix = 'cost_matrix.txt'
     ground_truth_table = 'table_lsoas_to_msoas.txt'
+    cost_matrix = """cost_matrices/clustered_facilities_sample_20x20_20_01_2023_\
+    sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_\
+    prob_origin_destination_adjusted_normalised_boundary_only_\
+    edge_corrected_cost_matrix_sum_normalised.txt"""
 
 [spatial_interaction_model]
   # sim_type = 'ProductionConstrained','TotallyConstrained'
@@ -32,10 +35,13 @@ to_learn = ['alpha', 'beta', 'kappa']
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
-    sigma = 0.0141421356 # 0.0141421356, 0.1414213562
+    # sigma = 0.0141421356 # 0.0141421356, 0.1414213562
     epsilon = 1.0
     # kappa = 0
     # delta = 0
+    [harris_wilson_model.parameters.sigma.sweep]
+      default = 0.0141421356
+      range = [0.0141421356,0.141421356]
 
 [neural_network]
   disable_tqdm = true

@@ -27,7 +27,8 @@
           "dtype": "customList",
           "list-dtype": "int",
           "default-value": "1:100:1",
-          "valid-range": [1, null]
+          "valid-range": [1, null],
+          "unique-vals": true
         }
       }
     },
@@ -97,7 +98,8 @@
             "list-dtype": "file",
             "file-exists": false,
             "file-extension": "txt",
-            "default-value": ["origin_demand.txt"]
+            "default-value": ["origin_demand.txt"],
+            "unique-vals": true
           }
         }
       },
@@ -118,7 +120,8 @@
             "list-dtype": "file",
             "file-exists": false,
             "file-extension": "txt",
-            "default-value": ["destination_attraction_ts.txt"]
+            "default-value": ["destination_attraction_ts.txt"],
+            "unique-vals": true
           }
         }
       },
@@ -139,7 +142,8 @@
             "list-dtype": "file",
             "file-exists": false,
             "file-extension": "txt",
-            "default-value": ["cost_matrix.txt"]
+            "default-value": ["cost_matrix.txt"],
+            "unique-vals": true
           }
         }
       }
@@ -164,7 +168,8 @@
           "list-length": [1, 2],
           "list-dtype": "str",
           "default-value": ["TotallyConstrained"],
-          "is-any-of": ["TotallyConstrained", "ProductionConstrained"]
+          "is-any-of": ["TotallyConstrained", "ProductionConstrained"],
+          "unique-vals": true
         }
       }
     },
@@ -193,7 +198,8 @@
             "dtype": "list",
             "list-dtype": "float",
             "default-value": [1.0],
-            "valid-range": [0.0, null]
+            "valid-range": [0.0, null],
+            "unique-vals": true
           }
         }
       },
@@ -211,7 +217,8 @@
             "dtype": "list",
             "list-dtype": "float",
             "default-value": [0.0],
-            "valid-range": [0.0, null]
+            "valid-range": [0.0, null],
+            "unique-vals": true
           }
         }
       },
@@ -231,7 +238,8 @@
             "list-dtype": "float",
             "default-value": [0.0],
             "valid-range": [0.0, null],
-            "inclusive": false
+            "inclusive": false,
+            "unique-vals": true
           }
         }
       }
@@ -255,7 +263,8 @@
           "dtype": "list",
           "list-dtype": "float",
           "default-value": [0.001],
-          "valid-range": [0, 1]
+          "valid-range": [0, 1],
+          "unique-vals": true
         }
       }
     },
@@ -277,7 +286,8 @@
             "dtype": "list",
             "list-dtype": "float",
             "default-value": [0.0],
-            "valid-range": [0.0, null]
+            "valid-range": [0.0, null],
+            "unique-vals": true
           }
         }
       },
@@ -297,7 +307,8 @@
             "list-dtype": "float",
             "default-value": [0.0],
             "valid-range": [0.0, null],
-            "inclusive": false
+            "inclusive": false,
+            "unique-vals": true
           }
         }
       },
@@ -315,7 +326,8 @@
             "dtype": "list",
             "list-dtype": "float",
             "default-value": [0.0],
-            "valid-range": [0.0, null]
+            "valid-range": [0.0, null],
+            "unique-vals": true
           }
         }
       },
@@ -335,7 +347,8 @@
             "list-dtype": "float",
             "default-value": [0.0],
             "valid-range": [0.0, null],
-            "inclusive": false
+            "inclusive": false,
+            "unique-vals": true
           }
         }
       }
@@ -372,7 +385,8 @@
           "list-dtype": "int",
           "list-length": [1, null],
           "default-value": [1],
-          "valid-range": [1, null]
+          "valid-range": [1, null],
+          "unique-vals": true
         }
       }
     },
@@ -406,7 +420,8 @@
           "list-dtype": "list",
           "list-list-dtype": "str",
           "default-value": [["alpha", "beta", "sigma"]],
-          "is-any-of": ["alpha", "beta", "kappa", "delta", "sigma"]
+          "is-any-of": ["alpha", "beta", "kappa", "delta", "sigma"],
+          "unique-vals": true
         }
       }
     },
@@ -472,7 +487,8 @@
               "multimarginloss",
               "tripletmarginloss",
               "tripletmarginwithdistanceloss"
-            ]
+            ],
+            "unique-vals": true
           }
         }
       }
@@ -495,7 +511,8 @@
             "dtype": "list",
             "list-dtype": "int",
             "default-value": [1],
-            "valid-range": [1, null]
+            "valid-range": [1, null],
+            "unique-vals": true
           }
         }
       },
@@ -539,7 +556,8 @@
               "RMSprop",
               "Rprop",
               "SGD"
-            ]
+            ],
+            "unique-vals": true
           }
         }
       },
@@ -557,7 +575,8 @@
             "dtype": "list",
             "list-dtype": "float",
             "default-value": [0.002],
-            "valid-range": [0, 1]
+            "valid-range": [0, 1],
+            "unique-vals": true
           }
         }
       },
