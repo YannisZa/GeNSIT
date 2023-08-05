@@ -430,7 +430,7 @@ class Plot(object):
                 outputs = Outputs(
                     output_directory,
                     self.settings,
-                    sample_names=['tableerror'],
+                    output_names=['tableerror'],
                     log_to_console=False
                 )
                 # Apply statistic to error norm
@@ -519,7 +519,7 @@ class Plot(object):
                 outputs = Outputs(
                     output_directory,
                     self.settings,
-                    sample_names=['intensity','table','sign'],
+                    output_names=['intensity','table','sign'],
                     slice_samples=False,
                     log_to_console=False
                 )
@@ -1471,7 +1471,7 @@ class Plot(object):
             # Load contingency table
             outputs = Outputs(
                 output_directory,
-                sample_names=['log_destination_attraction','sign'],
+                output_names=['log_destination_attraction','sign'],
                 settings=self.settings,
                 slice_samples=True,
                 log_to_console=False
@@ -2001,8 +2001,8 @@ class Plot(object):
             outputs = Outputs(
                 experiment=output_directory,
                 settings=self.settings,
-                # order is important in sample_names
-                sample_names = (['ground_truth_table']+list(self.settings['sample'])),
+                # order is important in output_names
+                output_names = (['ground_truth_table']+list(self.settings['sample'])),
                 slice_samples=True,
                 log_to_console=False
             )
