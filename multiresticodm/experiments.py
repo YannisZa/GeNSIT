@@ -4,6 +4,7 @@ import time
 import logging
 import itertools
 
+
 from os import path
 from tqdm import tqdm
 from glob import glob
@@ -32,8 +33,9 @@ np.set_printoptions(suppress=True)
 
 def instantiate_experiment(experiment_type:str,config:Config,**kwargs):
     # Get whether sweep is active and its settings available
+    conf_setts_copy = deepcopy(config.settings)
     sweep_param_key_paths = get_keys_in_path(
-        config.settings,
+        conf_setts_copy,
         "sweep",
         path = []
     )
@@ -78,9 +80,9 @@ class ExperimentHandler(object):
         self.experiments = {}
 
         # Only run experiments specified in command line
-        for experiment_id in self.config.settings['run_experiments']:
+        for experiment_type in self.config.settings['run_experiments']:
             # Check that such experiment already exists in the config file
-            if experiment_id in self.avail_experiments.keys():
+            if experiment_type in self.avail_experiments.keys():
                 # Construct sub-config with only data relevant for experiment
                 experiment_config = Config(
                     settings=deepcopy(self.config.settings),
@@ -88,14 +90,14 @@ class ExperimentHandler(object):
                 )
                 # Store one experiment
                 experiment_config.settings['experiments'] = [
-                    self.config.settings['experiments'][self.avail_experiments[experiment_id]]
+                    self.config.settings['experiments'][self.avail_experiments[experiment_type]]
                 ]
                 # Update id, seed and logging detail
-                experiment_config.settings['experiment_id'] = experiment_id
+                experiment_config.settings['experiment_type'] = experiment_type
                 if self.config.settings['inputs'].get('dataset',None) is not None:
                     experiment_config['experiment_data'] = path.basename(path.normpath(self.config.settings['inputs']['dataset']))
                 else:
-                    raise Exception(f'No dataset found for experiment id {experiment_id}')
+                    raise Exception(f'No dataset found for experiment type {experiment_type}')
                 # Instatiate new experiment
                 experiment = instantiate_experiment(
                     experiment_type=experiment_config.settings['experiments'][0]['type'],
@@ -105,7 +107,7 @@ class ExperimentHandler(object):
                     instance=kwargs.get('instance','')
                 )
                 # Append it to list of experiments
-                self.experiments[experiment_id] = experiment
+                self.experiments[experiment_type] = experiment
 
     def run_and_write_experiments_sequentially(self):
         # Run all experiments sequential
@@ -164,6 +166,7 @@ class Experiment(object):
             deep_update(self.config.settings, key='datetime', val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), overwrite=False)
         else:
             self.config['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+        
         # Initialise empty results
         self.results = []
 
@@ -181,7 +184,7 @@ class Experiment(object):
             self.seed = int(self.config["seed"])
             self.logger.warning(f"Updated seed to {self.seed}")
         # Get experiment data
-        self.logger.info(f"Experiment {self.config['experiment_id']} has been set up.")
+        self.logger.info(f"Experiment {self.config['experiment_type']} has been set up.")
 
         # Get device name
         self.device = self.config['inputs']['device']
@@ -190,7 +193,7 @@ class Experiment(object):
         pass
 
     def reset(self,metadata:bool=False) -> None:
-        self.logger.info(f"Resetting experimental results to release memory.")
+        self.logger.note(f"Resetting experimental results to release memory.")
         
         # Get shapes 
         theta_shape = deepcopy(np.shape(self.thetas[-1])[0] if hasattr(self,'thetas') and self.thetas is not None else (2))
@@ -254,8 +257,8 @@ class Experiment(object):
                 self.config
             )
             # All parameter initialisations
-            parameter_inits = dict(zip(self.sample_names,[0]*len(self.sample_names)))
-            parameter_acceptances = dict(zip(self.sample_names,[0]*len(self.sample_names)))
+            parameter_inits = dict(zip(self.output_names,[0]*len(self.output_names)))
+            parameter_acceptances = dict(zip(self.output_names,[0]*len(self.output_names)))
             # Total samples for table,theta,x posteriors, respectively
             K = deep_call(self,'.od_mcmc.table_steps',1)
             M = deep_call(self,'.sim_mcmc.theta_steps',1)
@@ -263,7 +266,7 @@ class Experiment(object):
             assert K == 1
             assert M == 1
             assert L == 1
-            for sample_name in self.sample_names:
+            for sample_name in self.output_names:
                 # Find last batch of samples and load it
                 filenames = glob(path.join(outputs.outputs_path,f'samples/{sample_name}*.npy'))
                 # Sort by batch number if it exists
@@ -344,7 +347,7 @@ class Experiment(object):
         dims = self.config['inputs']['dims']
         
         # Setup neural net loss
-        if str_in_list('loss',self.sample_names):
+        if str_in_list('loss',self.output_names):
             # Setup chunked dataset to store the state data in
             self.losses = self.outputs.h5group.create_dataset(
                 'loss',
@@ -353,12 +356,12 @@ class Experiment(object):
                 chunks=True,
                 compression=3,
             )
-            self.losses.attrs['dim_names'] = ['time']
+            self.losses.attrs['dim_names'] = XARRAY_SCHEMA['loss']['coords']
             self.losses.attrs['coords_mode__time'] = 'start_and_step'
             self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
         
         # Setup sampled/predicted log destination attractions
-        if str_in_list('log_destination_attraction',self.sample_names):
+        if str_in_list('log_destination_attraction',self.output_names):
             self.log_destination_attractions = self.outputs.h5group.create_dataset(
                 "log_destination_attraction",
                 (dims[1],0),
@@ -366,12 +369,12 @@ class Experiment(object):
                 chunks=True,
                 compression=3,
             )
-            self.log_destination_attractions.attrs["dim_names"] = ["destination","time"]
+            self.log_destination_attractions.attrs["dim_names"] = XARRAY_SCHEMA['log_destination_attraction']['coords']
             self.log_destination_attractions.attrs["coords_mode__time"] = "start_and_step"
             self.log_destination_attractions.attrs["coords__time"] = [self._write_start, self._write_every]
         
         # Setup computation time
-        if str_in_list('computation_time',self.sample_names):
+        if str_in_list('computation_time',self.output_names):
             self.compute_time = self.outputs.h5group.create_dataset(
                 'computation_time',
                 (0,),
@@ -379,11 +382,11 @@ class Experiment(object):
                 chunks=True,
                 compression=3,
             )
-            self.compute_time.attrs['dim_names'] = ['epoch']
+            self.compute_time.attrs['dim_names'] = XARRAY_SCHEMA['computation_time']['coords']
             self.compute_time.attrs['coords_mode__epoch'] = 'trivial'
 
         # Setup sampled/predicted theta
-        if str_in_list('theta',self.sample_names):
+        if str_in_list('theta',self.output_names):
             predicted_thetas = []
             for p_name in self.theta_names:
                 dset = self.outputs.h5group.create_dataset(
@@ -393,7 +396,7 @@ class Experiment(object):
                     chunks=True, 
                     compression=3
                 )
-                dset.attrs['dim_names'] = ['time']
+                dset.attrs['dim_names'] = XARRAY_SCHEMA[p_name]['coords']
                 dset.attrs['coords_mode__time'] = 'start_and_step'
                 dset.attrs['coords__time'] = [self._write_start, self._write_every]
 
@@ -401,7 +404,7 @@ class Experiment(object):
             self.thetas = predicted_thetas
         
         # Setup sampled signs
-        if str_in_list('sign',self.sample_names):
+        if str_in_list('sign',self.output_names):
             self.signs = self.outputs.h5group.create_dataset(
                 "sign",
                 (0,),
@@ -409,12 +412,12 @@ class Experiment(object):
                 chunks=True,
                 compression=3,
             )
-            self.signs.attrs["dim_names"] = ["sign","time"]
+            self.signs.attrs["dim_names"] = XARRAY_SCHEMA['sign']['coords']
             self.signs.attrs["coords_mode__time"] = "start_and_step"
             self.signs.attrs["coords__time"] = [self._write_start, self._write_every]
 
         # Setup sampled tables
-        if str_in_list('table',self.sample_names):
+        if str_in_list('table',self.output_names):
             self.tables = self.outputs.h5group.create_dataset(
                 "table",
                 (*dims,0),
@@ -422,7 +425,7 @@ class Experiment(object):
                 chunks=True,
                 compression=3,
             )
-            self.tables.attrs["dim_names"] = ["origin","destination","time"]
+            self.tables.attrs["dim_names"] = ["origin","destination","iter"]
             self.tables.attrs["coords_mode__time"] = "start_and_step"
             self.tables.attrs["coords__time"] = [self._write_start, self._write_every]
 
@@ -1036,7 +1039,7 @@ class SIM_MCMC(Experiment):
         # Run garbage collector
         gc.collect()
 
-        self.sample_names = ['log_destination_attraction','theta','sign']
+        self.output_names = ['log_destination_attraction','theta','sign']
         
     def run(self) -> None:
 
@@ -1247,7 +1250,7 @@ class JointTableSIM_MCMC(Experiment):
         # Run garbage collector
         gc.collect()
 
-        self.sample_names = ['table','log_destination_attraction','theta','sign']
+        self.output_names = ['table','log_destination_attraction','theta','sign']
 
         # print_json(self.config)
         print(self.sim_mcmc)
@@ -1529,7 +1532,7 @@ class Table_MCMC(Experiment):
         # Run garbage collector to release memory
         gc.collect()
 
-        self.sample_names = ['table']
+        self.output_names = ['table']
 
     def initialise_parameters(self):
         if str_in_list('load_experiment',self.config['inputs']) and \
@@ -1733,7 +1736,7 @@ class TableSummariesMCMCConvergence(Experiment):
         # Run garbage collector to release memory
         gc.collect()
 
-        self.sample_names = ['table']
+        self.output_names = ['table']
 
     def initialise_parameters(self):
             
@@ -1928,23 +1931,32 @@ class SIM_NN(Experiment):
         self.outputs = Outputs(
             self.config,
             module=__name__+kwargs.get('instance',''),
-            name_params=kwargs.get('name_params',{}),
+            sweep_params=kwargs.get('sweep_params',{}),
             log_to_file=True,
             log_to_console=True,
         )
 
+        # Prepare writing to file
+        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+
         # Write metadata
         if self.config.settings.get('export_metadata',True):
             self.logger.debug("Writing metadata ...")
-            dir_path = os.path.join("samples",self.outputs.samples_stamp)
+            if self.config.settings["sweep_mode"]:
+                dir_path = os.path.join("samples",self.outputs.sweep_id)
+                filename = 'metadata'
+            else:
+                dir_path = ""
+                filename = 'config'
+            
             self.outputs.write_metadata(
                 dir_path=dir_path,
-                filename=f"metadata"
+                filename=filename
             )
         
         self.logger.note(f"{self.harris_wilson_nn}")
 
-        self.sample_names = ['log_destination_attraction','theta','loss']
+        self.output_names = ['log_destination_attraction','theta','loss']
         self.theta_names = config['inputs']['to_learn']
         
     def run(self) -> None:
@@ -1996,7 +2008,7 @@ class SIM_NN(Experiment):
         
         if self.config.settings.get('export_metadata',True):
             # Write metadata
-            dir_path = os.path.join("samples",self.outputs.samples_stamp)
+            dir_path = os.path.join("samples",self.outputs.sweep_id)
             self.outputs.write_metadata(
                 dir_path=dir_path,
                 filename=f"metadata"
@@ -2021,9 +2033,9 @@ class ExperimentSweep():
             log_to_file = True,
             log_to_console = True,
         )
-
-        self.logger.info(f"Performing parameter sweep")
         
+        self.logger.info(f"Performing parameter sweep")
+
         # Get config
         self.config = config
 
@@ -2045,27 +2057,17 @@ class ExperimentSweep():
         self.n_workers = self.config.settings['inputs'].get("n_workers",1)
 
         # Parse sweep configurations
-        self.sweep_params = {}
-        for key_path in sweep_key_paths:
-            # Get sweep configuration
-            sweep_input,_ = self.config.path_get(
-                settings=self.config.settings,
-                path=(key_path+["sweep","range"])
-            )
-            # Parse values
-            sweep_vals = self.config.parse_data(sweep_input,(key_path+["sweep","range"]))
-            self.sweep_params[">".join(key_path)] = {
-                "var":key_path[-1],
-                "path": key_path,
-                "values": sweep_vals
-            }
+        self.sweep_params = self.parse_sweep_params(sweep_key_paths)
 
         # Temporarily disable sample output writing
         deep_update(self.config.settings,'export_samples',False)
         self.outputs = Outputs(
             self.config,
-            name_params=kwargs.get('name_params',{})
+            sweep_params=kwargs.get('sweep_params',{})
         )
+        # Prepare writing to file
+        self.outputs.open_output_file(kwargs.get('sweep_params',{}))
+
         # Enable it again
         deep_updates(self.config.settings,{'export_samples':True})
 
@@ -2075,6 +2077,8 @@ class ExperimentSweep():
                 dir_path='',
                 filename=f"config"
             )
+
+        self.logger.info(f"Experiment: {self.outputs.experiment_id}")
     
     def __repr__(self) -> str:
         return "ParameterSweep("+(self.experiment.__repr__())+")"
@@ -2083,6 +2087,24 @@ class ExperimentSweep():
         return f"""
             Sweep key paths: {self.sweep_key_paths}
         """
+
+    def parse_sweep_params(self,params:list=None):
+        sweep_params = {}
+        for key_path in params:
+            # Get sweep configuration
+            sweep_input,_ = self.config.path_get(
+                settings=self.config.settings,
+                path=(key_path+["sweep","range"])
+            )
+            # Parse values
+            sweep_vals = self.config.parse_data(sweep_input,(key_path+["sweep","range"]))
+
+            sweep_params[">".join(key_path)] = {
+                "var":key_path[-1],
+                "path": key_path,
+                "values": sweep_vals
+            }
+        return sweep_params
 
     def run(self):
         # Compute all combinations of sweep parameters
@@ -2122,10 +2144,11 @@ class ExperimentSweep():
             new_experiment = instantiate_experiment(
                 experiment_type=new_config.settings['experiments'][0]['type'],
                 config=new_config,
-                name_params={val['var']:sval[i] for i,val in enumerate(self.sweep_params.values())},
+                sweep_params={val['var']:sval[i] for i,val in enumerate(self.sweep_params.values())},
                 log_to_file=True,
                 log_to_console=False,
-                instance=str(j)
+                instance=str(j),
+                experiment_id=self.outputs.experiment_id
             )
             # Append to experiments
             self.experiments.append(new_experiment)
