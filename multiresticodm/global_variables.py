@@ -61,6 +61,12 @@ XARRAY_SCHEMA = {
         "args_dtype":["int32"],
         "new_shape":["N","1"]
     },
+    'computation_time': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    },
 }
 
 
