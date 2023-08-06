@@ -885,9 +885,8 @@ class Outputs(object):
         coords = {k:np.array(list(v)) for k,v in coords.items()}
 
         # print({k:np.shape(v) for k,v in data_vars.items()})
-        new_data_vars = {k:data_vars[k] for k in ['alpha','log_destination_attraction','beta','loss']}
         # Create an xarray dataset for each sample
-        for sample_name,sample_data in new_data_vars.items():
+        for sample_name,sample_data in data_vars.items():
 
             # Get data dims
             dims = np.shape(sample_data)[1:]
