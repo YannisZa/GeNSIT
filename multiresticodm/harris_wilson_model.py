@@ -65,12 +65,11 @@ class HarrisWilson:
             raise Exception('Cannot instantiate Harris Wilson Model.')
         
         params_to_learn = {}
-        if true_parameters is not None:
-            idx = 0
-            for param in self.config.settings['inputs']['to_learn']:
-                if param not in true_parameters.keys():
-                    params_to_learn[param] = idx
-                    idx += 1
+        idx = 0
+        for param in self.config.settings['inputs']['to_learn']:
+            if true_parameters is not None and param not in list(true_parameters.keys()):
+                params_to_learn[param] = idx
+                idx += 1
         self.params_to_learn = params_to_learn
 
         # Auxiliary hyperparameters
@@ -317,7 +316,7 @@ class HarrisWilson:
             log_destination_attraction = torch.log(new_sizes),
             grand_total = torch.tensor(1.)
         )
-
+        # print(alpha,beta,kappa)
         # Update the current values
         new_sizes = (
             new_sizes
