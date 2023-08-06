@@ -181,9 +181,9 @@ class Experiment(object):
 
         # Update seed if specified
         self.seed = None
-        if "seed" in self.config.keys():
-            self.seed = int(self.config["seed"])
-            self.logger.warning(f"Updated seed to {self.seed}")
+        if "seed" in self.config['inputs'].keys():
+            self.seed = int(self.config['inputs']["seed"])
+            self.logger.info(f"Updated seed to {self.seed}")
         # Get experiment data
         self.logger.info(f"Experiment {self.config['experiment_type']} has been set up.")
 
@@ -1957,6 +1957,8 @@ class SIM_NN(Experiment):
             )
         
         self.logger.note(f"{self.harris_wilson_nn}")
+        
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
 
         self.output_names = ['log_destination_attraction','theta','loss']
         self.theta_names = config['inputs']['to_learn']
