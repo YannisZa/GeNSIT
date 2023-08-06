@@ -6,13 +6,14 @@
 import sys
 import time
 import torch
+import logging
 import numpy as np
-import torch
 
 from torch import nn
 from typing import Any, List, Union
 
 from multiresticodm.config import Config
+from multiresticodm.utils import setup_logger
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS
 
@@ -210,7 +211,7 @@ class HarrisWilson_NN:
         config: Config = None,
         write_every: int = 1,
         write_start: int = 1,
-        **__,
+        **kwargs,
     ):
         '''Initialize the model instance with a previously constructed RNG and
         HDF5 group to write the output data to.
@@ -225,6 +226,15 @@ class HarrisWilson_NN:
             write_start: iteration at which to start writing
             num_steps: number of iterations of the physics_model
         '''
+        # Setup logger
+        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        self.logger = setup_logger(
+            __name__+kwargs.get('instance',''),
+            level=self.level,
+            log_to_file=kwargs.get('log_to_file',True),
+            log_to_console=kwargs.get('log_to_console',True),
+        )
+
         self._rng = rng
 
         # The numerical solver
@@ -282,7 +292,6 @@ class HarrisWilson_NN:
 
         # Process the training set elementwise, updating the loss after batch_size steps
         for t, sample in enumerate(training_data):
-
             predicted_theta = self._neural_net(torch.flatten(sample))
             predicted_dest_attraction = self.physics_model.run_single(
                 curr_destination_attractions=sample,
