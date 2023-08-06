@@ -110,7 +110,7 @@ class Inputs:
             
 
         # Extract parameters to learn
-        if hasattr(self.config.settings['inputs'],'to_learn'):
+        if 'to_learn' in list(self.config.settings['inputs'].keys()):
             params_to_learn = self.config.settings['inputs']['to_learn']
         else:
             params_to_learn = ['alpha','beta']
