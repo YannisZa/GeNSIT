@@ -15,6 +15,7 @@ import coloredlogs
 
 import logging
 from multiresticodm.config import Config
+from multiresticodm.logger_class import LOG_LEVELS
 from multiresticodm.global_variables import TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
 
 
@@ -129,7 +130,7 @@ _common_options = [
     click.option('--n_threads','-nt', type=click.IntRange(min=1,max=AVAILABLE_CORES), multiple=True, 
                  default = ['1','1'],help = '''Overwrites number of threads (per worker) used in multithreading.
             If many are provided first is set as the numpy threads and the second as the numba threads'''),
-    click.option('--logging_mode','-log', type=click.Choice(['debug', 'info', 'warning', 'critical']), default='info', 
+    click.option('--logging_mode','-log', type=click.Choice(['debug', 'info', 'warning', 'critical']+LOG_LEVELS), default='info', 
             help=f'Type of logging mode used.'),
     click.option('--n','-n', type=click.IntRange(min=1), help = 'Overwrites number of MCMC samples'),
     click.option('--table','-tab', type=click.STRING,default=None, help = 'Overwrites input table filename in config'),
