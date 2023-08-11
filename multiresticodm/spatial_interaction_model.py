@@ -14,7 +14,6 @@ def instantiate_sim(
         sim_type:str,
         config:Config=None,
         true_parameters=None,
-        device=None,
         **kwargs
     ):
     
@@ -26,7 +25,6 @@ def instantiate_sim(
     return getattr(sys.modules[__name__], sim_type)(
         config=config,
         true_parameters=true_parameters,
-        device=device,
         **kwargs
     )
     
@@ -42,7 +40,6 @@ class SpatialInteraction2D():
             self,
             config:Config=None,
             true_parameters: dict = None,
-            device: str = None,
             **kwargs
     ):
         '''  Constructor '''
@@ -63,7 +60,7 @@ class SpatialInteraction2D():
             self.config = config
 
         # Device name
-        self.device = device
+        self.device = kwargs.get('device','cpu')
 
         # Instantiate dataset 
         self.data = Dataset()
