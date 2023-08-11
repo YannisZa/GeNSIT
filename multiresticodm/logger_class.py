@@ -14,7 +14,7 @@ HILIGHT = 25
 SUCCESS = 35
 EMPTY = 60
 
-
+LOG_LEVELS = ['trace','remark','note','progress','caution','hilight','success','empty']
     
 # Custom Formatter with additional options
 class CustomFormatter(logging.Formatter):
