@@ -5,6 +5,8 @@ import sys
 import torch
 import logging
 
+from torch import int32, float32, uint8
+
 from multiresticodm.config import Config
 # from multiresticodm.utils import safe_delete,str_in_list
 from multiresticodm.global_variables import PARAMETER_DEFAULTS
