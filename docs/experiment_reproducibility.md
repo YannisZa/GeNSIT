@@ -25,19 +25,19 @@ multiresticodm run ./data/inputs/configs/table_convergence.toml \
 ### Grand total margin constrained
 
 multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_2x3_N_100/ -ax '[0| 1]' \
+ -d ./data/inputs/synthetic_2x3_N_100/ -ax '[0, 1]' \
 -n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et grand_total
 
 multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_2x3_N_5000/ -ax '[0| 1]' \
+ -d ./data/inputs/synthetic_2x3_N_5000/ -ax '[0, 1]' \
 -n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et grand_total
 
 multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_100/ -ax '[0| 1]' \
+ -d ./data/inputs/synthetic_33x33_N_100/ -ax '[0, 1]' \
 -n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -sm -et grand_total
 
 multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[0| 1]' \
+ -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[0, 1]' \
 -n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et grand_total
 
 ### Row margin constrained
@@ -460,13 +460,23 @@ multiresticodm run ./data/inputs/configs/joint_table_sim_inference_high_noise_mc
  -re exp14 -nw 16 -nt 1 -nt 8 -et both_margins_permuted_cells_20% \
  -n 100000 -sp 0.05
 
-## Neural Network SIM
+## Neural Network
+
+### SIM only
 
 clear; multiresticodm run-nn ./data/inputs/configs/sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
  -od origin_demand_sum_normalised.txt \
  -dats destination_attraction_time_series_sum_normalised.txt \
  -re SIM_NN -nw 16 -nt 1 -nt 8 -et test
+
+### Independent (non-joint) Table and SIM
+
+clear; multiresticodm run-nn ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+ -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
+ -od origin_demand_sum_normalised.txt \
+ -dats destination_attraction_time_series_sum_normalised.txt \
+ -re NonJointTableSIM_NN -nw 16 -nt 1 -nt 8 -et test -ax '[]'
 
 ## Plots
 
