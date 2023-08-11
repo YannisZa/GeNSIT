@@ -2,11 +2,12 @@
 import torch
 import numpy as np
 
-from typing import Union, Tuple
 from numba import njit, prange
+from typing import Union, Tuple
+from torch import int32, float32, uint8
 
 from multiresticodm.global_variables import PROBABILITY_UTILS_CACHED
-from multiresticodm.math_utils import log_factorial_vectorised,log_factorial
+from multiresticodm.math_utils import log_factorial
 
 def uniform_binary_choice(n:int=1,choices:list=[-1,1]):
     x = np.random.rand(n)
@@ -24,11 +25,11 @@ def product_multinomial_sample(log_intensity:np.ndarray,rsums:np.ndarray):
     # AVOID USING
 
     # Compute probabilities for each row
-    # log_rsums = np.array([logsumexp(log_intensity[i,:]) for i in range(rsums.shape[0])])
+    # log_rsums = np.array([torch.logsumexp(log_intensity[i,:]) for i in range(rsums.shape[0])])
     p = np.exp(log_intensity-np.log(rsums).reshape((rsums.shape[0],1)))
-    p = p / p.sum(axis=1).reshape((log_intensity.shape[1],1))
+    p = p / p.sum(dim=1).reshape((log_intensity.shape[1],1))
     # Initialise table
-    tab = np.empty(p.shape,dtype='int32')
+    tab = np.empty(p.shape,dtype=int32)
     # Loop through each row and sample it
     for i in range(rsums.shape[0]):
         tab[i,:] = np.random.multinomial(n=rsums[i],pvals=p[i,:])
@@ -40,9 +41,9 @@ def log_odds_ratio_wrt_intensity(log_intensity: np.ndarray):
     # Extract dimensions of intensity
     nrows,ncols = np.shape(log_intensity)
     # Computes log of odds ratio of intensity
-    log_intensity_rowsums = np.array([logsumexp(log_intensity[i,:]) for i in range(nrows)]).reshape((nrows,1))
-    log_intensity_colsums = np.array([logsumexp(log_intensity[:,j]) for j in range(ncols)]).reshape((1,ncols))
-    log_intensity_total = logsumexp(log_intensity_rowsums)
+    log_intensity_rowsums = np.array([torch.logsumexp(log_intensity[i,:]) for i in range(nrows)]).reshape((nrows,1))
+    log_intensity_colsums = np.array([torch.logsumexp(log_intensity[:,j]) for j in range(ncols)]).reshape((1,ncols))
+    log_intensity_total = torch.logsumexp(log_intensity_rowsums)
     # Computes log of odds ratio of intensity
     log_or = log_intensity + \
         log_intensity_total - \
@@ -61,8 +62,8 @@ def log_table_likelihood_total_derivative_wrt_x(likelihood_grad,intensity_grad_x
     # Dimensions
     nrows,ncols = likelihood_grad.shape
     # Reshape necessary objects
-    likelihood_grad = likelihood_grad.reshape((nrows*ncols)).astype('float32')
-    intensity_grad_x = intensity_grad_x.reshape((nrows*ncols,ncols)).astype('float32')
+    likelihood_grad = likelihood_grad.reshape((nrows*ncols)).to(dtype=float32)
+    intensity_grad_x = intensity_grad_x.reshape((nrows*ncols,ncols)).to(dtype=float32)
     # By default chain rule the total derivative is equal to the sum of
     # the derivative of the intensity wrt to x times the derivative of the table likelihood wrt x 
     return (likelihood_grad @ intensity_grad_x)
@@ -70,9 +71,9 @@ def log_table_likelihood_total_derivative_wrt_x(likelihood_grad,intensity_grad_x
 @njit(cache=PROBABILITY_UTILS_CACHED)
 def log_poisson_pmf_unnormalised(log_intensity:np.ndarray,table:np.ndarray) -> float:
     # Compute log intensity total
-    log_total = logsumexp(log_intensity.ravel())
+    log_total = torch.logsumexp(log_intensity.ravel())
     # Compute log pmf
-    return -np.exp(log_total) + np.sum(table.astype('float32')*log_intensity) - log_factorial_vectorised(1,table.ravel()).sum()
+    return -np.exp(log_total) + np.sum(table.to(dtype=float32)*log_intensity) - log_factorial(1,table.ravel()).sum()
 
 
 @njit(cache=PROBABILITY_UTILS_CACHED)
@@ -96,10 +97,10 @@ def log_poisson_pmf_jacobian_wrt_intensity(log_intensity:np.ndarray,table:np.nda
 @njit(cache=PROBABILITY_UTILS_CACHED)
 def log_multinomial_pmf_unnormalised(log_intensity:np.ndarray,table:np.ndarray) -> float:
     # Normalise log intensites by log rowsums to create multinomial probabilities
-    log_probabilities = (log_intensity - logsumexp(log_intensity.ravel())).astype('float32')
+    log_probabilities = (log_intensity - torch.logsumexp(log_intensity.ravel())).to(dtype=float32)
     # Compute log pmf
-    # return np.einsum('ij,ij',table.astype('float32'),log_probabilities)
-    return table.astype('float32').ravel().dot(log_probabilities.ravel()) - log_factorial_vectorised(1,table.ravel()).sum()
+    # return np.einsum('ij,ij',table.to(dtype=float32),log_probabilities)
+    return table.to(dtype=float32).ravel().dot(log_probabilities.ravel()) - log_factorial(1,table.ravel()).sum()
 
 @njit(cache=PROBABILITY_UTILS_CACHED)
 def log_multinomial_pmf_normalised(log_intensity:np.ndarray,table:np.ndarray,) -> float:
@@ -114,9 +115,9 @@ def multinomial_pmf_ground_truth(log_intensity:np.ndarray,table:np.ndarray,axis:
 
 @njit(cache=PROBABILITY_UTILS_CACHED)
 def log_multinomial_pmf_jacobian_wrt_intensity(log_intensity:np.ndarray,table:np.ndarray) -> float:
-    table = table.astype('float32')
+    table = table.to(dtype=float32)
     # Compute intensity
-    intensity = np.exp(log_intensity).astype('float32')
+    intensity = np.exp(log_intensity).to(dtype=float32)
     # Compute likelihood derivative wrt to intensity
     return table/intensity - np.sum(table)/np.sum(intensity)
 
@@ -126,18 +127,18 @@ def log_product_multinomial_pmf_unnormalised(log_intensity:np.ndarray,table:np.n
     # Get dimensions
     nrows,ncols = np.shape(table)
     # Compute log margins of intensity matrix
-    log_rowsums = np.asarray([[logsumexp(log_intensity[i,:]) for i in range(nrows)]],dtype='float32')
+    log_rowsums = np.asarray([[torch.logsumexp(log_intensity[i,:]) for i in range(nrows)]],dtype=float32)
     # Normalise log intensites by log rowsums to create multinomial probabilities
-    log_probabilities = (log_intensity - log_rowsums.reshape((nrows,1))).astype('float32')
+    log_probabilities = (log_intensity - log_rowsums.reshape((nrows,1))).to(dtype=float32)
     # Compute log pmf
-    return table.astype('float32').ravel().dot(log_probabilities.ravel()) - log_factorial_vectorised(1,table.ravel()).sum()
+    return table.to(dtype=float32).ravel().dot(log_probabilities.ravel()) - log_factorial(1,table.ravel()).sum()
 
 
 @njit(cache=PROBABILITY_UTILS_CACHED)
 def log_product_multinomial_pmf_normalised(log_intensity:np.ndarray,table:np.ndarray) -> float:
     # Return log pmf
     log_target = log_product_multinomial_pmf_unnormalised(log_intensity,table) + \
-        log_factorial_vectorised(1,table.sum(axis=1).astype('int32')).sum()    
+        log_factorial(1,table.sum(dim=1).to(dtype=int32)).sum()    
     return log_target
 
 
@@ -145,7 +146,7 @@ def log_product_multinomial_pmf_normalised(log_intensity:np.ndarray,table:np.nda
 def product_multinomial_pmf_ground_truth(log_intensity:np.ndarray,table:np.ndarray,axis:int=None) -> float:
     if axis is None:
         axis = 1
-    return np.sum(table,axis=axis)/np.sum(np.exp(log_intensity),axis=axis) * np.exp(log_intensity)
+    return np.sum(table,dim=axis)/np.sum(np.exp(log_intensity),dim=axis) * np.exp(log_intensity)
 
 
 @njit(cache=PROBABILITY_UTILS_CACHED)
@@ -154,8 +155,8 @@ def log_product_multinomial_pmf_jacobian_wrt_intensity(log_intensity:np.ndarray,
     nrows,ncols = np.shape(table)
     intensity = np.exp(log_intensity)
     # Compute log margins of intensity and table
-    intensity_rowsums = intensity.sum(axis=1)
-    table_rowsums = table.sum(axis=1)
+    intensity_rowsums = intensity.sum(dim=1)
+    table_rowsums = table.sum(dim=1)
     # Normalise log intensites by log colsums to create multinomial probabilities
     return table/intensity - (table_rowsums/intensity_rowsums).reshape((nrows,1))
 
@@ -166,16 +167,16 @@ def log_fishers_hypergeometric_pmf_unnormalised(log_intensity:np.ndarray,table:n
     # Compute log odds ratio
     log_or = log_odds_ratio_wrt_intensity(log_intensity)
     # Compute log_probabilities
-    log_or_colsums = np.asarray([[logsumexp(log_or[:,j]) for j in range(dims[1])]],dtype='float32')
+    log_or_colsums = np.asarray([[torch.logsumexp(log_or[:,j]) for j in range(dims[1])]],dtype=float32)
     log_or_probabilities = log_or - log_or_colsums.reshape((1,dims[1]))
     # Compute log pmf
-    return table.astype('float32').ravel().dot(log_or_probabilities.ravel()) - log_factorial_vectorised(1,table.ravel()).sum()
+    return table.to(dtype=float32).ravel().dot(log_or_probabilities.ravel()) - log_factorial(1,table.ravel()).sum()
 
 @njit(cache=PROBABILITY_UTILS_CACHED)
 def log_fishers_hypergeometric_pmf_normalised(log_intensity:np.ndarray,table:np.ndarray) -> float:
     # Return log pmf
     return  log_fishers_hypergeometric_pmf_unnormalised(log_intensity,table) + \
-        log_factorial_vectorised(1,table.sum(axis=0).astype('int32')).sum()
+        log_factorial(1,table.sum(dim=0).to(dtype=int32)).sum()
 
 
 @njit(cache=PROBABILITY_UTILS_CACHED)
@@ -184,7 +185,7 @@ def fishers_hypergeometric_pmf_ground_truth(log_intensity:np.ndarray,table:np.nd
         axis = 0
     # Compute odds ratio
     odds_ratio = np.exp(log_odds_ratio_wrt_intensity(log_intensity=log_intensity))
-    return np.sum(table,axis=axis) * (odds_ratio / np.sum(odds_ratio,axis=axis))
+    return np.sum(table,dim=axis) * (odds_ratio / np.sum(odds_ratio,dim=axis))
 
 
 @njit(cache=PROBABILITY_UTILS_CACHED)
@@ -194,20 +195,20 @@ def log_fishers_hypergeometric_pmf_jacobian_wrt_intensity(log_intensity:np.ndarr
     # Intensity
     intensity = np.exp(log_intensity)
     # Compute log margins of intensity
-    intensity_rowsums = intensity.sum(axis=1)
+    intensity_rowsums = intensity.sum(dim=1)
     # Compute odd ratio
     odds_ratio = np.exp(log_odds_ratio_wrt_intensity(log_intensity))
     # Compute odd ratio margins
-    odds_ratio_colsums = odds_ratio.sum(axis=0)
+    odds_ratio_colsums = odds_ratio.sum(dim=0)
     # Compute log margins of table 
-    table_rowsums = table.sum(axis=1)
-    table_colsums = table.sum(axis=0)
+    table_rowsums = table.sum(dim=1)
+    table_colsums = table.sum(dim=0)
     # Store temp quantity
     temp = (table_colsums/odds_ratio_colsums).T*odds_ratio
     # All entry contributions
     log_pmf_grad = (table-temp)/intensity
     # Rowsum contributions
-    log_pmf_grad -= (table_rowsums-temp.sum(axis=1)).reshape((nrows,1))/(intensity_rowsums.reshape((nrows,1)))
+    log_pmf_grad -= (table_rowsums-temp.sum(dim=1)).reshape((nrows,1))/(intensity_rowsums.reshape((nrows,1)))
     return log_pmf_grad
 
 @njit(cache=PROBABILITY_UTILS_CACHED)
@@ -225,7 +226,7 @@ def multinomial_mode(n,p):
     # Get length of probability vector
     r = np.shape(p)[0]
     # Make make first towards finding mode
-    kis = np.floor((n+r/2)*p).astype('int32')
+    kis = np.floor((n+r/2)*p).to(dtype=int32)
     # Sum all elements to check if they sum up to n
     n0 = int(np.sum(kis))
     # Generate random vector in [0,1]^r
@@ -250,7 +251,7 @@ def multinomial_mode(n,p):
             qis[min_index] = fis[min_index]/kis[min_index]
             n0 -= 1
 
-    return kis.astype('int32')
+    return kis.to(dtype=int32)
 
 
 @njit
@@ -278,7 +279,7 @@ def compute_truncated_infinite_series(N:int,log_weights:np.array,k_power:float) 
     
     # Compute increasing averages estimator (Appendix C5)
     for i in range(0, N+1):
-        ln_Y[i] = np.log(i+1) - logsumexp(log_weights[:i+1])
+        ln_Y[i] = np.log(i+1) - torch.logsumexp(log_weights[:i+1])
     # Compute first term in series
     ln_Y_pos[0] = ln_Y[0]
     # Compute log of Y[i]/P(N > i) and Y[i-1]/P(N > i)
@@ -286,8 +287,8 @@ def compute_truncated_infinite_series(N:int,log_weights:np.array,k_power:float) 
         ln_Y_pos[i] = ln_Y[i] + k_power*np.log(i)
         ln_Y_neg[i-1] = ln_Y[i-1] + k_power*np.log(i)
     # Sum of all positive and negative terms and convert back to log
-    positive_sum = logsumexp(ln_Y_pos)
-    negative_sum = logsumexp(ln_Y_neg)
+    positive_sum = torch.logsumexp(ln_Y_pos)
+    negative_sum = torch.logsumexp(ln_Y_neg)
 
     ret = np.empty(2)
     # If positive terms are larger in magnitude than negative terms
