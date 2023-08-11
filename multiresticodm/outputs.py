@@ -14,10 +14,11 @@ from glob import glob
 from pathlib import Path
 from copy import deepcopy
 from tqdm.auto import tqdm
-from itertools import product,chain
-from argparse import Namespace
 from datetime import datetime
+from argparse import Namespace
 from typing import Union,List,Tuple
+from itertools import product,chain
+from torch import int32, float32, uint8
 from multiresticodm.inputs import Inputs
 # from numba_progress import ProgressBar
 
@@ -621,7 +622,7 @@ class Outputs(object):
                         )
                     )
                     # Convert to tensor
-                    self.ground_truth_table = torch.tensor(self.ground_truth_table,dtype=torch.int32)
+                    self.ground_truth_table = torch.tensor(self.ground_truth_table,dtype=int32)
                 except:
                     # Try reading it from inputs
                     try:
@@ -996,12 +997,12 @@ class Outputs(object):
 
             # Compute log intensity function
             samples = sim.log_intensity(
-                grand_total=torch.tensor(table_total,dtype=torch.int32),
+                grand_total=torch.tensor(table_total,dtype=int32),
                 **data
             )
 
             # Exponentiate
-            samples = torch.exp(samples).to(dtype=torch.float32)
+            samples = torch.exp(samples).to(dtype=float32)
 
         elif sample_name.endswith("__error"):
             # Load all samples
@@ -1115,7 +1116,7 @@ class Outputs(object):
             return data
         
         elif not str_in_list(sample_name,OUTPUT_TYPES.keys()):
-            return convert_string_to_torch_function(statistic)(data.float(),dim=axis).to(dtype=torch.float32)
+            return convert_string_to_torch_function(statistic)(data.float(),dim=axis).to(dtype=float32)
         
         elif statistic.lower() == 'signedmean' and \
             str_in_list(sample_name,OUTPUT_TYPES.keys()): 
@@ -1123,7 +1124,7 @@ class Outputs(object):
                 and hasattr(self.data,'sign'):
                 signs = self.data.sign.unsqueeze(1)
                 # Compute moments
-                return ( torch.einsum('nk,n...->k...',signs.float(),data.float()) / torch.sum(torch.ravel(signs.float()))).to(dtype=torch.float32)
+                return ( torch.einsum('nk,n...->k...',signs.float(),data.float()) / torch.sum(torch.ravel(signs.float()))).to(dtype=float32)
             else:
                 return self.compute_sample_statistics(data,sample_name,'mean',axis)
        
@@ -1136,7 +1137,7 @@ class Outputs(object):
                 # Compute intensity variance
                 samples_mean = self.compute_sample_statistics(data,sample_name,'signedmean',axis)
                 samples_squared_mean = np.einsum('nk,n...->k...',signs,torch.pow(data.float(),2)) / torch.sum(torch.ravel(signs.float()))
-                return (samples_squared_mean.float() - torch.pow(samples_mean.float(),2)).to(dtype=torch.float32)
+                return (samples_squared_mean.float() - torch.pow(samples_mean.float(),2)).to(dtype=float32)
             else:
                 return self.compute_sample_statistics(data,sample_name,'var',axis)
         
@@ -1151,7 +1152,7 @@ class Outputs(object):
             )
        
         else:
-            return convert_string_to_torch_function(statistic)(data.float(),dim=axis).to(dtype=torch.float32)
+            return convert_string_to_torch_function(statistic)(data.float(),dim=axis).to(dtype=float32)
 
     def apply_sample_statistics(self,samples,sample_name,statistic_axes:Union[List,Tuple]=[]):
         # print('apply_sample_statistics',sample_name,statistic_axes)
