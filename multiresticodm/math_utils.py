@@ -5,20 +5,17 @@ from tqdm import tqdm
 from scipy import optimize
 from itertools import product
 from numba_progress import ProgressBar
+from torch import int32, float32, uint8
 from itertools import chain, combinations
-from numba import njit, vectorize, float32, int32, int64, int8, prange, guvectorize
+
+from numba import njit, vectorize, prange, guvectorize
 
 from multiresticodm.utils import flatten
 from multiresticodm.global_variables import MATH_UTILS_CACHED
 
 
-@njit(cache=MATH_UTILS_CACHED)
-def log_factorial(end:int,start:int=1):
-    return sum([np.log(x) for x in prange(int(start)+1,int(end)+1)])
-
-@vectorize([float32(int32, int32),float32(int64, int32),float32(int8, int32)])
-def log_factorial_vectorised(start:np.ndarray,end:np.ndarray):
-    return sum([np.log(x) for x in prange(start+1,end+1)])
+def log_factorial(start:int32,end:int32):
+    return torch.sum(torch.log(torch.range(int32(start+1),int32(end))))
 
 @njit(cache=MATH_UTILS_CACHED)
 def positive_sigmoid(x,scale:float=1.0):
@@ -312,8 +309,8 @@ def SRMSE(tab:np.array,tab0:np.array,**kwargs:dict):
     # Get dimensions
     dims = np.shape(tab)[1:]
     # Compute SRMSE
-    numerator = torch.pow( torch.sum(torch.pow(tab0-tab,2),dim=(1,2)) / torch.tensor((np.prod(dims)),dtype=torch.float32), 0.5)
-    denominator = ( torch.sum(torch.ravel(tab0)) / torch.tensor(np.prod(dims)) ).to(dtype=torch.float32)
+    numerator = torch.pow( torch.sum(torch.pow(tab0-tab,2),dim=(1,2)) / torch.tensor((np.prod(dims)),dtype=float32), 0.5)
+    denominator = ( torch.sum(torch.ravel(tab0)) / torch.tensor(np.prod(dims)) ).to(dtype=float32)
     srmse = numerator / denominator
 
     return srmse
