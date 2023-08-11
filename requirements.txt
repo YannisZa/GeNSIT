@@ -254,3 +254,4 @@ torch==2.0.1
 pathos==0.2.9
 dask==2023.3.2
 xarray==2023.1.0
+inflect==7.0.0
