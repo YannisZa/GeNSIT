@@ -234,7 +234,7 @@ class HarrisWilson_NN:
             log_to_file=kwargs.get('log_to_file',True),
             log_to_console=kwargs.get('log_to_console',True),
         )
-
+        # Store random number generator
         self._rng = rng
 
         # The numerical solver
@@ -253,8 +253,8 @@ class HarrisWilson_NN:
         self.loss_function = LOSS_FUNCTIONS[loss_function.get('name').lower()](
             loss_function.get('args', None), **loss_function.get('kwargs', {})
         )
-        self._current_loss = torch.tensor(0.0, requires_grad=False)
-        self._current_predictions = torch.stack(
+        self._loss_sample = torch.tensor(0.0, requires_grad=False)
+        self._theta_sample = torch.stack(
             [torch.tensor(0.0, requires_grad=False)] * len(to_learn)
         )
 
@@ -271,7 +271,7 @@ class HarrisWilson_NN:
         training_data: torch.tensor,
         batch_size: int,
         dt: float = None,
-        **__,
+        **kwargs,
     ):
 
         '''Trains the model for a single epoch.
@@ -291,17 +291,17 @@ class HarrisWilson_NN:
         n_processed_steps = 0
 
         # Process the training set elementwise, updating the loss after batch_size steps
-        for t, sample in enumerate(training_data):
-            predicted_theta = self._neural_net(torch.flatten(sample))
+        for t, data in enumerate(training_data):
+            predicted_theta = self._neural_net(torch.flatten(data))
             predicted_dest_attraction = self.physics_model.run_single(
-                curr_destination_attractions=sample,
+                curr_destination_attractions=data,
                 free_parameters=predicted_theta,
                 dt=dt,
                 requires_grad=True,
             )
 
             # Update loss
-            loss = loss + self.loss_function(predicted_dest_attraction, sample)
+            loss = loss + self.loss_function(predicted_dest_attraction, data)
 
             n_processed_steps += 1
 
@@ -311,40 +311,88 @@ class HarrisWilson_NN:
                 self._neural_net.optimizer.step()
                 self._neural_net.optimizer.zero_grad()
                 self._time += 1
-                self._current_loss = (
+                self._loss_sample = (
                     loss.clone().detach().cpu().numpy().item() / n_processed_steps
                 )
                 self._theta_sample = predicted_theta.clone().detach().cpu()
                 self._log_destination_attraction_sample = torch.log(predicted_dest_attraction).clone().detach().cpu()
-                self.write_data(experiment)
+                # Write data
+                experiment.write()
                 del loss
                 loss = torch.tensor(0.0, requires_grad=True)
                 n_processed_steps = 0
 
-        return predicted_theta, torch.log(torch.squeeze(predicted_dest_attraction))
+        return loss, predicted_theta, torch.log(predicted_dest_attraction.squeeze())
 
-    def write_data(self,experiment):
-        '''Write the current state into the state dataset.
 
-        In the case of HDF5 data writing that is used here, this requires to
-        extend the dataset size prior to writing; this way, the newly written
-        data is always in the last row of the dataset.
+    def epoch_time_step(
+        self,
+        *,
+        loss,
+        n_processed_steps,
+        experiment,
+        nn_data: torch.tensor,
+        t: int,
+        dt: float,
+        batch_size: int,
+        data_size: int,
+        loss_data: torch.tensor = None,
+        **__,
+    ):
+
+        '''Trains the model for a single epoch and time step.
+
+        :param training_data: the training data
+        :param batch_size: the number of time series elements to process before conducting a gradient descent
+                step
+        :param epsilon: (optional) the epsilon value to use during training
+        :param dt: (optional) the time differential to use during training
+        :param __: other parameters (ignored)
         '''
-        if self._time >= self._write_start and (self._time % self._write_every == 0):
 
-            if 'loss' in experiment.output_names:
-                experiment.losses.resize(experiment.losses.shape[0] + 1, axis=0)
-                experiment.losses[-1] = self._current_loss
+        predicted_theta = self._neural_net(torch.flatten(nn_data))
+        predicted_dest_attraction = self.physics_model.run_single(
+            curr_destination_attractions=nn_data,
+            free_parameters=predicted_theta,
+            dt=dt,
+            requires_grad=True,
+        )
 
-            if 'theta' in experiment.output_names:
-                for idx, dset in enumerate(experiment.thetas):
-                    dset.resize(dset.shape[0] + 1, axis=0)
-                    dset[-1] = self._theta_sample[idx]
+        # Update loss
+        loss = loss + self.loss_function(predicted_dest_attraction, nn_data)
+        # Update number of processed steps
+        n_processed_steps = n_processed_steps + 1
+
+        # Update the model parameters after every batch and clear the loss
+        if t % batch_size == 0 or t == data_size - 1:
+            # Update gradients and time
+            loss.backward()
+            self._neural_net.optimizer.step()
+            self._neural_net.optimizer.zero_grad()
+            self._time += 1
             
-            if 'log_destination_attraction' in experiment.output_names:
-                experiment.log_destination_attractions.resize(experiment.log_destination_attractions.shape[1] + 1, axis=1)
-                experiment.log_destination_attractions[:,-1] = self._log_destination_attraction_sample.flatten()
+            # Store samples
+            _loss_sample = (
+                loss.clone().detach().cpu().numpy().item() / n_processed_steps
+            )
+            _theta_sample = predicted_theta.clone().detach().cpu()
+            _log_destination_attraction_sample = torch.log(predicted_dest_attraction).clone().detach().cpu()
 
+            # Write to file
+            experiment.write_data(
+                time = self._time,
+                write_every = self._write_every,
+                write_start = self._write_start,
+                loss = _loss_sample,
+                theta = _theta_sample,
+                log_destination_attraction = _log_destination_attraction_sample
+            )
+            # Delete loss
+            del loss
+            loss = torch.tensor(0.0, requires_grad=True)
+            n_processed_steps = 0
+
+        return loss, predicted_theta, torch.log(predicted_dest_attraction.squeeze())
 
     def __repr__(self):
         return f"{self.physics_model.noise_regime}Noise HarrisWilson NeuralNet( {self.sim.sim_type}(SpatialInteraction2D) )"
