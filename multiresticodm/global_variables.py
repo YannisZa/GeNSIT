@@ -1,6 +1,9 @@
 import logging
 import torch 
 
+from torch import int32, float32, uint8, int8, float64, int64, int16
+from torch import bool as tbool
+
 PARAMETER_DEFAULTS = {
     'alpha': 0, 
     'beta': 1, 
@@ -83,14 +86,14 @@ DISTANCE_FUNCTIONS = [
 ]
 
 NUMPY_TO_TORCH_DTYPE = {
-    'float32':torch.float32,
-    'float64':torch.float64,
-    'uint8':torch.uint8,
-    'int8':torch.int8,
-    'int16':torch.int16,
-    'int32':torch.int32,
-    'int64':torch.int64,
-    'bool':torch.bool
+    'float32':float32,
+    'float64':float64,
+    'uint8':uint8,
+    'int8':int8,
+    'int16':int16,
+    'int32':int32,
+    'int64':int64,
+    'bool':tbool
 }
 
 
