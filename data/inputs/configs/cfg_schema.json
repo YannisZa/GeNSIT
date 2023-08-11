@@ -354,16 +354,7 @@
       }
     }
   },
-  "neural_network": {
-    "sweepable": false,
-    "optional": false,
-
-    "disable_tqdm": {
-      "sweepable": false,
-      "optional": true,
-      "dtype": "bool",
-      "default-value": true
-    },
+  "training": {
     "table_inference": {
       "sweepable": false,
       "optional": false,
@@ -403,6 +394,17 @@
       "dtype": "int",
       "default-value": 1,
       "valid-range": [1, null]
+    }
+  },
+  "neural_network": {
+    "sweepable": false,
+    "optional": false,
+
+    "disable_tqdm": {
+      "sweepable": false,
+      "optional": true,
+      "dtype": "bool",
+      "default-value": true
     },
     "to_learn": {
       "sweepable": true,
@@ -729,6 +731,7 @@
           "SIM_NN",
           "SIM_MCMC",
           "TableMCMC",
+          "NonJointTableSIM_NN",
           "JointTableSIM_NN",
           "JointTableSIM_MCMC"
         ]
