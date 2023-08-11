@@ -1,18 +1,21 @@
+import torch
 import logging
 import numpy as np
+import torch.distributions as distr
 
 from os import path
 from copy import deepcopy
 from argparse import Namespace
+from torch import int32, float32, uint8
 from typing import Union, Tuple, Dict, List
 from scipy.stats import nchypergeom_fisher
 
 
-from multiresticodm.utils import  setup_logger, str_in_list, tuplize, flatten, set_numba_torch_threads
 from multiresticodm.math_utils import log_factorial
-from multiresticodm.probability_utils import uniform_binary_choice, log_odds_cross_ratio
 from multiresticodm.markov_basis import instantiate_markov_basis,MarkovBasis
 from multiresticodm.contingency_table import ContingencyTable, ContingencyTable2D
+from multiresticodm.probability_utils import uniform_binary_choice, log_odds_cross_ratio
+from multiresticodm.utils import  setup_logger, str_in_list, tuplize, flatten, set_numba_torch_threads
 
 
 class ContingencyTableMarkovChainMonteCarlo(object):
@@ -21,7 +24,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
     Work Station for holding and running Monte Carlo methods on table space.
     """
 
-    def __init__(self, ct: ContingencyTable, table_mb:MarkovBasis=None, **kwargs):
+    def __init__(self, ct: ContingencyTable, rng: np.random.Generator, table_mb:MarkovBasis=None, **kwargs):
         # Setup logger
         self.level = ct.config.level if hasattr(ct.config,'level') else kwargs.get('level','INFO')
         self.logger = setup_logger(
@@ -48,6 +51,9 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         else:
             raise Exception(f'ContingencyTableMarkovChainMonteCarlo did not recognise input of type {ct.__class__.__name__}')
 
+        # Store random number generator
+        self._rng = rng
+        
         # Get number of cores/threads to use in (pseudo) parallelisation
         self.n_workers = int(self.ct.config.settings['inputs'].get('n_workers',1))
         self.n_threads = list(self.ct.config.settings['inputs'].get('n_threads',['1','1']))
@@ -95,7 +101,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             Number of Table Markov bases: {len(self.table_mb.basis_dictionaries)}
             Number of workers: {self.n_workers}
             Number of threads (numpy,numba): {str(self.n_threads)}
-            Random number generation seed: {self.ct.seed}
+            Random number generator: {self._rng}
         """
 
     def __repr__(self):
@@ -166,32 +172,22 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # If no intensity provided 
         # Use uniform intensity for every cell
         if intensity is None:
-            intensity = np.ones(self.ct.dims,dtype='float32')
+            intensity = torch.ones(self.ct.dims,dtype=float32)
 
-        # If table can be sampled in closed form
-        # Sample directly from the table distribution
-        # if self.proposal_type.lower() == 'direct_sampling':
-        #     # Get direct sampling proposal
-        #     direct_sampling_proposal = getattr(self,f"direct_sampling_proposal_{self.ct.ndims()}way_table")
-        #     table0,_,_,_,_ = direct_sampling_proposal(
-        #         table_prev=None,
-        #         log_intensity=np.log(intensity)
-        #     )
-        # Otherwise initialise based on user-defined solver
-        # else:
         # Sample uncostrained margins
         self.sample_unconstrained_margins(intensity)
         # Use table solver to get initial table
         table0 = self.table_solver(
             intensity=intensity,
-            margins=margins
+            margins=margins,
+            ct_mcmc=self
         )
         
         return table0
     
     
     def sample_margins_2way_table(self, intensity: list = None, axes: list = None) -> None:
-        
+
         self.logger.debug('initialise_margins_2way_tables')
         
         # Sort axes
@@ -199,32 +195,38 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
         # Set probabilities to uniform
         if intensity is None:
-            intensity = np.ones(self.ct.dims,dtype='float32')
+            intensity = torch.ones(self.ct.dims,dtype=float32)
         
         margins = {}
         for ax in sorted_axes:
             if len(ax) == self.ct.ndims():
                 # Calculate normalisation of multinomial probabilities (total intensity)
-                total_intensity = np.sum(intensity.ravel())
+                total_intensity = torch.sum(intensity.ravel())
                 # If this is the only constraint
                 if len(sorted_axes) == 1:
                     # Sample grand total from Poisson
-                    margins[ax] = np.array([np.random.poisson(total_intensity)],dtype='int32')
+                    margins[ax] = distr.poisson.Poisson(
+                        rate = grand_total.item(),
+                    ).sample().to(dtype=int32)
                 else:
                     # Get margin grand total data
-                    margins[ax] = np.array([np.sum(intensity)],dtype='int32')
-
+                    margins[ax] = total_intensity.to(dtype=int32)
+                    
             elif len(ax) == 1:
                 # Get total
-                grand_total = self.ct.margins[tuplize(range(self.ct.ndims()))][0]
+                grand_total = self.ct.margins[tuplize(range(self.ct.ndims()))]
                 # Compute multinomial probabilities
-                table_probabilities = intensity/intensity.sum()
-                margin_probabilities = np.sum(
+                table_probabilities = torch.div(intensity,grand_total)
+                margin_probabilities = torch.sum(
                     table_probabilities,
-                    axis=tuplize(ax)
+                    dim=tuplize(ax),
+                    keepdim=False
                 ).flatten()
                 # Sample row or column margin from Multinomial conditioned on grand total
-                margins[ax] = np.random.multinomial(grand_total,margin_probabilities).astype('int32')
+                margins[ax] = distr.multinomial.Multinomial(
+                    total_count = grand_total.item(),
+                    probs = margin_probabilities
+                ).sample().to(dtype=int32)
             else:
                 raise Exception(f"margins for axes {ax} could not be initialised")
 
@@ -268,7 +270,6 @@ class ContingencyTableMarkovChainMonteCarlo(object):
     def build_table_distribution(self) -> None:
 
         build_successful = True
-
         self.target_distribution = self.ct.distribution_name.replace("_", " ").capitalize()
         self.sample_margins = getattr(self, f'sample_margins_{self.ct.ndims()}way_table')
         if self.proposal_type.lower() == 'direct_sampling':
@@ -313,8 +314,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # Number of steps to skip storing a sample (thinning)
         self.table_thinning = 1
         if str_in_list('thinning', self.ct.config.settings['mcmc']['contingency_table'].keys()):
-            self.table_thinning = int(
-                self.ct.config.settings['mcmc']['contingency_table']['thinning'])
+            self.table_thinning = int(self.ct.config.settings['mcmc']['contingency_table']['thinning'])
 
         if len(self.ct.distribution_name) > 0:
             build_successful = build_successful and self.build_table_distribution()
@@ -326,41 +326,30 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             raise Exception(
                 f'Proposal type {self.proposal_type.lower()} for type {self.ct.__class__.__name__} not defined')
 
-    def log_intensities_to_multinomial_log_probabilities(self, log_intensity: Union[np.array, np.ndarray], column_indices: List[Tuple] = None):
+    def log_intensities_to_multinomial_log_probabilities(self, log_intensity: torch.tensor, column_indices: List[Tuple] = None):
 
         self.logger.debug('Log intensities to multinomial log probabilities')
 
         # Compute cell intensities
         # depending on dimensionality of log cell intensities
-        if len(np.shape(log_intensity)) == 1:
+        if len(list(log_intensity.shape)) <= 2:
             # Slice log cell intensities at column of interest
             if column_indices is not None:
-                log_intensity = log_intensity[column_indices]
-            # Get dimensions of cell intensities
-            nrows,ncols = np.shape(log_intensity)
+                log_intensity = log_intensity[...,-1:][column_indices]
             # Compute unnormalised log probabilities
-            log_intensities_colsums = np.array([logsumexp(log_intensity[j]) for j in range(ncols)])
-        elif len(np.shape(log_intensity)) == 2:
-            # Slice log cell intensities at column of interest
-            if column_indices is not None:
-                log_intensity = log_intensity[:, column_indices]
-            # Get dimensions of cell intensities
-            I, J = np.shape(log_intensity)
-            # Compute unnormalised log probabilities
-            log_intensities_colsums = np.array(
-                [logsumexp(log_intensity[:, j]) for j in range(J)])
+            log_intensities_colsums = torch.logsumexp(log_intensity,dim=0)
         else:
             raise Exception(
                 f'Cannot handle log_intensity with dimensions {len(np.shape(log_intensity))}')
 
         # Get total intensities (normalising factor in log space)
-        total_log_intensities = logsumexp(log_intensities_colsums)
+        total_log_intensities = torch.logsumexp(log_intensities_colsums)
         # Get normalised probabilities
         log_probabilities = log_intensities_colsums-total_log_intensities
 
         return self.ct.margins[tuplize(range(self.ct.ndims()))], log_probabilities, log_intensities_colsums
 
-    def get_table_step_size_support(self, table_prev: np.ndarray, basis_function: np.ndarray, non_zero_cells: List[Tuple]) -> Union[list, np.array]:
+    def get_table_step_size_support(self, table_prev: torch.tensor, basis_function: torch.tensor, non_zero_cells: List[Tuple]) -> list:
         # Get maximum value of current table at cells where markov basis non-negative
         # Get minimum values across two diagonal of the 2x2 subtable
         min_value1 = min([table_prev[non_zero_cells[0]],
@@ -388,14 +377,24 @@ class ContingencyTableMarkovChainMonteCarlo(object):
     
     def poisson_sample_2way_table(self,margin_probabilities):
         # Initialise table to zero
-        table_new = np.zeros(self.ct.dims, dtype='int32')
-        for cell in self.ct.constraints['cells']:
-            table_new[cell] = np.int32(self.ct.table[cell])
+        table_new = torch.zeros(tuple(self.ct.dims), dtype=int32)
+        # Get fixed cells
+        fixed_cells = np.array(self.ct.constraints['cells'])
+        # Apply cell constaints if at least one cell is fixed
+        if len(fixed_cells) > 0:
+            # Extract indices,
+            fixed_indices = [ fixed_cells[:,i] for i in range(self.ct.ndims()) ]
+            # Fix table cells
+            table_new[ fixed_indices ] = self.ct.ground_truth_table[ fixed_indices ]
+
+        # Non fixed (free) indices
+        free_cells = np.array(self.ct.cells)
+        free_indices = [ free_cells[:,i] for i in range(self.ct.ndims()) ]
+
         # Update remaining table cells
         continue_loop = True
         while continue_loop:
-            for cell in self.ct.cells:
-                table_new[cell] = np.int32(np.random.poisson(margin_probabilities[cell])) 
+            table_new[ free_indices ] = distr.poisson.Poisson(rate = margin_probabilities[ free_indices ]).sample().to(dtype=int32)
             # Continue loop only if table is not sparse admissible
             continue_loop = not self.ct.table_sparse_admissible(table_new)
         return table_new
@@ -407,61 +406,58 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         continue_loop = True
         while continue_loop:
             # Sample from multinomial
-            table_new = np.random.multinomial(
-                n=self.ct.margins[tuplize(axis_constrained)].item(),
-                pvals=margin_probabilities.ravel()).astype('int32')
+            table_new = distr.multinomial.Multinomial(
+                total_count=self.ct.margins[tuplize(axis_constrained)].item(),
+                probs=margin_probabilities.ravel()
+            ).sample()
             # Reshape table to match original dims
-            table_new = np.reshape(table_new, tuplize(self.ct.dims))
+            table_new = torch.reshape(table_new, tuplize(self.ct.dims)).to(dtype=int32)
             # Continue loop only if table is not sparse admissible
             continue_loop = not self.ct.table_sparse_admissible(table_new)
-            
-        # Make sure sampled table has the right shape
-        # if np.shape(table_new) != tuplize(self.dims):
-            # table_new = table_new.T
         
         return table_new
 
     def product_multinomial_sample_2way_table(self,margin_probabilities):
+        # This is the case with either margins fixed (but not both)
+
         # Get constrained axes
         axis_constrained = min(self.ct.constraints['constrained_axes'], key=len)
+        # Get plain uncostrained axis (must have length 1)
+        axis_constrained_flat = next(flatten(axis_constrained))
         # Get all unconstrained axes
         axis_uncostrained = deepcopy(self.ct.constraints['unconstrained_axes'])
         # Get plain uncostrained axis (must have length 1)
         axis_uncostrained_flat = next(flatten(axis_uncostrained))
-        # This is the case with either margins fixed (but not both)
         # Sample from product multinomials
         continue_loop = True
         while continue_loop:
-            table_new = np.array(
+            table_new = torch.cat(
                 [
-                    np.random.multinomial(
-                        n=msum, 
-                        pvals=margin_probabilities.take(
-                            indices=i, 
-                            axis=axis_uncostrained_flat
-                        )
-                    )
+                    distr.multinomial.Multinomial(
+                        total_count = msum.item(),
+                        probs = margin_probabilities[[i if n == axis_uncostrained_flat else None for n in range(self.ct.ndims())]]
+                    ).sample()
                     for i, msum in enumerate(self.ct.margins[tuplize(axis_constrained)])
                 ],
-                dtype='int32'
+                dim = axis_constrained_flat
             )
+
+            # Reshape table to match original dims
+            table_new = torch.reshape(table_new, tuplize(self.ct.dims)).to(dtype=int32)
+
             # Continue loop only if table is not sparse admissible
             continue_loop = not self.ct.table_sparse_admissible(table_new)
 
-        # Reshape table to match original dims
-        table_new = np.reshape(table_new, tuplize(self.ct.dims))
         # Make sure sampled table has the right shape
         try:
             assert self.ct.table_admissible(table_new) and self.ct.table_sparse_admissible(table_new)
         except:
             print(self.ct.table_admissible(table_new),self.ct.table_sparse_admissible(table_new))
             raise Exception()
-        # if np.shape(table_new) != tuplize(self.dims):
-            # table_new = table_new.T
         
         return table_new
 
-    def direct_sampling_proposal_2way_table(self, table_prev: np.ndarray, log_intensity: np.ndarray) -> Tuple[Dict, Dict, int, Dict, Dict]:
+    def direct_sampling_proposal_2way_table(self, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict, Dict]:
 
         self.logger.debug(f'direct_sampling_2way_table for {self.ct.distribution_name}')
         
@@ -469,46 +465,35 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         if len(self.ct.constraints['constrained_axes']) > 0:
             axis_constrained = min(self.ct.constraints['constrained_axes'], key=len)
         else:
-            axis_constrained = np.array([])
+            axis_constrained = torch.tensor([])
         # Get all unconstrained axes
         axis_uncostrained = deepcopy(self.ct.constraints['unconstrained_axes'])
         # Initialise shape of probability normalisation matrix
-        new_shape = np.ones(2, dtype='uint8')
+        new_shape = torch.ones(self.ct.ndims(), dtype=torch.uint8)
 
         if len(axis_constrained) == self.ct.ndims():
             # Calculate normalisation of multinomial probabilities (total intensity)
-            probabilities_normalisation = np.array([logsumexp(log_intensity.ravel())],dtype=np.float64)
+            probabilities_normalisation = torch.logsumexp(log_intensity.ravel(),dim=0)
             axis_uncostrained_flat = None
         elif len(axis_constrained) > 0 and len(axis_uncostrained) > 0:
             # Get plain uncostrained axis (must have length 1)
             axis_uncostrained_flat = next(flatten(axis_uncostrained))
             # Calculate normalisation of multinomial probabilities for each row or column
-            probabilities_normalisation = np.array([
-                logsumexp(log_intensity.take(
-                            indices=idx,
-                            axis=axis_uncostrained_flat
-                        )) for idx in range(self.ct.dims[axis_uncostrained_flat])
-            ],dtype=np.float64)
+            probabilities_normalisation = log_intensity.logsumexp(dim=axis_constrained,keepdim=True)
             # Update shape of probability normalisation matrix
             new_shape[axis_uncostrained_flat] = self.ct.dims[axis_uncostrained_flat]
         else:
-            probabilities_normalisation = np.array([0],dtype=np.float64)
-            new_shape = np.array([1,1])
+            probabilities_normalisation = torch.tensor([0],dtype=float32)
+            new_shape = np.array([1]*self.ct.ndims())
             axis_uncostrained_flat = None
 
         # Calculate probabilities
-        margin_probabilities = np.exp(
+        margin_probabilities = torch.exp(
             log_intensity-probabilities_normalisation.reshape(tuple(new_shape))
         )
 
-        # There is a casting issue with numpy that forces the following recasting and normalisation
-        # margin_sum = margin_probabilities.sum(
-        #     axis=tuplize(axis_constrained)
-        # ).reshape(new_shape).astype('float64')
-        # margin_probabilities /= margin_sum
-        
         # Initialise table
-        table_new = np.zeros(self.ct.dims,dtype='int32')
+        table_new = torch.zeros(tuple(self.ct.dims),dtype=int32)
         firstIteration = True
         # Resample if margins are not allowed to be sparse but contain zeros
         while (not self.ct.table_sparse_admissible(table_new)) or firstIteration:
@@ -544,7 +529,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         return table_new, None, None, None, None
     
 
-    def degree_one_proposal_2way_table(self, table_prev: np.ndarray, log_intensity: np.ndarray) -> Tuple[Dict, Dict, int, Dict]:
+    def degree_one_proposal_2way_table(self, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict]:
 
         self.logger.debug('2way table degree one move')
 
@@ -571,13 +556,13 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             func_index, \
             {'support': [-1, 1], 'probs': [0.5, 0.5]}
 
-    def degree_higher_proposal_2way_table_multinomial(self, table_prev: np.ndarray, log_intensity: np.ndarray) -> Tuple[Dict, Dict, int, Dict, Dict]:
+    def degree_higher_proposal_2way_table_multinomial(self, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict, Dict]:
         return self.degree_higher_proposal_2way_table_product_multinomial(
             table_prev=table_prev,
             log_intensity=log_intensity
         )
 
-    def degree_higher_proposal_2way_table_product_multinomial(self, table_prev: np.ndarray, log_intensity: np.ndarray) -> Tuple[Dict, Dict, int, Dict, Dict]:
+    def degree_higher_proposal_2way_table_product_multinomial(self, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict, Dict]:
 
         self.logger.debug('2way table degree higher move product multinomial')
 
@@ -588,7 +573,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         non_zero_cells = sorted(list(self.table_mb.basis_dictionaries[func_index].keys()))
 
         # Normalise intensities at basis function cells
-        log_total_intensity = logsumexp(np.array([log_intensity[cell] for cell in non_zero_cells]))
+        log_total_intensity = torch.logsumexp(log_intensity[non_zero_cells])
         log_probabilities = np.array([log_intensity[cell] - log_total_intensity for cell in non_zero_cells])
 
         # Copy previous table
@@ -612,7 +597,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             None
         
 
-    def degree_higher_proposal_2way_table_fishers_hypergeometric(self, tab_prev: np.ndarray, log_intensity: np.ndarray) -> Tuple[Dict, Dict, int, Dict]:
+    def degree_higher_proposal_2way_table_fishers_hypergeometric(self, tab_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict]:
 
         self.logger.debug(
             '2way table degree higher move Fishers hypergeometric')
@@ -659,7 +644,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             func_index, \
             None
 
-    def metropolis_log_acceptance_ratio_2way_table(self, table_new: np.ndarray, table_prev: np.ndarray, log_intensity: np.ndarray) -> Union[float, None]:
+    def metropolis_log_acceptance_ratio_2way_table(self, table_new: torch.tensor, table_prev: torch.tensor, log_intensity: torch.tensor) -> Union[float, None]:
         '''Acceptance ratio for one degree proposals
         This gives the Metropolis Hastings ratio i.e.
         p(x')p(x|x') / p(x)p(x'|x)
@@ -689,7 +674,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         else:
             return -np.infty
 
-    def gibbs_log_acceptance_ratio_2way_table(self, table_new: np.ndarray, table_prev: np.ndarray, log_intensity: np.ndarray) -> float:
+    def gibbs_log_acceptance_ratio_2way_table(self, table_new: torch.tensor, table_prev: torch.tensor, log_intensity: torch.tensor) -> float:
         ''' Acceptance ratio for higher degree proposals
         This gives the Gibbs acceptance ratio i.e. equal to 1 iff proposal is non-negative'''
 
@@ -702,11 +687,11 @@ class ContingencyTableMarkovChainMonteCarlo(object):
                 f'Proposed table {table_new} is inadmissible or non positive')
             return -np.infty
 
-    def direct_sampling_log_acceptance_ratio_2way_table(self, table_new: np.ndarray, table_prev: np.ndarray, log_intensity: np.ndarray) -> Tuple[Dict, Dict, int, Dict]:
+    def direct_sampling_log_acceptance_ratio_2way_table(self, table_new: torch.tensor, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict]:
         return 0
 
 
-    def log_target_measure_difference_2way_table(self, table_new: np.ndarray, table_prev: np.ndarray, cells: Union[np.array, np.ndarray, list], log_intensity: np.ndarray) -> float:
+    def log_target_measure_difference_2way_table(self, table_new: torch.tensor, table_prev: torch.tensor, cells: torch.tensor, log_intensity: torch.tensor) -> float:
         '''
         Computes log of acceptance ratio.
         log (sigma(table_new)) / (sigma(table_prev)) = log(sigma(table_new)) - log(sigma(table_prev))
@@ -739,7 +724,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         return log_ratio
     
 
-    def table_gibbs_step(self, table_prev: np.ndarray, log_intensity: np.ndarray) -> Tuple[Union[list, np.array, np.ndarray], Union[list, np.array, np.ndarray], float]:
+    def table_gibbs_step(self, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[torch.tensor, int]:
 
         self.logger.debug('Table Gibbs step')
 

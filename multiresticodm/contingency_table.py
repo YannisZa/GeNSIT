@@ -1,38 +1,42 @@
 import os
 import sys
+import torch
 import logging
 import numpy as np
+import torch.distributions as distr
 
 from copy import deepcopy
 from pandas import read_csv
 from pandas import DataFrame
 from itertools import product
 from tabulate import tabulate
+from torch import int32, uint8
+from torch import bool as tbool
+from num2words import num2words
+from torch.masked import masked_tensor
 from typing import List, Union, Callable
 
 from multiresticodm.config import Config
 from multiresticodm.global_variables import *
-from multiresticodm.utils import setup_logger, str_in_list, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth
 from multiresticodm.math_utils import powerset
+from multiresticodm.utils import setup_logger, str_in_list, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth
 
 # -> Union[ContingencyTable,None]:
 def instantiate_ct(table, config: Config, **kwargs):
-    if hasattr(sys.modules[__name__], config.settings['inputs']['contingency_table']['ct_type']):
-        return getattr(sys.modules[__name__], config.settings['inputs']['contingency_table']['ct_type'])(
+    if hasattr(sys.modules[__name__], config.settings['contingency_table']['ct_type']):
+        return getattr(sys.modules[__name__], config.settings['contingency_table']['ct_type'])(
                 table=table, 
-                config=config, 
-                log_to_console=kwargs.get('log_to_console',True), 
-                level=config.level,
+                config=config,
                 **kwargs
         )
     else:
         raise Exception(
-            f"Input class {config.settings['inputs']['contingency_table']['ct_type']} not found")
+            f"Input class {config.settings['contingency_table']['ct_type']} not found")
 
 
 class ContingencyTable(object):
 
-    def __init__(self, table=None, config: Config = None, **kwargs: dict):
+    def __init__(self, table = None, config: Config = None, **kwargs: dict):
         # Setup logger
         self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
         self.logger = setup_logger(
@@ -42,15 +46,19 @@ class ContingencyTable(object):
             log_to_console=kwargs.get('log_to_console',True),
         )
         # Config
-        self.config = None
-        # Update Markov basis class
+        self.config = config
+        # Table
+        self.ground_truth_table = table
+        # Device name
+        self.device = kwargs.get('device','cpu')
+        # Instantiate dataset 
+        self.data = Dataset()
+        # Markov basis class
         self.markov_basis_class = None
-        # Store flag for whether to allow sparse margins or not
+        # Flag for whether to allow sparse margins or not
         self.sparse_margins = False
         # Random seed
         self.seed = None
-        # Table
-        self.table = None
         # margins
         self.margins = {}
         self.residual_margins = {}
@@ -59,22 +67,17 @@ class ContingencyTable(object):
         # Build contingency table
         if config is not None:
             # Set configuration file
-            self.config = extract_config_parameters(config,
-                                                    {"seed": "",
-                                                     "inputs": {
-                                                        "contingency_table": "", 
-                                                        "seed": "", 
-                                                        "n_workers": "", 
-                                                        "n_threads": "", 
-                                                        "directory": "", 
-                                                        "spatial_interaction_model": {"sim_type": "","sim_name":""}
-                                                        },
-                                                        "mcmc": {"table_inference": "", "N": "", "contingency_table": ""},
-                                                        "outputs": ""
-                                                     })
+            self.config = extract_config_parameters(
+                config,
+                {
+                    "log_mode", "sweep_mode", 
+                    "inputs", "contingency_table",
+                    "outputs"
+                }
+            )
             # Store flag for whether to allow sparse margins or not
-            if str_in_list('sparse_margins', self.config.settings['inputs']['contingency_table'].keys()):
-                self.sparse_margins = self.config.settings['inputs']['contingency_table']['sparse_margins']
+            if str_in_list('sparse_margins', self.config.settings['contingency_table'].keys()):
+                self.sparse_margins = self.config.settings['contingency_table']['sparse_margins']
             if str_in_list('seed', self.config.settings['inputs'].keys()):
                 self.seed = int(self.config.settings['inputs']['seed'])
             
@@ -83,8 +86,11 @@ class ContingencyTable(object):
 
         elif table is not None:
             # Read table and dimensions
-            self.table = table.astype('int32')
-            self.dims = np.asarray(np.shape(self.table), dtype='uint8')
+            if torch.is_tensor(table):
+                self.ground_truth_table = table.int().to(dtype=int32,device=self.device)
+            else:
+                self.ground_truth_table = torch.from_numpy(table).int().to(dtype=int32,device=self.device)
+            self.dims = np.asarray(np.shape(self.ground_truth_table), dtype='uint8')
             # Read seed
             self.seed = int(kwargs['seed']) if str_in_list('seed', kwargs.keys()) else None
             # Read margin sparsity
@@ -136,68 +142,78 @@ class ContingencyTable(object):
     
     # Compute summary statistics for given function
     def table_margins_summary_statistic(self, tab: np.ndarray) -> List:
-        return np.concatenate([self.table_axis_margin_summary_statistic(tab=tab,ax=ax) for ax in self.constraints['all_axes']], axis=0)
+        return torch.cat(tuple([self.table_axis_margin_summary_statistic(tab=tab,ax=ax) for ax in self.constraints['all_axes']]), dim=0)
     
     def table_axis_margin_summary_statistic(self, tab: np.ndarray, ax:int = None) -> List:
-        return np.sum(tab, axis=tuplize(ax), keepdims=True, dtype='int32').flatten()
+        return tab.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten()
 
     # Compute margin summary statistics for given function
     def table_constrained_margin_summary_statistic(self, tab: np.ndarray) -> List:
         if len(self.constraints['constrained_axes']) > 0:
-            return np.concatenate([np.sum(tab, axis=tuplize(ax), keepdims=True, dtype='int32').flatten() for ax in sorted(self.constraints['constrained_axes'])], axis=0)
+            return torch.cat(tuple([tab.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten() for ax in sorted(self.constraints['constrained_axes'])]), dim=0)
         else:
-            return np.array([])
+            return torch.empty(1)
 
     def table_unconstrained_margin_summary_statistic(self, tab: np.ndarray) -> List:
         if len(self.constraints['unconstrained_axes']) > 0:
-            return np.concatenate([np.sum(tab, axis=tuplize(ax), keepdims=True, dtype='int32').flatten() for ax in sorted(self.constraints['unconstrained_axes'])], axis=0)
+            return torch.cat(tuple([tab.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten() for ax in sorted(self.constraints['unconstrained_axes'])]), dim=0)
         else:
-            return np.array([])
+            return torch.empty(1)
 
     # Compute cell summary statistics for given function
     def table_cell_constraint_summary_statistic(self, tab: np.ndarray, cells: list=None) -> List:
         if cells is None:
-            return np.asarray([tab[cell] for cell in sorted(self.constraints['cells'])], dtype='int32')
+            return torch.tensor(
+                [tab[cell] for cell in sorted(self.constraints['cells'])], 
+                dtype=int32
+            )
         else:
-            return np.asarray([tab[cell] for cell in sorted(self.constraints['cells'])], dtype='int32')
+            return torch.tensor(
+                [tab[cell] for cell in sorted(self.constraints['cells'])], 
+                dtype=int32
+            )
 
     # Check if margin constraints are satisfied
     def table_margins_admissible(self, tab) -> bool:
         if len(self.constraints['constrained_axes']) > 0:
-            return np.array_equal(
+            return torch.equal(
                 self.table_constrained_margin_summary_statistic(tab),
-                np.concatenate([self.margins[tuplize(ax)] for ax in sorted(self.constraints['constrained_axes'])], axis=0)
+                torch.cat(
+                    [self.margins[tuplize(ax)] \
+                        for ax in sorted(self.constraints['constrained_axes'])],
+                    dim=0
+                )
             )
         else:
             return True
 
     # Check if cell constraints are satisfied
     def table_cells_admissible(self, tab) -> bool:
-        return np.all([self.table[cell] == tab[cell] for cell in sorted(self.constraints['cells'])])
+        return all([self.ground_truth_table[cell] == tab[cell] for cell in sorted(self.constraints['cells'])])
 
     # Check if function (or table equivalently) is admissible
     def table_admissible(self, tab) -> bool:
         return self.table_margins_admissible(tab) and self.table_cells_admissible(tab)
     
     def table_sparse_admissible(self, tab) -> bool:
-        return np.all(self.table_unconstrained_margin_summary_statistic(tab) > 0) if not self.sparse_margins else True
+        return all(self.table_unconstrained_margin_summary_statistic(tab) > 0) if not self.sparse_margins else True
     
     def margin_sparse_admissible(self, margin) -> bool:
-        return np.all(margin > 0) if not self.sparse_margins else True
+        return torch.torch.all(margin > 0) if not self.sparse_margins else True
 
     # Checks if function f proposed is positive
     def table_nonnegative(self, tab) -> bool:
-        return not np.any(tab < 0)
+        return not torch.any(tab < 0)
 
     def table_positive(self, tab) -> bool:
-        return not np.any(tab <= 0)
+        return not torch.any(tab <= 0)
 
     def table_difference_histogram(self, tab: np.ndarray, tab0: np.ndarray):
         # Take difference of tables
         difference = tab - tab0
         # Values classification
-        values = {"+": np.count_nonzero(difference > 0), "-": np.count_nonzero(
-            difference < 0), "0": np.count_nonzero(difference == 0)}
+        values = {"+": torch.count_nonzero(difference > 0), "-": torch.count_nonzero(
+            difference < 0), "0": torch.count_nonzero(difference == 0)}
         return values
 
     def check_table_validity(self, table: np.ndarray) -> bool:
@@ -240,8 +256,10 @@ class ContingencyTable(object):
         return equality_holds
     
     def __str__(self):
-        if self.table is not None:
-            return ','.join([str(x) for x in self.table])
+        if self.ground_truth_table is not None:
+            # Convert to numpy
+            ground_truth_table = self.ground_truth_table.cpu().detach().numpy()
+            return ',\n'.join([''.join(['{:4}'.format(item) for item in row]) for row in ground_truth_table])
         else:
             return 'Empty Table'
 
@@ -254,18 +272,18 @@ class ContingencyTable(object):
     def ndims(self):
         return np.sum([1 for dim in self.dims if dim > 1],dtype='int32')
     
-    def reset(self, table, config, **kwargs) -> None:
+    def reset(self, ground_truth_table, config, **kwargs) -> None:
         # Rebuild table
-        self.build(table=table, config=config, **kwargs)
+        self.build(ground_truth_table=ground_truth_table, config=config, **kwargs)
     
     def constraint_table(self,with_margins:bool=False):
-        if self.table is not None:
-            table_constraints = -np.ones(self.table.shape)
-            table_mask = np.zeros(self.table.shape,dtype=bool)
+        if self.ground_truth_table is not None:
+            table_constraints = -np.ones(self.ground_truth_table.shape)
+            table_mask = np.zeros(self.ground_truth_table.shape,dtype=tbool)
             for cell in self.constraints['cells']:
-                table_constraints[cell] = self.table[cell]
+                table_constraints[cell] = self.ground_truth_table[cell].cpu().detach().numpy()
                 table_mask[cell] = True
-            table_constraints = table_constraints.astype('int32')
+            table_constraints = table_constraints.astype(torch.int32)
             
             # Printing margins for visualisation purposes only
             if with_margins:
@@ -273,7 +291,7 @@ class ContingencyTable(object):
 
                 # Flip table for viz purposes (clear visibility)
                 row_margin,col_margin = (0,),(1,)
-                if self.table.shape[1] >= self.table.shape[0]:
+                if self.dims[1] >= self.dims[0]:
                     table_constraints = table_constraints.T
                     row_margin,col_margin = (1,),(0,)
                 
@@ -281,8 +299,8 @@ class ContingencyTable(object):
                 table_constraints_ct = DataFrame(table_constraints)
 
                 # Add margins to the contingency table
-                table_constraints_ct.loc['Total',:] = self.residual_margins[row_margin].astype('int32')
-                table_constraints_ct['Total'] = list(self.residual_margins[col_margin].astype('int32')) + list(self.residual_margins[(0,1)].astype('int32'))
+                table_constraints_ct.loc['Total',:] = self.residual_margins[row_margin].to(dtype=int32)
+                table_constraints_ct['Total'] = list(self.residual_margins[col_margin].to(dtype=int32)) + list(self.residual_margins[(0,1)].to(dtype=int32))
                 
                 # Replace free cells with empty string
                 table_constraints_ct[table_constraints_ct < 0] = ''
@@ -297,43 +315,33 @@ class ContingencyTable(object):
 
     def import_tabular_data(self) -> None:
         # Based on filepath read txt or csv
-        if str_in_list('table', self.config.settings['inputs']['contingency_table']['import'].keys()) and \
-                bool(self.config.settings['inputs']['contingency_table']['import']['table']) and \
-                os.path.isfile(os.path.join(self.config.settings['inputs']['dataset'], self.config.settings['inputs']['contingency_table']['import']['table'])):
+        if str_in_list('ground_truth_table', self.config.settings['inputs']['data_files'].keys()) and \
+                bool(self.config.settings['inputs']['data_files']['ground_truth_table']) and \
+                os.path.isfile(os.path.join(self.config.settings['inputs']['dataset'], self.config.settings['inputs']['data_files']['ground_truth_table'])):
             
             table_filepath = os.path.join(
                 self.config.settings['inputs']['dataset'], 
-                self.config.settings['inputs']['contingency_table']['import']['table']
+                self.config.settings['inputs']['data_files']['ground_truth_table']
             )
-            if self.config.settings['inputs']['contingency_table']['import']['table'].endswith('.csv'):
-                self.table = read_csv(table_filepath, index_col=0, header=0)
-                # Convert to numpy
-                self.table = self.table.values
-            elif self.config.settings['inputs']['contingency_table']['import']['table'].endswith('.txt'):
-                self.table = np.loadtxt(
-                    table_filepath, dtype='float32').astype('int32')
-            else:
-                raise Exception(
-                    f"Extension {table_filepath.split('.')[1]} cannot be imported")
+            # Read ground truth table
+            ground_truth_table = np.loadtxt(table_filepath, dtype='float32').astype('int32')
+            self.ground_truth_table = torch.from_numpy(ground_truth_table).to(dtype=int32,device=self.device)
 
             # Check that all entries are non-negative
             try:
-                assert self.check_table_validity(self.table)
+                assert self.check_table_validity(self.ground_truth_table)
             except:
-                self.logger.error(self.table.to_string())
-                raise Exception(
-                    "Imported table contains negative values! Import aborted...")
-
-            # Cast to int
-            self.table = self.table.astype('int32')
+                print(self.ground_truth_table)
+                raise Exception("Imported table contains negative values! Import aborted...")
+            
             # Update table properties
             self.update_table_properties_from_table()
             # Copy residal margins
             self.residual_margins = deepcopy(self.margins)
         else:
             self.logger.warning('Valid contingency table was not provided. One will be randomly generated.')
-            if hasattr(self,'table') and self.table is not None:
-                self.dims = np.asarray(np.shape(self.table), dtype='uint8')
+            if hasattr(self,'ground_truth_table') and self.ground_truth_table is not None:
+                self.dims = np.asarray(np.shape(self.ground_truth_table), dtype='uint8')
             elif str_in_list('dims', self.config.settings['inputs'].keys()):
                 self.dims = np.asarray(self.config.settings['inputs']['dims'], dtype='uint8')
             else:
@@ -345,30 +353,26 @@ class ContingencyTable(object):
             for axis, margin in self.margins.items():
                 # Assert all margins are unidimensional
                 try:
-                    assert np.sum(
-                        [1 for dim in np.shape(margin) if dim > 1]) == 1
+                    assert np.sum([1 for dim in np.shape(margin) if dim > 1]) == 1
                 except:
-                    raise Exception(
-                        f"margin for axis {axis} is not unidimensional.")
+                    raise Exception(f"margin for axis {axis} is not unidimensional.")
                 # Assert all margin axis match dimensions
                 if np.sum(self.dims) > 0:
                     try:
                         assert len(margin) == self.dims[axis]
                     except:
-                        self.logger.error(
-                            f"margin for axis {axis} has dim {len(margin)} and not {self.dims[axis]}.")
+                        self.logger.error(f"margin for axis {axis} has dim {len(margin)} and not {self.dims[axis]}.")
                         raise Exception('Imported inconsistent margins.')
                 else:
                     self.dims[axis] = len(margin)
                 # Assert all margin sums are the same
                 try:
                     assert np.array_equal(
-                                np.sum(margin,keepdims=True,dtype='int32').flatten(),
+                                margin.sum(keepdims=True,dtype=int32).flatten(),
                                 self.margins[tuplize(range(self.ndims()))]
                     )
                 except:
-                    self.logger.error(
-                        f"margin for axis {axis} has total {np.sum(margin.ravel(),keepdims=True).flatten()} and not {self.margins[tuplize(range(self.ndims()))]}.")
+                    self.logger.error(f"margin for axis {axis} has total {margin.sum(keepdims=True).ravel().flatten()} and not {self.margins[tuplize(range(self.ndims()))]}.")
                     raise Exception('Imported inconsistent margins.')
             # No dim must be zero
             try:
@@ -380,21 +384,23 @@ class ContingencyTable(object):
             for axis in sorted(list(powerset(range(self.ndims()))), key=len, reverse=True):
                 if tuplize(axis) not in self.margins.keys():
                     if tuplize(axis) == tuplize(range(self.ndims())):
-                        self.margins[tuplize(axis)] = np.random.randint(
+                        self.margins[tuplize(axis)] = torch.randint(
                             low=1,
-                            high=None
+                            high=None,
+                            size=1,
+                            dtype=int32
                         )
                     else:
                         dim = self.dims[self.axes_complement(axis,same_length=True)[0]]
-                        self.margins[tuplize(axis)] = np.random.multinomial(
+                        self.margins[tuplize(axis)] = distr.multinomial.Multinomial(
                             n=self.margins[tuplize(range(self.ndims()))], 
                             pvals=np.repeat(1/dim, dim)
-                        )
+                        ).sample().to(dtype=int32)
                         self.logger.debug(f"Randomly initialising margin for axis", tuplize(axis))
             # Copy residal margins
             self.residual_margins = deepcopy(self.margins)
             # Initialise table
-            self.table = -np.ones(self.dims)
+            self.ground_truth_table = -torch.ones(self.dims)
             # Import and update cells of table
             self.import_cells()
             # Initialise constraints
@@ -404,18 +410,21 @@ class ContingencyTable(object):
             self.constraints['unconstrained_axes'] = sorted(list(set(powerset(range(self.ndims())))))
 
     def import_margins(self) -> None:
-        if str_in_list('margins', self.config.settings['inputs']['contingency_table']['import'].keys()):
-            for axis, margin_filename in enumerate(self.config.settings['inputs']['contingency_table']['import']['margins']):
+        if str_in_list('margins', self.config.settings['inputs']['data_files'].keys()):
+            for axis, margin_filename in enumerate(self.config.settings['inputs']['data_files']['margins']):
                 # Make sure that imported filename is not empty
                 if len(margin_filename) > 0:
                     margin_filepath = os.path.join(
-                        self.config.settings['inputs']['dataset'], margin_filename)
+                        self.config.settings['inputs']['dataset'], 
+                        margin_filename
+                    )
                     if os.path.isfile(margin_filepath):
                         # Import margin
-                        self.margins[tuplize(axis)] = np.loadtxt(
-                            margin_filepath, dtype='int32')
+                        margin = np.loadtxt(margin_filepath, dtype='int32')
+                        # Convert to tensor
+                        self.margins[tuplize(axis)] = torch.tensor(margin).int().to(dtype=int32,device=self.device)
                         # Check to see see that they are all positive
-                        if (self.margins[tuplize(axis)] <= 0).any():
+                        if torch.any(self.margins[tuplize(axis)] <= 0):
                             self.logger.error(f'margin {self.margins[tuplize(axis)]} for axis {axis} is not strictly positive')
                             self.margins[tuplize(axis)] = None
                     else:
@@ -430,27 +439,24 @@ class ContingencyTable(object):
             # raise Exception(f"Importing margins failed.")
 
     def import_cells(self) -> None:
-        if str_in_list('cell_values', self.config.settings['inputs']['contingency_table']['import'].keys()):
+        if str_in_list('cell_values', self.config.settings['inputs']['data_files'].keys()):
             cell_filename = os.path.join(
                 self.config.settings['inputs']['dataset'],
-                self.config.settings['inputs']['contingency_table']['import']['cell_values']
+                self.config.settings['inputs']['data_files']['cell_values']
             )
             if os.path.isfile(cell_filename):
                 # Import all cells
                 cells = read_json(cell_filename)
                 # Check to see see that they are all positive
                 if (cells.values() < 0).any():
-                    self.logger.error(
-                        f'Cell values{cells.values()} are not strictly positive')
+                    self.logger.error(f'Cell values{cells.values()} are not strictly positive')
                 # Check that no cells exceed any of the margins
                 for cell, value in cells.items():
                     try:
                         assert len(cell) == self.ndims() and cell < self.dims
                     except:
-                        self.logger.error(
-                            f"Cell has length {len(cell)}. The number of table dims are {self.ndims()}")
-                        self.logger.error(
-                            f"Cell is equal to {cell}. The cell bounds are {self.dims}")
+                        self.logger.error(f"Cell has length {len(cell)}. The number of table dims are {self.ndims()}")
+                        self.logger.error(f"Cell is equal to {cell}. The cell bounds are {self.dims}")
                     for ax in cell:
                         if tuplize(ax) in self.margins.keys():
                             try:
@@ -459,14 +465,12 @@ class ContingencyTable(object):
                                 else:
                                     assert self.margins[tuplize(ax)][cell[ax]] > value
                             except:
-                                self.logger.error(
-                                    f"margin for ax = {','.join([str(a) for a in ax])} is less than specified cell value {value}")
+                                self.logger.error(f"margin for ax = {','.join([str(a) for a in ax])} is less than specified cell value {value}")
                                 raise Exception('Cannot import cells.')
                     # Update table
-                    self.table[cell] = value
+                    self.ground_truth_table[cell] = value
                 else:
-                    raise Exception(
-                        f"Cell values not found in {cell_filename}.")
+                    raise Exception(f"Cell values not found in {cell_filename}.")
         else:
             self.logger.debug(f"Cells file not provided")
             # raise Exception(f"Importing cells failed.")
@@ -478,17 +482,17 @@ class ContingencyTable(object):
         ## Reading config if provided
 
         if self.config is not None:
-            if str_in_list('constraints', self.config.settings['inputs']['contingency_table'].keys()):
-                if str_in_list('axes', self.config.settings['inputs']['contingency_table']['constraints'].keys()):
-                    constrained_axes = [tuplize(ax) for ax in self.config.settings['inputs']['contingency_table']['constraints']['axes'] if len(ax) > 0]
-                if str_in_list('cells', self.config.settings['inputs']['contingency_table']['constraints'].keys()):
-                    if isinstance(self.config.settings['inputs']['contingency_table']['constraints']['cells'],str):
+            if str_in_list('constraints', self.config.settings['contingency_table'].keys()):
+                if str_in_list('axes', self.config.settings['contingency_table']['constraints'].keys()):
+                    constrained_axes = [tuplize(ax) for ax in self.config.settings['contingency_table']['constraints']['axes'] if len(ax) > 0]
+                if str_in_list('cells', self.config.settings['contingency_table']['constraints'].keys()):
+                    if isinstance(self.config.settings['contingency_table']['constraints']['cells'],str):
                         cell_constraints = os.path.join(
                             self.config.settings['inputs']['dataset'],
-                            self.config.settings['inputs']['contingency_table']['constraints']['cells']
+                            self.config.settings['contingency_table']['constraints']['cells']
                         )
-                    elif isinstance(self.config.settings['inputs']['contingency_table']['constraints']['cells'],(list,np.ndarray)):
-                        cell_constraints = self.config.settings['inputs']['contingency_table']['constraints']['cells']
+                    elif isinstance(self.config.settings['contingency_table']['constraints']['cells'],(list,np.ndarray)):
+                        cell_constraints = self.config.settings['contingency_table']['constraints']['cells']
         ## Reading kwargs if provided
         elif str_in_list('constraints', kwargs.keys()):
             if str_in_list('axes', kwargs['constraints'].keys()):
@@ -523,23 +527,25 @@ class ContingencyTable(object):
         if cell_constraints is not None:
             if isinstance(cell_constraints,str):
                 if os.path.isfile(cell_constraints):
-                    # Find cell constraints
-                    self.constraints['cells'] = np.loadtxt(cell_constraints, dtype='uint8')
-                    self.constraints['cells'] = self.constraints['cells'].reshape(np.size(self.constraints['cells'])//self.ndims(), self.ndims()).tolist()
+                    # Load cell constraints from file
+                    cells = np.loadtxt(cell_constraints, dtype='uint8')
+                    # Reshape cells
+                    cells = cells.reshape(np.size(self.constraints['cells'])//self.ndims(), self.ndims()).tolist()
                     # Remove invalid cells (i.e. cells than do not have the right number of dims or are out of bounds)
-                    self.constraints['cells'] = sorted([tuplize(c) for c in self.constraints['cells'] if (len(c) == self.ndims() and (c < self.dims).all())])
-                    self.logger.info(f"Cell constraints {','.join([str(c) for c in self.constraints['cells']])} provided")
+                    cells = sorted([tuplize(c) for c in cells if (len(c) == self.ndims() and (c < self.dims).all())])
+                    self.constraints['cells'] = torch.tensor(cells).to(dtype=uint8,device=self.device)
+                    self.logger.info(f"Cell constraints {','.join([str(c) for c in cells])} provided")
                 else:
-                    self.constraints['cells'] = []
+                    self.constraints['cells'] = torch.tensor([]).to(dtype=uint8,device=self.device)
             elif isinstance(cell_constraints,(list,np.ndarray)):
-                self.constraints['cells'] = [tuplize(ax) for ax in cell_constraints]
+                self.constraints['cells'] = torch.tensor([tuplize(ax) for ax in cell_constraints],dtype=uint8).to(device=self.device)
             else:
                 print('cell constraints')
                 print(cell_constraints)
                 self.logger.error(f"Cell constraints of type {type(cell_constraints)}")
                 raise Exception('Cell constraints could not be recognised')
         else:
-            self.constraints['cells'] = []
+            self.constraints['cells'] = torch.empty(1).to(device=self.device)
 
     def update_table_type_and_markov_basis_class(self):
         # Check if there are is at lest one active cell
@@ -548,7 +554,7 @@ class ContingencyTable(object):
         except:
             # Groudn truth
             print('Ground truth table')
-            print(self.table)
+            print(self.ground_truth_table)
             print('Constraint table')
             print(self.constraint_table())
             self.logger.error('No activate cells found. Table can be deterministically elicited based on provided constraints.')
@@ -558,18 +564,12 @@ class ContingencyTable(object):
         if self.ndims() == 0:
             self.ct_type = 'empty_table'
             self.markov_basis_class = None
-        elif self.ndims() == 1:
+        elif self.ndims() <= 2:
             self.markov_basis_class = f'MarkovBasis{self.ndims()}DTable'
             if isinstance(self, ContingencyTableDependenceModel):
-                self.ct_type = 'one_way_contingency_table_dependence_model'
+                self.ct_type = f'{num2words(self.ndims())}_way_contingency_table_dependence_model'
             else:
-                self.ct_type = 'one_way_contingency_table_independence_model'
-        elif self.ndims() == 2:
-            self.markov_basis_class = f'MarkovBasis{self.ndims()}DTable'
-            if isinstance(self, ContingencyTableDependenceModel):
-                self.ct_type = 'two_way_contingency_table_dependence_model'
-            else:
-                self.ct_type = 'two_way_contingency_table_independence_model'
+                self.ct_type = f'{num2words(self.ndims())}_way_contingency_table_independence_model'
         else:
             self.logger.error(f'No implementation found for ndims = {self.ndims()}')
             raise Exception('Table type and markov basis class could not be identified.')
@@ -577,8 +577,12 @@ class ContingencyTable(object):
     def update_margins(self, margins: dict = {}):
         for ax, margin in margins.items():
             # Update margins
-            self.margins[tuplize(ax)] = np.array(margin, dtype='int32')
-            self.residual_margins[tuplize(ax)] = np.array(margin, dtype='int32')
+            if not torch.is_tensor(margin):
+                self.margins[tuplize(ax)] = torch.from_numpy(margin).int().to(dtype=int32,device=self.device)
+                self.residual_margins[tuplize(ax)] = torch.from_numpy(margin).int().to(dtype=int32,device=self.device)
+            else:
+                self.margins[tuplize(ax)] = margin.int().to(dtype=int32,device=self.device)
+                self.residual_margins[tuplize(ax)] = margin.int().to(dtype=int32,device=self.device)
 
     def update_residual_margins_from_cell_constraints(self, constrained_cells=None):
         constrained_cells = self.constraints['cells'] if constrained_cells is None or len(constrained_cells) <= 0 else constrained_cells
@@ -589,10 +593,10 @@ class ContingencyTable(object):
                 for subax in ax_complement:
                     # Subtract non-total margins
                     if len(subax) < self.ndims() and len(ax) < self.ndims():
-                        self.residual_margins[subax][cell_list[ax]] -= self.table[tuplize(cell)]
+                        self.residual_margins[subax][cell_list[ax]] -= self.ground_truth_table[tuplize(cell)]
                 if len(ax) == self.ndims():
                     # Subtract cell values from grand total (only once)
-                    self.residual_margins[ax] -= self.table[tuplize(cell)]
+                    self.residual_margins[ax] -= self.ground_truth_table[tuplize(cell)]
 
         # Update cells though
         self.cells = sorted(list(set(self.cells) - set(constrained_cells)))
@@ -604,23 +608,23 @@ class ContingencyTable(object):
         # Get flags for whether cells are constrained or not
         cell_unconstrained = (constraint_table == -1)
         # Repeat process if there any margins with only one unknown
-        while np.any([np.any(cell_unconstrained.sum(axis=ax,keepdims=True).flatten() == 1) for ax in self.constraints['constrained_axes']]):
+        while any([any(cell_unconstrained.sum(dim=ax,keepdims=True).flatten() == 1) for ax in self.constraints['constrained_axes']]):
             # If cells need to be filled in deterministically the entire table must be available
             try:
-                assert self.table_nonnegative(self.table)
+                assert self.table_nonnegative(self.ground_truth_table)
             except:
                 self.logger.error('Table has negative entries')
                 raise Exception('Cannot fill in remainder of cells determinstically as table values are not provided for these cells.')
             # Go through each margin
             for ax in self.constraints['constrained_axes']:
                 # If there any margins with only one unknown cell
-                if np.any(cell_unconstrained.sum(axis=tuplize(ax),keepdims=True).flatten() == 1):
+                if any(cell_unconstrained.sum(dim=tuplize(ax),keepdims=True).flatten() == 1):
                     # Get axis complement
                     ax_complement = list(flatten(self.axes_complement(ax, same_length=True)))
                     # Create cell index
                     cell_index = [{
                         "axis": ax,
-                        "index": list(flatten(np.where(cell_unconstrained.sum(axis=tuplize(ax)) == 1)))
+                        "index": list(flatten(np.where(cell_unconstrained.sum(dim=tuplize(ax)) == 1)))
                     }]
                     # Update last index
                     last_axis_index = cell_index[-1]['index']
@@ -628,7 +632,7 @@ class ContingencyTable(object):
                         # Find indices
                         cell_index.append({
                             "axis": subax,
-                            "index": np.where(cell_unconstrained.take(indices=last_axis_index[0], axis=subax))
+                            "index": np.where(cell_unconstrained.take(indices=last_axis_index[0], dim=subax))
                         })
                         # Update last index
                         last_axis_index = cell_index[-1]['index']
@@ -663,43 +667,55 @@ class ContingencyTable(object):
         if table is None:
             return {ax:self.margins[ax] for ax in self.constraints['constrained_axes']}
         else:
-            return {ax:table.sum(axis=tuplize(ax), keepdims=True, dtype='int32').flatten() for ax in self.constraints['constrained_axes']}
+            return {ax:table.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten() for ax in self.constraints['constrained_axes']}
 
     def unconstrained_margins(self,table=None):
         if table is None:
             return {ax:self.margins[ax] for ax in self.constraints['unconstrained_axes']}
         else:
-            return {ax:table.sum(axis=tuplize(ax), keepdims=True, dtype='int32').flatten() for ax in self.constraints['unconstrained_axes']}
+            return {ax:table.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten() for ax in self.constraints['unconstrained_axes']}
 
     def update_unconstrained_margins_from_table(self, table):
+
         for ax in self.constraints['unconstrained_axes']:
-            self.margins[tuplize(ax)] = np.sum(
-                table, axis=tuplize(ax), keepdims=True, dtype='int32').flatten()
-            self.residual_margins[tuplize(ax)] = np.sum(
-                table, axis=tuplize(ax), keepdims=True, dtype='int32').flatten()
+            self.margins[tuplize(ax)] = table.sum(
+                dim=tuplize(ax), 
+                keepdims=True, 
+                dtype=int32
+            ).flatten()
+            self.residual_margins[tuplize(ax)] = table.sum(
+                dim=tuplize(ax), 
+                keepdims=True, 
+                dtype=int32
+            ).flatten()
 
     def update_constrained_margins_from_table(self, table):
         for ax in self.constraints['constrained_axes']:
-            self.margins[tuplize(ax)] = np.sum(
-                table, axis=tuplize(ax), keepdims=True, dtype='int32').flatten()
-            self.residual_margins[tuplize(ax)] = np.sum(
-                table, axis=tuplize(ax), keepdims=True, dtype='int32').flatten()
+            self.margins[tuplize(ax)] = table.sum(
+                dim=tuplize(ax), 
+                keepdims=True, 
+                dtype=int32
+            ).flatten()
+            self.residual_margins[tuplize(ax)] = table.sum(
+                dim=tuplize(ax), 
+                keepdims=True, 
+                dtype=int32
+            ).flatten()
 
     def update_margins_from_table(self, table):
-        for axes in powerset(range(self.ndims())):            
-            self.margins[tuplize(axes)] = np.sum(
-                table, 
-                axis=tuplize(axes), 
+        for axes in powerset(range(self.ndims())):
+            self.margins[tuplize(axes)] = table.sum( 
+                dim=tuplize(axes), 
                 keepdims=True, 
-                dtype='int32'
+                dtype=int32
             ).flatten()
-            self.residual_margins[tuplize(axes)] = np.sum(
-                table, 
-                axis=tuplize(axes), 
+            print(axes,self.margins[tuplize(axes)].shape)
+            self.residual_margins[tuplize(axes)] = table.sum(
+                dim=tuplize(axes), 
                 keepdims=True, 
-                dtype='int32'
+                dtype=int32
             ).flatten()
-
+    
     def update_unconstrained_margins(self, margins: dict = {}):
         return self.update_margins({
             tuplize(ax): val for ax, val in margins.items() \
@@ -716,11 +732,13 @@ class ContingencyTable(object):
         try:
             assert np.shape(tab) == self.dims
         except:
-            self.logger(
-                f"Cannot update table of dims {self.dims} to table of dims {np.shape(tab)}")
+            self.logger(f"Cannot update table of dims {self.dims} to table of dims {np.shape(tab)}")
             raise Exception('Table update failed.')
         # Update table
-        self.table = tab.astype('int32')
+        if not torch.is_tensor(tab):
+            self.ground_truth_table = torch.from_numpy(tab).int().to(dtype=int32,device=self.device)
+        else:
+            self.ground_truth_table = tab.int().to(dtype=int32,device=self.device)
         # Update table properties
         self.update_table_properties_from_table()
         # Copy residal margins
@@ -728,31 +746,33 @@ class ContingencyTable(object):
 
     def update_table_properties_from_table(self) -> None:
         # Update dimensions
-        self.dims = np.asarray(np.shape(self.table), dtype='uint8')
+        self.dims = np.asarray(np.shape(self.ground_truth_table), dtype='uint8')
         # Update margins
-        self.update_margins_from_table(self.table)
+        self.update_margins_from_table(self.ground_truth_table)
 
     
     def export(self, dirpath: str = './synthetic_dummy', overwrite: bool = False) -> None:
         # Make directory if it does not exist
         makedir(dirpath)
 
-        if self.table is not None:
+        if self.ground_truth_table is not None:
             # Get filepath experiment filepath
             filepath = os.path.join(dirpath, 'table.txt')
 
             # Write experiment summaries to file
             if (not os.path.exists(filepath)) or overwrite:
-                write_txt(self.table, filepath)
+                write_txt(self.ground_truth_table.cpu().detach().numpy(), filepath)
 
         for axis, margin in self.margins.items():
             # Get filepath experiment filepath
             filepath = os.path.join(
-                dirpath, f"margin_sum_axis{','.join([str(a) for a in axis])}.txt")
+                dirpath, 
+                f"margin_sum_axis{','.join([str(a) for a in axis])}.txt"
+            )
 
             # Write experiment summaries to file
             if (not os.path.exists(filepath)) or overwrite:
-                write_txt(margin, filepath)
+                write_txt(margin.cpu().detach().numpy(), filepath)
 
         self.logger.info(f'Table successfully exported to {dirpath}')
 
@@ -803,20 +823,20 @@ class ContingencyTable(object):
 class ContingencyTableIndependenceModel(ContingencyTable):
     def __init__(self, table=None, config: Config = None, **kwargs: dict):
         # Set configuration file
-        super().__init__(table, config, log_to_console = kwargs.get('log_to_console',True), **kwargs)
+        super().__init__(table, config, **kwargs)
 
 
 class ContingencyTableDependenceModel(ContingencyTable):
     def __init__(self, table=None, config: Config = None, **kwargs: dict):
         # Set configuration file
-        super().__init__(table, config, log_to_console = kwargs.get('log_to_console',True), **kwargs)
+        super().__init__(table, config, **kwargs)
 
 
 class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDependenceModel):
 
     def __init__(self, table=None, config: Config = None, **kwargs: dict):
         # Set configuration file
-        super().__init__(table, config, log_to_console = kwargs.get('log_to_console',True), **kwargs)
+        super().__init__(table, config, **kwargs)
         # Build
         self.build(table=table, config=config, **kwargs)        
 
@@ -830,7 +850,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             print(f'Generated table (free cells)')
             print(table0_copy)
             print('True table')
-            print(self.table)
+            print(self.ground_truth_table)
             if not self.table_cells_admissible(table0):
                 table0_copy = deepcopy(table0)
                 table0_copy[constraint_table<0] = -1
@@ -849,9 +869,9 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 print("total value of constrained cells")
                 print(constraint_table[constraint_table>0].sum())
                 print("total value of residual margins")
-                print([np.sum(v) for v in self.residual_margins.values()])
+                print([v.sum() for v in self.residual_margins.values()])
                 print('table total')
-                print(self.table.ravel().sum())
+                print(torch.ravel(self.ground_truth_table.sum()))
                 for ax in sorted(self.constraints['constrained_axes']):
                     if len(ax) < self.ndims():
                         print(f"True summary statistics")
@@ -859,9 +879,9 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                         print(f"Residual summary statistics")
                         print(self.residual_margins[tuplize(ax)])
                         print(f"Fixed cell summary statistics")
-                        print(np.sum(table0_copy,axis=tuplize(ax),keepdims=True).flatten())
+                        print(table0_copy.sum(dim=tuplize(ax),keepdims=True).flatten())
                         print(f'Current summary statistics')
-                        print(np.sum(table0,axis=tuplize(ax),keepdims=True).flatten())
+                        print(table0.sum(dim=tuplize(ax),keepdims=True).flatten())
                 raise Exception(f'{sampler_name} sampler yielded a margin-inadmissible contingency table')
             else:
                 raise Exception('Unrecognized error encountered.')
@@ -887,22 +907,22 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
 
         margin0 = None
         # Read initialised table
-        if str_in_list('margin0', self.ct.config.settings['mcmc']['contingency_table'].keys()):
-            initialisation = self.ct.config.settings['mcmc']['contingency_table']['margin0']
+        if str_in_list('margin0', self.config.settings['mcmc']['contingency_table'].keys()):
+            initialisation = self.config.settings['mcmc']['contingency_table']['margin0']
             # If it is a path read file
             if isinstance(initialisation, str):
                 # Extract filepath
-                if os.path.isfile(os.path.join(self.ct.config.settings['inputs']['dataset'], initialisation)):
+                if os.path.isfile(os.path.join(self.config.settings['inputs']['dataset'], initialisation)):
                     margin0 = np.loadtxt(
                         os.path.join(
-                            self.ct.config.settings['inputs']['dataset'],
+                            self.config.settings['inputs']['dataset'],
                             initialisation
                         ), 
                         dtype='float32'
                     )
             # If it is an array/list make sure it has the
             elif isinstance(initialisation, (list, np.ndarray, np.generic)) and \
-                    np.any([(len(initialisation) == dim) for dim in self.ct.dims]):
+                    np.any([(len(initialisation) == dim) for dim in self.dims]):
                 margin0 = initialisation
             else:
                 self.logger.error(f"Initial table margin {initialisation} is neither a list nor a valid filepath.")
@@ -932,34 +952,34 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             if len(axis) < self.ndims():
                 margin = np.random.multinomial(
                     n=self.margins[tuplize(range(self.ndims()))], 
-                    pvals=intensity.sum(axis=axis)
+                    pvals=intensity.sum(dim=axis)
                 )
             else:
                 # This is sampling the grand total
-                margin = np.array([np.random.poisson(intensity.sum(axis=axis))])
+                margin = np.array([np.random.poisson(intensity.sum(dim=axis))])
             # The loop can now end
             firstIteration = False
         return margin
     
-    def table_monte_carlo_sample(self,intensity:list=None, margins: dict = {}) -> Union[np.ndarray, None]:
+    def table_monte_carlo_sample(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
         # Update margins
         if margins is not None:
             self.update_margins(margins)
 
         # Fix random seed
-        # np.random.seed(self.seed)
+
         # Define axes
         constrained_axis1 = (1,)
         constrained_axis2 = (0,)
         
         # Initialise table to zero
-        table0 = np.zeros(shape=self.dims, dtype='int32')
+        table0 = torch.zeros(tuple(self.dims), dtype=int32)
 
         # Get N (sum or row or column sums)
-        N = self.residual_margins[tuplize(range(self.ndims()))][0]
+        N = self.residual_margins[tuplize(range(self.ndims()))]
 
         # Generate permutation of N items
-        permutation = np.random.permutation(range(1, N+1))
+        permutation = torch.randperm(N) + torch.tensor(1,dtype=int32)
 
         # Loop through first axis
         for i in range(self.dims[constrained_axis2]):
@@ -967,56 +987,56 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             if i == 0:
                 permutation_subset = permutation[0 : (self.residual_margins[constrained_axis1][i])]
             else:
-                permutation_subset = permutation[int(np.sum(self.residual_margins[constrained_axis1][:(i)])):
-                                                int(np.sum(self.residual_margins[constrained_axis1][:(i+1)]))]
+                permutation_subset = permutation[torch.sum(self.residual_margins[constrained_axis1][:(i)]):
+                                                torch.sum(self.residual_margins[constrained_axis1][:(i+1)])]
                     
             # Loop through columns
             for j in range(self.dims[constrained_axis1]):
                 # Create index appropriately
-                query_index = np.zeros(self.ndims(), dtype='uint8')
+                query_index = torch.zeros(tuple(self.ndims()), dtype=uint8)
                 query_index[constrained_axis2] = i
                 query_index[constrained_axis1] = j
                 query_index = tuplize(query_index)
 
                 if query_index in self.constraints['cells']:
                     # Initialise cell at constraint
-                    table0[query_index] = self.table[query_index]
+                    table0[query_index] = self.ground_truth_table[query_index]
                 else:
                     # Count number of entries between c_1+...+c_{j-1}+1 and c_1+...+c_j
                     if j == 0:
-                        table0[query_index] = np.int32(
+                        table0[query_index] = torch.int32(
                             ((1 <= permutation_subset) & \
                              (permutation_subset <= self.residual_margins[constrained_axis2][j])).sum()
                         )
                     else:
-                        table0[query_index] = np.int32(
-                            (((np.sum(self.residual_margins[constrained_axis2][:j])+1) <= permutation_subset) & \
-                            (permutation_subset <= np.sum(self.residual_margins[constrained_axis2][:(j+1)]))).sum()
+                        table0[query_index] = torch.int32(
+                            (((torch.sum(self.residual_margins[constrained_axis2][:j])+1) <= permutation_subset) & \
+                            (permutation_subset <= torch.sum(self.residual_margins[constrained_axis2][:(j+1)]))).sum()
                         )
 
         self.admissibility_debugging('Monte Carlo',table0)
 
-        return table0.astype('int32')
+        return table0.to(device=self.device,dtype=int32)
     
-    def table_import(self,intensity:list=None, margins: dict = {}) -> Union[np.ndarray, None]:
+    def table_import(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
         # Read initial table
         table0 = None
-        if str_in_list('table0', self.ct.config.settings['mcmc']['contingency_table'].keys()):
-            initialisation = self.ct.config.settings['mcmc']['contingency_table']['table0']
+        if str_in_list('table0', self.config.settings['mcmc']['contingency_table'].keys()):
+            initialisation = self.config.settings['mcmc']['contingency_table']['table0']
             # If it is a path read file
             if isinstance(initialisation, str):
                 # Extract filepath
-                if os.path.isfile(os.path.join(self.ct.config.settings['inputs']['dataset'], initialisation)):
+                if os.path.isfile(os.path.join(self.config.settings['inputs']['dataset'], initialisation)):
                     tab0 = np.loadtxt(
                         os.path.join(
-                            self.ct.config.settings['inputs']['dataset'], 
+                            self.config.settings['inputs']['dataset'], 
                             initialisation
                         ), 
                         dtype='float32'
                     )
             # If it is an array/list make sure it has the
             elif isinstance(initialisation, (list, np.ndarray, np.generic)) and \
-                    (np.shape(initialisation) == self.ct.dims):
+                    (np.shape(initialisation) == self.dims):
                 table0 = initialisation
             else:
                 self.logger.warning(
@@ -1027,39 +1047,44 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         if table0 is None:
             raise Exception('Table 0 could not be found.')
         else:
-            return table0
+            return table0.to(device=self.device,dtype=int32)
 
-    def table_random_sample(self,intensity:list=None, margins: dict = {}) -> Union[np.ndarray, None]:
+    def table_random_sample(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
 
         try:
             assert len(self.constraints['constrained_axes']) == 0
         except:
             raise Exception ('table_random_sample is only used by tables with no margin constraints')
         # Fix random seed
-        # np.random.seed(self.seed)
         
         # Initialise table to zero
-        table0 = np.zeros(self.dims, dtype='int32')
+        table0 = torch.zeros(tuple(self.dims), dtype=int32)
         min_cell_value,max_cell_value = 0,1
         for cell in self.constraints['cells']:
-            table0[cell] = np.int32(self.table[cell])
+            table0[cell] = torch.int32(self.ground_truth_table[cell])
             min_cell_value = min(min_cell_value,table0[cell])
             max_cell_value = max(max_cell_value,table0[cell])
         
         # Define support to sample from
         cell_value_range = [min(min_cell_value,1), max(max_cell_value,100)]
-        
         # Update remaining table cells
         for cell in self.cells:
             # Sample value randomly
-            table0[cell] = np.int32(np.random.randint(*cell_value_range))
+            table0[cell] = torch.randint(low=cell_value_range[0],high=cell_value_range[1],size=(1,),dtype=int32)
 
         self.admissibility_debugging('Random solution',table0)
-        # np.random.seed(None)
+        return table0.to(device=self.device,dtype=int32)
 
-        return table0.astype('int32')
+    def table_direct_sampling(self, intensity:list=None, margins:dict = {}, **kwargs):
+        # Get direct sampling proposal
+        direct_sampling_proposal = getattr(kwargs['ct_mcmc'],f"direct_sampling_proposal_{self.ndims()}way_table")
+        table0,_,_,_,_ = direct_sampling_proposal(
+            table_prev=None,
+            log_intensity=torch.log(intensity)
+        )
+        return table0.to(device=self.device,dtype=int32)
 
-    def table_maximum_entropy_solution(self, intensity:list=None, margins: dict = {}) -> Union[np.ndarray, None]:
+    def table_maximum_entropy_solution(self, intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
         '''
         This is the solution of the maximum entropy in the non-integer case
         X_ij = (r_i*c_j) / T
@@ -1069,30 +1094,33 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             self.update_margins(margins)
 
         # Fix random seed
-        # np.random.seed(self.seed)
 
         # Initialise table to zero
-        table0 = np.zeros(self.dims, dtype='int32')
-        table0_learned = np.zeros(table0.shape,dtype=bool)
-        for cell in self.constraints['cells']:
-            table0[cell] = self.table[cell]
-            table0_learned[cell] = True
+        table0 = torch.zeros(tuple(self.dims), dtype=int32)
+        table0_learned = torch.zeros(tuple(table0.shape),dtype=tbool)
+
+        # Non fixed (free) indices
+        free_cells = np.array(self.cells)
+        free_indices = [ free_cells[:,i] for i in range(self.ndims()) ]
+
+        table0[free_indices] = self.ground_truth_table[free_indices]
+        table0_learned[free_indices] = True
         # Create masked array
-        table0 = np.ma.array(table0, mask=table0_learned)
+        table0 = masked_tensor(table0, table0_learned)
 
         # Define axes
-        constrained_axis1 = 1
-        constrained_axis2 = 0
-            
+        constrained_axis1 = (1,)
+        constrained_axis2 = (0,)
+
         # Keep a copy of row and column sums
-        rowsums0 = np.zeros(self.dims[constrained_axis2])
-        rowsums0[:] = self.residual_margins[tuplize(constrained_axis1)]
-        colsums0 = np.zeros(self.dims[constrained_axis1])
-        colsums0[:] = self.residual_margins[tuplize(constrained_axis2)]
+        rowsums0 = self.residual_margins[tuplize(constrained_axis1)].detach().clone().numpy()
+        colsums0 = self.residual_margins[tuplize(constrained_axis2)].detach().clone().numpy()
 
         # Minimum residual table
-        min_residual = np.zeros(self.dims,dtype='int32')
-        min_residual_mask = np.zeros(self.dims,dtype=bool)
+        min_residual = np.zeros(tuple(self.dims),dtype='int32')
+        min_residual_mask = np.zeros(tuple(self.dims),dtype=bool)
+
+        min_residual[free_indices] = np.minimum(rowsums0[free_cells[:,0]],colsums0[free_cells[:,1]])
         for i in range(self.dims[0]):
             for j in range(self.dims[1]):
                 if (i,j) in self.constraints['cells']:
@@ -1105,7 +1133,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         min_residual = np.ma.array(min_residual, mask=min_residual_mask)
 
         # Get N (sum or row or column sums)
-        N = self.margins[tuplize(range(self.ndims()))][0]
+        N = self.margins[tuplize(range(self.ndims()))]
         counter = 0
 
         while not self.table_margins_admissible(table0):
@@ -1149,7 +1177,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                     # Order min residual values
                     sorted_indices = np.ma.argsort(
                                 min_residual,
-                                axis=None,
+                                dim=None,
                                 kind='quicksort', 
                                 fill_value=np.int32(self.margins[tuplize(range(self.ndims()))]+1)
                     )
@@ -1221,11 +1249,10 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             counter += 1
 
         self.admissibility_debugging('Maximum entropy solution',table0)
-        # np.random.seed(None)
 
-        return table0.astype('int32')
+        return table0.to(device=self.device,dtype=int32)
 
-    def table_iterative_residual_filling_solution(self,intensity:list=None, margins: dict = {}) -> Union[np.ndarray, None]:
+    def table_iterative_residual_filling_solution(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
 
         # Update margins
         if margins is not None:
@@ -1235,14 +1262,14 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         table0 = np.zeros(self.dims, dtype='int32')
         table0_learned = np.zeros(table0.shape,dtype=bool)
         for cell in self.constraints['cells']:
-            table0[cell] = self.table[cell]
+            table0[cell] = self.ground_truth_table[cell]
             table0_learned[cell] = True
         # Create masked array
         table0 = np.ma.array(table0, mask=table0_learned)
 
         # Define axes
-        constrained_axis1 = 1
-        constrained_axis2 = 0
+        constrained_axis1 = (1,)
+        constrained_axis2 = (0,)
             
         # Keep a copy of row and column sums
         rowsums0 = np.zeros(self.dims[constrained_axis2])
@@ -1269,7 +1296,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             # Order min residual values
             min_residual_index_flat = np.ma.argmin(
                         min_residual,
-                        axis=None,
+                        dim=None,
                         fill_value=np.int32(self.margins[tuplize(range(self.ndims()))]+1)
             )
             min_residual_index = np.unravel_index(min_residual_index_flat,shape=self.dims)
@@ -1302,22 +1329,21 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
 
         self.admissibility_debugging('Iterative residual filling solution',table0.data)
 
-        return table0.data.astype('int32')
+        return table0.to(device=self.device,dtype=int32)
 
-    def table_iterative_uniform_residual_filling_solution(self,intensity:list=None, margins: dict = {}) -> Union[np.ndarray, None]:
+    def table_iterative_uniform_residual_filling_solution(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
 
         # Update margins
         if margins is not None:
             self.update_margins(margins)
 
         # Fix random seed
-        # np.random.seed(self.seed)
         
         # Initialise table to zero
         table0 = np.zeros(self.dims, dtype='int32')
         table0_learned = np.zeros(table0.shape,dtype=bool)
         for cell in self.constraints['cells']:
-            table0[cell] = self.table[cell]
+            table0[cell] = self.ground_truth_table[cell]
             table0_learned[cell] = True
         # Create masked array
         table0 = np.ma.array(table0, mask=table0_learned)
@@ -1394,7 +1420,6 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 table0.mask[:,cell[1]] = True
 
         self.admissibility_debugging('Iterative uniform residual filling solution',table0.data)
-        # np.random.seed(None)
 
-        return table0.data.astype('int32')
+        return table0.data.to(device=self.device,dtype=int32)
     
