@@ -43,18 +43,19 @@ seed = 1
       # default = 0.0141421356
       # range = [0.0141421356,0.141421356]
 
-[neural_network]
-  disable_tqdm = true
+[training]
   table_inference = false
-  # N = +100000 # number of epochs
   num_steps = +1
   batch_size = +1
-  N = 100
-  [neural_network.loss_function] 
-    name = 'mseloss'
-  # [neural_network.N.sweep]
+  N = +100
+  # [training.N.sweep]
   #   default = 100
   #   range = [100,1000,10000]
+
+[neural_network]
+  disable_tqdm = true
+  [neural_network.loss_function] 
+    name = 'mseloss'
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
