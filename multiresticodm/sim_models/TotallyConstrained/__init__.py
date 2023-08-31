@@ -144,9 +144,9 @@ def _log_flow_matrix(**kwargs):
 
     # Extract dimensions
     nrows,ncols = cost_matrix.size(dim=0), cost_matrix.size(dim=1)
-    N = log_destination_attraction.size(dim=1)
+    N = log_destination_attraction.size(dim=0)
     log_flow = torch.zeros((N,nrows,ncols),dtype=float32)
-    
+
     # Reshape tensors to ensure operations are possible
     log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,ncols))
     cost_matrix = torch.reshape(cost_matrix,(1,nrows,ncols))

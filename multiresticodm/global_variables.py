@@ -20,61 +20,61 @@ XARRAY_SCHEMA = {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["1","N"]
+        "new_shape":["N","1"]
     }, 
     'beta': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["1","N"]
+        "new_shape":["N","1"]
     }, 
     'kappa': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["1","N"]
+        "new_shape":["N","1"]
     }, 
     'delta': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["1","N"]
+        "new_shape":["N","1"]
     }, 
     'sigma': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["1","N"]
+        "new_shape":["N","1"]
     }, 
     'log_destination_attraction': {
         "coords":["destination","iter"],
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "new_shape":["J","N"]
+        "new_shape":["N","J"]
     },
     'table': {
         "coords":["origin","destination","iter"],
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32","int32"],
-        "new_shape":["I","J","N"]
+        "new_shape":["N","I","J"]
     },
     'loss': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["1","N"]
+        "new_shape":["N","1"]
     },
     'log_target': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["1","N"]
+        "new_shape":["N","1"]
     },
     'computation_time': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
-        "new_shape":["1","N"]
+        "new_shape":["N","1"]
     },
 }
 
@@ -104,35 +104,35 @@ NUMPY_TO_TORCH_DTYPE = {
 
 
 INPUT_TYPES = {
-    'cost_matrix':'float32',
-    'origin_demand':'float32',
-    'destination_demand':'float32',
-    'origin_attraction_ts':'float32',
-    'destination_attraction_ts':'float32',
-    'ground_truth_table':'int32'
+    'cost_matrix':torch.float32,
+    'origin_demand':torch.float32,
+    'destination_demand':torch.float32,
+    'origin_attraction_ts':torch.float32,
+    'destination_attraction_ts':torch.float32,
+    'ground_truth_table':torch.int32
 }
 
 TABLE_TYPES = {
-    'table':'int32',
-    'tableerror':'float32',
+    'table':torch.int32,
+    'tableerror':torch.float32,
 }
     
 INTENSITY_TYPES = {
-    'intensity':'float32',
-    'intensityerror':'float32',
-    'log_destination_attraction':'float32',
-    'log_origin_attraction':'float32',
-    'alpha':'float32',
-    'beta':'float32',
-    'delta':'float32',
-    'kappa':'float32',
-    'sigma':'float32',
+    'intensity':torch.float32,
+    'intensityerror':torch.float32,
+    'log_destination_attraction':torch.float32,
+    'log_origin_attraction':torch.float32,
+    'alpha':torch.float32,
+    'beta':torch.float32,
+    'delta':torch.float32,
+    'kappa':torch.float32,
+    'sigma':torch.float32,
 }
 
 OUTPUT_TYPES = {
-    'loss':'float32',
-    'log_target':'float32',
-    'sign':'int8',
+    'loss':torch.float32,
+    'log_target':torch.float32,
+    'sign':torch.int8,
     **INTENSITY_TYPES,
     **TABLE_TYPES
 }

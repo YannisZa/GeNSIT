@@ -834,7 +834,6 @@ def setup_logger(name,level,log_to_file:bool=False,log_to_console:bool=False):
                     logger.handlers[i].setLevel(level.upper())
                 else:
                     logger.handlers[i].setLevel(logging.CRITICAL)
-            # print(type(hand),logging.getLevelName(logger.handlers[i].level))
     else:
 
         # Configure standard error handler

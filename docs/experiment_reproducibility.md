@@ -605,11 +605,11 @@ clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_ls
 
 ### SSI
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -m SSI -s table -s intensity -stat 'mean&' '0&' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SSIs
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -e NonJointTableSIM_NN -e JointTableSIM_NN -m SSI -s table -s intensity -stat 'mean&' '0&' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SSIs
 
 ### Coverage probability
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -m coverage_probability -r 0.99 -s table -s intensity -stat '&mean' '&1_2' -b 10 -t 2 -n 100000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe coverage_probabilities
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -e NonJointTableSIM_NN -e JointTableSIM_NN -m coverage_probability -r 0.99 -s table -s intensity -stat '&mean' '&1_2' -b 10 -t 2 -n 100000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe coverage_probabilities
 
 ### Markov Basis Distance (POSSIBLE SYNTAX ERRORS)
 

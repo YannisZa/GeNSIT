@@ -655,9 +655,8 @@ class Outputs(object):
                         slice_samples = slice_samples
                     )
                 )
-
                 if sample_name == 'table' and self.settings['table_total'] != 1:
-                    self.settings['table_total'] = list(torch.sum(torch.ravel(self.data.table)))[0]
+                    self.settings['table_total'] = torch.sum(torch.tensor(self.data.table).ravel())
                 self.logger.info(f'Sample {sample_name} loaded with shape {list(getattr(self.data,sample_name).shape)}')
                 # except:
                 #     self.logger.debug(traceback.format_exc())
@@ -825,7 +824,7 @@ class Outputs(object):
     def slice_sample_iterations(self,samples):
 
         # Get burnin parameter
-        burnin = min(self.settings.get('burnin',1),samples.shape[0])
+        burnin = min(self.settings.get('burnin',1),samples['iter'].shape[0])
 
         # Get thinning parameter
         thinning = list(deep_get(key='thinning',value=self.settings))
@@ -940,9 +939,6 @@ class Outputs(object):
             
             # Store dataset
             setattr(self._data,sample_name,xr_data)
-            print(sample_name)
-            if sample_name == 'table':
-                print(xr_data)
             
             
 
@@ -986,7 +982,7 @@ class Outputs(object):
             # Instantiate ct
             sim = instantiate_sim(
                 sim_type = next(deep_get(key='sim_type',value=self.config.settings), None),
-            **data
+                **data
             )
             
             data = {}
@@ -994,7 +990,7 @@ class Outputs(object):
             for output in sim_model.REQUIRED_OUTPUTS:
                 data[output] = torch.tensor(
                     self.get_sample(output,slice_samples),
-                    dtype=NUMPY_TO_TORCH_DTYPE[OUTPUT_TYPES[output]]
+                    dtype=OUTPUT_TYPES[output]
                 )
 
             # Compute log intensity function
@@ -1036,7 +1032,7 @@ class Outputs(object):
             # Get samples and cast them to appropriate type
             samples = torch.clone(
                 getattr(self.inputs.data,sample_name).to(
-                    dtype=NUMPY_TO_TORCH_DTYPE[INPUT_TYPES[sample_name]]
+                    INPUT_TYPES[sample_name]
                 )
             )
 
@@ -1045,13 +1041,11 @@ class Outputs(object):
                 raise Exception(f"{sample_name} not found in output data {','.join(vars(self._data).keys())}")
             
             # Get xarray
-            xr_samples = getattr(self._data,sample_name)#[sample_name]
-            # print(sample_name,samples.shape)
-            print('first',xr_samples.data_vars)
+            xr_samples = getattr(self._data,sample_name)
+
             # Apply burning, thinning and trimming
             if slice_samples:
                 xr_samples = self.slice_sample_iterations(xr_samples)
-            # print(sample_name,samples.shape)
             # Remove non-core coordinates
             noncore_coords = list(set(xr_samples.dims) - set(XARRAY_SCHEMA[sample_name]['coords']))
             # Stack all non-core coordinates into new coordinate
@@ -1060,10 +1054,10 @@ class Outputs(object):
             N = xr_samples['new_iter'].shape[0]
             # Convert xarray DataSet to DataArray
             xr_samples = xr_samples[sample_name]
-            # Convert to numpy
-            samples = xr_samples.values
+            # Convert to torch
+            samples = torch.tensor(xr_samples.values)
             # Cast to specific data type
-            samples = samples.astype(dtype=OUTPUT_TYPES[sample_name])
+            samples = samples.to(OUTPUT_TYPES[sample_name])
             # Reshape
             dims = {"N":N,"I":self.inputs.data.dims[0],"J":self.inputs.data.dims[1]}
             # print(sample_name,samples.shape)
@@ -1113,7 +1107,7 @@ class Outputs(object):
         return filename
 
     def compute_sample_statistics(self,data,sample_name,statistic,axis:int=0):
-        # print('compute_sample_statistics',sample_name,statistic,axis)
+        # print('compute_sample_statistics',sample_name,type(data),statistic,axis)
         if statistic is None or statistic.lower() == '' or 'sample' in statistic.lower():
             return data
         
