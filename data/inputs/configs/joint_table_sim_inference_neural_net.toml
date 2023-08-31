@@ -28,7 +28,7 @@ seed = 1
   sparse_margins = false
   [contingency_table.constraints]
     axes = [[1]]
-    cells = ''
+    cells = [[0,1],[1,2]]
 
 [training]
   N = +100 # number of epochs
@@ -40,14 +40,14 @@ seed = 1
   table_steps = 1
   disable_tqdm = true
   proposal = 'direct_sampling' # ['degree_one','degree_higher','direct_sampling']
-  table0 = 'maximum_entropy_solution' #['direct_sampling','random_sample','maximum_entropy_solution','iterative_residual_filling_solution','iterative_uniform_residual_filling_solution']
+  table0 = 'maximum_entropy_solution' #['direct_sampling','random_sample','maximum_entropy_solution']
   margin0 = 'multinomial' # ['multinomial','import']
 
 
 [spatial_interaction_model]
   # sim_type = 'ProductionConstrained','TotallyConstrained'
   sim_type = 'TotallyConstrained'
-  grand_total = +1 #+33704
+  grand_total = +1
   [spatial_interaction_model.parameters]
     bmax = +1.0
     # alpha = 1.0
