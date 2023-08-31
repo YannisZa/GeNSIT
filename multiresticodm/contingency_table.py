@@ -6,6 +6,7 @@ import numpy as np
 import torch.distributions as distr
 
 from copy import deepcopy
+from pprint import pprint
 from pandas import read_csv
 from pandas import DataFrame
 from itertools import product
@@ -19,7 +20,7 @@ from typing import List, Union, Callable
 from multiresticodm.config import Config
 from multiresticodm.global_variables import *
 from multiresticodm.math_utils import powerset
-from multiresticodm.utils import setup_logger, str_in_list, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth
+from multiresticodm.utils import setup_logger, str_in_list, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth, broadcast
 
 # -> Union[ContingencyTable,None]:
 def instantiate_ct(table, config: Config, **kwargs):
@@ -279,11 +280,12 @@ class ContingencyTable(object):
     def constraint_table(self,with_margins:bool=False):
         if self.ground_truth_table is not None:
             table_constraints = -np.ones(self.ground_truth_table.shape)
-            table_mask = np.zeros(self.ground_truth_table.shape,dtype=tbool)
+            table_mask = np.zeros(self.ground_truth_table.shape,dtype=bool)
+            ground_truth_table = self.ground_truth_table.cpu().detach().numpy()
             for cell in self.constraints['cells']:
-                table_constraints[cell] = self.ground_truth_table[cell].cpu().detach().numpy()
+                table_constraints[cell] = ground_truth_table[cell]
                 table_mask[cell] = True
-            table_constraints = table_constraints.astype(torch.int32)
+            table_constraints = table_constraints.astype(np.int32)
             
             # Printing margins for visualisation purposes only
             if with_margins:
@@ -533,19 +535,19 @@ class ContingencyTable(object):
                     cells = cells.reshape(np.size(self.constraints['cells'])//self.ndims(), self.ndims()).tolist()
                     # Remove invalid cells (i.e. cells than do not have the right number of dims or are out of bounds)
                     cells = sorted([tuplize(c) for c in cells if (len(c) == self.ndims() and (c < self.dims).all())])
-                    self.constraints['cells'] = torch.tensor(cells).to(dtype=uint8,device=self.device)
+                    self.constraints['cells'] = [tuplize(c) for c in cells]
                     self.logger.info(f"Cell constraints {','.join([str(c) for c in cells])} provided")
                 else:
-                    self.constraints['cells'] = torch.tensor([]).to(dtype=uint8,device=self.device)
+                    self.constraints['cells'] = []
             elif isinstance(cell_constraints,(list,np.ndarray)):
-                self.constraints['cells'] = torch.tensor([tuplize(ax) for ax in cell_constraints],dtype=uint8).to(device=self.device)
+                self.constraints['cells'] = [tuplize(c) for c in cell_constraints]
             else:
                 print('cell constraints')
                 print(cell_constraints)
                 self.logger.error(f"Cell constraints of type {type(cell_constraints)}")
                 raise Exception('Cell constraints could not be recognised')
         else:
-            self.constraints['cells'] = torch.empty(1).to(device=self.device)
+            self.constraints['cells'] = []
 
     def update_table_type_and_markov_basis_class(self):
         # Check if there are is at lest one active cell
@@ -585,21 +587,35 @@ class ContingencyTable(object):
                 self.residual_margins[tuplize(ax)] = margin.int().to(dtype=int32,device=self.device)
 
     def update_residual_margins_from_cell_constraints(self, constrained_cells=None):
-        constrained_cells = self.constraints['cells'] if constrained_cells is None or len(constrained_cells) <= 0 else constrained_cells
-        for ax in self.constraints['all_axes']:
-            ax_complement = self.axes_complement([ax])
-            for cell in constrained_cells:
-                cell_list = np.asarray(cell)
-                for subax in ax_complement:
-                    # Subtract non-total margins
-                    if len(subax) < self.ndims() and len(ax) < self.ndims():
-                        self.residual_margins[subax][cell_list[ax]] -= self.ground_truth_table[tuplize(cell)]
-                if len(ax) == self.ndims():
-                    # Subtract cell values from grand total (only once)
-                    self.residual_margins[ax] -= self.ground_truth_table[tuplize(cell)]
-
+        # Update residual margins
+        residual_margins = self.update_residual_margins_from_cells(
+            residual_margins=self.residual_margins,
+            axes=self.constraints['all_axes'],
+            constrained_cells=constrained_cells,
+            table=self.ground_truth_table
+        )
         # Update cells though
         self.cells = sorted(list(set(self.cells) - set(constrained_cells)))
+        return residual_margins
+
+    def update_residual_margins_from_cells(self,residual_margins=None, axes=None, constrained_cells=None, table=None):
+        constrained_cells = self.constraints['cells'] if constrained_cells is None or len(constrained_cells) <= 0 else constrained_cells
+        residual_margins = deepcopy(self.residual_margins) if deepcopy(residual_margins) is None else residual_margins
+        table = self.ground_truth_table if table is None else table
+        axes = self.constraints['all_axes'] if axes is None else axes
+
+        for cell in constrained_cells:
+            cell_arr = np.asarray(cell)
+            for ax in axes:
+                if len(ax) < self.ndims():
+                    axc = self.axes_complement([ax],same_length=True)
+                    axc = axc[0]
+                    # Subtract non-total margins
+                    residual_margins[ax][cell_arr[axc]] -= table[tuplize(cell)]
+                else:
+                    # Subtract cell values from grand total (only once)
+                    residual_margins[ax] -= table[tuplize(cell)] 
+        return residual_margins
 
 
     def update_cell_constraints_deterministically(self):
@@ -608,7 +624,7 @@ class ContingencyTable(object):
         # Get flags for whether cells are constrained or not
         cell_unconstrained = (constraint_table == -1)
         # Repeat process if there any margins with only one unknown
-        while any([any(cell_unconstrained.sum(dim=ax,keepdims=True).flatten() == 1) for ax in self.constraints['constrained_axes']]):
+        while any([any(cell_unconstrained.sum(axis=ax,keepdims=True).flatten() == 1) for ax in self.constraints['constrained_axes']]):
             # If cells need to be filled in deterministically the entire table must be available
             try:
                 assert self.table_nonnegative(self.ground_truth_table)
@@ -709,7 +725,7 @@ class ContingencyTable(object):
                 keepdims=True, 
                 dtype=int32
             ).flatten()
-            print(axes,self.margins[tuplize(axes)].shape)
+            # print(axes,self.margins[tuplize(axes)].shape)
             self.residual_margins[tuplize(axes)] = table.sum(
                 dim=tuplize(axes), 
                 keepdims=True, 
@@ -961,6 +977,74 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             firstIteration = False
         return margin
     
+    def maxent_given_constraints(self,min_residual,residual_margins):
+        # get all contraint axes
+        ax_constraints = list(residual_margins.keys())
+
+        # If empty return residual 1 for all non-zero entries
+        if len(ax_constraints) <= 0:
+            min_residual[min_residual < 0] = 1
+            return min_residual 
+        
+        # Constraint axis minimum length
+        min_constraint_ax_len = min([len(ax) for ax in ax_constraints])
+
+        # If only grant total is given
+        if min_constraint_ax_len == self.ndims():
+            maxent_solution = np.floor(
+                residual_margins[tuplize(range(self.ndims()))] / sum(min_residual.flatten() != 0)
+            )
+            # Make sure that max ent solution is non-zero
+            maxent_solution = maxent_solution if maxent_solution > 0 else 1
+
+            min_residual[min_residual > 0] = int( min(
+                    maxent_solution,
+                    residual_margins[tuplize(range(self.ndims()))]
+            ))
+
+            return min_residual
+        else:
+            # If both rowsums and colsums are provided
+            if len(ax_constraints) == self.ndims() + 1:
+                updated_cells = np.minimum(
+                    *[broadcast(residual_margins[tuplize((ax,))],self.dims) for ax in range(self.ndims())]
+                )
+                # Update cells at locations where there is residual value left
+                min_residual[min_residual > 0] = updated_cells[min_residual > 0]
+            else:
+                # Find singleton axis that is constraints
+                ax = min(ax_constraints,key=len)
+                updated_cells = broadcast(residual_margins[ax],self.dims)
+                # Update cells at locations where there is residual value left
+                min_residual[min_residual > 0] = updated_cells[min_residual > 0]
+            
+            return min_residual
+
+    def minres_given_constraints(self,min_residual,residual_margins):
+        # get all contraint axes
+        ax_constraints = list(residual_margins.keys())
+
+        # If empty return residual 1 for all non-zero entries
+        if len(ax_constraints) <= 0:
+            min_residual[min_residual > 0] = 1
+            return min_residual
+        
+        else:
+            # Minimum residual
+            minres_solution = np.floor(
+                np.min([torch.min(val) for val in residual_margins.values()]) / sum(min_residual.flatten() != 0)
+            )
+
+            # Make sure that min res solution is non-zero
+            minres_solution = minres_solution if minres_solution > 0 else 1
+
+            min_residual[min_residual > 0] = int( min(
+                    minres_solution,
+                    np.min([torch.min(val) for val in residual_margins.values()])
+            ))
+            return min_residual
+
+
     def table_monte_carlo_sample(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
         # Update margins
         if margins is not None:
@@ -1093,333 +1177,84 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         if margins is not None:
             self.update_margins(margins)
 
-        # Fix random seed
-
-        # Initialise table to zero
-        table0 = torch.zeros(tuple(self.dims), dtype=int32)
-        table0_learned = torch.zeros(tuple(table0.shape),dtype=tbool)
-
         # Non fixed (free) indices
         free_cells = np.array(self.cells)
-        free_indices = [ free_cells[:,i] for i in range(self.ndims()) ]
-
-        table0[free_indices] = self.ground_truth_table[free_indices]
-        table0_learned[free_indices] = True
-        # Create masked array
-        table0 = masked_tensor(table0, table0_learned)
-
-        # Define axes
-        constrained_axis1 = (1,)
-        constrained_axis2 = (0,)
+        # Fixed indices
+        fixed_cells = np.array(self.constraints['cells'])
+        # Initialise table to zero
+        table0 = torch.zeros(tuple(self.dims), dtype=int32)
+        # Fix table cells
+        table0[tuple(fixed_cells.T)] = self.ground_truth_table[tuple(fixed_cells.T)]
 
         # Keep a copy of row and column sums
-        rowsums0 = self.residual_margins[tuplize(constrained_axis1)].detach().clone().numpy()
-        colsums0 = self.residual_margins[tuplize(constrained_axis2)].detach().clone().numpy()
+        residual_margins = deepcopy(self.residual_margins)
+        # Get only constrained residual margins
+        residual_margins = {k:v for k,v in residual_margins.items() if k in self.constraints['constrained_axes']}
 
         # Minimum residual table
-        min_residual = np.zeros(tuple(self.dims),dtype='int32')
-        min_residual_mask = np.zeros(tuple(self.dims),dtype=bool)
-
-        min_residual[free_indices] = np.minimum(rowsums0[free_cells[:,0]],colsums0[free_cells[:,1]])
-        for i in range(self.dims[0]):
-            for j in range(self.dims[1]):
-                if (i,j) in self.constraints['cells']:
-                    min_residual[i,j] = 0
-                    min_residual_mask[i,j] = True
-                else:
-                    min_residual[i,j] = int(min(rowsums0[i], colsums0[j]))
-                    if min_residual[i,j] == 0:
-                        min_residual_mask[i,j] = True
-        min_residual = np.ma.array(min_residual, mask=min_residual_mask)
-
-        # Get N (sum or row or column sums)
-        N = self.margins[tuplize(range(self.ndims()))]
+        min_residual = np.iinfo(np.int32).max*np.ones(tuple(self.dims),dtype='int32')
+        min_residual[tuple(fixed_cells.T)] = 0
+        min_residual = self.minres_given_constraints(min_residual,residual_margins)
+        
+        # Count number of steps run max entropy updates
         counter = 0
 
-        while not self.table_margins_admissible(table0):
-
+        while not self.table_admissible(table0):
             # In first iteration
             if counter == 0:
-                # Loop through every table cell
-                for cell in self.cells:
-                    # Use stochastic rounding to round up maximum entropy solution
-                    # Max-entropy solution is to set all cells (i,j) to value c_j*r_i/N
-                    max_ent_solution = (rowsums0[cell[constrained_axis2]]*colsums0[cell[constrained_axis1]]) / N
-
-                    # Determine amount to set by stochastically rounding it up or down
-                    # + int(add_delta)*delta)
-                    amount = int(np.floor(max_ent_solution))
-
-                    # Update table
-                    table0[cell] += np.int32(amount)
-
-                    # Update row,column sums
-                    rowsums0[cell[constrained_axis2]] -= amount
-                    colsums0[cell[constrained_axis1]] -= amount
-                    min_residual[cell] = int(min(rowsums0[cell[constrained_axis2]], colsums0[cell[constrained_axis1]]))
-
-                    # Assert that residual col and rowsums are non-negative
-                    assert rowsums0[cell[constrained_axis2]] >= 0
-                    assert colsums0[cell[constrained_axis1]] >= 0
-
-                    if rowsums0[cell[constrained_axis2]] == 0:
-                        table0.mask[cell[constrained_axis2],:] = True
-                        min_residual.mask[cell[constrained_axis2],:] = True
-                    if colsums0[cell[constrained_axis1]] == 0:
-                        table0.mask[:,cell[constrained_axis1]] = True
-                        min_residual.mask[:,cell[constrained_axis1]] = True
-
+                cells = np.array(self.cells)
+                # Update table
+                table0[tuple(cells.T)] += np.int32(min_residual[tuple(cells.T)])
+                # Update residual margins
+                residual_margins = self.update_residual_margins_from_cells(
+                    residual_margins=residual_margins, 
+                    axes=list(residual_margins.keys()), 
+                    constrained_cells=self.cells,
+                    table=table0
+                )
+                # Update min residual
+                min_residual = self.maxent_given_constraints(min_residual,residual_margins)
             else:
-                k = 0
-                # Fill in residual rowsums or colsums
-                while (any(rowsums0 > 0) or any(colsums0 > 0)):
-                    
-                    # Order min residual values
-                    sorted_indices = np.ma.argsort(
-                                min_residual,
-                                dim=None,
-                                kind='quicksort', 
-                                fill_value=np.int32(self.margins[tuplize(range(self.ndims()))]+1)
-                    )
-                    # sorted_indices = np.unravel_index(sorted_indices,table0.shape)
-                    # Get indices of unmasked elements
-                    unmasked_indices = np.ma.where(~table0.mask)
-                    # unmasked_indices = np.asarray(list(zip(*unmasked_indices)))
-                    # Create index in same dims ars sorted_indices
-                    unmasked_indices = np.ravel_multi_index(unmasked_indices,table0.shape)
-                    # Maintain index order and get only unmasked indices
-                    sorted_unmasked_indices_2d = np.unravel_index(
-                        sorted_indices[np.isin(sorted_indices, unmasked_indices[np.isin(unmasked_indices, sorted_indices)])], table0.shape
-                    )
-                    # ordered_vals = []
-                    # for j in range(np.shape(sorted_unmasked_indices_2d)[1]):
-                    #     ordered_cell = (sorted_unmasked_indices_2d[0][j],sorted_unmasked_indices_2d[1][j])
-                    #     ordered_vals.append(min_residual[ordered_cell])
-                    # print(ordered_vals)
-                    # sys.exit()
 
+                # Order min residual values making sure that 
+                # zero residual values are last in order by assigning them to integer infinity
+                sorted_indices = np.argsort(
+                    np.where(min_residual > 0, min_residual, np.iinfo(np.int32).max),
+                    kind='quicksort',
+                    axis=None 
+                )
 
-                    try:
-                        smallest_value_cell = (sorted_unmasked_indices_2d[0][k], sorted_unmasked_indices_2d[1][k])
-                    except:
-                        print(np.shape(sorted_unmasked_indices_2d))
-                        print(k)
-                        print(min_residual.data)
-                        print(rowsums0)
-                        print(colsums0)
-                        raise Exception()
-                    # print(smallest_value_cell)
-                    # print(table0[smallest_value_cell])
-                    # print(table0[smallest_value_cell])
-                    # sys.exit()
-                    assert not table0.mask[smallest_value_cell]
+                # Convert flat index to N-dimensional index
+                sorted_indices = np.unravel_index(sorted_indices,min_residual.shape)
+                try:
+                    smallest_value_cell = tuplize([sorted_indices[i][0] for i in range(self.ndims())])
+                except:
+                    print(np.shape(sorted_indices))
+                    print(min_residual)
+                    print(residual_margins)
+                    raise Exception()
 
-                    # Try to add maximum amount possible
-                    amount = int(min(rowsums0[smallest_value_cell[0]], colsums0[smallest_value_cell[1]]))
-                    table0[smallest_value_cell] += np.int32(amount)
-                    # Update row,column sums
-                    rowsums0[smallest_value_cell[0]] -= amount
-                    colsums0[smallest_value_cell[1]] -= amount
+                # Try to add maximum amount possible
+                table0[smallest_value_cell] += np.int32(min_residual[smallest_value_cell])
+                
+                # Update residual margins
+                residual_margins = self.update_residual_margins_from_cells(
+                    residual_margins=residual_margins, 
+                    axes=list(residual_margins.keys()),
+                    constrained_cells=[smallest_value_cell],
+                    table={smallest_value_cell:min_residual[smallest_value_cell]}
+                )
 
-                    min_residual[cell] = int(min(rowsums0[smallest_value_cell[0]], colsums0[smallest_value_cell[1]]))
-                    # Get query index
-                    # query_index = [None] * self.ndims()
-                    # if smallest_value_cell[0] == 20 or smallest_value_cell[1] == 6:
-                        # print('smallest cell val',smallest_value_cell,'amount',amount)
-                        # print('table val',table0[smallest_value_cell])
-                        # print('rowsums',rowsums0[smallest_value_cell[0]],'colsums',colsums0[smallest_value_cell[1]])
-
-                    if rowsums0[smallest_value_cell[0]] <= 0:
-                        # print('To be learned',table0[smallest_value_cell])
-                        # print('Deactivating row',smallest_value_cell[0])
-                        # print(table0.mask[smallest_value_cell],table0[smallest_value_cell])
-                        # Update deactivated (fixed) cells
-                        table0.mask[smallest_value_cell[0],:] = True
-                        min_residual.mask[smallest_value_cell[0],:] = True
-                        
-                    if colsums0[smallest_value_cell[1]] <= 0:
-                        # print('To be learned',table0[smallest_value_cell])
-                        # print('Deactivating col',smallest_value_cell[1])
-                        # print(table0.mask[smallest_value_cell],table0[smallest_value_cell])
-                        # Update deactivated (fixed) cells
-                        table0.mask[:,smallest_value_cell[1]] = True
-                        min_residual.mask[:,smallest_value_cell[1]] = True
+                # Update min residual
+                min_residual = self.maxent_given_constraints(min_residual,residual_margins)
+                if min_residual[smallest_value_cell] < 0 or any([v.sum() < 0 for v in residual_margins.values()]):
+                    print(min_residual)
+                    print(table0.sum())
+                    pprint(residual_margins)
+                    sys.exit()
 
             # Increment counter
             counter += 1
 
         self.admissibility_debugging('Maximum entropy solution',table0)
-
         return table0.to(device=self.device,dtype=int32)
-
-    def table_iterative_residual_filling_solution(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
-
-        # Update margins
-        if margins is not None:
-            self.update_margins(margins)
-            
-        # Initialise table to zero
-        table0 = np.zeros(self.dims, dtype='int32')
-        table0_learned = np.zeros(table0.shape,dtype=bool)
-        for cell in self.constraints['cells']:
-            table0[cell] = self.ground_truth_table[cell]
-            table0_learned[cell] = True
-        # Create masked array
-        table0 = np.ma.array(table0, mask=table0_learned)
-
-        # Define axes
-        constrained_axis1 = (1,)
-        constrained_axis2 = (0,)
-            
-        # Keep a copy of row and column sums
-        rowsums0 = np.zeros(self.dims[constrained_axis2])
-        rowsums0[:] = self.residual_margins[tuplize(constrained_axis1)]
-        colsums0 = np.zeros(self.dims[constrained_axis1])
-        colsums0[:] = self.residual_margins[tuplize(constrained_axis2)]
-
-        # Minimum residual table
-        min_residual = np.zeros(self.dims,dtype='int32')
-        min_residual_mask = np.zeros(self.dims,dtype=bool)
-        for i in range(self.dims[0]):
-            for j in range(self.dims[1]):
-                if (i,j) in self.constraints['cells']:
-                    min_residual[i,j] = 0
-                    min_residual_mask[i,j] = True
-                else:
-                    min_residual[i,j] = int(min(rowsums0[i], colsums0[j]))
-                    if min_residual[i,j] == 0:
-                        min_residual_mask[i,j] = True
-        min_residual = np.ma.array(min_residual, mask=min_residual_mask)
-
-        while not self.table_margins_admissible(table0.data):
-
-            # Order min residual values
-            min_residual_index_flat = np.ma.argmin(
-                        min_residual,
-                        dim=None,
-                        fill_value=np.int32(self.margins[tuplize(range(self.ndims()))]+1)
-            )
-            min_residual_index = np.unravel_index(min_residual_index_flat,shape=self.dims)
-            smallest_value_cell = tuplize(min_residual_index)
-            
-            assert not table0.mask[smallest_value_cell]
-        
-            # Try to add maximum amount possible
-            amount = int(min(rowsums0[smallest_value_cell[0]], colsums0[smallest_value_cell[1]]))
-            table0[smallest_value_cell] += np.int32(amount)
-            # Update row,column sums
-            rowsums0[smallest_value_cell[0]] -= amount
-            colsums0[smallest_value_cell[1]] -= amount
-            for i in range(self.dims[0]):
-                if rowsums0[i] <= 0:
-                    table0.mask[i,:] = True
-                    min_residual.mask[i,:] = True
-            for j in range(self.dims[1]):
-                if colsums0[j] <= 0:
-                    table0.mask[:,j] = True
-                    min_residual.mask[:,j] = True
-            # Update residual
-            for i in range(self.dims[0]):
-                for j in range(self.dims[1]):
-                    # Update minimum residual table
-                    if not min_residual.mask[i,j]:
-                        min_residual[i,j] = int(min(rowsums0[i], colsums0[j]))
-                    if min_residual[i,j] == 0:
-                        min_residual.mask[i,j] = True
-
-        self.admissibility_debugging('Iterative residual filling solution',table0.data)
-
-        return table0.to(device=self.device,dtype=int32)
-
-    def table_iterative_uniform_residual_filling_solution(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
-
-        # Update margins
-        if margins is not None:
-            self.update_margins(margins)
-
-        # Fix random seed
-        
-        # Initialise table to zero
-        table0 = np.zeros(self.dims, dtype='int32')
-        table0_learned = np.zeros(table0.shape,dtype=bool)
-        for cell in self.constraints['cells']:
-            table0[cell] = self.ground_truth_table[cell]
-            table0_learned[cell] = True
-        # Create masked array
-        table0 = np.ma.array(table0, mask=table0_learned)
-
-        # Define axes
-        constrained_axis1 = 1
-        constrained_axis2 = 0
-            
-        # Keep a copy of row and column sums
-        rowsums0 = np.zeros(self.dims[constrained_axis2])
-        rowsums0[:] = self.residual_margins[tuplize(constrained_axis1)]
-        colsums0 = np.zeros(self.dims[constrained_axis1])
-        colsums0[:] = self.residual_margins[tuplize(constrained_axis2)]
-
-        for cell in self.cells:
-            # Initalise table values with minimum possible row or col sum or N/IJ
-            amount = int(min(np.floor(np.sum(rowsums0)/np.sum(table0.mask)),rowsums0[cell[0]],colsums0[cell[1]]))
-
-            # Update table
-            table0[cell] += np.int32(amount)
-
-            # Update row,column sums
-            # This method allows for negative residuals
-            rowsums0[cell[0]] -= amount
-            colsums0[cell[1]] -= amount
-
-            if table0[cell] <= 0:
-                table0.mask[cell] = True
-            if rowsums0[cell[0]] <= 0:
-                table0.mask[cell[0],:] = True
-            if colsums0[cell[1]] <= 0:
-                table0.mask[:,cell[1]] = True
-
-        while not self.table_margins_admissible(table0.data):
-
-            # IF no solution found rerun
-            if np.sum(table0.mask) == np.prod(self.ndims()):
-                self.table_iterative_uniform_residual_filling_solution(margins)
-            
-            # Get indices of unmasked elements
-            unmasked_indices = np.ma.where(~table0.mask)
-            # Create index in same dims ars sorted_indices
-            # unmasked_indices = np.ravel_multi_index(unmasked_indices,table0.shape)
-            # Maintain index order and get only unmasked indices
-            # print(table0)
-            # print('unmasked_indices',unmasked_indices)
-            cell_index = np.random.randint(len(unmasked_indices))
-            # print(cell_index,list(zip(*unmasked_indices)))
-            try:
-                cell = list(zip(*unmasked_indices))[cell_index]
-            except:
-                self.table_iterative_uniform_residual_filling_solution(margins)
-            # try:
-            # assert not table0.mask[cell]
-            # except:
-            #     print('cell',cell, 'out of index')
-            #     print(table0)
-            # print('\n')
-            # Try to add maximum amount possible
-            amount = int(min(
-                rowsums0[cell[0]], 
-                colsums0[cell[1]]
-            ))
-            table0[cell] += np.int32(amount)
-            # Update row,column sums
-            rowsums0[cell[0]] -= amount
-            colsums0[cell[1]] -= amount
-            
-            if table0[cell] <= 0:
-                table0.mask[cell] = True
-            if rowsums0[cell[0]] <= 0:
-                table0.mask[cell[0],:] = True           
-            if colsums0[cell[1]] <= 0:
-                table0.mask[:,cell[1]] = True
-
-        self.admissibility_debugging('Iterative uniform residual filling solution',table0.data)
-
-        return table0.data.to(device=self.device,dtype=int32)
-    

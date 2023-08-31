@@ -898,3 +898,16 @@ def h5_deep_get(name,group,prefix=''):
             elif isinstance(val, h5py.Dataset):
                 if name == key:
                     yield path
+
+def broadcast(arr,shape):
+    # Squeeze array
+    arr = np.squeeze(arr)
+    # Figure out repetitions
+    axes = [i for i in range(len(shape)) if shape[i] not in list(arr.shape)]
+    # Expand dims
+    arr_reshaped = np.expand_dims(arr,axis=axes)
+    for ax in axes:
+        # Repeat along axis
+        arr_reshaped = np.repeat(arr_reshaped,shape[ax],axis=ax)
+
+    return arr_reshaped

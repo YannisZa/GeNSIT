@@ -448,7 +448,7 @@ class Experiment(object):
             if 'theta' in self.output_names:
                 for idx, dset in enumerate(self.thetas):
                     dset.resize(dset.shape[0] + 1, axis=0)
-                    dset[-1] = kwargs.get('table',[None]*len(self.thetas))[idx]
+                    dset[-1] = kwargs.get('theta',[None]*len(self.thetas))[idx]
             
             if 'log_destination_attraction' in self.output_names:
                 self.log_destination_attractions.resize(self.log_destination_attractions.shape[-1] + 1, axis=len(self.log_destination_attractions.shape)-1)
@@ -2018,7 +2018,6 @@ class SIM_NN(Experiment):
             theta_sample = torch.unsqueeze(theta_sample,0)
             log_destination_attraction_sample = torch.unsqueeze(log_destination_attraction_sample,0)
 
-            # intensity = np.exp(log_intensity.cpu().detach().numpy())
             self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
 
             # Write the epoch training time (wall clock time)
@@ -2120,7 +2119,6 @@ class NonJointTableSIM_NN(Experiment):
             table = None,
             config = config
         )
-
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
@@ -2162,6 +2160,7 @@ class NonJointTableSIM_NN(Experiment):
             )
         
         self.logger.note(f"{self.harris_wilson_nn}")
+        self.logger.info(f"{self.ct_mcmc}")
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
 
@@ -2197,7 +2196,10 @@ class NonJointTableSIM_NN(Experiment):
             for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
                 
                 # Perform neural net training
-                loss_sample, theta_sample, log_destination_attraction_sample = self.harris_wilson_nn.epoch_time_step(
+                loss_sample, \
+                theta_sample, \
+                log_destination_attraction_sample, \
+                n_processed_steps = self.harris_wilson_nn.epoch_time_step(
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
                     experiment = self,
@@ -2205,19 +2207,19 @@ class NonJointTableSIM_NN(Experiment):
                     dt = self.config['harris_wilson_model'].get('dt',0.001),
                     nn_data = training_data,
                     data_size = len(training_data),
-                    **self.config['training']   
+                    **self.config['training']
                 )
             
                 # Add axis to every sample to ensure compatibility 
                 # with the functions used below
-                theta_sample = torch.unsqueeze(theta_sample,0)
-                log_destination_attraction_sample = log_destination_attraction_sample.unsqueeze(0).unsqueeze(0)
+                theta_sample_expanded = torch.unsqueeze(theta_sample,0)
+                log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0).unsqueeze(0)
 
                 # Compute log intensity
                 log_intensity = self.harris_wilson_nn.physics_model.sim.log_intensity(
-                    log_destination_attraction = log_destination_attraction_sample,
+                    log_destination_attraction = log_destination_attraction_sample_expanded,
                     grand_total = self.ct_mcmc.ct.margins[tuplize(range(self.ct_mcmc.ct.ndims()))],
-                    **dict(zip(self.harris_wilson_nn.parameters_to_learn,theta_sample.split(1,dim=1)))
+                    **dict(zip(self.harris_wilson_nn.parameters_to_learn,theta_sample_expanded.split(1,dim=1)))
                 ).squeeze()
 
                 # Sample table
@@ -2231,6 +2233,18 @@ class NonJointTableSIM_NN(Experiment):
                         log_intensity = log_intensity
                     )
 
+                # Clean and write to file
+                self.harris_wilson_nn.clean_and_export(
+                    loss = loss_sample,
+                    theta = theta_sample,
+                    log_dest_attraction = log_destination_attraction_sample,
+                    table = table_sample,
+                    n_processed_steps = n_processed_steps,
+                    experiment = self,
+                    t = t,
+                    data_size = len(training_data),
+                    **self.config['training']
+                )
 
             self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
 

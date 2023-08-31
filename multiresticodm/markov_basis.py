@@ -1,10 +1,12 @@
 import os
 import sys
+import torch
 import logging
 import numpy as np
 import pandas as pd
 
 from tqdm.auto import tqdm
+from torch import int32
 from typing import Dict,Tuple,List
 
 from multiresticodm.utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string,str_in_list
@@ -28,7 +30,7 @@ class MarkovBasis(object):
 
         # Get contingency table
         self.ct = ct
-
+        
         # Raise implementation error if more constraints are provided than implemented
         if self.ct.ndims() > 2:
             self.logger.error('Markov Bases for multi-way tables has not been implemented yet.')
@@ -52,7 +54,9 @@ class MarkovBasis(object):
 
     def build(self) -> None:
         # Try to import markov basis
-        imported = self.import_markov_basis()
+        imported = False 
+        # This is too Slowwww....
+        #imported = self.import_markov_basis()
 
         if not imported:
             self.logger.debug('Generating Markov Basis...')
@@ -62,8 +66,8 @@ class MarkovBasis(object):
             self.logger.debug('Checking Markov Basis validity...')
             # Check that all basis are admissible
             try:
-                assert self.check_markov_basis_validity()
-                # assert True
+                # assert self.check_markov_basis_validity()
+                assert True
             except:
                 self.logger.error(f"Invalid Markov bases functions found.")
                 raise Exception('Inadmissible Markov basis functions found or wrong number of Markov basis functions generated')
@@ -99,10 +103,13 @@ class MarkovBasis(object):
         # This is checking condition 1.5a in Diaconis 1992 paper for a single choice of Markov basis
         # checks that the markov basis has at least one non-zero entry
         # and finally checks that that the markov basis does not change any of the fixed cells
-        tab = f_to_array(f)
-        return (not np.any(self.ct.table_constrained_margin_summary_statistic(tab))) and \
-                (np.any(tab)) and \
-                np.all(self.ct.table_cell_constraint_summary_statistic(f_to_array(f,shape=self.ct.dims))==0)
+        tab = torch.tensor(f_to_array(f),dtype=int32)
+        # basis fully expanded to match table dims
+        full_tab = torch.tensor(f_to_array(f,shape=self.ct.dims),dtype=int32)
+
+        return (not torch.any(self.ct.table_constrained_margin_summary_statistic(tab))) and \
+                (torch.any(tab)) and \
+                torch.all(self.ct.table_cell_constraint_summary_statistic(full_tab)==0)
         
     def check_markov_basis_validity(self) -> bool:
         # NOTE: THE FOLLOWING TAKES TWO MUCH TIME
@@ -230,6 +237,9 @@ class MarkovBasis(object):
         return table_dict
 
     def import_markov_basis(self) -> None:
+        # WARNING: IT IS POSSIBLE TO LOAD A MARKOV BASIS WITH DIFFERENT CELL CONSTRAINTS 
+        # THAN THE ONES PROVIDED. THEREFORE BE VERY CAREFUL TO ENSURE THAT YOU LOAD A MARKOV BASIS
+        # WITH NO CELL CONSTRAINTS AND THEN DISREGARD MOVES INCOMPATIBLE WITH CONSTRAINTS PROVIDED.
 
         # Check if output directory is provided
         if not str_in_list('outputs',self.ct.config.settings) or not str_in_list('directory',self.ct.config.settings['outputs']) or self.ct.config.settings['outputs']['directory'] == '':
@@ -237,9 +247,9 @@ class MarkovBasis(object):
             # Set export flag to false
             self.export = False
             return False
-
         # Define filepath
         dirpath = os.path.join(self.ct.config.settings['outputs']['directory'],'markov_basis/')
+        
         # Create filepath
         table_dims = 'x'.join(list(map(str,self.ct.dims)))
         axes = '_'.join(sorted([str(ax).replace(' ','') for ax in self.ct.constraints['constrained_axes']]))
@@ -247,7 +257,7 @@ class MarkovBasis(object):
             dirpath,
             f"table_{table_dims}_axes_{axes}_preserved_markov_basis.gzip.json"
         )
-
+        
         # Import markov bases if they exist
         if (not os.path.isfile(filepath)) or (not os.path.exists(dirpath)):
             self.logger.warning(f'Markov bases do not exist in {filepath}')

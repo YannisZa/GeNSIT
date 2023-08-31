@@ -940,7 +940,9 @@ class Outputs(object):
             
             # Store dataset
             setattr(self._data,sample_name,xr_data)
-            
+            print(sample_name)
+            if sample_name == 'table':
+                print(xr_data)
             
             
 

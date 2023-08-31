@@ -52,6 +52,12 @@ XARRAY_SCHEMA = {
         "args_dtype":["int32","int32"],
         "new_shape":["J","N"]
     },
+    'table': {
+        "coords":["origin","destination","iter"],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32","int32"],
+        "new_shape":["I","J","N"]
+    },
     'loss': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],

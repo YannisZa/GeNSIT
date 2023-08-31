@@ -330,13 +330,8 @@ class HarrisWilson_NN:
         *,
         loss,
         n_processed_steps,
-        experiment,
         nn_data: torch.tensor,
-        t: int,
         dt: float,
-        batch_size: int,
-        data_size: int,
-        loss_data: torch.tensor = None,
         **__,
     ):
 
@@ -363,6 +358,21 @@ class HarrisWilson_NN:
         # Update number of processed steps
         n_processed_steps = n_processed_steps + 1
 
+        return loss, predicted_theta, torch.log(predicted_dest_attraction.squeeze()), n_processed_steps
+    
+    def clean_and_export(
+            self,
+            batch_size: int,
+            data_size: int,
+            n_processed_steps: int,
+            t: int,
+            experiment,
+            theta: torch.tensor = None,
+            log_dest_attraction: torch.tensor = None,
+            table: torch.tensor = None,
+            loss: torch.tensor = None,
+            **__
+        ):
         # Update the model parameters after every batch and clear the loss
         if t % batch_size == 0 or t == data_size - 1:
             # Update gradients and time
@@ -375,8 +385,9 @@ class HarrisWilson_NN:
             _loss_sample = (
                 loss.clone().detach().cpu().numpy().item() / n_processed_steps
             )
-            _theta_sample = predicted_theta.clone().detach().cpu()
-            _log_destination_attraction_sample = torch.log(predicted_dest_attraction).clone().detach().cpu()
+            _theta_sample = theta.clone().detach().cpu() if theta is not None else None
+            _log_destination_attraction_sample = log_dest_attraction.clone().detach().cpu() if log_dest_attraction is not None else None
+            _table_sample = table.clone().detach().cpu() if table is not None else None
 
             # Write to file
             experiment.write_data(
@@ -385,14 +396,13 @@ class HarrisWilson_NN:
                 write_start = self._write_start,
                 loss = _loss_sample,
                 theta = _theta_sample,
+                table = _table_sample,
                 log_destination_attraction = _log_destination_attraction_sample
             )
             # Delete loss
             del loss
             loss = torch.tensor(0.0, requires_grad=True)
             n_processed_steps = 0
-
-        return loss, predicted_theta, torch.log(predicted_dest_attraction.squeeze())
 
     def __repr__(self):
         return f"{self.physics_model.noise_regime}Noise HarrisWilson NeuralNet( {self.sim.sim_type}(SpatialInteraction2D) )"

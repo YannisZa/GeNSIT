@@ -155,13 +155,13 @@ def _log_flow_matrix(**kwargs):
 
     # Compute log unnormalised expected flow
     # Compute log utility
-    log_utility = log_destination_attraction.float()*alpha - cost_matrix.float()*beta
+    log_utility = log_destination_attraction*alpha - cost_matrix*beta
     # Compute log normalisation factor
     normalisation = torch.logsumexp(log_utility,dim=(1,2))
     # and reshape it
     normalisation = torch.reshape(normalisation,(N,1,1))
     # Evaluate log flow scaled
-    log_flow = log_utility - normalisation + torch.log(grand_total).float()
+    log_flow = log_utility - normalisation + torch.log(grand_total).to(device=log_utility.device)
 
     return log_flow
 

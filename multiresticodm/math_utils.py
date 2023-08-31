@@ -1,25 +1,30 @@
 import torch
 import numpy as np
 
-from tqdm import tqdm
+from numpy import shape 
 from scipy import optimize
-from itertools import product
+from torch import int32, float32
 from numba_progress import ProgressBar
-from torch import int32, float32, uint8
 from itertools import chain, combinations
 
-from numba import njit, vectorize, prange, guvectorize
-
 from multiresticodm.utils import flatten
-from multiresticodm.global_variables import MATH_UTILS_CACHED
 
 
 def log_factorial(start:int32,end:int32):
-    return torch.sum(torch.log(torch.range(int32(start+1),int32(end))))
+    if start+1 > end:
+        return torch.tensor(0,dtype=int32)
+    return torch.sum(
+        torch.log(
+            torch.range(
+                start=start,
+                end=end,
+                step=1
+            )
+        )
+    )
 
-@njit(cache=MATH_UTILS_CACHED)
 def positive_sigmoid(x,scale:float=1.0):
-    return 2/(1+np.exp(-x/scale)) - 1
+    return 2/(1+torch.exp(-x/scale)) - 1
 
 def powerset(iterable):
     # Flatten list
@@ -29,13 +34,13 @@ def powerset(iterable):
     return chain.from_iterable(combinations(s, r) for r in range(1,len(s)+1))
 
 
-def normalised_manhattan_distance(tab:np.ndarray,tab0:np.ndarray):
+def normalised_manhattan_distance(tab:torch.tensor,tab0:torch.tensor):
 
     # Take difference
     difference = tab - tab0
 
     # Take absolute value of difference and divide by L1 norms
-    return np.mean(np.divide(np.absolute(difference), (np.absolute(tab)+np.absolute(tab0)), out=np.zeros_like(tab,dtype=float), where=tab!=0.0))
+    return torch.mean(torch.divide(torch.absolute(difference), (torch.absolute(tab)+torch.absolute(tab0)), out=torch.zeros_like(tab,dtype=float32), where=tab!=0.0))
 
 
 def map_distance_name_to_function(distance_name):
@@ -44,12 +49,12 @@ def map_distance_name_to_function(distance_name):
     else:
         raise Exception(f"Distance function {distance_name} does not exist.")
 
-def apply_norm(tab:np.ndarray,tab0:np.ndarray,name:str,**kwargs:dict):
+def apply_norm(tab:torch.tensor,tab0:torch.tensor,name:str,**kwargs:dict):
     try:
         norm_function = globals()[name]
     except:
         raise Exception(f'Norm function name {name} not recognized')
-    with ProgressBar(total=int(np.shape(tab)[0]),leave=False) as progress:
+    with ProgressBar(total=int(shape(tab)[0]),leave=False) as progress:
         norm = norm_function(
             tab=tab,
             tab0=tab0,
@@ -58,105 +63,55 @@ def apply_norm(tab:np.ndarray,tab0:np.ndarray,name:str,**kwargs:dict):
         )
     return norm
 
-@njit()
-def l_0(tab:np.ndarray,tab0:np.ndarray,normalisation_constant:float=None,progress_proxy=None):
-    N,I,J = np.shape(tab)
-    res = np.zeros((N,I,J),dtype='float32')
-    if np.shape(tab0) == (N,I,J):
-        for n in prange(N):
-            res[n] = (tab[n] - tab0[n]).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
-    else:
-       for n in prange(N):
-            res[n] = (tab[n] - tab0).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
-    return res
-
-@njit()
-def relative_l_0(tab:np.ndarray,tab0:np.ndarray,normalisation_constant:float=None,progress_proxy=None):
-    N,I,J = np.shape(tab)
-    res = np.zeros((N,I,J),dtype='float32')
-    if np.shape(tab0) == (N,I,J):
-        for n in prange(N):
-            res[n] = (tab[n] - tab0[n]).astype('float32')
-            if normalisation_constant is None:
-                res[n] = ((tab[n] - tab0[n])/np.sum(tab0[n])).astype('float32')
-            else:
-                res[n] = ((tab[n] - tab0[n])/normalisation_constant).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
-    else:
-       for n in prange(N):
-            if normalisation_constant is None:
-                res[n] = ((tab[n] - tab0)/np.sum(tab0)).astype('float32')
-            else:
-                res[n] = ((tab[n] - tab0)/normalisation_constant).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
-    return res
-
-@njit()
-def l_1(tab:np.ndarray,tab0:np.ndarray,normalisation_constant:float=None,progress_proxy=None):
-    N,I,J = np.shape(tab)
-    res = np.zeros((N,I,J),dtype='float32')
-    if np.shape(tab0) == (N,I,J):
-        for n in prange(N):
-            res[n] = (np.absolute(tab[n] - tab0[n])).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
-    else:
-       for n in prange(N):
-            res[n] = (np.absolute(tab[n] - tab0)).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
-    return res
-
-@njit()
-def relative_l_1(tab:np.ndarray,tab0:np.ndarray,normalisation_constant:float=None,progress_proxy=None):
-    N,I,J = np.shape(tab)
-    res = np.zeros((N,I,J),dtype='float32')
-    if int(np.shape(tab0)[0]) == int(N):
-        for n in prange(N):
-            if normalisation_constant is None:
-                res[n] = (np.absolute(tab[n] - tab0[n])/np.sum(np.absolute(tab0[n]))).astype('float32')
-            else:
-                res[n] = (np.absolute(tab[n] - tab0[n])/normalisation_constant).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
-    else:
-       for n in prange(N):
-            if normalisation_constant is None:
-                res[n] = (np.absolute(tab[n] - tab0)/np.sum(np.absolute(tab0))).astype('float32')
-            else:
-                res[n] = (np.absolute(tab[n] - tab0)/normalisation_constant).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
-    return res
-
-@njit()
-def l_2(tab:np.ndarray,tab0:np.ndarray,progress_proxy):
-    N,I,J = np.shape(tab)
-    res = np.zeros((N,I,J),dtype='float32')
-    if np.shape(tab0) == (N,I,J):
-        for n in prange(N):
-            res[n] = ((tab[n] - tab0[n])**2).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
-    else:
-       for n in prange(N):
-            res[n] = ((tab[n] - tab0)**2).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
+def l_0(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+    N,I,J = shape(tab)
+    if shape(tab0) != (N,I,J):
+        tab0 = torch.unsqueeze(tab0,dim=0)
+    res = (tab - tab0).to(dtype=float32)
     return res
 
 
-def p_distance(tab:np.array,tab0:np.array,**kwargs:dict):
+def relative_l_0(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+    N,I,J = shape(tab)
+    if shape(tab0) != (N,I,J):
+        tab0 = torch.unsqueeze(tab0,dim=0)
+    res = (tab - tab0).to(device=float32)
+    if normalisation_constant is None:
+        res = ((tab - tab0)/torch.sum(tab0)).to(dtype=float32)
+    else:
+        res = ((tab - tab0)/normalisation_constant).to(dtype=float32)
+    return res
+
+def l_1(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+    N,I,J = shape(tab)
+    if shape(tab0) != (N,I,J):
+        tab0 = torch.unsqueeze(tab0,dim=0)
+    res = torch.absolute(tab - tab0).to(device=float32)
+    return res
+
+def relative_l_1(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+    N,I,J = shape(tab)
+    if shape(tab0) != (N,I,J):
+        tab0 = torch.unsqueeze(tab0,dim=0)
+    if normalisation_constant is None:
+        res = (torch.absolute(tab - tab0)/torch.sum(torch.absolute(tab0))).astype('float32')
+    else:
+        res = (torch.absolute(tab - tab0)/normalisation_constant).astype('float32')
+    return res
+
+def l_2(tab:torch.tensor,tab0:torch.tensor,progress_proxy):
+    N,I,J = shape(tab)
+    if shape(tab0) != (N,I,J):
+        tab0 = torch.unsqueeze(tab0,dim=0)
+    res = torch.pow((tab - tab0),2).to(dtype=float32)
+    return res
+
+
+def p_distance(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
     # Type of norm
     p = float(kwargs['kwargs'].get('p_norm',2))
     # Get dimensions
-    dims = np.shape(tab)
+    dims = shape(tab)
     # Return difference in case of 0-norm
     if p == 0:
         return tab-tab0
@@ -165,105 +120,45 @@ def p_distance(tab:np.array,tab0:np.array,**kwargs:dict):
 
 def scipy_optimize(init,function,method,theta):
     try: 
-        f = minimize(function, init, method=method, args=(theta), jac=True, options={'disp': False})
+        f = optimize.minimize(function, init, method=method, args=(theta.detach().numpy()), jac=True, options={'disp': False})
     except:
         return None
 
     return f.x
 
-@njit()
-def relative_l_2(tab:np.ndarray,tab0:np.ndarray,normalisation_constant:float=None,progress_proxy=None):
-    N,I,J = np.shape(tab)
-    res = np.zeros((N,I,J),dtype='float32')
-    if np.shape(tab0) == (N,I,J):
-        for n in prange(N):
-            if normalisation_constant is None:
-                res[n] = ((tab[n] - tab0[n])**2/np.sum(tab0[n]**2)).astype('float32')
-            else:
-                res[n] = ((tab[n] - tab0[n])**2/normalisation_constant).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
+def relative_l_2(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+    N,I,J = shape(tab)
+    if shape(tab0) != (N,I,J):
+        tab0 = torch.unsqueeze(tab0,dim=0)
+    if normalisation_constant is None:
+        res = torch.pow(tab - tab0,2)/torch.sum(torch.pow(tab0,2)).to(dtype=float32)
     else:
-       for n in prange(N):
-            if normalisation_constant is None:
-                res[n] = ((tab[n] - tab0)**2/np.sum(tab0**2)).astype('float32')
-            else:
-                res[n] = ((tab[n] - tab0)**2/normalisation_constant).astype('float32')
-            if progress_proxy is not None:
-                progress_proxy.update(1)
+        res = (torch.pow(tab - tab0,2)/normalisation_constant).to(dtype=float32)
     return res
 
-# @njit
-def euclidean_distance(tab1:np.ndarray,tab2:np.ndarray,**kwargs):
-    return np.sqrt( np.sum( ((tab1 - tab2)/np.sum(tab1.ravel()))**2 ) )
+def euclidean_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
+    return torch.sqrt( torch.sum( torch.pow(((tab1 - tab2)/torch.sum(tab1.ravel())),2) ) )
 
-# @njit
-def l_p_distance(tab1:np.ndarray,tab2:np.ndarray,**kwargs):
-    return np.linalg.norm( 
-        ((tab1 - tab2).ravel()/np.sum(tab2.ravel())), 
+def l_p_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
+    return torch.linalg.norm( 
+        ((tab1 - tab2).ravel()/torch.sum(tab2.ravel())), 
         ord=int(kwargs['ord']) if kwargs['ord'].isnumeric() else kwargs['ord']
     )
 
-# @njit
-def edit_distance_degree_one(tab:np.ndarray,tab0:np.ndarray,**kwargs):
+def edit_distance_degree_one(tab:torch.tensor,tab0:torch.tensor,**kwargs):
     dims = kwargs.get('dims',None)
     if dims is not None:
         tab = tab.reshape(dims)
         tab0 = tab0.reshape(dims)
-    return np.sum(np.absolute(tab - tab0))/2
+    return torch.sum(torch.absolute(tab - tab0))/2
 
-def edit_degree_one_error(tab:np.ndarray,tab0:np.ndarray,**kwargs):
-    @njit
-    def _edit_degree_one_error(tab,tab0,progress_proxy):
-        N = np.shape(tab)[0]
-        K = np.shape(tab0)[0]
-        res = np.zeros((N,1),dtype='float32')
-        if K == N:
-            for n in prange(N):
-                res[n,0] += np.sum(np.absolute(tab[n] - tab0[n]))/2
-                progress_proxy.update(1)
-        elif K == 1:
-            for n in prange(N):
-                res[n,0] += np.sum(np.absolute(tab[n] - tab0[0]))/2
-                progress_proxy.update(1)
-        return res
-    
-    with ProgressBar(total=int(np.shape(tab)[0]),leave=False) as progress:
-        error = _edit_degree_one_error(tab,tab0,progress)
-    
-    return error
+def edit_degree_one_error(tab:torch.tensor,tab0:torch.tensor,**kwargs):
+    return torch.sum(torch.absolute(tab - tab0,dim=0))/2
 
-def edit_distance_degree_higher(tab:np.ndarray,tab0:np.ndarray,**kwargs):
-    dims = kwargs.get('dims',None)
-    if dims is not None:
-        tab = tab.reshape(dims)
-        tab0 = tab0.reshape(dims)
-    return np.sum((tab - tab0) > 0)
+def edit_distance_degree_higher(tab:torch.tensor,tab0:torch.tensor,**kwargs):
+    return torch.sum((tab - tab0) > 0,axis=slice(1,None))
 
-
-def edit_degree_higher_error(tab:np.ndarray,tab0:np.ndarray,**kwargs):
-    @njit
-    def _edit_degree_higher_error(tab,tab0,progress_proxy):
-        N = np.shape(tab)[0]
-        K = np.shape(tab0)[0]
-        res = np.zeros((N,1),dtype='float32')
-        if K == N:
-            for n in prange(N):
-                res[n,0] = np.sum((tab[n] - tab0[n]) > 0)
-                progress_proxy.update(1)
-        elif K == 1:
-            for n in prange(N):
-                res[n,0] = np.sum((tab[n] - tab0[0]) > 0)
-                progress_proxy.update(1)
-        return res
-       
-    with ProgressBar(total=int(np.shape(tab)[0]),leave=False) as progress:
-        error = _edit_degree_higher_error(tab,tab0,progress)
-    
-    return error
-
-# @njit
-def chi_squared_row_distance(tab1:np.ndarray,tab2:np.ndarray,**kwargs):
+def chi_squared_row_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
     dims = kwargs.get('dims',None)
     tab1 = tab1.reshape(dims)
     tab2 = tab2.reshape(dims)
@@ -272,8 +167,7 @@ def chi_squared_row_distance(tab1:np.ndarray,tab2:np.ndarray,**kwargs):
     colsums = np.where(tab1.sum(axis=0)<=0,1,tab1.sum(axis=0)).reshape((1,dims[1]))
     return np.sum((tab1/rowsums1 - tab2/rowsums2)**2 / colsums)
 
-# @njit
-def chi_squared_column_distance(tab1:np.ndarray,tab2:np.ndarray,**kwargs):
+def chi_squared_column_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
     dims = kwargs.get('dims',None)
     tab1 = tab1.reshape(dims)
     tab2 = tab2.reshape(dims)
@@ -282,22 +176,21 @@ def chi_squared_column_distance(tab1:np.ndarray,tab2:np.ndarray,**kwargs):
     rowsums = np.where(tab1.sum(axis=1)<=0,1,tab1.sum(axis=1)).reshape((dims[0],1))
     return np.sum((tab1/colsums1 - tab2/colsums2)**2 / rowsums)
 
-# @njit
-def chi_squared_distance(tab1:np.ndarray,tab2:np.ndarray,**kwargs):
+def chi_squared_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
     dims = kwargs.get('dims',None)
     return chi_squared_column_distance(tab1,tab2,dims) + chi_squared_row_distance(tab1,tab2,dims)
 
 
-def SRMSE(tab:np.array,tab0:np.array,**kwargs:dict):
+def SRMSE(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
     """ Computes standardised root mean square error. See equation (22) of
     "A primer for working with the Spatial Interaction modeling (SpInt) module
     in the python spatial analysis library (PySAL)" for more details.
 
     Parameters
     ----------
-    table : np.array [NxM]
+    table : torch.tensor [NxM]
         Estimated flows.
-    true_table : np.array [NxM]
+    true_table : torch.tensor [NxM]
         Actual flows.
 
     Returns
@@ -307,7 +200,7 @@ def SRMSE(tab:np.array,tab0:np.array,**kwargs:dict):
 
     """
     # Get dimensions
-    dims = np.shape(tab)[1:]
+    dims = shape(tab)[1:]
     # Compute SRMSE
     numerator = torch.pow( torch.sum(torch.pow(tab0-tab,2),dim=(1,2)) / torch.tensor((np.prod(dims)),dtype=float32), 0.5)
     denominator = ( torch.sum(torch.ravel(tab0)) / torch.tensor(np.prod(dims)) ).to(dtype=float32)
@@ -315,16 +208,16 @@ def SRMSE(tab:np.array,tab0:np.array,**kwargs:dict):
 
     return srmse
 
-def SSI(tab:np.array,tab0:np.array,**kwargs:dict):
+def SSI(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
     """ Computes Sorensen similarity index. See equation (23) of
     "A primer for working with the Spatial Interaction modeling (SpInt) module
     in the python spatial analysis library (PySAL)" for more details.
 
     Parameters
     ----------
-    table : np.array [NxM]
+    table : torch.tensor [NxM]
         Estimated flows.
-    true_table : np.array [NxM]
+    true_table : torch.tensor [NxM]
         Actual flows.
 
     Returns
@@ -342,7 +235,7 @@ def SSI(tab:np.array,tab0:np.array,**kwargs:dict):
     ssi = torch.mean(torch.divide(numerator,denominator))
     return ssi
 
-def shannon_entropy(tab:np.array,tab0:np.array,**kwargs:dict):
+def shannon_entropy(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
     """Computes entropy for a table X
     E = sum_{i}^I sum_{j=1}^{J} X_{ij}log(X_{ij})
     
@@ -355,7 +248,7 @@ def shannon_entropy(tab:np.array,tab0:np.array,**kwargs:dict):
     _tab = np.copy(tab)
     _tab0 = np.copy(tab0)
     # Apply distribution
-    with ProgressBar(total=int(np.shape(_tab)[0]),leave=False) as progress:
+    with ProgressBar(total=int(shape(_tab)[0]),leave=False) as progress:
         res = _shannon_entropy(
             _tab,
             _tab0,
@@ -364,56 +257,33 @@ def shannon_entropy(tab:np.array,tab0:np.array,**kwargs:dict):
         )
     return res
 
-# @guvectorize([(int32[:,:,:], int32[:,:,:], float32[:], float32[:]),
-#             (float32[:,:,:], int32[:,:,:], float32[:], float32[:]),
-#             (int32[:,:,:], float32[:,:,:], float32[:], float32[:]),
-#             (float32[:,:,:], float32[:,:,:], float32[:], float32[:])], '(n,i,j),(k,i,j),(),()', target='parallel')
-@njit(parallel=True)
-def _shannon_entropy(tab,tab0,distr,progress_proxy):
-    N = np.shape(tab)[0]
-    K = np.shape(tab0)[0]
-    res = np.zeros((1,1),dtype='float32')
-    if K == N:
-        for n in prange(N):
-            res[0,0] += distr(tab[n],tab0[n])
-            progress_proxy.update(1)
-    elif K == 1:
-        for n in prange(N):
-            res[0,0] += distr(tab[n],tab0[0])
-            progress_proxy.update(1)
-    # Take mean
-    return -res/N
 
-def von_neumann_entropy(tab:np.array,tab0:np.array,**kwargs):
-    N = int(np.shape(tab)[0])
-    res = np.zeros((N,1),dtype='float32')
-    
-    # with ProgressBar(total=N) as progress:
-    for n in tqdm(range(N),leave=False):
-        # Convert matrix to square
-        matrix = (tab[n]@tab[n].T).astype('float32')
-        # Add jitter
-        matrix += kwargs['kwargs']['epsilon_threshold'] * np.eye(matrix.shape[0],dtype='float32')
-        # Find eigenvalues
-        eigenval = np.real(np.linalg.eigvals(matrix))
-        # Get all non-zero eigenvalues
-        eigenval = eigenval[~np.isclose(eigenval,0,atol=1e-08)]
-        # Compute entropy
-        res[n,0] = np.sum(-eigenval*np.log(eigenval),dtype='float32')
-        # # Update progress bar
-        # progress.update(1)
+def _shannon_entropy(tab,tab0,distr,progress_proxy):
+    res = distr(tab,tab0)
+    # Take mean
+    return -res/shape(tab)[0]
+
+def von_neumann_entropy(tab:torch.tensor,tab0:torch.tensor,**kwargs):
+    N = int(shape(tab)[0])
+    # Convert matrix to square
+    matrix = (tab@tab.T).astype('float32')
+    # Add jitter
+    matrix += kwargs['kwargs']['epsilon_threshold'] * torch.eye(matrix.shape[0],dtype='float32')
+    # Find eigenvalues
+    eigenval = torch.real(torch.linalg.eigvals(matrix))
+    # Get all non-zero eigenvalues
+    eigenval = eigenval[~torch.isclose(eigenval,0,atol=1e-08)]
+    # Compute entropy
+    res = torch.sum(-eigenval*torch.log(eigenval)).to(dtype=float32)
+
     return res
 
-# @guvectorize([(int32[:,:], int32[:,:,:], float32[:]),
-#             (float32[:,:], int32[:,:,:], float32[:]),
-#             (int32[:,:], float32[:,:,:], float32[:]),
-#             (float32[:,:], float32[:,:,:], float32[:])], '(i,j),(n,i,j)->(n)')
-def _sparsity(tab:np.array,tab0:np.array,**kwargs:dict):
+def sparsity(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
     """Computes percentage of zero cells in table
 
     Parameters
     ----------
-    table : np.ndarray
+    table : torch.tensor
         Description of parameter `table`.
 
     Returns
@@ -422,14 +292,12 @@ def _sparsity(tab:np.array,tab0:np.array,**kwargs:dict):
         Description of returned object.
 
     """
-    N,_,_ = np.shape(tab)
-    res = np.zeros((N,1))
-    for n in range(N):
-        res[n] = np.count_nonzero(tab[n]==0)/np.prod(np.shape(tab[n]))
+    N,_,_ = shape(tab)
+    res = torch.count_nonzero(tab==0)/np.prod(shape(tab))
     return res
 
 
-def coverage_probability(tab:np.array,tab0:np.array,**kwargs:dict):
+def coverage_probability(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
     # High posterior density mass
     alpha = 1-kwargs['kwargs'].get('region_mass',0.95)
     # Get dimensions of tables
