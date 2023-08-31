@@ -601,7 +601,7 @@ multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp
 
 ### SRMSE
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' '0&' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e NonJointTableSIM_NN -e JointTableSIM_NN -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' '0&' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs
 
 ### SSI
 
