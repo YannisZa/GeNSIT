@@ -42,10 +42,8 @@
     "n_threads": {
       "sweepable": false,
       "optional": true,
-      "dtype": "list",
-      "list-length": 2,
-      "list-dtype": "int",
-      "default-value": [8, 8],
+      "dtype": "int",
+      "default-value": 8,
       "valid-range": [1, 16]
     },
     "device": {
@@ -319,6 +317,7 @@
         "sweep": {
           "default": {
             "dtype": "float",
+            "allow-nan": true,
             "default-value": 0.0,
             "valid-range": [0.0, null]
           },
@@ -327,6 +326,7 @@
             "list-dtype": "float",
             "default-value": [0.0],
             "valid-range": [0.0, null],
+            "allow-nan": true,
             "unique-vals": true
           }
         }
@@ -730,7 +730,7 @@
         "is-any-of": [
           "SIM_NN",
           "SIM_MCMC",
-          "TableMCMC",
+          "Table_MCMC",
           "NonJointTableSIM_NN",
           "JointTableSIM_NN",
           "JointTableSIM_MCMC"
