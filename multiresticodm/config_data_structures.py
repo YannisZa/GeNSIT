@@ -2,10 +2,10 @@ import os
 import sys
 from typing import Any
 
-from numpy import arange,isfinite,isnan
+from numpy import arange,isfinite
 from collections.abc import Iterable,Sequence
 
-from multiresticodm.utils import in_range, str_in_list,string_to_numeric
+from multiresticodm.utils import in_range, str_in_list,string_to_numeric,is_null
 
 def instantiate_data_type(
     data,
@@ -36,7 +36,7 @@ class Entry():
         return "Entry()"
     
     def value(self) -> Any:
-        return self.data
+        return None if is_null(self.data) else self.data
     
     def check_type(self,data_type=None,key_path=[]):
         data_type = self.schema.get("dtype",data_type)
@@ -71,8 +71,9 @@ class PrimitiveEntry(Entry):
         if valid_range != "invalid":
             # Get whether bounds are tight or not
             inclusive = self.schema.get("inclusive",True)
+            allow_nan = self.schema.get("allow-nan",False)
             try: 
-                assert in_range(self.data,valid_range,inclusive)
+                assert in_range(self.data,valid_range,allow_nan=allow_nan,inclusive=inclusive)
             except:
                 raise InvalidRangeException(f"Data {self.data} is out of range {valid_range}",key_path=key_path)
         return True
@@ -114,9 +115,8 @@ class Numeric(PrimitiveEntry):
 
     def check_finiteness(self,key_path=[]):
         # Get whether data is allowed to be infinite or not
-        infinite = self.schema.get("is-infinite",False)
+        infinite = self.schema.get("is-infinite",True)
         if not infinite:
-            # print(key_path,isfinite(self.data))
             try:
                 assert isfinite(self.data)
             except:
@@ -230,7 +230,7 @@ class Path(Str):
         return True
 
     def value(self):
-        return os.path.basename(self.data)
+        return '' if isnan(self.data) else os.path.basename(self.data)
 
 
 class File(Path):
@@ -284,7 +284,7 @@ class NonPrimitiveEntry(Entry):
         if length is not None:
             if isinstance(length,Iterable):
                 try: 
-                    assert in_range(len(self.data),length,True)
+                    assert in_range(len(self.data),length,allow_nan=False,inclusive=True)
                 except:
                     raise InvalidLengthException(f"Length {len(self.data)} is not in range {length}.",key_path=key_path)
             else:
@@ -346,7 +346,7 @@ class List(NonPrimitiveEntry):
         self.data = [instantiate_data_type(val,self.schema) for val in data]
 
     def value(self) -> list:
-        return [datum.value() for datum in self.data]
+        return [None if is_null(datum.value()) else datum.value() for datum in self.data]
             
         
     def check(self,key_path=[]):
@@ -389,7 +389,7 @@ class CustomList(NonPrimitiveEntry):
         self.data = [instantiate_data_type(val,self.schema) for val in self.data]
     
     def value(self) -> list:
-        return [datum.value() for datum in self.data]
+        return [None if is_null(datum.value()) else datum.value() for datum in self.data]
 
     def parse(self,data,schema):
         # Split by ':'
@@ -464,7 +464,7 @@ class Dict(NonPrimitiveEntry):
         self.data = {instantiate_data_type(key,key_schema):instantiate_data_type(val,value_schema) for key,val in data.items()}
     
     def value(self) -> dict:
-        return {key.value():value.value() for key,value in self.data.items()}
+        return {key.value():(None if is_null(value) else value.value()) for key,value in self.data.items()}
 
     def check(self,key_path=[]):
         # Check that correct length is provided
@@ -511,7 +511,7 @@ class CustomDict(NonPrimitiveEntry):
         self.data = {instantiate_data_type(key,key_schema):instantiate_data_type(val,value_schema[key]) for key,val in data.items()}
             
     def value(self) -> dict:
-        return {key.value():value.value() for key,value in self.data.items()}
+        return {key.value():(None if is_null(value) else value.value()) for key,value in self.data.items()}
     
 
     def check(self,key_path=[]):
