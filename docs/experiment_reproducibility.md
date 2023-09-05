@@ -104,30 +104,6 @@ multiresticodm plot \
  -stat 'sum' '0' -b 0 -t 90 -n 100000 -ff pdf \
  -exc exp10_K1000_direct_sampling_TableSummariesMCMCConvergence_row_margin_30_05_2023_14_35_30
 
-# London Retail inference
-
-## RSquared and LogTarget analysis
-
-multiresticodm run ./data/inputs/configs/sim_inference_low_noise_mcmc.toml -d ./data/inputs/london_retail -cm cost_mat.txt -od P.txt -lda xd0.txt -delta 0.006122448979591836 -bm 700000 -gs 100 -re exp2
-
-### Low noise
-
-multiresticodm run ./data/inputs/configs/sim_inference_low_noise_mcmc.toml -d ./data/inputs/london_retail -nw 4 -delta 0.00612245 -bm 700000 -gs 100
-
-multiresticodm run ./data/inputs/configs/sim_inference_low_noise_mcmc.toml -d ./data/inputs/london_retail \
--cm london_borough_centroid_cost_matrix.txt -nw 4 -delta 0.00612245 -bm 700000 -gs 100
-
-### High noise
-
-multiresticodm run ./data/inputs/configs/sim_inference_high_noise_mcmc.toml -d ./data/inputs/london_retail -nw 6 -delta 0.00612245 -bm 700000 -cm cost_mat.txt -od P.txt -lda log_destination_attraction.txt -re exp5
-
-## RSquared and LogTarget plots
-
-multiresticodm plot -dn london_retail -od ./data/outputs/ -e RSquaredAnalysisLowNoise -p 24 -mc RdYlGn -ms 20 -ff png
-multiresticodm plot -dn london_retail -od ./data/outputs/ -e LogTargetAnalysisLowNoise -p 24 -mc RdYlGn -ms 20 -ff png
-
-multiresticodm plot -d ./data/outputs/london_retail_exp2_RSquaredAnalysisLowNoise_14_12_2022 -p 24 -mc RdYlGn -ms 20 -ff png; multiresticodm plot -d ./data/outputs/london_retail_exp1_LogTargetAnalysisLowNoise_14_12_2022 -p 25 -mc RdYlGn -ms 20 -ff png
-
 ## SIM inference
 
 ### Low noise
@@ -464,19 +440,45 @@ multiresticodm run ./data/inputs/configs/joint_table_sim_inference_high_noise_mc
 
 ### SIM only
 
-clear; multiresticodm run-nn ./data/inputs/configs/sim_inference_neural_net.toml \
+clear; multiresticodm run ./data/inputs/configs/sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -od origin_demand_sum_normalised.txt \
- -dats destination_attraction_time_series_sum_normalised.txt \
- -re SIM_NN -nw 16 -nt 1 -nt 8 -et test
+ -re SIM_NN -nw 16 -nt 8 -et total_constrained
 
 ### Independent (non-joint) Table and SIM
 
-clear; multiresticodm run-nn ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -od origin_demand_sum_normalised.txt \
- -dats destination_attraction_time_series_sum_normalised.txt \
- -re NonJointTableSIM_NN -nw 16 -nt 1 -nt 8 -et test -ax '[]'
+ -re NonJointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et unconstrained -ax '[]' -sm -dev cuda
+
+clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+ -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
+ -re NonJointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[0,1]' -dev cuda
+
+clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+ -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
+ -re NonJointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[1]' -dev cuda
+
+clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+ -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
+ -re NonJointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[1]' -ax '[0]' -dev cuda
+
+### Dependent Non-joint Table and SIM
+
+clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+ -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
+ -re JointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et unconstrained -ax '[]' -sm -dev cuda
+
+clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+ -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
+ -re JointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[0,1]' -dev cuda
+
+clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+ -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
+ -re JointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[1]' -dev cuda
+
+clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+ -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
+ -re JointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[1]' -ax '[0]' -dev cuda
 
 ## Plots
 
