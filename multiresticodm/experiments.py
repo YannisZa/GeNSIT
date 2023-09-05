@@ -2281,7 +2281,7 @@ class NonJointTableSIM_NN(Experiment):
 
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
-                
+
                 # Perform neural net training
                 loss_sample, \
                 theta_sample, \
@@ -2497,7 +2497,7 @@ class JointTableSIM_NN(Experiment):
 
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
-
+                self.logger.progress('Neural net training')
                 # Perform neural net training
                 loss_sample, \
                 theta_sample, \
@@ -2512,14 +2512,14 @@ class JointTableSIM_NN(Experiment):
                 # with the functions used below
                 theta_sample_expanded = torch.unsqueeze(theta_sample,0)
                 log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0).unsqueeze(0)
-
+                self.logger.progress('Compute log intensity')
                 # Compute log intensity
                 log_intensity = self.harris_wilson_nn.physics_model.sim.log_intensity(
                     log_destination_attraction = log_destination_attraction_sample_expanded,
                     grand_total = self.ct_mcmc.ct.margins[tuplize(range(self.ct_mcmc.ct.ndims()))],
                     **dict(zip(self.harris_wilson_nn.parameters_to_learn,theta_sample_expanded.split(1,dim=1)))
                 ).squeeze()
-
+                self.logger.progress('table_sample')
                 # Sample table
                 if e == 0:
                     table_sample = self.ct_mcmc.initialise_table(
@@ -2531,13 +2531,13 @@ class JointTableSIM_NN(Experiment):
                         table_prev = table_sample,
                         log_intensity = log_intensity
                     )
-
+                self.logger.progress('table_loss_update')
                 # Update table loss
                 loss_sample += self.ct_mcmc.table_loss_function(
                     log_intensity = log_intensity,
                     table = table_sample
                 )
-
+                self.logger.progress('update_and_export')
                 # Clean and write to file
                 loss_sample = self.update_and_export(
                     loss = loss_sample,

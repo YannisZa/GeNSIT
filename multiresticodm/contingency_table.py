@@ -52,7 +52,7 @@ class ContingencyTable(object):
         self.ground_truth_table = table
         # Device name
         self.device = self.config['inputs']['device']
-        print('UPDATE',self.device)
+
         # Instantiate dataset 
         self.data = Dataset()
         # Markov basis class
