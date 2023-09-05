@@ -805,7 +805,7 @@ class Outputs(object):
                 self.h5group = self.h5file.create_group(self.experiment_id)
                 # Store sweep configurations as attributes 
                 self.h5group.attrs.create("sweep_params",list(sweep_params.keys()))
-                self.h5group.attrs.create("sweep_values",list(sweep_params.values()))
+                self.h5group.attrs.create("sweep_values",['' if val is None else val for val in sweep_params.values()])
                 # Update log filename
                 if isinstance(self.logger,logging.Logger):
                     for i,hand in enumerate(self.logger.handlers):
@@ -1059,7 +1059,7 @@ class Outputs(object):
             # Cast to specific data type
             samples = samples.to(OUTPUT_TYPES[sample_name])
             # Reshape
-            dims = {"N":N,"I":self.inputs.data.dims[0],"J":self.inputs.data.dims[1]}
+            dims = {"N":N,"I":self.inputs.data.dims[0],"J":self.inputs.data.dims[1],"T":self.inputs.data.destination_attraction_ts.shape[0]}
             # print(sample_name,samples.shape)
             samples = samples.reshape(*[string_to_numeric(var) if var.isnumeric() else dims.get(var,None) for var in XARRAY_SCHEMA[sample_name]['new_shape']])
             # print(sample_name,samples.shape)

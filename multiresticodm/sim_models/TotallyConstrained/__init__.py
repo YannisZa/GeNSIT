@@ -144,7 +144,7 @@ def _log_flow_matrix(**kwargs):
 
     # Extract dimensions
     nrows,ncols = cost_matrix.size(dim=0), cost_matrix.size(dim=1)
-    N = log_destination_attraction.size(dim=0)
+    N = log_destination_attraction.size(dim=0) if log_destination_attraction.ndim > 2 else 1
     log_flow = torch.zeros((N,nrows,ncols),dtype=float32)
 
     # Reshape tensors to ensure operations are possible
@@ -175,8 +175,7 @@ def _destination_demand(**kwargs):
 
     # Compute destination demand
     log_destination_demand = torch.logsumexp(log_flow,dim=0,keepdim=True)
-
-    return torch.t(torch.exp(log_destination_demand))
+    return torch.exp(log_destination_demand)
 
 # @njit(cache=CACHED,parallel=NUMBA_PARALLELISE)
 # def flow_matrix_jacobian(theta,log_intensity):

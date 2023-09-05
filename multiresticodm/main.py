@@ -127,8 +127,8 @@ _common_options = [
             type=click.Choice(NORMS), help=f'Sets norm to use in relevant plots.'),
     click.option('--n_workers','-nw', type=click.IntRange(min=1,max=AVAILABLE_THREADS),
             default = '1', help = 'Overwrites number of independent workers used in multiprocessing'),
-    click.option('--n_threads','-nt', type=click.IntRange(min=1,max=AVAILABLE_CORES), multiple=True, 
-                 default = ['1','1'],help = '''Overwrites number of threads (per worker) used in multithreading.
+    click.option('--n_threads','-nt', type=click.IntRange(min=1,max=AVAILABLE_CORES), 
+                 default = '1',help = '''Overwrites number of threads (per worker) used in multithreading.
             If many are provided first is set as the numpy threads and the second as the numba threads'''),
     click.option('--logging_mode','-log', type=click.Choice(['debug', 'info', 'warning', 'critical']+LOG_LEVELS), default='info', 
             help=f'Type of logging mode used.'),
@@ -152,6 +152,8 @@ _common_run_options = [
               help=f'Flag for whether parameter sweep mode is activated or not.'),
     click.option('--dataset','-d', type=click.Path(exists=True),
                default=None, help = 'Overwrites inputs dataset in config'),
+    click.option('--to_learn','-tl', type=click.Choice(['alpha','beta','kappa','sigma']), default = None,
+           help = 'Overwrites parameters to learn.'),
     click.option('--sim_type','-sim', type=click.Choice(['TotallyConstrained','ProductionConstrained']),
                default=None, help = 'Overwrites spatial interaction model of choice (intensity function)'),
     click.option('--origin_demand','-od', type=click.STRING,
@@ -160,6 +162,10 @@ _common_run_options = [
            default=None, help = 'Overwrites input cost matrix filename in config'),
     click.option('--table0','-tab0', type=click.Choice(TABLE_SOLVERS), default = None,
            help = 'Overwrites table initialisation method name in MCMC.'),
+    click.option('--log_destination_attraction','-lda', type=click.STRING,
+            default=None, help = 'Overwrites input log destination attraction filename in config'),
+    click.option('--destination_attraction_ts','-dats', type=click.STRING,
+            default=None, help = 'Overwrites input destination attraction time series filename in config'),
     click.option('--margins','-ma', type=click.STRING, cls=OptionEatAll,
            default=None, help = 'Overwrites input margin filenames in config'),
     click.option('--margin0','-m0', type=click.Choice(MARGINAL_SOLVERS), default = None,
@@ -196,10 +202,10 @@ def common_run_options(func):
         func = option(func)
     return func
 
-def run(logger,settings,config_path,**kwargs):
+def exec(logger,settings,config_path,**kwargs):
     # Import all modules
     from multiresticodm.experiments import ExperimentHandler
-    from multiresticodm.utils import deep_updates,set_numba_torch_threads,update_device
+    from multiresticodm.utils import deep_updates,update_device
 
     # Read config
     config = Config(
@@ -217,14 +223,13 @@ def run(logger,settings,config_path,**kwargs):
     )
     logger.warning(f"Device used: {config.settings['inputs']['device']}")
 
-    # Set number of cores used (numba package)
-    set_numba_torch_threads(settings['n_threads'])
-
     # Update root
     config.path_sets_root()
+    
     # Maintain a dictionary of available experiments and their list index
     available_experiments = {exp.get('type',''):i for i,exp in enumerate(config.settings['experiments']) if len(exp.get('type','')) > 0}
     config.settings.setdefault('available_experiments',available_experiments)
+    
     # Keep experiment ids argument
     if len(kwargs.get('run_experiments',[])) > 0:
         config.settings.setdefault('run_experiments', list(kwargs.get('run_experiments',[])))
@@ -249,10 +254,8 @@ def run(logger,settings,config_path,**kwargs):
     logger.success('Done')
 
 
-@cli.command('run-mcmc')
+@cli.command('run')
 # @click.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.option('--log_destination_attraction','-lda', type=click.STRING,
-            default=None, help = 'Overwrites input log destination attraction filename in config')
 @click.option('--proposal','-p', type=click.Choice(['direct_sampling','degree_higher','degree_one']),
             default = None, help = 'Overwrites contingency table MCMC proposal')
 @click.option('--grid_size','-gs', type=click.IntRange(min=1),
@@ -289,53 +292,55 @@ def run(logger,settings,config_path,**kwargs):
             help = 'Overwrites number of temperatures in tempered distribution in AIS (normalising constant sampling)')
 @common_options
 @common_run_options
-def run_mcmc(
-            log_destination_attraction,
-            proposal,
-            grid_size,
-            theta_steps,
-            log_destination_attraction_steps,
-            table_steps,
-            alpha0,
-            beta0,
-            beta_max,
-            covariance,
-            step_size,
-            leapfrog_steps,
-            leapfrog_step_size,
-            ais_leapfrog_steps,
-            ais_leapfrog_step_size,
-            ais_samples,
-            n_bridging_distributions,
-            config_path,
-            load_experiment,
-            dataset,
-            sim_type,
-            origin_demand,
-            cost_matrix,
-            run_experiments,
-            experiment_title,
-            sweep_mode,
-            table,
-            device,
-            table0,
-            margins,
-            margin0,
-            axes,
-            store_progress,
-            cells,
-            sparse_margins,
-            k,
-            seed,
-            dims,
-            delta,
-            kappa,
-            logging_mode,
-            n_workers,
-            n_threads,
-            norm,
-            n
-        ):
+def run(
+        log_destination_attraction,
+        destination_attraction_ts,
+        proposal,
+        grid_size,
+        theta_steps,
+        log_destination_attraction_steps,
+        table_steps,
+        alpha0,
+        beta0,
+        beta_max,
+        covariance,
+        step_size,
+        leapfrog_steps,
+        leapfrog_step_size,
+        ais_leapfrog_steps,
+        ais_leapfrog_step_size,
+        ais_samples,
+        n_bridging_distributions,
+        config_path,
+        load_experiment,
+        dataset,
+        to_learn,
+        sim_type,
+        origin_demand,
+        cost_matrix,
+        run_experiments,
+        experiment_title,
+        sweep_mode,
+        table,
+        device,
+        table0,
+        margins,
+        margin0,
+        axes,
+        store_progress,
+        cells,
+        sparse_margins,
+        k,
+        seed,
+        dims,
+        delta,
+        kappa,
+        logging_mode,
+        n_workers,
+        n_threads,
+        norm,
+        n
+    ):
     """
     Run Data Augementation Spatial Interaction Model Markov Chain Monte Carlo.
     :param config_path: Configuration file path    
@@ -346,10 +351,10 @@ def run_mcmc(
     # Remove all nulls
     settings = {k: v for k, v in settings.items() if v}
     # Convert strings to ints
-    settings['n_threads'] = [int(thread) for thread in settings.get('n_threads',[1,1])]
+    settings['n_threads'] = int(settings.get('n_threads',1))
     settings['n_workers'] = settings.get('n_workers',1)
     # Update number of workers
-    set_numpy_threads(settings['n_threads'][0])
+    set_numpy_threads(settings['n_threads'])
 
     # Import all modules
     from numpy import asarray
@@ -369,67 +374,7 @@ def run_mcmc(
         log_to_console=True
     )
 
-    run(logger,settings=settings,config_path=config_path,run_experiments=run_experiments)
-
-@cli.command('run-nn')
-@click.option('--destination_attraction_ts','-dats', type=click.STRING,
-            default=None, help = 'Overwrites input destination attraction time series filename in config')
-@common_options
-@common_run_options
-def run_nn(
-    destination_attraction_ts,
-    config_path,
-    load_experiment,
-    dataset,
-    sim_type,
-    origin_demand,
-    cost_matrix,
-    run_experiments,
-    experiment_title,
-    sweep_mode,
-    table,
-    device,
-    table0,
-    margins,
-    margin0,
-    axes,
-    store_progress,
-    cells,
-    sparse_margins,
-    seed,
-    dims,
-    delta,
-    kappa,
-    logging_mode,
-    n_workers,
-    n_threads,
-    norm,
-    n
-):
-
-    # Gather all arguments in dictionary
-    settings = {k:v for k,v in locals().items() if k != 'ctx'}
-    # Remove all nulls
-    settings = {k: v for k, v in settings.items() if v}
-    # Convert strings to ints
-    settings['n_threads'] = [int(thread) for thread in settings.get('n_threads',[1,1])]
-    settings['n_workers'] = settings.get('n_workers',1)
-    # Update number of workers
-    set_numpy_threads(settings['n_threads'][0])
-
-    # Capitalise all single-letter arguments
-    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
-    
-    # Setup logger
-    logger = setup_logger(
-        __name__,
-        settings.get('logging_mode','info').upper(),
-        log_to_file=True,
-        log_to_console=True
-    )
-
-    # Run
-    run(logger,settings=settings,config_path=config_path,run_experiments=run_experiments)
+    exec(logger,settings=settings,config_path=config_path,run_experiments=run_experiments)
 
 
 _output_options = [
@@ -651,22 +596,17 @@ def plot(
     settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
 
     # Convert strings to ints
-    settings['n_threads'] = [thread for thread in settings.get('n_threads',[1,1])]
+    settings['n_threads'] = int(settings.get('n_threads',1))
     settings['n_workers'] = settings.get('n_workers',1)
 
     # Add undefined settings to settings
     settings = {**settings, **undefined_settings}
 
     # Update number of workers
-    set_numpy_threads(settings['n_threads'][0])
+    set_numpy_threads(settings['n_threads'])
     
     # Import modules
     from multiresticodm.plot import Plot
-    from multiresticodm.utils import set_numba_torch_threads
-
-    # Set number of cores used (numba package)
-    # and get torch random number generator
-    set_numba_torch_threads(settings['n_threads'])
 
     # Setup logger
     logger = setup_logger(
@@ -751,21 +691,17 @@ def summarise(
     settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
 
     # Convert strings to ints
-    settings['n_threads'] = [thread for thread in settings.get('n_threads',[1,1])]
+    settings['n_threads'] = int(settings.get('n_threads',1))
     settings['n_workers'] = settings.get('n_workers',1)
 
     # Add undefined settings to settings
     settings = {**settings, **undefined_settings}
     
     # Update number of workers
-    set_numpy_threads(settings['n_threads'][0])
+    set_numpy_threads(settings['n_threads'])
 
     # Import modules
     from multiresticodm.outputs import OutputSummary
-    from multiresticodm.utils import set_numba_torch_threads
-
-    # Set number of cores used (numba package)
-    set_numba_torch_threads(settings['n_threads'])
 
     # Setup logger
     logger = setup_logger(
@@ -785,4 +721,4 @@ def summarise(
     logger.info('Done')
 
 if __name__ == '__main__':
-    run_nn()
+    run()

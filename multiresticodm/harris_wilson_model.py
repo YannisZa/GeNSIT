@@ -52,13 +52,19 @@ class HarrisWilson:
             self.config = config
 
         # Device name
-        self.device = device
+        self.device = self.config['inputs']['device']
 
         # Model parameters
         self.aux_param_names = ['noise_var','epsilon']
         self.main_param_names = ['alpha','beta','kappa','sigma','delta']
-        self.true_parameters = true_parameters
+        self.true_parameters = {k:v for k,v in true_parameters.items() if v is not None}
 
+        # Add parameters to learn if None is provided as true parameter
+        for key,value in true_parameters.items():
+            if value is None and key not in self.config.settings['inputs']['to_learn']:
+                self.config.settings['inputs']['to_learn'].append(key)
+        
+        # Check that learnable parameters are in valid set
         try:
             assert set(self.config.settings['inputs']['to_learn']).issubset(set(self.main_param_names))
         except:
@@ -66,27 +72,39 @@ class HarrisWilson:
             self.logger.error(f"Acceptable parameters are {','.join(self.main_param_names)}.")
             raise Exception('Cannot instantiate Harris Wilson Model.')
         
+
         params_to_learn = {}
         idx = 0
         for param in self.config.settings['inputs']['to_learn']:
-            if true_parameters is not None and param not in list(true_parameters.keys()):
+            if self.true_parameters is not None and param not in list(self.true_parameters.keys()):
                 params_to_learn[param] = idx
                 idx += 1
         self.params_to_learn = params_to_learn
 
+
         # Auxiliary hyperparameters
         for param in PARAMETER_DEFAULTS.keys():
-            setattr(
-                self,
-                param,
-                torch.tensor(true_parameters.get(param,PARAMETER_DEFAULTS[param])).float().to(device)
-            )
+            true_param = self.true_parameters.get(param,PARAMETER_DEFAULTS[param])
+            if true_param is None:
+                setattr(
+                    self,
+                    param,
+                    torch.tensor(PARAMETER_DEFAULTS[param]).float().to(device)
+                )
+            else:
+                setattr(
+                    self,
+                    param,
+                    torch.tensor(true_param).float().to(device)
+                )
             if hasattr(self,'config'):
-                self.config.settings['harris_wilson_model']['parameters'][param] = true_parameters.get(param,PARAMETER_DEFAULTS[param])
+                self.config.settings['harris_wilson_model']['parameters'][param] = self.true_parameters.get(param,PARAMETER_DEFAULTS[param])
+        
+        # Time discretisation step size
         self.dt = torch.tensor(dt).float().to(device)
 
         # Error noise on log destination attraction
-        noise_percentage = true_parameters.get('noise_percentage',PARAMETER_DEFAULTS['noise_percentage'])
+        noise_percentage = self.true_parameters.get('noise_percentage',PARAMETER_DEFAULTS['noise_percentage'])
         self.noise_var = torch.pow(
             (
                 torch.tensor(noise_percentage).float() / \
@@ -277,7 +295,6 @@ class HarrisWilson:
         :return: the updated values
 
         """
-
         # Parameters to learn
         alpha = (
             self.true_parameters["alpha"]
@@ -311,6 +328,7 @@ class HarrisWilson:
         new_sizes = curr_destination_attractions.clone()
         new_sizes.requires_grad = requires_grad
 
+
         # Calculate the vector of demands
         demand = self.sim.intensity_demand(
             alpha = alpha,
@@ -321,8 +339,8 @@ class HarrisWilson:
         # print(alpha,beta,kappa)
         # Update the current values
         new_sizes = (
-            new_sizes
-            + +torch.mul(
+            new_sizes + \
+            +torch.mul(
                 curr_destination_attractions,
                 self.epsilon * (demand - kappa * curr_destination_attractions + delta)
                 + sigma
@@ -330,11 +348,10 @@ class HarrisWilson:
                 / torch.sqrt(torch.tensor(2, dtype=torch.float) * torch.pi * dt).to(
                     self.device
                 )
-                * torch.normal(0, 1, size=(self.sim.dims[1], 1)).to(self.device),
+                * torch.normal(0, 1, size=(1, self.sim.dims[1])).to(self.device),
             )
             * dt
         )
-
         return new_sizes
 
     def run(
@@ -358,7 +375,6 @@ class HarrisWilson:
         :return: the time series data
 
         """
-
         if not generate_time_series:
             sizes = init_destination_attraction.clone()
             for _ in range(n_iterations):

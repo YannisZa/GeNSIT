@@ -13,19 +13,20 @@ from datetime import datetime
 from scipy.optimize import minimize
 from joblib import Parallel, delayed
 from multiprocessing.pool import Pool
+from torch import int32, float32, uint8
 
 from multiresticodm.utils import *
 from multiresticodm.config import Config
 from multiresticodm.inputs import Inputs
 from multiresticodm.outputs import Outputs
 from multiresticodm.global_variables import *
-from multiresticodm.markov_basis import MarkovBasis
-from multiresticodm.contingency_table import ContingencyTable,instantiate_ct
 from multiresticodm.math_utils import apply_norm
-from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from multiresticodm.markov_basis import MarkovBasis
+from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.harris_wilson_model import HarrisWilson
+from multiresticodm.spatial_interaction_model import instantiate_sim
 from multiresticodm.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
-from multiresticodm.spatial_interaction_model import SpatialInteraction,instantiate_sim
+from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 from multiresticodm.spatial_interaction_model_mcmc import instantiate_spatial_interaction_mcmc
 
 # Suppress scientific notation
@@ -188,6 +189,12 @@ class Experiment(object):
         # Get device name
         self.device = self.config['inputs']['device']
 
+        # Count the number of gradient descent steps
+        self._time = 0
+        self._write_every = self.config['outputs'].get('write_every',1)
+        self._write_start = self.config['outputs'].get('write_start',1)
+        self.n_processed_steps = 0
+
     def run(self) -> None:
         pass
 
@@ -337,11 +344,7 @@ class Experiment(object):
         )
         return parameter_inits,parameter_acceptances
 
-    def initialise_data_structures(self):
-        # Count the number of gradient descent steps
-        self._time = 0
-        self._write_every = self.config['outputs'].get('write_every',1)
-        self._write_start = self.config['outputs'].get('write_start',1)
+    def initialise_data_structures(self):        
         # Get dimensions
         dims = self.config['inputs']['dims']
         
@@ -363,8 +366,8 @@ class Experiment(object):
         if str_in_list('log_destination_attraction',self.output_names):
             self.log_destination_attractions = self.outputs.h5group.create_dataset(
                 "log_destination_attraction",
-                (dims[1],0),
-                maxshape=(dims[1],None),
+                (0,self.inputs.data.destination_attraction_ts.shape[0],dims[1]),
+                maxshape=(None,self.inputs.data.destination_attraction_ts.shape[0],dims[1]),
                 chunks=True,
                 compression=3,
             )
@@ -419,14 +422,81 @@ class Experiment(object):
         if str_in_list('table',self.output_names):
             self.tables = self.outputs.h5group.create_dataset(
                 "table",
-                (*dims,0),
-                maxshape=(*dims,None),
+                (0,*dims),
+                maxshape=(None,*dims),
                 chunks=True,
                 compression=3,
             )
             self.tables.attrs["dim_names"] = ["origin","destination","iter"]
             self.tables.attrs["coords_mode__time"] = "start_and_step"
-            self.tables.attrs["coords__time"] = [self._write_start, self._write_every]
+            
+        # Setup acceptances
+        if str_in_list('theta_acc',self.output_names):
+            # Setup chunked dataset to store the state data in
+            self.theta_acc = self.outputs.h5group.create_dataset(
+                'theta_acceptance',
+                (0,),
+                maxshape=(None,),
+                chunks=True,
+                compression=3,
+            )
+            self.losses.attrs['dim_names'] = XARRAY_SCHEMA['theta_acceptance']['coords']
+            self.losses.attrs['coords_mode__time'] = 'start_and_step'
+            self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+        if str_in_list('log_destination_attraction_acc',self.output_names):
+            # Setup chunked dataset to store the state data in
+            self.log_destination_attraction_acc = self.outputs.h5group.create_dataset(
+                'log_destination_attraction_acceptance',
+                (0,),
+                maxshape=(None,),
+                chunks=True,
+                compression=3,
+            )
+            self.losses.attrs['dim_names'] = XARRAY_SCHEMA['log_destination_attraction_acc']['coords']
+            self.losses.attrs['coords_mode__time'] = 'start_and_step'
+            self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+        if str_in_list('table_acc',self.output_names):
+            # Setup chunked dataset to store the state data in
+            self.table_acc = self.outputs.h5group.create_dataset(
+                'table_acceptance',
+                (0,),
+                maxshape=(None,),
+                chunks=True,
+                compression=3,
+            )
+            self.losses.attrs['dim_names'] = XARRAY_SCHEMA['table_acc']['coords']
+            self.losses.attrs['coords_mode__time'] = 'start_and_step'
+            self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+    
+    def update_and_export(
+            self,
+            batch_size: int,
+            data_size: int,
+            t: int,
+            **kwargs
+        ):
+        # Update the model parameters after every batch and clear the loss
+        if t % batch_size == 0 or t == data_size - 1:
+            # Update time
+            self._time += 1
+
+            # Update gradients
+            loss = kwargs.get('loss',None)
+            if loss is not None:
+                loss.backward()
+                self.harris_wilson_nn._neural_net.optimizer.step()
+                self.harris_wilson_nn._neural_net.optimizer.zero_grad()
+
+            # Write to file
+            self.write_data(
+                **kwargs
+            )
+            # Delete loss
+            del loss
+            loss = torch.tensor(0.0, requires_grad=True)
+            self.n_processed_steps = 0
+        
+        return loss
 
     def write_data(self,**kwargs):
         '''Write the current state into the state dataset.
@@ -435,24 +505,50 @@ class Experiment(object):
         extend the dataset size prior to writing; this way, the newly written
         data is always in the last row of the dataset.
         '''
-        if kwargs.get('time',1) >= kwargs.get('write_start',1) and (kwargs.get('time',1) % kwargs.get('write_every',1) == 0):
-
+        if self._time >= self._write_start and self._time % self._write_every == 0:
             if 'loss' in self.output_names:
+                # Store samples
+                _loss_sample = kwargs.get('loss',None) 
+                _loss_sample = _loss_sample.clone().detach().cpu().numpy().item() / self.n_processed_steps if _loss_sample is not None else None
                 self.losses.resize(self.losses.shape[0] + 1, axis=0)
-                self.losses[-1] = kwargs.get('loss',None)
+                self.losses[-1] = _loss_sample
 
             if 'table' in self.output_names:
-                self.tables.resize(self.tables.shape[-1] + 1, axis=len(self.tables.shape)-1)
-                self.tables[...,-1] = kwargs.get('table',None)
+                _table_sample = kwargs.get('table',None)
+                _table_sample = _table_sample.clone().detach().cpu() if _table_sample is not None else None
+                self.tables.resize(self.tables.shape[0] + 1, axis=0)
+                self.tables[-1,...] = _table_sample
 
             if 'theta' in self.output_names:
+                _theta_sample = kwargs.get('theta',[None]*len(self.thetas))
+                _theta_sample = _theta_sample.clone().detach().cpu() if _theta_sample is not None else None
                 for idx, dset in enumerate(self.thetas):
                     dset.resize(dset.shape[0] + 1, axis=0)
-                    dset[-1] = kwargs.get('theta',[None]*len(self.thetas))[idx]
+                    dset[-1] = _theta_sample[idx]
             
             if 'log_destination_attraction' in self.output_names:
-                self.log_destination_attractions.resize(self.log_destination_attractions.shape[-1] + 1, axis=len(self.log_destination_attractions.shape)-1)
-                self.log_destination_attractions[...,-1] = kwargs.get('log_destination_attraction',np.array([None])).flatten()
+                _log_destination_attraction_sample = kwargs.get('log_destination_attraction',np.array([None]))
+                _log_destination_attraction_sample = _log_destination_attraction_sample.clone().detach().cpu() if _log_destination_attraction_sample is not None else None
+                self.log_destination_attractions.resize(self.log_destination_attractions.shape[0] + 1, axis=0)
+                self.log_destination_attractions[-1,...] = _log_destination_attraction_sample
+
+            if 'theta_acc' in self.output_names:
+                _theta_acc = kwargs.get('theta_acc',None)
+                _theta_acc = _theta_acc / self.n_processed_steps if _theta_acc is not None else None
+                self.theta_acc.resize(self.theta_acc.shape[0] + 1, axis=0)
+                self.theta_acc[-1] = _theta_acc
+
+            if 'log_destination_attraction_acc' in self.output_names:
+                _log_dest_attract_acc = kwargs.get('log_destination_attraction_acc',None)
+                _log_dest_attract_acc = _log_dest_attract_acc / self.n_processed_steps if _log_dest_attract_acc is not None else None
+                self.log_destination_attraction_acc.resize(self.log_destination_attraction_acc.shape[0] + 1, axis=0)
+                self.log_destination_attraction_acc[-1] = _log_dest_attract_acc
+
+            if 'table_acc' in self.output_names:
+                _table_acc = kwargs.get('table_acc',None)
+                _table_acc = _table_acc / self.n_processed_steps if _table_acc is not None else None
+                self.table_acc.resize(self.table_acc.shape[0] + 1, axis=0)
+                self.table_acc[-1] = _table_acc
 
     def print_initialisations(self,parameter_inits,print_lengths:bool=True,print_values:bool=False):
         for p,v in parameter_inits.items():
@@ -495,8 +591,8 @@ class Experiment(object):
                     args1=tuplize(range(deep_call(self,'.od_mcmc.ct.ndims()',0)))
                 ))
                 # Get markov basis length from table mcmc
-                if isinstance(deep_call(self,'.od_mcmc.table_mb',None),MarkovBasis):
-                    self.config['markov_basis_len'] = int(len(self.od_mcmc.table_mb))
+                if isinstance(deep_call(self,'.od_mcmc.markov_basis',None),MarkovBasis):
+                    self.config['markov_basis_len'] = int(len(self.od_mcmc.markov_basis))
             elif hasattr(self,'sim_mcmc'):
                 # Compute total sum of squares for r2 computation
                 self.w_data = np.exp(self.sim_mcmc.sim.log_destination_attraction)
@@ -1251,7 +1347,10 @@ class JointTableSIM_MCMC(Experiment):
         super().__init__(config,**kwargs)
         
         # Setup table
-        ct = instantiate_ct(table=None,config=self.config)
+        ct = instantiate_ct(
+            table = None,
+            config = self.config
+        )
         # Update table distribution
         self.config.settings['inputs']['contingency_table']['distribution_name'] = ct.distribution_name
         # Build spatial interaction model
@@ -1331,8 +1430,8 @@ class JointTableSIM_MCMC(Experiment):
         
         # Compute intensity
         log_intensity = self.sim_mcmc.sim.log_intensity(
-                            log_destination_attraction_sample,
-                            theta_sample_scaled_and_expanded,
+                            log_destination_attraction = log_destination_attraction_sample,
+                            theta = theta_sample_scaled_and_expanded,
                             total_flow=self.od_mcmc.ct.margins[tuplize(range(self.od_mcmc.ct.ndims()))].item()
                         )
         # Compute table likelihood and its gradient
@@ -1511,176 +1610,174 @@ class Table_MCMC(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        # Setup table
-        ct = instantiate_ct(table=None,config=self.config)
-        # Update table distribution
-        self.config.settings['inputs']['contingency_table']['distribution_name'] = ct.distribution_name
-        # Build spatial interaction model
-        sim = instantiate_sim(self.config)
-        
-        # Update config with table dimension
-        # self.config['table_dim'] = 'x'.join(map(str,ct.dims))
-        # self.config['table_total'] = int(ct.margins[tuplize(range(ct.ndims()))])
-        # Initialise intensities at ground truths
-        if (ct is not None) and (ct.table is not None):
-            self.logger.info("Using table as ground truth intensity")
-            # Use true table to construct intensities
-            with np.errstate(invalid='ignore',divide='ignore'):
-                self.true_log_intensities = np.log(
-                                                ct.table,
-                                                dtype='float32'
-                                            )
-            
-        elif (sim is not None) and (sim.ground_truth_known):
-            self.logger.info("Using SIM model as ground truth intensity")
-            # Spatial interaction model MCMC
-            # Compute intensities
-            self.true_log_intensities = sim.log_intensity(
-                                            sim.log_true_destination_attraction,
-                                            np.array([sim.alpha_true,sim.beta_true*sim.bmax]),
-                                            total_flow=ct.margins[tuplize(range(ct.ndims()))].item()
-                                        )
-        else:
-            raise Exception('No ground truth or table provided to construct table intensities.')
+        # Fix random seed
+        rng = set_seed(self.seed)
 
-        # Contingency Table mcmc
-        self.od_mcmc = ContingencyTableMarkovChainMonteCarlo(
-            ct,
-            table_mb=None,
-            log_to_console=kwargs.get('log_to_console',True)
+        # Enable garbage collections
+        gc.enable()
+
+        # Prepare inputs
+        self.inputs = Inputs(
+            config=config,
+            synthetic_data = False,
+            instance = kwargs.get('instance','')
+        )
+
+        # Pass inputs to device
+        self.inputs.pass_to_device()
+
+        # Build contingency table
+        ct = instantiate_ct(
+            table = None,
+            config = config
+        )
+        # Update table distribution
+        config.settings['contingency_table']['distribution_name'] = ct.distribution_name
+
+        # Build contingency table MCMC
+        self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
+            ct = ct,
+            rng = rng,
+            log_to_console = False,
+            instance = kwargs.get('instance','')
         )
         # Set table steps to 1
-        self.od_mcmc.table_steps = 1
-        # Delete duplicate of contingency table and spatial interaction model
-        safe_delete(self.ct)
-        safe_delete(self.sim)
-        # Run garbage collector to release memory
-        gc.collect()
+        self.ct_mcmc.table_steps = 1
+
+        # Get config
+        config = getattr(self.ct_mcmc,'config') if hasattr(self.ct_mcmc,'config') else None
+        # Initialise intensity
+        if (ct is not None) and (ct.ground_truth_table is not None):
+            self.logger.info("Using table as ground truth intensity")
+            # Use ground truth table to construct intensity
+            with np.errstate(invalid='ignore',divide='ignore'):
+                self.log_intensity = torch.log(
+                    ct.ground_truth_table
+                ).to(float32)
+            
+        else:
+            try:
+                # Instantiate Spatial Interaction Model
+                sim = instantiate_sim(
+                    sim_type= config['spatial_interaction_model']['sim_type'],
+                    config = config,
+                    true_parameters = config['spatial_interaction_model']['parameters'],
+                    instance = kwargs.get('instance',''),
+                    **vars(self.inputs.data)
+                )
+                # Get and remove config
+                config = pop_variable(sim,'config')
+                self.logger.note("Using SIM model as ground truth intensity")
+                
+                # Spatial interaction model for intensity
+                self.log_intensity = sim.log_intensity(
+                    log_true_destination_attraction = sim.log_destination_attraction,
+                    alpha = sim.alpha,
+                    beta = sim.beta*sim.bmax,
+                    grand_total = ct.margins[tuplize(range(ct.ndims()))].item()
+                )
+            except:
+                raise Exception('No ground truth or table provided to construct table intensities.')
+
+        # Update config
+        if config is not None:
+            self.config = config
+
+        # Create outputs
+        self.outputs = Outputs(
+            self.config,
+            module=__name__+kwargs.get('instance',''),
+            sweep_params=kwargs.get('sweep_params',{}),
+            experiment_id=self.sweep_experiment_id,
+            log_to_file=True,
+            log_to_console=True,
+        )
+
+        # Prepare writing to file
+        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+
+        # Write metadata
+        if self.config.settings.get('export_metadata',True):
+            self.logger.debug("Writing metadata ...")
+            if self.config.settings["sweep_mode"]:
+                dir_path = os.path.join("samples",self.outputs.sweep_id)
+                filename = 'metadata'
+            else:
+                dir_path = ""
+                filename = 'config'
+            
+            self.outputs.write_metadata(
+                dir_path=dir_path,
+                filename=filename
+            )
+        
+        self.logger.note(f"{self.ct_mcmc}")
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
 
         self.output_names = ['table']
 
-    def initialise_parameters(self):
-        if str_in_list('load_experiment',self.config['inputs']) and \
-            len(self.config['inputs']['load_experiment']) > 0:
-            # Read last batch of experiments 
-            outputs = Outputs(
-                self.config
-            )
-            # Parameter initialisations
-            parameter_inits = {}
-            # Total samples for joint posterior
-            N = self.sim_mcmc.sim.config.settings['mcmc']['N']
-            # Find last batch of samples and load it
-            filenames = sorted(glob(path.join(outputs.outputs_path,f'samples/table*.npy')))
-            if len(filenames) > 0:
-                # Get last batch
-                filepath = filenames[-1]
-                # Extrach batch number 
-                parameter_inits['batch_counter'] = int(filepath.split(f"batch_")[1].split(f"_samples.npy")[0])
-                # Load samples
-                samples = read_npy(filepath)
-                # Initialise parameter
-                parameter_inits["tables"] = samples.astype('float32')
-                # Extract number of iterations
-                parameter_inits['N0'] = len(samples)
-            else:
-                parameter_inits = {
-                    "batch_counter":0,
-                    "N0":1
-                }
-        else:
-            self.od_mcmc.sample_unconstrained_margins()
-            parameter_inits = {
-                "batch_counter":0,
-                "N0":1,
-                "tables":np.asarray([self.od_mcmc.initialise_table(np.exp(self.true_log_intensities))],dtype='int32')
-            }
-        # Update metadata initially
-        self.update_metadata(
-            0,
-            parameter_inits.get('batch_counter',0),
-            print_flag=False,
-            update_flag=True
-        )
-        return parameter_inits
-
     def run(self) -> None:
 
-        # Time run
-        self.start_time = time.time()
+        self.logger.note(f"Running Table MCMC.")
 
-        # Fix random seed
-        set_seed(self.seed)
-
-        # Initialise parameters
-        parameter_inits = self.initialise_parameters()
-        
-        # Initialise table
-        self.tables = parameter_inits['tables'].astype('int32')
-        table_sample = self.tables[-1]
-        self.table_acceptance = 1
+        # Initialise data structures
+        self.initialise_data_structures()
 
         # Store number of samples
-        # Total samples for joint posterior
-        N = self.od_mcmc.ct.config.settings['mcmc']['N']
+        num_epochs = self.config['training']['N']
 
-        # Define sample batch sizes
-        sample_sizes = self.define_sample_batch_sizes()
-        # Initialise batch counter
-        batch_counter = parameter_inits['batch_counter']
+        # For each epoch
+        for e in range(num_epochs):
 
-        # Loop through each sample batch
-        for i in tqdm(range(parameter_inits['N0'],N),disable=self.config['disable_tqdm']):
-                
-            # Take step
-            table_sample, table_accepted = self.od_mcmc.table_gibbs_step(
-                table_sample, 
-                self.true_log_intensities
+            # Track the epoch training time
+            self.start_time = time.time()
+
+            # Count the number of batch items processed
+            self.n_processed_steps = 0
+
+            # Sample table
+            if e == 0:
+                table_sample = self.ct_mcmc.initialise_table(
+                    intensity = torch.exp(self.log_intensity)
+                )
+                accepted = 1
+            else:
+                table_sample,accepted = self.ct_mcmc.table_gibbs_step(
+                    table_prev = table_sample,
+                    log_intensity = self.log_intensity
+                )
+            # Clean and write to file
+            _ = self.update_and_export(
+                table = table_sample,
+                table_acceptance = accepted,
+                # Batch size is in training settings
+                t = 0,
+                data_size = 1,
+                **self.config['training']
             )
-            # Append new tables samples to list
-            self.tables = np.append(self.tables,table_sample[np.newaxis,:],axis=0)
-            # Increment acceptance
-            self.table_acceptance += table_accepted
-                    
-            # Print metadata
-            if ((int(self.print_percentage*N) > 0) and (i % int(self.print_percentage*N) == 0) or i == (N-1)):
-                self.update_metadata(
-                    i+1,
-                    batch_counter,
-                    print_flag=True,
-                    update_flag=False
-                )
-            
-            # Export batch and reset
-            if ((i+1) >= sample_sizes[batch_counter]):
-                # Append to result array
-                self.results = [{"samples":{
-                                    f"table_batch_{batch_counter}":np.asarray(self.tables,dtype='int32')
-                                }}]
-                
-                self.update_metadata(
-                    i+1,
-                    batch_counter,
-                    print_flag=False,
-                    update_flag=True
-                )
-                
-                # Write samples and metadata
-                # self.write(metadata=True)
 
-                # Reset tables and columns sums to release memory
-                self.reset(metadata=False)
+            self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
 
-                # Increment batch counter
-                batch_counter += 1
+            # Write the epoch training time (wall clock time)
+            if hasattr(self,'compute_time'):
+                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
+                self.compute_time[-1] = time.time() - self.start_time
 
-        # Unfix random seed
-        set_seed(None)
-
-        self.logger.info(f"Experimental results have been compiled.")
-
-        # Append to result array
-        self.results.append({"samples":{"table":self.tables}})
+        if self.config.settings.get('export_metadata',True):
+            # Write metadata
+            dir_path = os.path.join("samples",self.outputs.sweep_id)
+            self.outputs.write_metadata(
+                dir_path=dir_path,
+                filename=f"metadata"
+            )
+        if self.config.settings.get('export_samples',True):
+            # Close h5 data file
+            self.outputs.h5file.close()
+            self.logger.note("Simulation run finished.")
+            # Write log file
+            self.outputs.write_log(self.logger)
+        else:
+            self.logger.note("Simulation run finished.")
 
 
 class TableSummariesMCMCConvergence(Experiment):
@@ -1689,7 +1786,10 @@ class TableSummariesMCMCConvergence(Experiment):
         super().__init__(config,**kwargs)
 
         # Setup table
-        ct = instantiate_ct(table=None,config=self.config)
+        ct = instantiate_ct(
+            table = None,
+            config = self.config,
+        )
         # Update table distribution
         self.config.settings['inputs']['contingency_table']['distribution_name'] = ct.distribution_name
         # Build spatial interaction model
@@ -1749,7 +1849,7 @@ class TableSummariesMCMCConvergence(Experiment):
                 # Append sampler to samplers
                 self.samplers[str(k)] = ContingencyTableMarkovChainMonteCarlo(
                     ct_copy,
-                    table_mb=self.samplers['0'].table_mb,
+                    table_mb=self.samplers['0'].markov_basis,
                     log_to_console=True
                 )
                 # Initialise fixed margins
@@ -1912,7 +2012,6 @@ class SIM_NN(Experiment):
             sim_type= config['spatial_interaction_model']['sim_type'],
             config = config,
             true_parameters = config['spatial_interaction_model']['parameters'],
-            device = self.device,
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data)
         )
@@ -1926,7 +2025,6 @@ class SIM_NN(Experiment):
             config = config,
             dt = config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
-            device = self.device,
             instance = kwargs.get('instance','')
         )
         # Get and remove config
@@ -1941,8 +2039,8 @@ class SIM_NN(Experiment):
             loss_function = config['neural_network'].pop('loss_function'),
             physics_model = harris_wilson_model,
             to_learn = config['inputs']['to_learn'],
-            write_every = config['outputs']['write_every'],
-            write_start = config['outputs']['write_start'],
+            write_every = self._write_every,
+            write_start = self._write_start,
             instance = kwargs.get('instance','')
         )
         # Get config
@@ -1991,9 +2089,6 @@ class SIM_NN(Experiment):
 
         self.logger.note(f"Running Neural Network training of Harris Wilson model.")
 
-        # Time run
-        start_time = time.time()
-
         # Initialise data structures
         self.initialise_data_structures()
         
@@ -2001,7 +2096,7 @@ class SIM_NN(Experiment):
         num_epochs = self.config['training']['N']
 
         # For each epoch
-        for e in range(num_epochs):
+        for e in tqdm(range(num_epochs),disable=self.logger.disabled,leave=False):
 
             # Track the epoch training time
             start_time = time.time()
@@ -2060,10 +2155,226 @@ class NonJointTableSIM_NN(Experiment):
             synthetic_data = False,
             instance = kwargs.get('instance','')
         )
+        # Pass inputs to device
+        self.inputs.pass_to_device()
+
+        # Instantiate Spatial Interaction Model
+        self.logger.note("Initializing the spatial interaction model ...")
+
+        sim = instantiate_sim(
+            sim_type= config['spatial_interaction_model']['sim_type'],
+            config = config,
+            true_parameters = config['spatial_interaction_model']['parameters'],
+            instance = kwargs.get('instance',''),
+            **vars(self.inputs.data)
+        )
+        # Get and remove config
+        config = pop_variable(sim,'config')
+
+        # Build Harris Wilson model
+        self.logger.note("Initializing the Harris Wilson physics model ...")
+        harris_wilson_model = HarrisWilson(
+            sim = sim,
+            config = config,
+            dt = config['harris_wilson_model'].get('dt',0.001),
+            true_parameters = self.inputs.true_parameters,
+            instance = kwargs.get('instance','')
+        )
+        # Get and remove config
+        config = pop_variable(harris_wilson_model,'config')
+        
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
-            input_size=self.inputs.data.destination_attraction_ts.shape[1],
+            input_size=self.inputs.data.destination_attraction_ts.shape[-1],
+            output_size=len(config['inputs']['to_learn']),
+            **config['neural_network']['hyperparameters'],
+        ).to(self.device)
+
+        # Instantiate harris and wilson neural network model
+        self.logger.note("Initializing the Harris Wilson Neural Network model ...")
+        self.harris_wilson_nn = HarrisWilson_NN(
+            rng = rng,
+            config = config,
+            neural_net = neural_network,
+            loss_function = config['neural_network'].pop('loss_function'),
+            physics_model = harris_wilson_model,
+            to_learn = config['inputs']['to_learn'],
+            instance = kwargs.get('instance','')
+        )
+        # Get config
+        config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else None
+
+        # Build contingency table
+        ct = instantiate_ct(
+            table = None,
+            config = config
+        )
+        # Build contingency table MCMC
+        self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
+            ct = ct,
+            rng = rng,
+            log_to_console = False,
+            instance = kwargs.get('instance','')
+        )
+
+        # Update config
+        if config is not None:
+            self.config = config
+
+        # Create outputs
+        self.outputs = Outputs(
+            self.config,
+            module=__name__+kwargs.get('instance',''),
+            sweep_params=kwargs.get('sweep_params',{}),
+            experiment_id=self.sweep_experiment_id,
+            log_to_file=True,
+            log_to_console=True,
+        )
+
+        # Prepare writing to file
+        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+
+        # Write metadata
+        if self.config.settings.get('export_metadata',True):
+            self.logger.debug("Writing metadata ...")
+            if self.config.settings["sweep_mode"]:
+                dir_path = os.path.join("samples",self.outputs.sweep_id)
+                filename = 'metadata'
+            else:
+                dir_path = ""
+                filename = 'config'
+            
+            self.outputs.write_metadata(
+                dir_path=dir_path,
+                filename=filename
+            )
+        
+        self.logger.note(f"{self.harris_wilson_nn}")
+        self.logger.note(f"{self.ct_mcmc}")
+        
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+
+        self.output_names = ['log_destination_attraction','theta','loss', 'table']
+        self.theta_names = config['inputs']['to_learn']
+        
+    def run(self) -> None:
+
+        self.logger.note(f"Running Neural Network training of Harris Wilson model.")
+
+        # Initialise data structures
+        self.initialise_data_structures()
+        
+        # Train the neural net
+        num_epochs = self.config['training']['N']
+
+        # For each epoch
+        for e in tqdm(range(num_epochs),disable=self.logger.disabled,leave=False):
+            # Track the epoch training time
+            start_time = time.time()
+            
+            # Track the training loss
+            loss_sample = torch.tensor(0.0, requires_grad=True)
+
+            # Count the number of batch items processed
+            self.n_processed_steps = 0
+
+            # Process the training set elementwise, updating the loss after batch_size steps
+            for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
+                
+                # Perform neural net training
+                loss_sample, \
+                theta_sample, \
+                log_destination_attraction_sample = self.harris_wilson_nn.epoch_time_step(
+                    loss = loss_sample,
+                    experiment = self,
+                    nn_data = training_data,
+                    dt = self.config['harris_wilson_model'].get('dt',0.001),
+                )
+            
+                # Add axis to every sample to ensure compatibility 
+                # with the functions used below
+                theta_sample_expanded = torch.unsqueeze(theta_sample,0)
+                log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0).unsqueeze(0)
+
+                # Compute log intensity
+                log_intensity = self.harris_wilson_nn.physics_model.sim.log_intensity(
+                    log_destination_attraction = log_destination_attraction_sample_expanded,
+                    grand_total = self.ct_mcmc.ct.margins[tuplize(range(self.ct_mcmc.ct.ndims()))],
+                    **dict(zip(self.harris_wilson_nn.parameters_to_learn,theta_sample_expanded.split(1,dim=1)))
+                ).squeeze()
+
+                # Sample table
+                if e == 0:
+                    table_sample = self.ct_mcmc.initialise_table(
+                        intensity = torch.exp(log_intensity)
+                    )
+                    accepted = 1
+                else:
+                    table_sample,accepted = self.ct_mcmc.table_gibbs_step(
+                        table_prev = table_sample,
+                        log_intensity = log_intensity
+                    )
+
+                # Clean and write to file
+                loss_sample = self.update_and_export(
+                    loss = loss_sample,
+                    theta = theta_sample,
+                    log_destination_attraction = log_destination_attraction_sample,
+                    table = table_sample,
+                    table_acceptance = accepted,
+                    # Batch size is in training settings
+                    t = t,
+                    data_size = len(training_data),
+                    **self.config['training']
+                )
+
+            self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
+
+            # Write the epoch training time (wall clock time)
+            if hasattr(self,'compute_time'):
+                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
+                self.compute_time[-1] = time.time() - start_time
+
+        
+        if self.config.settings.get('export_metadata',True):
+            # Write metadata
+            dir_path = os.path.join("samples",self.outputs.sweep_id)
+            self.outputs.write_metadata(
+                dir_path=dir_path,
+                filename=f"metadata"
+            )
+        if self.config.settings.get('export_samples',True):
+            # Close h5 data file
+            self.outputs.h5file.close()
+            self.logger.note("Simulation run finished.")
+            # Write log file
+            self.outputs.write_log(self.logger)
+        else:
+            self.logger.note("Simulation run finished.")
+
+class JointTableSIM_NN(Experiment):
+    def __init__(self, config:Config, **kwargs):
+        
+        # Initalise superclass
+        super().__init__(config,**kwargs)
+
+        # Fix random seed
+        rng = set_seed(self.seed)
+
+        # Enable garbage collections
+        gc.enable()
+
+        # Prepare inputs
+        self.inputs = Inputs(
+            config=config,
+            synthetic_data = False,
+            instance = kwargs.get('instance','')
+        )
+        # Set up the neural net
+        self.logger.note("Initializing the neural net ...")
+        neural_network = NeuralNet(
+            input_size=self.inputs.data.destination_attraction_ts.shape[-1],
             output_size=len(config['inputs']['to_learn']),
             **config['neural_network']['hyperparameters'],
         ).to(self.device)
@@ -2078,7 +2389,6 @@ class NonJointTableSIM_NN(Experiment):
             sim_type= config['spatial_interaction_model']['sim_type'],
             config = config,
             true_parameters = config['spatial_interaction_model']['parameters'],
-            device = self.device,
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data)
         )
@@ -2092,7 +2402,6 @@ class NonJointTableSIM_NN(Experiment):
             config = config,
             dt = config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
-            device = self.device,
             instance = kwargs.get('instance','')
         )
         # Get and remove config
@@ -2107,8 +2416,6 @@ class NonJointTableSIM_NN(Experiment):
             loss_function = config['neural_network'].pop('loss_function'),
             physics_model = harris_wilson_model,
             to_learn = config['inputs']['to_learn'],
-            write_every = config['outputs']['write_every'],
-            write_start = config['outputs']['write_start'],
             instance = kwargs.get('instance','')
         )
         # Get config
@@ -2171,9 +2478,6 @@ class NonJointTableSIM_NN(Experiment):
 
         self.logger.note(f"Running Neural Network training of Harris Wilson model.")
 
-        # Time run
-        start_time = time.time()
-
         # Initialise data structures
         self.initialise_data_structures()
         
@@ -2181,8 +2485,7 @@ class NonJointTableSIM_NN(Experiment):
         num_epochs = self.config['training']['N']
 
         # For each epoch
-        for e in range(num_epochs):
-
+        for e in tqdm(range(num_epochs),disable=self.logger.disabled,leave=False):
             # Track the epoch training time
             start_time = time.time()
             
@@ -2190,24 +2493,19 @@ class NonJointTableSIM_NN(Experiment):
             loss_sample = torch.tensor(0.0, requires_grad=True)
 
             # Count the number of batch items processed
-            n_processed_steps = 0
+            self.n_processed_steps = 0
 
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
-                
+
                 # Perform neural net training
                 loss_sample, \
                 theta_sample, \
-                log_destination_attraction_sample, \
-                n_processed_steps = self.harris_wilson_nn.epoch_time_step(
+                log_destination_attraction_sample = self.harris_wilson_nn.epoch_time_step(
                     loss = loss_sample,
-                    n_processed_steps = n_processed_steps,
                     experiment = self,
-                    t = t,
-                    dt = self.config['harris_wilson_model'].get('dt',0.001),
                     nn_data = training_data,
-                    data_size = len(training_data),
-                    **self.config['training']
+                    dt = self.config['harris_wilson_model'].get('dt',0.001),
                 )
             
                 # Add axis to every sample to ensure compatibility 
@@ -2227,20 +2525,27 @@ class NonJointTableSIM_NN(Experiment):
                     table_sample = self.ct_mcmc.initialise_table(
                         intensity = torch.exp(log_intensity)
                     )
+                    accepted = 1
                 else:
-                    table_sample,_ = self.ct_mcmc.table_gibbs_step(
+                    table_sample,accepted = self.ct_mcmc.table_gibbs_step(
                         table_prev = table_sample,
                         log_intensity = log_intensity
                     )
 
+                # Update table loss
+                loss_sample += self.ct_mcmc.table_loss_function(
+                    log_intensity = log_intensity,
+                    table = table_sample
+                )
+
                 # Clean and write to file
-                self.harris_wilson_nn.clean_and_export(
+                loss_sample = self.update_and_export(
                     loss = loss_sample,
                     theta = theta_sample,
-                    log_dest_attraction = log_destination_attraction_sample,
+                    log_destination_attraction = log_destination_attraction_sample,
                     table = table_sample,
-                    n_processed_steps = n_processed_steps,
-                    experiment = self,
+                    table_acceptance = accepted,
+                    # Batch size is in training settings
                     t = t,
                     data_size = len(training_data),
                     **self.config['training']
@@ -2252,8 +2557,7 @@ class NonJointTableSIM_NN(Experiment):
             if hasattr(self,'compute_time'):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - start_time
-
-        
+                
         if self.config.settings.get('export_metadata',True):
             # Write metadata
             dir_path = os.path.join("samples",self.outputs.sweep_id)
@@ -2386,8 +2690,7 @@ class ExperimentSweep():
                     sval[i],
                     self.sweep_params[key]['path']
                 )
-                # new_val = get_value_from_path(new_config.settings,self.sweep_params[key]['path'])
-                # print(key,new_val,type(new_val),get_value_from_path(new_config.settings,['sweep_mode']))
+
             # Create new experiment
             new_experiment = instantiate_experiment(
                 experiment_type=new_config.settings['experiments'][0]['type'],

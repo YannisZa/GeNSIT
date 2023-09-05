@@ -9,7 +9,7 @@ import gzip
 import json
 import h5py
 import torch
-import numba
+import random
 import numexpr
 import logging
 import operator
@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 from itertools import chain, count
 from difflib import SequenceMatcher
-from numba import njit
 from typing import Dict, List, Union, Tuple
 from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
@@ -511,11 +510,15 @@ def stringify_statistic(statistic):
     return text
 
 
-def set_seed(value):
-    if value is not None:
-        rng = np.random.default_rng(value)
-        np.random.seed(value)
-        torch.random.manual_seed(value)
+def set_seed(seed):
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+        rng = np.random.default_rng(seed)
+        torch.random.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
         return rng
     else:
         return np.random.default_rng(None)
@@ -530,18 +533,6 @@ def update_device(device):
             else "cpu"
         )
     return device
-
-
-def set_numba_torch_threads(n_threads):
-    # Update threads used by numba and torch
-    if len(n_threads) == 1:
-        numba.set_num_threads(int(n_threads[0]))
-        torch.set_num_threads(int(n_threads[0]))
-    elif len(n_threads) > 1:
-        numba.set_num_threads(int(n_threads[1]))
-        torch.set_num_threads(int(n_threads[1]))
-    else:
-        raise ValueError(f"Invalid number of threads '{str(n_threads)}' provided ")
 
 def tuplize(tup):
     # Convert strings
@@ -702,7 +693,6 @@ def f_to_str(f:dict) -> str:
     return ','.join([str(v) for k,v in sorted(f.items(),key=lambda x:str_to_tuple(x[0]))])
 
 
-@njit
 def table_to_str(tab:np.ndarray) -> str:
     return ','.join([str(num) for num in tab.flatten()])
 
@@ -754,13 +744,21 @@ def create_dynamic_data_label(__self__,data):
     # Add label to error data
     return x_label,label_by_key,label_by_value
 
-def in_range(v,limits:list,inclusive:bool=False):
+def in_range(v,limits:list,allow_nan:bool=False,inclusive:bool=False):
     within_range = True
+    if np.isnan(v):
+        if not allow_nan:
+            return False
+        else:
+            return True
     if limits[0] is not None:
         within_range = within_range and (v >= limits[0] if inclusive else v > limits[0])
     if limits[1] is not None:
         within_range = within_range and (v <= limits[1] if inclusive else v < limits[0])
     return within_range
+
+def is_null(v):
+    return v is None or np.isnan(v)
 
 def dict_inverse(d:dict):
     return {v:k for k,v in d.items()}

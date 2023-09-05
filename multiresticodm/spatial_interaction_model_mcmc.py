@@ -13,7 +13,7 @@ import multiresticodm.probability_utils as ProbabilityUtils
 
 from multiresticodm.math_utils import scipy_optimize
 from multiresticodm.spatial_interaction_model import SpatialInteraction
-from multiresticodm.utils import setup_logger, str_in_list,makedir,set_seed,deep_get,set_numba_torch_threads
+from multiresticodm.utils import setup_logger, str_in_list,makedir,set_seed,deep_get
 
 def instantiate_spatial_interaction_mcmc(sim:SpatialInteraction,**kwargs):
     if hasattr(sys.modules[__name__], (sim.sim_name+'MarkovChainMonteCarlo')):
@@ -41,9 +41,6 @@ class SpatialInteractionMarkovChainMonteCarlo():
         # Number of parallelisation workers
         self.n_workers = int(next(deep_get(key='n_workers',value=self.sim.config.settings)))
         self.n_threads = next(deep_get(key='n_threads',value=self.sim.config.settings))
-
-        # Update numba threads
-        set_numba_torch_threads(self.n_threads)
 
         # Get seed and number of cores for multiprocessing
         self.seed = int(self.sim.config.settings['inputs'].get('seed',None)) \
@@ -235,7 +232,7 @@ class SpatialInteraction2DMarkovChainMonteCarlo(SpatialInteractionMarkovChainMon
             Table dimensions: {"x".join([str(x) for x in self.sim.dims])}
             Noise regime: {self.sim.noise_regime}
             Number of cores: {self.n_workers}
-            Number of threads (numpy,numba): {str(self.n_threads)}
+            Number of threads per core: {str(self.n_threads)}
             Random number generation seed: {self.seed}
         """
 

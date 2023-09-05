@@ -59,8 +59,10 @@ class SpatialInteraction2D():
         if config is not None:
             self.config = config
 
-        # Device name
-        self.device = kwargs.get('device','cpu')
+            # Device name
+            self.device = self.config['inputs']['device']
+        else:
+             self.device = kwargs.get('device','cpu')
 
         # Instantiate dataset 
         self.data = Dataset()

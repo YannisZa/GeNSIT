@@ -51,7 +51,8 @@ class ContingencyTable(object):
         # Table
         self.ground_truth_table = table
         # Device name
-        self.device = kwargs.get('device','cpu')
+        self.device = self.config['inputs']['device']
+        print('UPDATE',self.device)
         # Instantiate dataset 
         self.data = Dataset()
         # Markov basis class
@@ -391,13 +392,13 @@ class ContingencyTable(object):
                             high=None,
                             size=1,
                             dtype=int32
-                        )
+                        ).to(device=self.device)
                     else:
                         dim = self.dims[self.axes_complement(axis,same_length=True)[0]]
                         self.margins[tuplize(axis)] = distr.multinomial.Multinomial(
                             n=self.margins[tuplize(range(self.ndims()))], 
                             pvals=np.repeat(1/dim, dim)
-                        ).sample().to(dtype=int32)
+                        ).sample().to(dtype=int32,device=self.device)
                         self.logger.debug(f"Randomly initialising margin for axis", tuplize(axis))
             # Copy residal margins
             self.residual_margins = deepcopy(self.margins)
@@ -698,12 +699,12 @@ class ContingencyTable(object):
                 dim=tuplize(ax), 
                 keepdims=True, 
                 dtype=int32
-            ).flatten()
+            ).flatten().to(device=self.device)
             self.residual_margins[tuplize(ax)] = table.sum(
                 dim=tuplize(ax), 
                 keepdims=True, 
                 dtype=int32
-            ).flatten()
+            ).flatten().to(device=self.device)
 
     def update_constrained_margins_from_table(self, table):
         for ax in self.constraints['constrained_axes']:
@@ -711,12 +712,12 @@ class ContingencyTable(object):
                 dim=tuplize(ax), 
                 keepdims=True, 
                 dtype=int32
-            ).flatten()
+            ).flatten().to(device=self.device)
             self.residual_margins[tuplize(ax)] = table.sum(
                 dim=tuplize(ax), 
                 keepdims=True, 
                 dtype=int32
-            ).flatten()
+            ).flatten().to(device=self.device)
 
     def update_margins_from_table(self, table):
         for axes in powerset(range(self.ndims())):
@@ -724,13 +725,13 @@ class ContingencyTable(object):
                 dim=tuplize(axes), 
                 keepdims=True, 
                 dtype=int32
-            ).flatten()
+            ).flatten().to(device=self.device)
             # print(axes,self.margins[tuplize(axes)].shape)
             self.residual_margins[tuplize(axes)] = table.sum(
                 dim=tuplize(axes), 
                 keepdims=True, 
                 dtype=int32
-            ).flatten()
+            ).flatten().to(device=self.device)
     
     def update_unconstrained_margins(self, margins: dict = {}):
         return self.update_margins({
@@ -1032,7 +1033,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         else:
             # Minimum residual
             minres_solution = np.floor(
-                np.min([torch.min(val) for val in residual_margins.values()]) / sum(min_residual.flatten() != 0)
+                np.min([torch.min(val).detach().cpu() for val in residual_margins.values()]) / sum(min_residual.flatten() != 0)
             )
 
             # Make sure that min res solution is non-zero
@@ -1040,7 +1041,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
 
             min_residual[min_residual > 0] = int( min(
                     minres_solution,
-                    np.min([torch.min(val) for val in residual_margins.values()])
+                    np.min([torch.min(val).detach().cpu() for val in residual_margins.values()])
             ))
             return min_residual
 
@@ -1060,7 +1061,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         table0 = torch.zeros(tuple(self.dims), dtype=int32)
 
         # Get N (sum or row or column sums)
-        N = self.residual_margins[tuplize(range(self.ndims()))]
+        N = self.residual_margins[tuplize(range(self.ndims()))].detach().cpu().numpy()[0]
 
         # Generate permutation of N items
         permutation = torch.randperm(N) + torch.tensor(1,dtype=int32)
@@ -1071,13 +1072,13 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             if i == 0:
                 permutation_subset = permutation[0 : (self.residual_margins[constrained_axis1][i])]
             else:
-                permutation_subset = permutation[torch.sum(self.residual_margins[constrained_axis1][:(i)]):
-                                                torch.sum(self.residual_margins[constrained_axis1][:(i+1)])]
+                permutation_subset = permutation[torch.sum(self.residual_margins[constrained_axis1][:(i)]).to(int32):
+                                                torch.sum(self.residual_margins[constrained_axis1][:(i+1)]).to(int32)]
                     
             # Loop through columns
             for j in range(self.dims[constrained_axis1]):
                 # Create index appropriately
-                query_index = torch.zeros(tuple(self.ndims()), dtype=uint8)
+                query_index = np.zeros(self.ndims(), dtype='uint8')
                 query_index[constrained_axis2] = i
                 query_index[constrained_axis1] = j
                 query_index = tuplize(query_index)
@@ -1088,18 +1089,16 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 else:
                     # Count number of entries between c_1+...+c_{j-1}+1 and c_1+...+c_j
                     if j == 0:
-                        table0[query_index] = torch.int32(
+                        table0[query_index] = (
                             ((1 <= permutation_subset) & \
                              (permutation_subset <= self.residual_margins[constrained_axis2][j])).sum()
-                        )
+                        ).to(int32)
                     else:
-                        table0[query_index] = torch.int32(
+                        table0[query_index] = (
                             (((torch.sum(self.residual_margins[constrained_axis2][:j])+1) <= permutation_subset) & \
                             (permutation_subset <= torch.sum(self.residual_margins[constrained_axis2][:(j+1)]))).sum()
-                        )
-
+                        ).to(int32)
         self.admissibility_debugging('Monte Carlo',table0)
-
         return table0.to(device=self.device,dtype=int32)
     
     def table_import(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
@@ -1145,7 +1144,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         table0 = torch.zeros(tuple(self.dims), dtype=int32)
         min_cell_value,max_cell_value = 0,1
         for cell in self.constraints['cells']:
-            table0[cell] = torch.int32(self.ground_truth_table[cell])
+            table0[cell] = self.ground_truth_table[cell].to(int32)
             min_cell_value = min(min_cell_value,table0[cell])
             max_cell_value = max(max_cell_value,table0[cell])
         
@@ -1182,7 +1181,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         # Fixed indices
         fixed_cells = np.array(self.constraints['cells'])
         # Initialise table to zero
-        table0 = torch.zeros(tuple(self.dims), dtype=int32)
+        table0 = torch.zeros(tuple(self.dims)).to(device = self.device, dtype=int32)
         # Fix table cells
         table0[tuple(fixed_cells.T)] = self.ground_truth_table[tuple(fixed_cells.T)]
 
@@ -1204,7 +1203,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             if counter == 0:
                 cells = np.array(self.cells)
                 # Update table
-                table0[tuple(cells.T)] += np.int32(min_residual[tuple(cells.T)])
+                table0[tuple(cells.T)] += (min_residual[tuple(cells.T)]).to(dtype=int32,device=self.device)
                 # Update residual margins
                 residual_margins = self.update_residual_margins_from_cells(
                     residual_margins=residual_margins, 
@@ -1258,3 +1257,4 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
 
         self.admissibility_debugging('Maximum entropy solution',table0)
         return table0.to(device=self.device,dtype=int32)
+        

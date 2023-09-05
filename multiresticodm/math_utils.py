@@ -11,17 +11,47 @@ from multiresticodm.utils import flatten
 
 
 def log_factorial(start:int32,end:int32):
-    if start+1 > end:
-        return torch.tensor(0,dtype=int32)
-    return torch.sum(
-        torch.log(
-            torch.range(
-                start=start,
-                end=end,
-                step=1
-            )
-        )
-    )
+    # Check if inputs are integers or tensors
+    if isinstance(start, int):
+        start = torch.tensor(start)
+    if isinstance(end, int):
+        end = torch.tensor(end)
+        
+    if start.numel() == 1 and end.numel() == 1:
+        
+        if start+1 > end:
+            return torch.tensor(0,dtype=int32)
+        else:
+            # Create a range of integers from start to end (inclusive)
+            integers = torch.range(start, end, 1)
+            # Compute the log factorial for each integer
+            log_factorials = torch.cumsum(torch.log(integers.float()), dim=0)
+            return log_factorials[-1]
+    
+    else:
+        try: 
+            assert (start.numel() == end.numel()) or \
+                    (start.numel() == 1) or \
+                    (end.numel() == 1)
+        except:
+            raise Exception(f"Start and end arguments must have either the same number of elements or one element.")
+        
+        # If either start or end is a tensor, compute the log factorial for each element
+        # Initialize an empty tensor to store the results
+        log_factorials = torch.zeros(max(start.numel(),end.numel()))
+        
+        # Iterate through the elements of the tensors and compute log factorials
+        for i in range(max(start.numel(),end.numel())):
+            s = start[i] if (1 < start.numel()) else start.item()
+            e = end[i] if (1 < end.numel()) else end.item()
+            if s + 1 > e:
+                # Set 0.0 for invalid range
+                log_factorials[i] = 0.0
+            else:
+                integers = torch.range(s, e, 1)
+                log_factorials[i] = torch.sum(torch.log(integers)).item()
+        
+        return log_factorials
 
 def positive_sigmoid(x,scale:float=1.0):
     return 2/(1+torch.exp(-x/scale)) - 1

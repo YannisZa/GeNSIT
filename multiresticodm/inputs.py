@@ -134,12 +134,12 @@ class Inputs:
             if hasattr(self.data,'destination_attraction_ts') and getattr(self.data,'destination_attraction_ts') is not None:
                 self.data.destination_attraction_ts = torch.unsqueeze(
                     torch.from_numpy(self.data.destination_attraction_ts).float(),
-                    -1
+                    0
                 ).to(device)
             if hasattr(self.data,'origin_attraction_ts') and getattr(self.data,'origin_attraction_ts') is not None:
                 self.data.origin_attraction_ts = torch.unsqueeze(
                     torch.from_numpy(self.data.origin_attraction_ts).float(),
-                    -1
+                    0
                 ).to(device)
             if hasattr(self.data,'cost_matrix') and getattr(self.data,'cost_matrix') is not None:
                 self.data.cost_matrix = torch.reshape(

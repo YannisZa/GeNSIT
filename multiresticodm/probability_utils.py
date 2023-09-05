@@ -1,4 +1,5 @@
 # import os
+import sys
 import torch
 import numpy as np
 import torch.distributions as distr
@@ -8,8 +9,9 @@ from torch import int32, float32
 
 from multiresticodm.math_utils import log_factorial
 
-def uniform_binary_choice(n:int=1,choices:list=[-1,1]):
-    x = torch.rand(n,dtype=int32)
+def uniform_binary_choice(n:int=1):
+    choices = [-1,1]
+    x = torch.rand(n)
     var = torch.zeros(n)
     var[x<.5] = choices[0]
     var[x>=.5] = choices[1]
@@ -38,9 +40,9 @@ def log_odds_ratio_wrt_intensity(log_intensity: torch.tensor):
     # Extract dimensions of intensity
     nrows,ncols = np.shape(log_intensity)
     # Computes log of odds ratio of intensity
-    log_intensity_rowsums = torch.tensor([torch.logsumexp(log_intensity[i,:]) for i in range(nrows)]).reshape((nrows,1))
-    log_intensity_colsums = torch.tensor([torch.logsumexp(log_intensity[:,j]) for j in range(ncols)]).reshape((1,ncols))
-    log_intensity_total = torch.logsumexp(log_intensity_rowsums)
+    log_intensity_rowsums = torch.logsumexp(log_intensity,dim=1).unsqueeze(1)
+    log_intensity_colsums = torch.logsumexp(log_intensity,dim=0).unsqueeze(0)
+    log_intensity_total = torch.logsumexp(log_intensity_rowsums.ravel(),dim=0)
     # Computes log of odds ratio of intensity
     log_or = log_intensity + \
         log_intensity_total - \
@@ -67,7 +69,7 @@ def log_table_likelihood_total_derivative_wrt_x(likelihood_grad,intensity_grad_x
 
 def log_poisson_pmf_unnormalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
     # Compute log intensity total
-    log_total = torch.logsumexp(log_intensity.ravel())
+    log_total = torch.logsumexp(log_intensity.ravel(),dim=0)
     # Compute log pmf
     return -torch.exp(log_total) + torch.sum(table.to(dtype=float32)*log_intensity) - log_factorial(1,table.ravel()).sum()
 
@@ -89,7 +91,7 @@ def log_poisson_pmf_jacobian_wrt_intensity(log_intensity:torch.tensor,table:torc
 
 def log_multinomial_pmf_unnormalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
     # Normalise log intensites by log rowsums to create multinomial probabilities
-    log_probabilities = (log_intensity - torch.logsumexp(log_intensity.ravel())).to(dtype=float32)
+    log_probabilities = (log_intensity - torch.logsumexp(log_intensity.ravel(),dim=0)).to(dtype=float32)
     # Compute log pmf
     return table.to(dtype=float32).ravel().dot(log_probabilities.ravel()) - log_factorial(1,table.ravel()).sum()
 
@@ -114,9 +116,9 @@ def log_product_multinomial_pmf_unnormalised(log_intensity:torch.tensor,table:to
     # Get dimensions
     nrows,ncols = np.shape(table)
     # Compute log margins of intensity matrix
-    log_rowsums = torch.tensor(np.asarray([[torch.logsumexp(log_intensity[i,:]) for i in range(nrows)]]),dtype=float32)
+    log_rowsums = torch.logsumexp(log_intensity,dim=1).unsqueeze(1)
     # Normalise log intensites by log rowsums to create multinomial probabilities
-    log_probabilities = (log_intensity - log_rowsums.reshape((nrows,1))).to(dtype=float32)
+    log_probabilities = (log_intensity - log_rowsums).to(dtype=float32)
     # Compute log pmf
     return table.to(dtype=float32).ravel().dot(log_probabilities.ravel()) - log_factorial(1,table.ravel()).sum()
 
@@ -150,8 +152,8 @@ def log_fishers_hypergeometric_pmf_unnormalised(log_intensity:torch.tensor,table
     # Compute log odds ratio
     log_or = log_odds_ratio_wrt_intensity(log_intensity)
     # Compute log_probabilities
-    log_or_colsums = torch.tensor(np.asarray([[torch.logsumexp(log_or[:,j]) for j in range(dims[1])]]),dtype=float32)
-    log_or_probabilities = log_or - log_or_colsums.reshape((1,dims[1]))
+    log_or_colsums = torch.logsumexp(log_or,dim=0).unsqueeze(0).to(dtype=float32)
+    log_or_probabilities = log_or - log_or_colsums
     # Compute log pmf
     return table.to(dtype=float32).ravel().dot(log_or_probabilities.ravel()) - log_factorial(1,table.ravel()).sum()
 

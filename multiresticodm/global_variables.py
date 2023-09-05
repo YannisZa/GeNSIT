@@ -47,13 +47,13 @@ XARRAY_SCHEMA = {
         "new_shape":["N","1"]
     }, 
     'log_destination_attraction': {
-        "coords":["destination","iter"],
-        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
-        "args_dtype":["int32","int32"],
-        "new_shape":["N","J"]
+        "coords":["iter","time","destination"],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32","int32"],
+        "new_shape":["N","T","J"]
     },
     'table': {
-        "coords":["origin","destination","iter"],
+        "coords":["iter","origin","destination"],
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32","int32"],
         "new_shape":["N","I","J"]
@@ -65,6 +65,24 @@ XARRAY_SCHEMA = {
         "new_shape":["N","1"]
     },
     'log_target': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    },
+    'theta_acc': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    },
+    'log_destination_attraction_acc': {
+        "coords":["iter"],
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "new_shape":["N","1"]
+    },
+    'table_acc': {
         "coords":["iter"],
         "funcs":[("np",".arange(start,stop,step)")],
         "args_dtype":["int32"],
