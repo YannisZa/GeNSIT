@@ -1,5 +1,6 @@
 import json
 import os.path
+import sys
 import toml
 import logging
 
@@ -16,14 +17,15 @@ class Config:
         :param path: Path to configuration TOML file
         """
         # Setup logger
-        self.level = kwargs.get('level','info').upper()
         self.logger = setup_logger(
             __name__,
-            level=self.level,
             log_to_file=True,
             log_to_console=True
-        )
-
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update logger level
+        level = kwargs.get('level','info').upper()
+        self.logger.setLevel(level)
+        
         # Load config
         if path:
 

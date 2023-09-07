@@ -26,7 +26,7 @@ class MarkovBasis(object):
             level=ct.config.level if ct.config else kwargs.get('level','INFO'),
             log_to_file=False,
             log_to_console=kwargs.get('log_to_console',True),
-        )
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
 
         # Get contingency table
         self.ct = ct

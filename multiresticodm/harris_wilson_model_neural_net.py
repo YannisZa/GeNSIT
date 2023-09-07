@@ -222,13 +222,15 @@ class HarrisWilson_NN:
             config: settings regarding model (hyper)parameters and other settings
         '''
         # Setup logger
-        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            level=self.level,
+            level=level,
             log_to_file=kwargs.get('log_to_file',True),
             log_to_console=kwargs.get('log_to_console',True),
-        )
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update logger level
+        self.logger.setLevel(level)
         # Store random number generator
         self._rng = rng
 

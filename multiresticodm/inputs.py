@@ -26,7 +26,7 @@ class Inputs:
             config.level,
             log_to_file=True,
             log_to_console=True
-        )
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
 
         # Store config
         self.config = config

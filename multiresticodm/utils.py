@@ -10,6 +10,8 @@ import json
 import h5py
 import torch
 import random
+import string
+import random
 import numexpr
 import logging
 import operator
@@ -217,6 +219,13 @@ def read_compressed_json(filepath:str) -> List[Dict]:
         f = json.loads(fin.read().decode('utf-8'))
     return f
 
+def parse(value):
+    if isinstance(value,str):
+        try:
+            value = string_to_numeric(value)
+        except:
+            pass
+    return value
 
 def makedir(directory:str) -> None:
     if not os.path.exists(directory):
@@ -534,6 +543,10 @@ def update_device(device):
         )
     return device
 
+def set_device_id(device_id):
+    torch.cuda.set_device(device)
+
+
 def tuplize(tup):
     # Convert strings
     if isinstance(tup,str):
@@ -792,7 +805,7 @@ def string_to_numeric(s):
 
 
 def setup_logger(name,level,log_to_file:bool=False,log_to_console:bool=False):
-    
+    print('setting up new logger',name)
     # Set logger class
     logging.setLoggerClass(CustomLogger)
 
@@ -841,7 +854,7 @@ def setup_logger(name,level,log_to_file:bool=False,log_to_console:bool=False):
             logger.handlers[0].setLevel(logging.CRITICAL)
 
         # Setup file handler
-        string_handler = CustomFileHandler('temp.log',name=name)
+        string_handler = CustomFileHandler(f'logs/temp_{name}_{random_string(10)}.log',name=name)
         if log_to_file:
             string_handler.setLevel(logging.DEBUG)
         else:
@@ -852,6 +865,9 @@ def setup_logger(name,level,log_to_file:bool=False,log_to_console:bool=False):
 
 
     return logger
+
+def random_string(N:int=10):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=N))
 
 def sigma_to_noise_regime(sigma=None):
     if sigma:

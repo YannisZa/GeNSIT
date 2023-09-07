@@ -35,16 +35,18 @@ OUTPUTS_MODULE = sys.modules[__name__]
 
 class OutputSummary(object):
 
-    def __init__(self, settings):
+    def __init__(self, settings, **kwargs):
         # Setup logger
         self.logger = setup_logger(
             __name__,
             level=settings.get('logging_mode','info').upper(),
             log_to_file=True,
             log_to_console=True
-        )
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Get command line settings
         self.settings = settings
+        # Store device
+        self.device = self.settings.get('device','cpu')
         # Instatiate list of experiments
         self.experiment_metadata = {}
         # Enable garbage collector
@@ -161,7 +163,7 @@ class OutputSummary(object):
                     name,value = param_tup
                     # Loop through experiment's sweeped parameters
                     for key_path in experiment_metadata['sweeped_params_paths']:
-                        # If there is a much between the two
+                        # If there is a match between the two
                         if name == key_path[-1]:
                             # If is a coordinate add to the coordinate slice
                             # This slices the xarray created from the outputs samples
@@ -189,7 +191,9 @@ class OutputSummary(object):
                         config=output_folder,
                         settings=self.settings,
                         output_names=(list(self.settings['sample'])+['ground_truth_table']),
-                        coordinate_slice=coordinate_slice
+                        coordinate_slice=coordinate_slice,
+                        level=self.settings['logging_mode'],
+                        logger = self.logger
                     )
                 # This is the case where there are SOME input slices provided
                 else:
@@ -198,7 +202,9 @@ class OutputSummary(object):
                         settings=self.settings,
                         output_names=(list(self.settings['sample'])+['ground_truth_table']),
                         coordinate_slice=coordinate_slice,
-                        input_slice=path_value
+                        input_slice=path_value,
+                        level=self.settings['logging_mode'],
+                        logger = self.logger
                     )
 
                 # Apply these metrics to the data 
@@ -362,8 +368,8 @@ class OutputSummary(object):
                                 samples_metric = samples_metric.reshape(metric_shape)
                             except Exception as e:
                                 self.logger.debug(traceback.format_exc())
-                                self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
-                                self.logger.error(f"tab0 {np.shape(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}")
+                                self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}, {samples_summarised.device}")
+                                self.logger.error(f"tab0 {np.shape(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}, {metric_kwargs['tab0'].device}")
                                 self.logger.error(f'Applying metric {metric} for {attribute_settings_string} \
                                                   over sample {sample_name} \
                                                   for experiment {experiment_id} failed')
@@ -436,8 +442,8 @@ class OutputSummary(object):
                                 samples_metric = deepcopy(samples_summarised)
                         except Exception as e:
                             self.logger.debug(traceback.format_exc())
-                            self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
-                            self.logger.error(f"tab0 {metric_kwargs['tab0'].shape}, {metric_kwargs['tab0'].dtype}")
+                            self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}, {samples_summarised.device}")
+                            self.logger.error(f"tab0 {metric_kwargs['tab0'].shape}, {metric_kwargs['tab0'].dtype}, {metric_kwargs['tab0'].device}")
                             self.logger.error(f'Applying metric {metric} over sample {sample_name} for experiment {experiment_id} failed')
                             print('\n')
                             continue
@@ -505,7 +511,12 @@ class OutputSummary(object):
         settings_copy = deepcopy(settings)
         if metric.lower() == 'shannon_entropy':
             dummy_config = Namespace(**{'settings':outputs.config})
-            ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False) 
+            ct = instantiate_ct(
+                table=None,
+                config=dummy_config,
+                log_to_console=False,
+                logger=self.logger
+            ) 
             try:
                 settings_copy['distribution_name'] = f"log_{ct.distribution_name}_pmf_normalised"
                 assert hasattr(ProbabilityUtils,settings_copy['distribution_name'])
@@ -519,7 +530,7 @@ class OutputSummary(object):
             metric_arguments['tab0'] = np.log(outputs.load_samples('intensity',slice_samples=True),dtype='float32')
         else:
             # Pass ground truth table as argument
-            metric_arguments['tab0'] = outputs.ground_truth_table
+            metric_arguments['tab0'] = outputs.ground_truth_table.to(dtype=int32,device=self.device)
         
         # Pass standard metric arguments
         metric_arguments['kwargs'] = settings_copy
@@ -538,12 +549,15 @@ class Outputs(object):
                  input_slice:dict={},
                  **kwargs):
         # Setup logger
+        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
         self.logger = setup_logger(
             module,
-            level=config.level if hasattr(config,'level') else kwargs.get('level','INFO'),
+            level=level,
             log_to_file=kwargs.get('log_to_file',True),
             log_to_console=kwargs.get('log_to_console',True),
-        )
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update config level
+        self.logger.setLevel(level)
 
         # Sample names must be a subset of all data names
         try:
@@ -556,6 +570,8 @@ class Outputs(object):
 
         # Store settings
         self.settings = settings
+        # Store device
+        self.device = self.settings.get('device','cpu')
         # Store coordinate slice
         self.coordinate_slice = coordinate_slice
         # Create semi-private xarray data 
@@ -572,7 +588,8 @@ class Outputs(object):
             assert os.path.exists(config)
             self.config = Config(
                 path=os.path.join(config,"config.json"),
-                level='info'
+                level='info',
+                logger = self.logger
             )
 
             # Update config based on slice of coordinate-like sweeped params
@@ -605,6 +622,7 @@ class Outputs(object):
             self.inputs = Inputs(
                 config = self.config,
                 synthetic_data = False,
+                logger = self.logger
             )
             # Convert all inputs to tensors
             self.inputs.pass_to_device()
@@ -622,11 +640,11 @@ class Outputs(object):
                         )
                     )
                     # Convert to tensor
-                    self.ground_truth_table = torch.tensor(self.ground_truth_table,dtype=int32)
+                    self.ground_truth_table = torch.tensor(self.ground_truth_table).to(dtype=int32,device=self.device)
                 except:
                     # Try reading it from inputs
                     try:
-                        self.ground_truth_table = self.inputs.table
+                        self.ground_truth_table = self.inputs.table.to(dtype=int32,device=self.device)
                     except:
                         pass
             
@@ -664,6 +682,7 @@ class Outputs(object):
                     # sys.exit()
 
             if self.settings['table_total'] == 0:
+                print(self.ground_truth_table)
                 self.logger.warning('Ground truth missing')
             
             
@@ -765,7 +784,7 @@ class Outputs(object):
             for i,hand in enumerate(logger.handlers):
                 if isinstance(hand,logging.FileHandler):
                     # Do not write to temporary filename
-                    if hand.filename != 'temp.log':
+                    if not hand.filename.startswith("logs/temp_"):
                         # Close handler
                         logger.handlers[i].flush()
                         logger.handlers[i].close()
@@ -805,7 +824,7 @@ class Outputs(object):
                 self.h5group = self.h5file.create_group(self.experiment_id)
                 # Store sweep configurations as attributes 
                 self.h5group.attrs.create("sweep_params",list(sweep_params.keys()))
-                self.h5group.attrs.create("sweep_values",['' if val is None else val for val in sweep_params.values()])
+                self.h5group.attrs.create("sweep_values",['' if val is None else str(val) for val in sweep_params.values()])
                 # Update log filename
                 if isinstance(self.logger,logging.Logger):
                     for i,hand in enumerate(self.logger.handlers):
@@ -824,25 +843,25 @@ class Outputs(object):
     def slice_sample_iterations(self,samples):
 
         # Get burnin parameter
-        burnin = min(self.settings.get('burnin',1),samples['iter'].shape[0])
+        burnin = min(self.settings.get('burnin',1),samples.shape[0])
 
         # Get thinning parameter
         thinning = list(deep_get(key='thinning',value=self.settings))
         thinning = thinning[0] if len(thinning) > 0 else 1
 
         # Apply burnin and thinning
-        samples = samples.isel(iter=slice(burnin,None,thinning))
+        samples = samples[burnin:None:thinning]
 
         # Get total number of samples
-        N = self.settings.get('N',samples['iter'].shape[0])
-        N = min(N,samples['iter'].shape[0])
+        N = self.settings.get('N',samples.shape[0])
+        N = min(N,samples.shape[0])
         
         # Apply stop
-        samples = samples.isel(iter=slice(None,N,None))
+        samples = samples[:N]
 
         return samples
 
-    def load_h5_data(self,output_path,coordinate_slice:dict={}):
+    def load_h5_data(self,output_path,coordinate_slice:dict={},slice_samples:bool=True):
         self.logger.info('Loading h5 data into xarrays...')
 
         # Get all h5 files
@@ -851,43 +870,56 @@ class Outputs(object):
         h5files = sorted(h5files, key = lambda x: int(str(x).split('seed_')[1].split('/',1)[0]) if 'seed' in str(x) else str(x))
         # Store data attributes for xarray
         coords,data_vars,data_variables = {},{},{}
-        # print(len(h5files))
         # Get each file and add it to the new dataset
-        for filename in h5files:
-            
-            with h5.File(filename) as h5data:
-
-                # Collect group-level attributes as coordinates
-                # Group coordinates are file-dependent
-                if 'sweep_params' in list(h5data[self.experiment_id].attrs.keys()) and \
-                    'sweep_values' in list(h5data[self.experiment_id].attrs.keys()):
-                
-                    # Loop through each sweep parameters and add it as a coordinate
-                    for (k,v) in zip(h5data[self.experiment_id].attrs['sweep_params'],
-                                h5data[self.experiment_id].attrs['sweep_values']):
-                        if k in list(coords.keys()) and len(coords) > 0:
-                            coords[k].add(v)
+        for filename in tqdm(h5files,desc='Reading h5 file(s)'):
+            self.logger.debug(filename)
+            try:
+                with h5.File(filename) as h5data:
+                    self.logger.debug('Collect group-level attributes as coordinates')
+                    # Collect group-level attributes as coordinates
+                    # Group coordinates are file-dependent
+                    if 'sweep_params' in list(h5data[self.experiment_id].attrs.keys()) and \
+                        'sweep_values' in list(h5data[self.experiment_id].attrs.keys()):
+                    
+                        # Loop through each sweep parameters and add it as a coordinate
+                        for (k,v) in zip(h5data[self.experiment_id].attrs['sweep_params'],
+                                    h5data[self.experiment_id].attrs['sweep_values']):
+                            if k in list(coords.keys()) and len(coords) > 0:
+                                coords[k].add(v)
+                            else:
+                                coords[k] = {v}
+                    self.logger.debug('Store dataset')
+                    # Store dataset
+                    for sample_name,sample_data in h5data[self.experiment_id].items():
+                        # Apply burning, thinning and trimming
+                        self.logger.debug(f'Slicing {sample_name}')
+                        if slice_samples:
+                            sample_data = self.slice_sample_iterations(sample_data)
+                        # Append
+                        self.logger.debug(f'Appending {sample_name}')
+                        if sample_name in list(data_vars.keys()):
+                            data_vars[sample_name] = np.append(
+                                data_vars[sample_name],
+                                np.array([sample_data[:]]),
+                                axis=0
+                            )
                         else:
-                            coords[k] = {v}
-                
-                # Store dataset
-                for sample_name,sample_data in h5data[self.experiment_id].items():
-                    if sample_name in list(data_vars.keys()):
-                        data_vars[sample_name] = np.append(
-                            data_vars[sample_name],
-                            np.array([sample_data[:]]),
-                            axis=0
-                        )
-                    else:
-                        data_vars[sample_name] = np.array([sample_data[:]])
+                            data_vars[sample_name] = np.array([sample_data[:]])
+                    self.logger.debug(f'Done with file')
+            except BlockingIOError:
+                self.logger.debug(f"Skipping in-use file: {filename}")
+                continue
+            except Exception:
+                self.logger.debug(traceback.format_exc())
+                raise Exception(f'Cannot read file {filename}')
         
         # Convert set to list
         coords = {k:np.array(list(v)) for k,v in coords.items()}
-
+        # print('coords',coords)
         # print({k:np.shape(v) for k,v in data_vars.items()})
         # Create an xarray dataset for each sample
-        for sample_name,sample_data in data_vars.items():
-
+        for sample_name,sample_data in tqdm(data_vars.items(),desc='Creating xarray dataset(s)'):
+            self.logger.debug(sample_name)
             # Get data dims
             dims = np.shape(sample_data)[1:]
             coordinates = {}
@@ -907,7 +939,7 @@ class Outputs(object):
             # Update coordinates to include schema and sweep coordinates
             # print('coordinates',coordinates.keys())
             # print('coords',coords.keys())
-            all_coordinates = {**{k:v for k,v in coordinates.items()},**{k:v for k,v in coords.items()}}
+            all_coordinates = {**{k:v for k,v in coordinates.items() if k != sample_name},**{k:v for k,v in coords.items() if k != sample_name}}
             
             # For each coordinate name
             # get data variable
@@ -915,7 +947,7 @@ class Outputs(object):
             # print('coordinates')
             # print({k:np.shape(v) for k,v in all_coordinates.items()})
             # print('data')
-            # print(np.shape(sample_data.reshape(*[len(val) for val in all_coordinates.values()])))
+            # print(np.shape(sample_data),[np.shape(val) for val in all_coordinates.values()])
             # print(list(all_coordinates.keys()))
             # if len(coordinates.keys()) > 0:
             data_variables[sample_name] = (
@@ -935,11 +967,16 @@ class Outputs(object):
             )
             # Slice according to coordinate slice
             if len(coordinate_slice) > 0:
-                xr_data = xr_data.isel(**coordinate_slice)
+                print('xr_data.coords',xr_data.coords)
+                print('coordinate_slice',{k:v['value'] for k,v in coordinate_slice.items()})
+                xr_data = xr_data.isel(sigma=0.1414213562)
+                # xr_data = xr_data.isel(**{k:v['value'] for k,v in coordinate_slice.items()})
+
             
             # Store dataset
             setattr(self._data,sample_name,xr_data)
             
+            print(sample_name,getattr(self._data,sample_name).coords,getattr(self._data,sample_name).sizes)
             
 
     def check_data_availability(self,sample_name:str,input_names:list=[],output_names:list=[]):
@@ -982,16 +1019,16 @@ class Outputs(object):
             # Instantiate ct
             sim = instantiate_sim(
                 sim_type = next(deep_get(key='sim_type',value=self.config.settings), None),
-                **data
+                **data,
+                logger=self.logger
             )
             
             data = {}
             # Prepare output arguments
             for output in sim_model.REQUIRED_OUTPUTS:
                 data[output] = torch.tensor(
-                    self.get_sample(output,slice_samples),
-                    dtype=OUTPUT_TYPES[output]
-                )
+                    self.get_sample(output,slice_samples)
+                ).to(dtype=OUTPUT_TYPES[output],device=self.device)
 
             # Compute log intensity function
             samples = sim.log_intensity(
@@ -1000,7 +1037,7 @@ class Outputs(object):
             )
 
             # Exponentiate
-            samples = torch.exp(samples).to(dtype=float32)
+            samples = torch.exp(samples).to(dtype=float32,device=self.device)
 
         elif sample_name.endswith("__error"):
             # Load all samples
@@ -1018,7 +1055,8 @@ class Outputs(object):
             ct = instantiate_ct(
                 table=None,
                 config=dummy_config,
-                log_to_console=False
+                log_to_console=False,
+                logger=self.logger
             )
             samples = torch.tensor(ct.table).int().reshape((1,*ct.dims))
         
@@ -1069,7 +1107,7 @@ class Outputs(object):
             if sample_name == 'beta' and self.intensity_model_class == 'spatial_interaction_model':
                 samples *= self.config.settings[self.intensity_model_class]['parameters']['bmax']
             
-        return samples
+        return samples.to(device=self.device)
 
     def load_geometry(self,geometry_filename,default_crs:str='epsg:27700'):
         # Load geometry from file

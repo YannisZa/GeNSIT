@@ -25,13 +25,15 @@ class SpatialInteractionMarkovChainMonteCarlo():
 
     def __init__(self, sim:SpatialInteraction,**kwargs):
         # Setup logger
-        self.level = sim.config.level if hasattr(sim,'config') else kwargs.get('level','INFO')
+        level = sim.config.level if hasattr(sim,'config') else kwargs.get('level','INFO')
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            level=self.level,
+            level=level,
             log_to_file=False,
             log_to_console=kwargs.get('log_to_console',True),
-        )
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update logger level
+        self.logger.setLevel(level)
         # Store sim model
         self.sim = sim
 

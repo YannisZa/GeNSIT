@@ -1,7 +1,5 @@
 import sys
 import torch
-import torch.multiprocessing as mp
-mp.set_start_method('spawn') 
 import logging
 import numpy as np
 import torch.distributions as distr
@@ -30,14 +28,16 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
     def __init__(self, ct: ContingencyTable, rng: np.random.Generator, table_mb:MarkovBasis=None, **kwargs):
         # Setup logger
-        self.level = ct.config.level if hasattr(ct.config,'level') else kwargs.get('level','INFO')
+        level = ct.config.level if hasattr(ct.config,'level') else kwargs.get('level','INFO')
         self.logger = setup_logger(
             __name__,
-            level=self.level,
+            level=level,
             log_to_file=False,
             log_to_console=kwargs.get('log_to_console',True),
-        )
-
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update logger level
+        self.logger.setLevel(level)
+        
         if isinstance(ct, ContingencyTable2D):
 
             # Get markov basis object
@@ -81,7 +81,8 @@ class ContingencyTableMarkovChainMonteCarlo(object):
                 # Instantiate markov basis object
                 self.markov_basis = instantiate_markov_basis(
                     self.ct, 
-                    log_to_console = self.logger.disabled
+                    log_to_console = self.logger.disabled,
+                    logger=self.logger
                 )
 
         # self.logger.info(self.__str__())

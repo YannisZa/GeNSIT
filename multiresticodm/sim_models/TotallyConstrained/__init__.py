@@ -141,11 +141,12 @@ def _log_flow_matrix(**kwargs):
     alpha = kwargs['alpha']
     beta = kwargs['beta']
     grand_total = kwargs.get('grand_total',None)
+    device = kwargs.get('device','cpu')
 
     # Extract dimensions
     nrows,ncols = cost_matrix.size(dim=0), cost_matrix.size(dim=1)
     N = log_destination_attraction.size(dim=0) if log_destination_attraction.ndim > 2 else 1
-    log_flow = torch.zeros((N,nrows,ncols),dtype=float32)
+    log_flow = torch.zeros((N,nrows,ncols)).to(dtype=float32,device=device)
 
     # Reshape tensors to ensure operations are possible
     log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,ncols))

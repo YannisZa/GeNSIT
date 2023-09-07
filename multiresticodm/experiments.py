@@ -2,14 +2,15 @@ import gc
 import sys
 import time
 import logging
+import warnings
 import itertools
-
 
 from os import path
 from tqdm import tqdm
 from glob import glob
 from copy import deepcopy
 from datetime import datetime
+import torch.multiprocessing as mp
 from scipy.optimize import minimize
 from joblib import Parallel, delayed
 from multiprocessing.pool import Pool
@@ -58,14 +59,16 @@ class ExperimentHandler(object):
 
     def __init__(self, config:Config, **kwargs):
         # Import logger
-        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
         self.logger = setup_logger(
             __name__,
-            level = self.level,
+            level = level,
             log_to_console = kwargs.get('log_to_console',False),
             log_to_file = kwargs.get('log_to_file',False),
-        )
-        
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update logger level
+        self.logger.setLevel(level)
+
         # Get configuration
         self.config = config
         # Store experiment name to list index dictionary
@@ -86,7 +89,7 @@ class ExperimentHandler(object):
                 # Construct sub-config with only data relevant for experiment
                 experiment_config = Config(
                     settings=deepcopy(self.config.settings),
-                    level=self.level
+                    logger = self.logger
                 )
                 # Store one experiment
                 experiment_config.settings['experiments'] = [
@@ -104,6 +107,7 @@ class ExperimentHandler(object):
                     config=experiment_config,
                     log_to_file=True,
                     log_to_console=False,
+                    logger=self.logger
                 )
                 # Append it to list of experiments
                 self.experiments[experiment_type] = experiment
@@ -123,20 +127,22 @@ class ExperimentHandler(object):
 class Experiment(object):
     def __init__(self, config:Config, **kwargs):
         # Create logger
-        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            level = self.level,
+            level = level,
             log_to_console = kwargs.get('log_to_console',True),
             log_to_file = kwargs.get('log_to_file',True),
-        )
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update logger lever
+        self.logger.setLevel(level)
         
         self.logger.debug(f"{self}")
         # Make sure you are reading a config
         if isinstance(config,dict):
             config = Config(
                 settings=config,
-                level=self.level
+                logger = self.logger
             )
         elif not isinstance(config,Config):
             raise Exception(f'config provided has invalid type {type(config)}')
@@ -156,7 +162,7 @@ class Experiment(object):
             # Merge settings to config
             self.config = Config(
                 settings={**self.config, **settings_flattened},
-                level=self.level
+                logger = self.logger
             )
         
         # Update config with current timestamp ( but do not overwrite)
@@ -188,6 +194,11 @@ class Experiment(object):
 
         # Get device name
         self.device = self.config['inputs']['device']
+        # Get device id
+        # device_id = kwargs.get('device_id',0)
+        # if self.device == 'cuda':
+            # set_device_id(f"cuda:{device_id}")
+        # print('currrent_device',torch.cuda.current_device())
 
         # Count the number of gradient descent steps
         self._time = 0
@@ -217,7 +228,7 @@ class Experiment(object):
             safe_delete(self.config)
             self.config = Config(
                 settings={},
-                level=self.level
+                logger = self.logger
             )
 
         # Run garbage collector
@@ -260,7 +271,8 @@ class Experiment(object):
         if str_in_list('load_experiment',self.config['inputs']) and len(self.config['inputs']['load_experiment']) > 0:
             # Read last batch of experiments
             outputs = Outputs(
-                self.config
+                self.config,
+                logger = self.logger
             )
             # All parameter initialisations
             parameter_inits = dict(zip(self.output_names,[0]*len(self.output_names)))
@@ -1149,10 +1161,16 @@ class SIM_MCMC(Experiment):
         super().__init__(config,**kwargs)
 
         # Build spatial interaction model
-        sim = instantiate_sim(self.config)
+        sim = instantiate_sim(
+            self.config,
+            logger=self.logger
+        )
 
         # Spatial interaction model MCMC
-        self.sim_mcmc = instantiate_spatial_interaction_mcmc(sim,kwargs.get('log_to_console',True))
+        self.sim_mcmc = instantiate_spatial_interaction_mcmc(
+            sim,
+            kwargs.get('log_to_console',True)
+        )
 
         # Delete duplicate of spatial interaction model
         safe_delete(self.sim)
@@ -1359,13 +1377,15 @@ class JointTableSIM_MCMC(Experiment):
         # Spatial interaction model MCMC
         self.sim_mcmc = instantiate_spatial_interaction_mcmc(
             sim,
-            log_to_console=kwargs.get('log_to_console',True)
+            log_to_console=kwargs.get('log_to_console',True),
+            logger=self.logger
         )
         # Contingency Table mcmc
         self.od_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct,
             table_mb=None,
-            log_to_console=kwargs.get('log_to_console',True)
+            log_to_console=kwargs.get('log_to_console',True),
+            logger=self.logger
         )
 
         # Delete duplicate of contingency table and spatial interaction model
@@ -1607,6 +1627,7 @@ class JointTableSIM_MCMC(Experiment):
 
 class Table_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
+        
         # Initalise superclass
         super().__init__(config,**kwargs)
 
@@ -1616,11 +1637,15 @@ class Table_MCMC(Experiment):
         # Enable garbage collections
         gc.enable()
 
+        # Disable tqdm if needed
+        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
+
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
             synthetic_data = False,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
 
         # Pass inputs to device
@@ -1629,7 +1654,8 @@ class Table_MCMC(Experiment):
         # Build contingency table
         ct = instantiate_ct(
             table = None,
-            config = config
+            config = config,
+            logger=self.logger
         )
         # Update table distribution
         config.settings['contingency_table']['distribution_name'] = ct.distribution_name
@@ -1639,7 +1665,8 @@ class Table_MCMC(Experiment):
             ct = ct,
             rng = rng,
             log_to_console = False,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
         # Set table steps to 1
         self.ct_mcmc.table_steps = 1
@@ -1663,7 +1690,8 @@ class Table_MCMC(Experiment):
                     config = config,
                     true_parameters = config['spatial_interaction_model']['parameters'],
                     instance = kwargs.get('instance',''),
-                    **vars(self.inputs.data)
+                    **vars(self.inputs.data),
+                    logger=self.logger
                 )
                 # Get and remove config
                 config = pop_variable(sim,'config')
@@ -1691,6 +1719,7 @@ class Table_MCMC(Experiment):
             experiment_id=self.sweep_experiment_id,
             log_to_file=True,
             log_to_console=True,
+            logger = self.logger
         )
 
         # Prepare writing to file
@@ -1727,7 +1756,7 @@ class Table_MCMC(Experiment):
         num_epochs = self.config['training']['N']
 
         # For each epoch
-        for e in range(num_epochs):
+        for e in tqdm(range(num_epochs),disable=self.tqdm_disabled,leave=False):
 
             # Track the epoch training time
             self.start_time = time.time()
@@ -1773,12 +1802,9 @@ class Table_MCMC(Experiment):
         if self.config.settings.get('export_samples',True):
             # Close h5 data file
             self.outputs.h5file.close()
-            self.logger.note("Simulation run finished.")
             # Write log file
             self.outputs.write_log(self.logger)
-        else:
-            self.logger.note("Simulation run finished.")
-
+        self.logger.note("Simulation run finished.")
 
 class TableSummariesMCMCConvergence(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -1789,6 +1815,7 @@ class TableSummariesMCMCConvergence(Experiment):
         ct = instantiate_ct(
             table = None,
             config = self.config,
+            logger=self.logger
         )
         # Update table distribution
         self.config.settings['inputs']['contingency_table']['distribution_name'] = ct.distribution_name
@@ -1837,7 +1864,8 @@ class TableSummariesMCMCConvergence(Experiment):
         self.samplers['0'] = ContingencyTableMarkovChainMonteCarlo(
             ct,
             table_mb=None,
-            log_to_console=kwargs.get('log_to_console',True)
+            log_to_console=kwargs.get('log_to_console',True),
+            logger = self.logger
         )
         self.samplers['0'].table_steps = 1
         if self.K > 1:
@@ -1850,7 +1878,8 @@ class TableSummariesMCMCConvergence(Experiment):
                 self.samplers[str(k)] = ContingencyTableMarkovChainMonteCarlo(
                     ct_copy,
                     table_mb=self.samplers['0'].markov_basis,
-                    log_to_console=True
+                    log_to_console=True,
+                    logger = self.logger
                 )
                 # Initialise fixed margins
                 self.samplers[str(k)].sample_constrained_margins(np.exp(self.true_log_intensities))
@@ -1988,19 +2017,16 @@ class SIM_NN(Experiment):
         # Enable garbage collections
         gc.enable()
 
+        # Disable tqdm if needed
+        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
+
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
             synthetic_data = False,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
-        # Set up the neural net
-        self.logger.note("Initializing the neural net ...")
-        neural_network = NeuralNet(
-            input_size=self.inputs.data.destination_attraction_ts.shape[1],
-            output_size=len(config['inputs']['to_learn']),
-            **config['neural_network']['hyperparameters'],
-        ).to(self.device)
 
         # Pass inputs to device
         self.inputs.pass_to_device()
@@ -2013,11 +2039,9 @@ class SIM_NN(Experiment):
             config = config,
             true_parameters = config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
-            **vars(self.inputs.data)
+            **vars(self.inputs.data),
+            logger=self.logger
         )
-        # Get and remove config
-        config = pop_variable(sim,'config')
-
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         harris_wilson_model = HarrisWilson(
@@ -2025,10 +2049,20 @@ class SIM_NN(Experiment):
             config = config,
             dt = config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
         # Get and remove config
         config = pop_variable(harris_wilson_model,'config')
+        
+        # Set up the neural net
+        self.logger.note("Initializing the neural net ...")
+        neural_network = NeuralNet(
+            input_size=self.inputs.data.destination_attraction_ts.shape[-1],
+            output_size=len(config['inputs']['to_learn']),
+            **config['neural_network']['hyperparameters'],
+            logger = self.logger
+        ).to(self.device)
 
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
@@ -2041,7 +2075,8 @@ class SIM_NN(Experiment):
             to_learn = config['inputs']['to_learn'],
             write_every = self._write_every,
             write_start = self._write_start,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
         # Get config
         config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else None
@@ -2058,6 +2093,7 @@ class SIM_NN(Experiment):
             experiment_id=self.sweep_experiment_id,
             log_to_file=True,
             log_to_console=True,
+            logger = self.logger
         )
 
         # Prepare writing to file
@@ -2096,7 +2132,7 @@ class SIM_NN(Experiment):
         num_epochs = self.config['training']['N']
 
         # For each epoch
-        for e in tqdm(range(num_epochs),disable=self.logger.disabled,leave=False):
+        for e in tqdm(range(num_epochs),disable=self.tqdm_disabled,leave=False):
 
             # Track the epoch training time
             start_time = time.time()
@@ -2119,7 +2155,6 @@ class SIM_NN(Experiment):
             if hasattr(self,'compute_time'):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - start_time
-
         
         if self.config.settings.get('export_metadata',True):
             # Write metadata
@@ -2131,11 +2166,9 @@ class SIM_NN(Experiment):
         if self.config.settings.get('export_samples',True):
             # Close h5 data file
             self.outputs.h5file.close()
-            self.logger.note("Simulation run finished.")
             # Write log file
             self.outputs.write_log(self.logger)
-        else:
-            self.logger.note("Simulation run finished.")
+        self.logger.note("Simulation run finished.")
 
 class NonJointTableSIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -2149,11 +2182,15 @@ class NonJointTableSIM_NN(Experiment):
         # Enable garbage collections
         gc.enable()
 
+        # Disable tqdm if needed
+        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
+
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
             synthetic_data = False,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
         # Pass inputs to device
         self.inputs.pass_to_device()
@@ -2166,7 +2203,8 @@ class NonJointTableSIM_NN(Experiment):
             config = config,
             true_parameters = config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
-            **vars(self.inputs.data)
+            **vars(self.inputs.data),
+            logger=self.logger
         )
         # Get and remove config
         config = pop_variable(sim,'config')
@@ -2178,7 +2216,8 @@ class NonJointTableSIM_NN(Experiment):
             config = config,
             dt = config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
         # Get and remove config
         config = pop_variable(harris_wilson_model,'config')
@@ -2189,6 +2228,7 @@ class NonJointTableSIM_NN(Experiment):
             input_size=self.inputs.data.destination_attraction_ts.shape[-1],
             output_size=len(config['inputs']['to_learn']),
             **config['neural_network']['hyperparameters'],
+            logger = self.logger
         ).to(self.device)
 
         # Instantiate harris and wilson neural network model
@@ -2200,7 +2240,8 @@ class NonJointTableSIM_NN(Experiment):
             loss_function = config['neural_network'].pop('loss_function'),
             physics_model = harris_wilson_model,
             to_learn = config['inputs']['to_learn'],
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
         # Get config
         config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else None
@@ -2208,14 +2249,16 @@ class NonJointTableSIM_NN(Experiment):
         # Build contingency table
         ct = instantiate_ct(
             table = None,
-            config = config
+            config = config,
+            logger=self.logger
         )
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
             rng = rng,
             log_to_console = False,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
 
         # Update config
@@ -2230,6 +2273,7 @@ class NonJointTableSIM_NN(Experiment):
             experiment_id=self.sweep_experiment_id,
             log_to_file=True,
             log_to_console=True,
+            logger = self.logger
         )
 
         # Prepare writing to file
@@ -2269,7 +2313,8 @@ class NonJointTableSIM_NN(Experiment):
         num_epochs = self.config['training']['N']
 
         # For each epoch
-        for e in tqdm(range(num_epochs),disable=self.logger.disabled,leave=False):
+        for e in tqdm(range(num_epochs),disable=self.tqdm_disabled,leave=False):
+
             # Track the epoch training time
             start_time = time.time()
             
@@ -2328,7 +2373,7 @@ class NonJointTableSIM_NN(Experiment):
                     data_size = len(training_data),
                     **self.config['training']
                 )
-
+            
             self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
 
             # Write the epoch training time (wall clock time)
@@ -2336,7 +2381,6 @@ class NonJointTableSIM_NN(Experiment):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - start_time
 
-        
         if self.config.settings.get('export_metadata',True):
             # Write metadata
             dir_path = os.path.join("samples",self.outputs.sweep_id)
@@ -2347,11 +2391,9 @@ class NonJointTableSIM_NN(Experiment):
         if self.config.settings.get('export_samples',True):
             # Close h5 data file
             self.outputs.h5file.close()
-            self.logger.note("Simulation run finished.")
             # Write log file
             self.outputs.write_log(self.logger)
-        else:
-            self.logger.note("Simulation run finished.")
+        self.logger.note("Simulation run finished.")
 
 class JointTableSIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -2365,19 +2407,16 @@ class JointTableSIM_NN(Experiment):
         # Enable garbage collections
         gc.enable()
 
+        # Disable tqdm if needed
+        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
+
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
             synthetic_data = False,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
-        # Set up the neural net
-        self.logger.note("Initializing the neural net ...")
-        neural_network = NeuralNet(
-            input_size=self.inputs.data.destination_attraction_ts.shape[-1],
-            output_size=len(config['inputs']['to_learn']),
-            **config['neural_network']['hyperparameters'],
-        ).to(self.device)
 
         # Pass inputs to device
         self.inputs.pass_to_device()
@@ -2390,11 +2429,9 @@ class JointTableSIM_NN(Experiment):
             config = config,
             true_parameters = config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
-            **vars(self.inputs.data)
+            **vars(self.inputs.data),
+            logger=self.logger
         )
-        # Get and remove config
-        config = pop_variable(sim,'config')
-
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         harris_wilson_model = HarrisWilson(
@@ -2402,10 +2439,20 @@ class JointTableSIM_NN(Experiment):
             config = config,
             dt = config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
         # Get and remove config
         config = pop_variable(harris_wilson_model,'config')
+        
+        # Set up the neural net
+        self.logger.note("Initializing the neural net ...")
+        neural_network = NeuralNet(
+            input_size=self.inputs.data.destination_attraction_ts.shape[-1],
+            output_size=len(config['inputs']['to_learn']),
+            **config['neural_network']['hyperparameters'],
+            logger = self.logger
+        ).to(self.device)
 
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
@@ -2416,7 +2463,8 @@ class JointTableSIM_NN(Experiment):
             loss_function = config['neural_network'].pop('loss_function'),
             physics_model = harris_wilson_model,
             to_learn = config['inputs']['to_learn'],
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
         # Get config
         config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else None
@@ -2424,14 +2472,16 @@ class JointTableSIM_NN(Experiment):
         # Build contingency table
         ct = instantiate_ct(
             table = None,
-            config = config
+            config = config,
+            logger=self.logger
         )
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
             rng = rng,
             log_to_console = False,
-            instance = kwargs.get('instance','')
+            instance = kwargs.get('instance',''),
+            logger = self.logger
         )
 
         # Update config
@@ -2446,6 +2496,7 @@ class JointTableSIM_NN(Experiment):
             experiment_id=self.sweep_experiment_id,
             log_to_file=True,
             log_to_console=True,
+            logger = self.logger
         )
 
         # Prepare writing to file
@@ -2476,7 +2527,7 @@ class JointTableSIM_NN(Experiment):
         
     def run(self) -> None:
 
-        self.logger.note(f"Running Neural Network training of Harris Wilson model.")
+        self.logger.note(f"Running Joint Table Inference and Neural Network training of Harris Wilson model.")
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -2485,7 +2536,8 @@ class JointTableSIM_NN(Experiment):
         num_epochs = self.config['training']['N']
 
         # For each epoch
-        for e in tqdm(range(num_epochs),disable=self.logger.disabled,leave=False):
+        for e in tqdm(range(num_epochs),disable=self.tqdm_disabled,leave=False):
+
             # Track the epoch training time
             start_time = time.time()
             
@@ -2550,7 +2602,6 @@ class JointTableSIM_NN(Experiment):
                     data_size = len(training_data),
                     **self.config['training']
                 )
-
             self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
 
             # Write the epoch training time (wall clock time)
@@ -2568,11 +2619,9 @@ class JointTableSIM_NN(Experiment):
         if self.config.settings.get('export_samples',True):
             # Close h5 data file
             self.outputs.h5file.close()
-            self.logger.note("Simulation run finished.")
             # Write log file
             self.outputs.write_log(self.logger)
-        else:
-            self.logger.note("Simulation run finished.")
+        self.logger.note("Simulation run finished.")
 
 class ExperimentSweep():
 
@@ -2584,8 +2633,8 @@ class ExperimentSweep():
             level = config.level,
             log_to_file = True,
             log_to_console = True,
-        )
-        
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+
         self.logger.info(f"Performing parameter sweep")
 
         # Get config
@@ -2603,7 +2652,7 @@ class ExperimentSweep():
 
         # Initialise experiments 
         # (each one corresponds to one parameter sweep)
-        self.experiments = []
+        self.experiment_configs = []
 
         # Store number of workers
         self.n_workers = self.config.settings['inputs'].get("n_workers",1)
@@ -2615,7 +2664,8 @@ class ExperimentSweep():
         deep_update(self.config.settings,'export_samples',False)
         self.outputs = Outputs(
             self.config,
-            sweep_params=kwargs.get('sweep_params',{})
+            sweep_params=kwargs.get('sweep_params',{}),
+            logger = self.logger
         )
         # Prepare writing to file
         self.outputs.open_output_file(kwargs.get('sweep_params',{}))
@@ -2673,16 +2723,21 @@ class ExperimentSweep():
 
         # Decide whether to run sweeps in parallel or not
         if self.n_workers > 1:
-            self.run_parallel()
+            # self.run_parallel()
+            self.run_concurrent()
         else:
             self.run_sequential()
-    
+        
     def prepare_experiments_sequential(self,sweep_configurations):
         for j,sval in tqdm(enumerate(sweep_configurations),total=len(sweep_configurations)):
             # Create new config
             new_config = deepcopy(self.config)
             # Deactivate sweep             
             new_config.settings["sweep_mode"] = False
+            # Deactivate logging
+            new_config.level = 'EMPTY'
+            # Activate sample exports
+            new_config.settings['export_samples'] = True
             # Update config
             for i,key in enumerate(self.sweep_params.keys()):
                 new_config.path_set(
@@ -2691,34 +2746,54 @@ class ExperimentSweep():
                     self.sweep_params[key]['path']
                 )
 
-            # Create new experiment
-            new_experiment = instantiate_experiment(
-                experiment_type=new_config.settings['experiments'][0]['type'],
-                config=new_config,
-                sweep_params={val['var']:sval[i] for i,val in enumerate(self.sweep_params.values())},
-                log_to_file=True,
-                log_to_console=False,
-                instance=str(j),
-                experiment_id=self.outputs.experiment_id
-            )
             # Append to experiments
-            self.experiments.append(new_experiment)
-        
-    def prepare_experiments_parallel(self,sweep_configurations):
-        return
+            self.experiment_configs.append({"config":new_config,"sweep":sval})
+    
+    def instantiate_and_run(self,instance_num:int,config_and_sweep:dict,semaphore=None):
+        # Create new experiment
+        new_experiment = instantiate_experiment(
+            experiment_type=config_and_sweep['config'].settings['experiments'][0]['type'],
+            config=config_and_sweep['config'],
+            sweep_params={val['var']:config_and_sweep['sweep'][i] for i,val in enumerate(self.sweep_params.values())},
+            log_to_file=True,
+            log_to_console=False,
+            instance=str(instance_num),
+            experiment_id=self.outputs.experiment_id,
+            tqdm_disabled=True,
+            device_id=(instance_num%self.n_workers),
+            logger=self.logger
+        )
+        new_experiment.run()
+        if semaphore is not None:
+            semaphore.release()
 
     def run_sequential(self):
         self.logger.info("Running Parameter Sweep in sequence...")
-        for exp in tqdm(self.experiments,total=len(self.experiments)):
-            exp.run()
+        for instance,conf_and_sweep in tqdm(enumerate(self.experiment_configs),total=len(self.experiment_configs)):
+            self.instantiate_and_run(instance,conf_and_sweep)
     
     def run_parallel(self):
         # Run experiments in parallel
+        semaphore = mp.Semaphore(self.n_workers)
+        processes = []
+        for instance,conf_and_sweep in tqdm(enumerate(self.experiment_configs),
+                                                      total=len(self.experiment_configs)):
+            semaphore.acquire()
+            p = mp.Process(target=self.instantiate_and_run, args=(instance,conf_and_sweep, semaphore))
+            p.start()
+            processes.append(p)
+    
+        for p in processes:
+            p.join()
+    
+    def run_concurrent(self):
         p = Pool(self.n_workers)
-        result = [p.apply_async(exp.run()) for exp in tqdm(self.experiments)]
+        results = [p.apply_async(self.instantiate_and_run(instance,conf_and_sweep)) \
+                  for instance,conf_and_sweep in tqdm(enumerate(self.experiment_configs),
+                                                      total=len(self.experiment_configs))]
         p.close()
         p.join()
-    
+            
     def run_process(self,process):
         process.run()
         return True

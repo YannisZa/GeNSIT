@@ -39,13 +39,16 @@ class ContingencyTable(object):
 
     def __init__(self, table = None, config: Config = None, **kwargs: dict):
         # Setup logger
-        self.level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
         self.logger = setup_logger(
             __name__,
-            level=self.level,
+            level=level,
             log_to_file=False,
             log_to_console=kwargs.get('log_to_console',True),
-        )
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update logger level
+        self.logger.setLevel(level)
+        
         # Config
         self.config = config
         # Table
@@ -143,27 +146,27 @@ class ContingencyTable(object):
         return list(set_diff)
     
     # Compute summary statistics for given function
-    def table_margins_summary_statistic(self, tab: np.ndarray) -> List:
+    def table_margins_summary_statistic(self, tab: torch.tensor) -> List:
         return torch.cat(tuple([self.table_axis_margin_summary_statistic(tab=tab,ax=ax) for ax in self.constraints['all_axes']]), dim=0)
     
-    def table_axis_margin_summary_statistic(self, tab: np.ndarray, ax:int = None) -> List:
+    def table_axis_margin_summary_statistic(self, tab: torch.tensor, ax:int = None) -> List:
         return tab.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten()
 
     # Compute margin summary statistics for given function
-    def table_constrained_margin_summary_statistic(self, tab: np.ndarray) -> List:
+    def table_constrained_margin_summary_statistic(self, tab: torch.tensor) -> List:
         if len(self.constraints['constrained_axes']) > 0:
             return torch.cat(tuple([tab.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten() for ax in sorted(self.constraints['constrained_axes'])]), dim=0)
         else:
             return torch.empty(1)
 
-    def table_unconstrained_margin_summary_statistic(self, tab: np.ndarray) -> List:
+    def table_unconstrained_margin_summary_statistic(self, tab: torch.tensor) -> List:
         if len(self.constraints['unconstrained_axes']) > 0:
             return torch.cat(tuple([tab.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten() for ax in sorted(self.constraints['unconstrained_axes'])]), dim=0)
         else:
             return torch.empty(1)
 
     # Compute cell summary statistics for given function
-    def table_cell_constraint_summary_statistic(self, tab: np.ndarray, cells: list=None) -> List:
+    def table_cell_constraint_summary_statistic(self, tab: torch.tensor, cells: list=None) -> List:
         if cells is None:
             return torch.tensor(
                 [tab[cell] for cell in sorted(self.constraints['cells'])], 
@@ -210,7 +213,7 @@ class ContingencyTable(object):
     def table_positive(self, tab) -> bool:
         return not torch.any(tab <= 0)
 
-    def table_difference_histogram(self, tab: np.ndarray, tab0: np.ndarray):
+    def table_difference_histogram(self, tab: torch.tensor, tab0: torch.tensor):
         # Take difference of tables
         difference = tab - tab0
         # Values classification
@@ -218,7 +221,7 @@ class ContingencyTable(object):
             difference < 0), "0": torch.count_nonzero(difference == 0)}
         return values
 
-    def check_table_validity(self, table: np.ndarray) -> bool:
+    def check_table_validity(self, table: torch.tensor) -> bool:
         return self.table_nonnegative(table)
 
     
@@ -745,7 +748,7 @@ class ContingencyTable(object):
                 if ax in self.constraints['constrained_axes']
         })
     
-    def update_table(self, tab: np.ndarray) -> None:
+    def update_table(self, tab: torch.tensor) -> None:
         try:
             assert np.shape(tab) == self.dims
         except:
@@ -938,7 +941,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                         dtype='float32'
                     )
             # If it is an array/list make sure it has the
-            elif isinstance(initialisation, (list, np.ndarray, np.generic)) and \
+            elif isinstance(initialisation, (list, torch.tensor)) and \
                     np.any([(len(initialisation) == dim) for dim in self.dims]):
                 margin0 = initialisation
             else:
@@ -1037,7 +1040,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             )
 
             # Make sure that min res solution is non-zero
-            minres_solution = minres_solution if minres_solution > 0 else 1
+            minres_solution = minres_solution if np.isfinite(minres_solution) and minres_solution > 0 else 1
 
             min_residual[min_residual > 0] = int( min(
                     minres_solution,
@@ -1046,7 +1049,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             return min_residual
 
 
-    def table_monte_carlo_sample(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
+    def table_monte_carlo_sample(self,intensity:list=None, margins: dict = {}, **__) -> Union[torch.tensor, None]:
         # Update margins
         if margins is not None:
             self.update_margins(margins)
@@ -1101,7 +1104,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         self.admissibility_debugging('Monte Carlo',table0)
         return table0.to(device=self.device,dtype=int32)
     
-    def table_import(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
+    def table_import(self,intensity:list=None, margins: dict = {}, **__) -> Union[torch.tensor, None]:
         # Read initial table
         table0 = None
         if str_in_list('table0', self.config.settings['mcmc']['contingency_table'].keys()):
@@ -1118,7 +1121,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                         dtype='float32'
                     )
             # If it is an array/list make sure it has the
-            elif isinstance(initialisation, (list, np.ndarray, np.generic)) and \
+            elif isinstance(initialisation, (list, torch.tensor)) and \
                     (np.shape(initialisation) == self.dims):
                 table0 = initialisation
             else:
@@ -1132,7 +1135,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         else:
             return table0.to(device=self.device,dtype=int32)
 
-    def table_random_sample(self,intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
+    def table_random_sample(self,intensity:list=None, margins: dict = {}, **__) -> Union[torch.tensor, None]:
 
         try:
             assert len(self.constraints['constrained_axes']) == 0
@@ -1167,7 +1170,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         )
         return table0.to(device=self.device,dtype=int32)
 
-    def table_maximum_entropy_solution(self, intensity:list=None, margins: dict = {}, **__) -> Union[np.ndarray, None]:
+    def table_maximum_entropy_solution(self, intensity:list=None, margins: dict = {}, **__) -> Union[torch.tensor, None]:
         '''
         This is the solution of the maximum entropy in the non-integer case
         X_ij = (r_i*c_j) / T

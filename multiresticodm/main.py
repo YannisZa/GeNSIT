@@ -1,21 +1,15 @@
-from copy import deepcopy
 import os
-
 import ast
 import sys
-import warnings
-
-from multiresticodm.utils import print_json, setup_logger
-warnings.simplefilter('ignore')
-
 import json
 import click
 import psutil
-import coloredlogs
 
-import logging
+from copy import deepcopy
+
 from multiresticodm.config import Config
 from multiresticodm.logger_class import LOG_LEVELS
+from multiresticodm.utils import print_json, setup_logger
 from multiresticodm.global_variables import TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
 
 
@@ -211,7 +205,8 @@ def exec(logger,settings,config_path,**kwargs):
     config = Config(
         path=config_path,
         settings=None,
-        level=settings.get('logging_mode','info').upper()
+        level=settings.get('logging_mode','info').upper(),
+        logger=logger
     )
 
     # Update settings with overwritten values
@@ -246,7 +241,10 @@ def exec(logger,settings,config_path,**kwargs):
     config.validate_config()
     
     # Intialise experiment handler
-    eh = ExperimentHandler(config)
+    eh = ExperimentHandler(
+        config,
+        logger = logger
+    )
 
     # Run experiments
     eh.run_and_write_experiments_sequentially()
@@ -710,8 +708,9 @@ def summarise(
         log_to_file=True,
         log_to_console=True
     )
-
+    
     logger.info('Gathering data')
+
 
     # Run output handler
     OutputSummary(
