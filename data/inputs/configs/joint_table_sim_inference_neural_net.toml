@@ -9,7 +9,9 @@ dataset = './data/inputs/synthetic_2x3_N_100/'
 load_experiment = ''
 dims = [+69,+13]
 to_learn = ['alpha', 'beta', 'kappa']
-seed = 1234
+[inputs.seed.sweep]
+  default = 1
+  range = "1:1000:1"
 
 [inputs.data_files]
     origin_demand = 'origin_demand_sum_normalised.txt'
@@ -31,7 +33,7 @@ seed = 1234
     # cells = [[0,1],[1,2]]
 
 [training]
-  N = +100 # number of epochs
+  N = +1000 # number of epochs
   table_inference = true
   num_steps = +1
   batch_size = +1
