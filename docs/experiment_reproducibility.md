@@ -448,37 +448,37 @@ clear; multiresticodm run ./data/inputs/configs/sim_inference_neural_net.toml \
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re NonJointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et unconstrained -ax '[]' -sm -dev cuda
+ -re NonJointTableSIM_NN -nw 4 -nt 8 -n 1000 -et unconstrained -ax '[]' -sm -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re NonJointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[0,1]' -dev cuda
+ -re NonJointTableSIM_NN -nw 4 -nt 8 -n 1000 -et total_constrained -ax '[0,1]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re NonJointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[1]' -dev cuda
+ -re NonJointTableSIM_NN -nw 4 -nt 8 -n 1000 -et total_constrained -ax '[1]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re NonJointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[1]' -ax '[0]' -dev cuda
+ -re NonJointTableSIM_NN -nw 4 -nt 8 -n 1000 -et total_constrained -ax '[1]' -ax '[0]' -dev cpu
 
 ### Dependent Non-joint Table and SIM
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re JointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et unconstrained -ax '[]' -sm -dev cuda
+ -re JointTableSIM_NN -nw 4 -nt 8 -n 1000 -et unconstrained -ax '[]' -sm -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re JointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[0,1]' -dev cuda
+ -re JointTableSIM_NN -nw 4 -nt 8 -n 1000 -et total_constrained -ax '[0,1]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re JointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[1]' -dev cuda
+ -re JointTableSIM_NN -nw 4 -nt 8 -n 1000 -et total_constrained -ax '[1]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re JointTableSIM_NN -nw 3 -nt 8 -n 1000000 -et total_constrained -ax '[1]' -ax '[0]' -dev cuda
+ -re JointTableSIM_NN -nw 4 -nt 8 -n 1000 -et total_constrained -ax '[1]' -ax '[0]' -dev cpu
 
 ## Plots
 
@@ -603,7 +603,7 @@ multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp
 
 ### SRMSE
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e NonJointTableSIM_NN -e JointTableSIM_NN -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' '0&' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e NonJointTableSIM_NN -e JointTableSIM_NN -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' '0&' -b 10 -t 100 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cuda
 
 ### SSI
 
