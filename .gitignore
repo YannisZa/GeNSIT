@@ -26,6 +26,7 @@ data/raw/london_commuter/GLA_data/Sources/A 2013-TCHC-Technical-Annex.xls
 data/raw/london_commuter/GLA_data/Sources/B ward-atlas-data.xls
 data/raw/misc/london_wards_old.json
 data/raw/cambridge_commuter/facility_euclidean_cost_matrix_all_facilities_13_12_2022.pickle
+logs/**
 
 # Distribution / packaging
 .Python
