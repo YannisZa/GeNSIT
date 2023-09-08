@@ -13,14 +13,15 @@ import geopandas as gpd
 from glob import glob
 from pathlib import Path
 from copy import deepcopy
-from tqdm.auto import tqdm
+from tqdm import tqdm
+from functools import partial
 from datetime import datetime
 from argparse import Namespace
+from torch import int32, float32
 from typing import Union,List,Tuple
 from itertools import product,chain
-from torch import int32, float32, uint8
+from multiprocessing.pool import Pool
 from multiresticodm.inputs import Inputs
-# from numba_progress import ProgressBar
 
 import multiresticodm.probability_utils as ProbabilityUtils
 
@@ -169,9 +170,9 @@ class OutputSummary(object):
                             # This slices the xarray created from the outputs samples
                             if SWEEPABLE_PARAMS[name]['is_coord']:
                                 if name in list(coordinate_slice.keys()):
-                                    coordinate_slice[name]['value'] = np.append(coordinate_slice[name]['value'],[value])
+                                    coordinate_slice[name]['value'] = np.append(coordinate_slice[name]['value'],[parse(value)])
                                 else:
-                                    coordinate_slice[name] = {"path": key_path, "value": [value]}
+                                    coordinate_slice[name] = {"path": key_path, "value": [parse(value)]}
                             # If is NOT a coordinate add to the input slice
                             # This slices the input data and requires reinstantiating outputs
                             else:
@@ -192,7 +193,7 @@ class OutputSummary(object):
                         settings=self.settings,
                         output_names=(list(self.settings['sample'])+['ground_truth_table']),
                         coordinate_slice=coordinate_slice,
-                        level=self.settings['logging_mode'],
+                        level=self.settings['logging_mode'].upper(),
                         logger = self.logger
                     )
                 # This is the case where there are SOME input slices provided
@@ -203,7 +204,7 @@ class OutputSummary(object):
                         output_names=(list(self.settings['sample'])+['ground_truth_table']),
                         coordinate_slice=coordinate_slice,
                         input_slice=path_value,
-                        level=self.settings['logging_mode'],
+                        level=self.settings['logging_mode'].upper(),
                         logger = self.logger
                     )
 
@@ -588,7 +589,7 @@ class Outputs(object):
             assert os.path.exists(config)
             self.config = Config(
                 path=os.path.join(config,"config.json"),
-                level='info',
+                level='INFO',
                 logger = self.logger
             )
 
@@ -824,7 +825,7 @@ class Outputs(object):
                 self.h5group = self.h5file.create_group(self.experiment_id)
                 # Store sweep configurations as attributes 
                 self.h5group.attrs.create("sweep_params",list(sweep_params.keys()))
-                self.h5group.attrs.create("sweep_values",['' if val is None else str(val) for val in sweep_params.values()])
+                self.h5group.attrs.create("sweep_values",['' if val is None else val for val in sweep_params.values()])
                 # Update log filename
                 if isinstance(self.logger,logging.Logger):
                     for i,hand in enumerate(self.logger.handlers):
@@ -848,9 +849,13 @@ class Outputs(object):
         # Get thinning parameter
         thinning = list(deep_get(key='thinning',value=self.settings))
         thinning = thinning[0] if len(thinning) > 0 else 1
+        
+        # Get iterations
+        iters = np.arange(start=1,stop=samples.shape[0]+1,step=1,dtype='int32')
 
         # Apply burnin and thinning
         samples = samples[burnin:None:thinning]
+        iters = iters[burnin:None:thinning]
 
         # Get total number of samples
         N = self.settings.get('N',samples.shape[0])
@@ -858,8 +863,124 @@ class Outputs(object):
         
         # Apply stop
         samples = samples[:N]
+        iters = iters[:N]
 
-        return samples
+        return samples,iters
+
+    def read_h5_file(self,filename,**kwargs):
+        coords = {}
+        data_vars = {}
+        try:
+            with h5.File(filename) as h5data:
+                self.logger.debug('Collect group-level attributes as coordinates')
+                # Collect group-level attributes as coordinates
+                # Group coordinates are file-dependent
+                if 'sweep_params' in list(h5data[self.experiment_id].attrs.keys()) and \
+                    'sweep_values' in list(h5data[self.experiment_id].attrs.keys()):
+                
+                    # Loop through each sweep parameters and add it as a coordinate
+                    for (k,v) in zip(h5data[self.experiment_id].attrs['sweep_params'],
+                                h5data[self.experiment_id].attrs['sweep_values']):
+                        coords[k] = {parse(v)}
+                self.logger.debug('Store dataset')
+                # Store dataset
+                for sample_name,sample_data in h5data[self.experiment_id].items():
+                    # Apply burning, thinning and trimming
+                    self.logger.debug(f'Slicing {sample_name}')
+                    if kwargs.get('slice_samples',True):
+                        sample_data,iters = self.slice_sample_iterations(sample_data)
+                    else:
+                        # Get iterations
+                        iters = np.arange(start=1,stop=sample_data.shape[0]+1,step=1,dtype='int32')
+                    coords['iter'] = iters.tolist()
+                    # Append
+                    self.logger.debug(f'Appending {sample_name}')
+                    data_vars[sample_name] = np.array([sample_data[:]])
+                self.logger.debug(f'Done with file')
+        except BlockingIOError:
+            self.logger.debug(f"Skipping in-use file: {filename}")
+            return {str(filename):{"coords":{},"data_vars":{}}}
+        except Exception:
+            self.logger.debug(traceback.format_exc())
+            raise Exception(f'Cannot read file {filename}')
+        
+        return {str(filename):{"coords":coords,"data_vars":data_vars}}
+
+    def read_h5_data(self,h5files:list,**kwargs):
+        # Get each file and add it to the new dataset
+        h5data, coords, data_vars = {},{},{}
+        if self.settings['n_workers'] > 1:
+            # Do it concurrently
+            # Use the Pool to parallelize loading
+            with Pool(processes=self.settings['n_workers']) as p:
+                with tqdm(total=len(h5files),leave=False) as pbar:
+                    # Use imap_unordered to process items and update progress
+                    for result in p.imap_unordered(
+                        partial(
+                            self.read_h5_file,
+                            **kwargs
+                        ),
+                        h5files,
+                        chunksize=5
+                    ):
+                        h5data.update(result)
+                        # Update the progress bar for each completed task
+                        pbar.update(1)
+            # Gather all data
+            # self.logger.setLevel(logging.DEBUG)
+            for filename in tqdm(h5files,desc='Gathering data',leave=False):
+                file_coords = h5data[str(filename)]['coords']
+                file_data_vars = h5data[str(filename)]['data_vars']
+                # print({k:np.shape(v) for k,v in file_coords.items()})
+                # print({k:np.shape(v) for k,v in file_data_vars.items()})
+                # Read coords
+                self.logger.debug(f"Read coords")
+                if len(coords) > 0:
+                    for k,v in file_coords.items():
+                        self.logger.debug(f"{k}")
+                        if k != 'iter':
+                            coords[k].update(v)
+                else:
+                    coords = deepcopy(file_coords)
+                # Read data
+                self.logger.debug(f"Read data")
+                for sample_name,sample_data in file_data_vars.items():
+                    self.logger.debug(f"{sample_name}")
+                    if sample_name in list(data_vars.keys()) and len(data_vars) > 0:
+                        data_vars[sample_name] = np.append(
+                            data_vars[sample_name],
+                            sample_data,
+                            axis=0
+                        )
+                    else:
+                        data_vars[sample_name] = deepcopy(sample_data)
+        else:
+            # Do it sequentially
+            for filename in tqdm(h5files,desc='Reading h5 file(s) in sequence',leave=False):
+
+                # Read h5 file
+                h5data = self.read_h5_file(filename,**kwargs)
+                file_coords = h5data[str(filename)]['coords']
+                file_data_vars = h5data[str(filename)]['data_vars']
+                
+                # Read coords
+                if len(coords) > 0:
+                    for k,v in file_coords.items():
+                        coords[k].update(v)
+                else:
+                    coords = deepcopy(file_coords)
+                
+                # Read data
+                for sample_name,sample_data in file_data_vars.items():
+                    if sample_name in list(data_vars.keys()) and len(data_vars) > 0:
+                        data_vars[sample_name] = np.append(
+                            data_vars[sample_name],
+                            sample_data,
+                            axis=0
+                        )
+                    else:
+                        data_vars[sample_name] = deepcopy(sample_data)
+        return coords,data_vars
 
     def load_h5_data(self,output_path,coordinate_slice:dict={},slice_samples:bool=True):
         self.logger.info('Loading h5 data into xarrays...')
@@ -869,90 +990,52 @@ class Outputs(object):
         # Sort them by seed
         h5files = sorted(h5files, key = lambda x: int(str(x).split('seed_')[1].split('/',1)[0]) if 'seed' in str(x) else str(x))
         # Store data attributes for xarray
-        coords,data_vars,data_variables = {},{},{}
-        # Get each file and add it to the new dataset
-        for filename in tqdm(h5files,desc='Reading h5 file(s)'):
-            self.logger.debug(filename)
-            try:
-                with h5.File(filename) as h5data:
-                    self.logger.debug('Collect group-level attributes as coordinates')
-                    # Collect group-level attributes as coordinates
-                    # Group coordinates are file-dependent
-                    if 'sweep_params' in list(h5data[self.experiment_id].attrs.keys()) and \
-                        'sweep_values' in list(h5data[self.experiment_id].attrs.keys()):
-                    
-                        # Loop through each sweep parameters and add it as a coordinate
-                        for (k,v) in zip(h5data[self.experiment_id].attrs['sweep_params'],
-                                    h5data[self.experiment_id].attrs['sweep_values']):
-                            if k in list(coords.keys()) and len(coords) > 0:
-                                coords[k].add(v)
-                            else:
-                                coords[k] = {v}
-                    self.logger.debug('Store dataset')
-                    # Store dataset
-                    for sample_name,sample_data in h5data[self.experiment_id].items():
-                        # Apply burning, thinning and trimming
-                        self.logger.debug(f'Slicing {sample_name}')
-                        if slice_samples:
-                            sample_data = self.slice_sample_iterations(sample_data)
-                        # Append
-                        self.logger.debug(f'Appending {sample_name}')
-                        if sample_name in list(data_vars.keys()):
-                            data_vars[sample_name] = np.append(
-                                data_vars[sample_name],
-                                np.array([sample_data[:]]),
-                                axis=0
-                            )
-                        else:
-                            data_vars[sample_name] = np.array([sample_data[:]])
-                    self.logger.debug(f'Done with file')
-            except BlockingIOError:
-                self.logger.debug(f"Skipping in-use file: {filename}")
-                continue
-            except Exception:
-                self.logger.debug(traceback.format_exc())
-                raise Exception(f'Cannot read file {filename}')
-        
+        data_variables = {}
+        # Read h5 data
+        coords,data_vars = self.read_h5_data(h5files,slice_samples=slice_samples)
         # Convert set to list
         coords = {k:np.array(list(v)) for k,v in coords.items()}
+        print(coords['sigma'])
+        print('after',{k:np.shape(v) for k,v in coords.items()})
         # print('coords',coords)
         # print({k:np.shape(v) for k,v in data_vars.items()})
         # Create an xarray dataset for each sample
         for sample_name,sample_data in tqdm(data_vars.items(),desc='Creating xarray dataset(s)'):
-            self.logger.debug(sample_name)
+            # self.logger.debug(sample_name)
             # Get data dims
-            dims = np.shape(sample_data)[1:]
-            coordinates = {}
-            # For each dim create coordinate
-            for i,d in enumerate(dims):
-                obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
-                # Create coordinate ranges based on schema
-                coordinates[XARRAY_SCHEMA[sample_name]['coords'][i]] = deep_call(
-                    globals()[obj],
-                    func,
-                    None,
-                    start=1,
-                    stop=d+1,
-                    step=1
-                ).astype(XARRAY_SCHEMA[sample_name]['args_dtype'][i])
+            print(sample_name,np.shape(sample_data))
+            print("\n")
+            # dims = np.shape(sample_data)[1:]
+            # coordinates = {}
+            # # For each dim create coordinate
+            # for i,d in enumerate(dims):
+            #     obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
+            #     # Create coordinate ranges based on schema
+            #     coordinates[XARRAY_SCHEMA[sample_name]['coords'][i]] = deep_call(
+            #         globals()[obj],
+            #         func,
+            #         None,
+            #         start=1,
+            #         stop=d+1,
+            #         step=1
+            #     ).astype(XARRAY_SCHEMA[sample_name]['args_dtype'][i])
             
             # Update coordinates to include schema and sweep coordinates
             # print('coordinates',coordinates.keys())
             # print('coords',coords.keys())
-            all_coordinates = {**{k:v for k,v in coordinates.items() if k != sample_name},**{k:v for k,v in coords.items() if k != sample_name}}
+            coordinates = {k:v for k,v in coords.items() if k != sample_name}
             
             # For each coordinate name
             # get data variable
-            # print(sample_name)
-            # print('coordinates')
-            # print({k:np.shape(v) for k,v in all_coordinates.items()})
-            # print('data')
-            # print(np.shape(sample_data),[np.shape(val) for val in all_coordinates.values()])
-            # print(list(all_coordinates.keys()))
+            print(sample_name)
+            print('coordinates')
+            print({k:np.shape(v) for k,v in coordinates.items()})
+            print('data')
+            print(np.shape(sample_data),[np.shape(val) for val in coordinates.values()])
             # if len(coordinates.keys()) > 0:
             data_variables[sample_name] = (
-                list(all_coordinates.keys()),
-                sample_data.reshape(tuple([len(val) for val in all_coordinates.values()]))
+                list(coordinates.keys()),
+                sample_data.reshape(tuple([len(val) for val in coordinates.values()]))
             )
             # else:
                 # data_variables[sample_name] = sample_data
@@ -960,7 +1043,7 @@ class Outputs(object):
             # Create xarray dataset
             xr_data = xr.Dataset(
                 data_vars = {sample_name:data_variables[sample_name]},
-                coords = all_coordinates,
+                coords = coordinates,
                 attrs = dict(
                     experiment_id = self.experiment_id
                 ),
@@ -968,9 +1051,8 @@ class Outputs(object):
             # Slice according to coordinate slice
             if len(coordinate_slice) > 0:
                 print('xr_data.coords',xr_data.coords)
-                print('coordinate_slice',{k:v['value'] for k,v in coordinate_slice.items()})
-                xr_data = xr_data.isel(sigma=0.1414213562)
-                # xr_data = xr_data.isel(**{k:v['value'] for k,v in coordinate_slice.items()})
+                print('coordinate_slice',{k:(v['value'] if len(v['value']) > 1 else v['value'][0]) for k,v in coordinate_slice.items()})
+                xr_data = xr_data.sel(**{k:(v['value'] if len(v['value']) > 1 else v['value'][0]) for k,v in coordinate_slice.items()})
 
             
             # Store dataset

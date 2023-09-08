@@ -221,10 +221,15 @@ def read_compressed_json(filepath:str) -> List[Dict]:
 
 def parse(value):
     if isinstance(value,str):
+        if len(value) <= 0:
+            return None
         try:
             value = string_to_numeric(value)
         except:
             pass
+    elif hasattr(value,'__len__') and len(value) <= 0:
+        return None
+    
     return value
 
 def makedir(directory:str) -> None:
@@ -799,8 +804,8 @@ def get_value_from_path(d, path=[]):
             return 'not-found'
 
 def string_to_numeric(s):
-    f = float(s)
-    i = int(f)
+    f = np.float32(s)
+    i = np.int32(f)
     return i if i == f else f
 
 

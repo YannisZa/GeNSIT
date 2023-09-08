@@ -480,6 +480,36 @@ clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
  -re JointTableSIM_NN -nw 4 -nt 8 -n 1000 -et total_constrained -ax '[1]' -ax '[0]' -dev cpu
 
+## Summaries and metrics
+
+### SRMSE
+
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e NonJointTableSIM_NN -e JointTableSIM_NN -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' '0&' -b 10 -t 100 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 6
+
+### SSI
+
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -e NonJointTableSIM_NN -e JointTableSIM_NN -m SSI -s table -s intensity -stat 'mean&' '0&' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SSIs
+
+### Coverage probability
+
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -e NonJointTableSIM_NN -e JointTableSIM_NN -m coverage_probability -r 0.99 -s table -s intensity -stat '&mean' '&1_2' -b 10 -t 2 -n 100000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe coverage_probabilities
+
+### Markov Basis Distance (POSSIBLE SYNTAX ERRORS)
+
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -m edit_degree_higher_error -m edit_degree_one_error -s table -stat '&mean' '&0' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -tab table_lsoas_to_msoas.txt -fe edit_distances
+
+### Bias
+
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -m p_distance -s table -s intensity -stat 'mean&X^2|sum' '0&|1_2' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe Bias2 --p_norm 0
+
+### Variance
+
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -s table -s intensity -m 'none' -stat 'var&sum' '0&1_2' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -tab table_lsoas_to_msoas.txt -fe variance
+
+### MSE
+
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -s table -s intensity -m p_distance -stat '&mean|sum' '&0|0_1' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -tab table_lsoas_to_msoas.txt -fe expected_error --p_norm 2
+
 ## Plots
 
 ### Isomap reduction
@@ -599,50 +629,4 @@ multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp
 
 multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIM_MCMCHighNoise_07_02_2023_16_15_43 -g ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson -p 41 -fs 20 10 -ff pdf -ac cgreen -ac cred -mc cblue --annotate -t posterior_table_mean_error -csl 0.5 1.0 -b 10000 -afs 26 -cfs 20 -mcl 7.592240947332791e-07 0.009970745312129123 -acl 0.0 0.0 -acl 0.000530141493261603 0.07746821280692036 -fe high_noise --no-colorbar -no relative_l1
 
-## Summaries and metrics
-
-### SRMSE
-
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e NonJointTableSIM_NN -e JointTableSIM_NN -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' '0&' -b 10 -t 100 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cuda
-
-### SSI
-
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -e NonJointTableSIM_NN -e JointTableSIM_NN -m SSI -s table -s intensity -stat 'mean&' '0&' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SSIs
-
-### Coverage probability
-
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -e NonJointTableSIM_NN -e JointTableSIM_NN -m coverage_probability -r 0.99 -s table -s intensity -stat '&mean' '&1_2' -b 10 -t 2 -n 100000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe coverage_probabilities
-
-### Markov Basis Distance (POSSIBLE SYNTAX ERRORS)
-
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -m edit_degree_higher_error -m edit_degree_one_error -s table -stat '&mean' '&0' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -tab table_lsoas_to_msoas.txt -fe edit_distances
-
-### Bias
-
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -m p_distance -s table -s intensity -stat 'mean&X^2|sum' '0&|1_2' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe Bias2 --p_norm 0
-
-### Variance
-
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -s table -s intensity -m 'none' -stat 'var&sum' '0&1_2' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -tab table_lsoas_to_msoas.txt -fe variance
-
-### MSE
-
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e SIM_NN -s table -s intensity -m p_distance -stat '&mean|sum' '&0|0_1' -b 10 -t 2 -n 1000 -k sigma -k experiment_title -tab table_lsoas_to_msoas.txt -fe expected_error --p_norm 2
-
 # Competitive methods
-
-## Neural Network
-
-### Run models
-
-utopya run HarrisWilson --cs Cambridge_dataset --no-eval
-
-### Evaluate models
-
-utopya eval HarrisWilson --cs Cambridge_dataset --po low_noise/alpha --po low_noise/beta --po high_noise/alpha --po high_noise/beta
-
-utopya eval HarrisWilson --cs Cambridge_dataset --po low_noise/alpha --po low_noise/beta --po high_noise/alpha --po high_noise/beta --po low_noise/kappa --po high_noise/kappa
-
-utopya eval HarrisWilson --cs Cambridge_dataset --po low_noise/alpha --po low_noise/beta --po high_noise/alpha --po high_noise/beta --po low_noise/kappa --po high_noise/kappa outputs/HarrisWilson/230517-112911_Cambridge_dataset
-
-utopya eval HarrisWilson --cs Cambridge_dataset --po destination_sizes_predictions

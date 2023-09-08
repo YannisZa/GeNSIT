@@ -391,7 +391,7 @@ _output_options = [
                 type=click.Choice(DATA_TYPES.keys()), help=f'Sets type of samples to compute metrics over.'),
     click.option('--statistic','-stat', multiple=True, default=[['','']], type = (click.STRING,click.STRING),required=False,
             help='Every argument corresponds to a list of statistics and their corresponding axes e.g. passing  (\"mean|sum\",  \"0|0_1\") corresponds to applying mean across axis 0 and then sum across axes 0,1'),
-    click.option('--slice_by','-sb', multiple=True, default=[['seed','']], type = (click.Choice(SWEEPABLE_PARAMS.keys()),click.STRING),required=False,
+    click.option('--slice_by','-sb', multiple=True, default=[], type = (click.Choice(SWEEPABLE_PARAMS.keys()),click.STRING),required=False,
             help='Every argument corresponds to a list of keys and values by which the output sweeped parameters will be sliced.'),
     click.option('--metric','-m', multiple=True, type=click.Choice(METRICS.keys()), required=False, default=['none'],
                 help=f'Sets list of metrics to compute over samples.'),
@@ -714,7 +714,8 @@ def summarise(
 
     # Run output handler
     OutputSummary(
-        settings=settings
+        settings=settings,
+        logger=logger
     )
 
     logger.info('Done')

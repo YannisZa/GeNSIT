@@ -24,7 +24,7 @@ class Config:
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
         level = kwargs.get('level','info').upper()
-        self.logger.setLevel(level)
+        self.logger.setLevel(level.upper())
         
         # Load config
         if path:
