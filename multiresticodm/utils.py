@@ -219,6 +219,13 @@ def read_compressed_json(filepath:str) -> List[Dict]:
         f = json.loads(fin.read().decode('utf-8'))
     return f
 
+def get_dims(data):
+    try:
+        res = list(np.shape(data))
+    except:
+        res = list(data.dims)
+    return res
+
 def parse(value):
     if isinstance(value,str):
         if len(value) <= 0:
@@ -465,9 +472,9 @@ def unpack_statistics(settings):
     # Unpack statistics if they exist
     if str_in_list('statistic',settings) and len(settings['statistic']) > 0:
         statistics = []
-        for stat,ax in settings['statistic']:
+        for stat,dim in settings['statistic']:
             # print('stat',stat)
-            # print('ax',ax)
+            # print('dim',dim)
             if isinstance(stat,str):
                 if '&' in stat:
                     stat_unpacked = stat.split('&')
@@ -478,49 +485,82 @@ def unpack_statistics(settings):
             else:
                 raise Exception(f'Statistic name {stat} of type {type(stat)} not recognized')
             
-            if isinstance(ax,str): 
-                #  if len(_ax) > 0
-                if '&' in ax:
-                    ax_unpacked = ax.split('&')
+            if isinstance(dim,str): 
+                if '&' in dim:
+                    dim_unpacked = dim.split('&')
                 else:
-                    ax_unpacked = [ax]
-            elif hasattr(ax,'__len__'):
-                ax_unpacked = deepcopy(ax)
+                    dim_unpacked = [str(dim)]
+            elif hasattr(dim,'__len__'):
+                dim_unpacked = list(map(str,dim))
             else:
-                raise Exception(f'Statistic axes {ax_unpacked} of type {type(ax_unpacked)} not recognized')
+                raise Exception(f'Statistic dim {dim_unpacked} of type {type(dim_unpacked)} not recognized')
             # Make sure number of statistics and axes provided is the same
-            assert len(stat_unpacked) == len(ax_unpacked)
+            assert len(stat_unpacked) == len(dim_unpacked)
             substatistics = []
-            for substat,subax in list(zip(stat_unpacked,ax_unpacked)):
+            for substat,subdim in list(zip(stat_unpacked,dim_unpacked)):
                 # print('substat',substat)
-                # print('subax',subax)
+                # print('subdim',subdim)
                 substat_unpacked = [_s for _s in substat.split('|')] if '|' in substat else [substat]
-                subax_unpacked = [_ax for _ax in subax.split('|')] if '|' in subax else [subax]
+                subdim_unpacked = [_dim for _dim in subdim.split('|')] if '|' in subdim else [subdim]
                 # Unpack individual axes
-                subax_unpacked = [tuple([int(_subax) for _subax in _ax.split("_")]) \
-                            if (_ax is not None and len(_ax) > 0) \
+                subdim_unpacked = [[str(_subdim) for _subdim in _dim.split("_")] \
+                            if (_dim is not None and len(_dim) > 0) \
                             else None
-                            for _ax in subax_unpacked]
+                            for _dim in subdim_unpacked]
                 # print('substat_unpacked',substat_unpacked)
-                # print('subax_unpacked',subax_unpacked)
+                # print('subdim_unpacked',subdim_unpacked)
                 # Add statistic name and axes pair to list
-                substatistics.append(list(zip(substat_unpacked,subax_unpacked)))
+                substatistics.append(list(zip(substat_unpacked,subdim_unpacked)))
             
             # Add statistic name and axes pair to list
             statistics.append(substatistics)
 
         return {'statistic': statistics}
 
+def parse_slice_by(slice_by:list):
+    if len(slice_by) <= 0:
+        return {}
+    
+    slices = {}
+    for key_val in slice_by:
+        key,val = key_val
+
+        # Convert value to appropriate data_type
+        if isinstance(val,str) and "_" in val:
+            val = val.split("_")
+            val = list(map(parse,val))
+        
+        if key in list(slices.keys()):
+            if isinstance(val,list):
+                slices[key].union(set(val))
+            else:
+                slices[key].add(val)
+
+        else:
+            if isinstance(val,list):
+                slices[key] = set(val)
+            else:
+                slices[key] = {val}
+    
+    # Map set values to list
+    slices = {k:list(v) for k,v in slices.items()}
+    
+    return slices
+
+
 
 def stringify_statistic(statistic):
     # Unpack statistic pair
-    statistic_name,statistic_axes = statistic
+    statistic_name,statistic_dims = statistic
     # Initialise text
     text = ''
     if statistic_name != '':
         text += statistic_name
-    if statistic_axes is not None:
-        text += '_'+str(statistic_axes)
+    if statistic_dims is not None:
+        if hasattr(statistic_dims,'__len__'):
+            text += '_'+','.join(statistic_dims)
+        else:
+            text += '_'+str(statistic_dims)
     return text
 
 
@@ -617,7 +657,6 @@ def convert_string_to_torch_function(s:str=''):
         return np.vectorize(evaluate_expression)
     else:
         raise Exception(f"Function name {s} not match to torch function")
-
 
 def valid_experiment_type(experiment_id,experiment_types):
     valid_experiment = False

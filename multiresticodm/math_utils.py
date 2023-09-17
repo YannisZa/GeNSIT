@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import xarray as xr
 
 from numpy import shape 
 from scipy import optimize
@@ -10,17 +11,67 @@ from itertools import chain, combinations
 from multiresticodm.utils import flatten
 
 
-def log_factorial(start:int32,end:int32):
+def log_factorial(start:int32,end:int32,is_torch:bool=True):
+    if is_torch:
+        return log_factorial_torch(start,end)
+    else:
+        return log_factorial_xarray(start,end)
+
+def log_factorial_torch(start:int32,end:int32):
     # Check if inputs are integers or tensors
     if isinstance(start, int):
-        start = torch.tensor(start)
+        start = torch.tensor(start,dtype=int32)
     if isinstance(end, int):
-        end = torch.tensor(end)
+        end = torch.tensor(end,dtype=int32)
+    if len(start.shape) == 0 and len(end.shape) == 0:
+        start = start.item()
+        end = end.item()
+        if start+1 > end:
+            return torch.tensor(0,dtype=int32)
+        else:
+            # Create a range of integers from start to end (inclusive)
+            integers = torch.range(start, end, 1)
+            # Compute the log factorial for each integer
+            log_factorials = torch.cumsum(torch.log(integers.float()), dim=0)
+            return log_factorials[-1]
+    
+    else:
+        start_len = start.shape[0] if len(start.shape) > 0 else 0
+        end_len = end.shape[0] if len(end.shape) > 0 else 0
+        try: 
+            assert (start_len == end_len) or \
+                    (start_len == 0) or \
+                    (end_len == 0)
+        except:
+            raise Exception(f"Start and end arguments must have either the same number of elements or one element.")
+        
+        # If either start or end is a tensor, compute the log factorial for each element
+        # Initialize an empty tensor to store the results
+        log_factorials = torch.zeros(max(start_len,end_len))
+        
+        # Iterate through the elements of the tensors and compute log factorials
+        for i in range(max(start_len,end_len)):
+            s = start[i] if (1 < start_len) else start.item()
+            e = end[i] if (1 < end_len) else end.item()
+            if s + 1 > e:
+                # Set 0.0 for invalid range
+                log_factorials[i] = 0.0
+            else:
+                integers = torch.range(s, e, 1)
+                log_factorials[i] = torch.sum(torch.log(integers)).item()
+        return log_factorials
+
+def log_factorial_xarray(start:int32,end:int32):
+    # Check if inputs are integers or tensors
+    if isinstance(start, int):
+        start = xr.DataArray(start)
+    if isinstance(end, int):
+        end = xr.DataArray(end)
         
     if start.numel() == 1 and end.numel() == 1:
         
         if start+1 > end:
-            return torch.tensor(0,dtype=int32)
+            return xr.DataArray(0,dtype=int32)
         else:
             # Create a range of integers from start to end (inclusive)
             integers = torch.range(start, end, 1)
@@ -52,6 +103,7 @@ def log_factorial(start:int32,end:int32):
                 log_factorials[i] = torch.sum(torch.log(integers)).item()
         
         return log_factorials
+    
 
 def positive_sigmoid(x,scale:float=1.0):
     return 2/(1+torch.exp(-x/scale)) - 1
@@ -64,7 +116,7 @@ def powerset(iterable):
     return chain.from_iterable(combinations(s, r) for r in range(1,len(s)+1))
 
 
-def normalised_manhattan_distance(tab:torch.tensor,tab0:torch.tensor):
+def normalised_manhattan_distance(tab:xr.DataArray,tab0:xr.DataArray):
 
     # Take difference
     difference = tab - tab0
@@ -79,7 +131,7 @@ def map_distance_name_to_function(distance_name):
     else:
         raise Exception(f"Distance function {distance_name} does not exist.")
 
-def apply_norm(tab:torch.tensor,tab0:torch.tensor,name:str,**kwargs:dict):
+def apply_norm(tab:xr.DataArray,tab0:xr.DataArray,name:str,**kwargs:dict):
     try:
         norm_function = globals()[name]
     except:
@@ -93,7 +145,7 @@ def apply_norm(tab:torch.tensor,tab0:torch.tensor,name:str,**kwargs:dict):
         )
     return norm
 
-def l_0(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+def l_0(tab:xr.DataArray,tab0:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
     N,I,J = shape(tab)
     if shape(tab0) != (N,I,J):
         tab0 = torch.unsqueeze(tab0,dim=0)
@@ -101,7 +153,7 @@ def l_0(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,pro
     return res
 
 
-def relative_l_0(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+def relative_l_0(tab:xr.DataArray,tab0:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
     N,I,J = shape(tab)
     if shape(tab0) != (N,I,J):
         tab0 = torch.unsqueeze(tab0,dim=0)
@@ -112,14 +164,14 @@ def relative_l_0(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float
         res = ((tab - tab0)/normalisation_constant).to(dtype=float32)
     return res
 
-def l_1(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+def l_1(tab:xr.DataArray,tab0:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
     N,I,J = shape(tab)
     if shape(tab0) != (N,I,J):
         tab0 = torch.unsqueeze(tab0,dim=0)
     res = torch.absolute(tab - tab0).to(device=float32)
     return res
 
-def relative_l_1(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+def relative_l_1(tab:xr.DataArray,tab0:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
     N,I,J = shape(tab)
     if shape(tab0) != (N,I,J):
         tab0 = torch.unsqueeze(tab0,dim=0)
@@ -129,7 +181,7 @@ def relative_l_1(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float
         res = (torch.absolute(tab - tab0)/normalisation_constant).astype('float32')
     return res
 
-def l_2(tab:torch.tensor,tab0:torch.tensor,progress_proxy):
+def l_2(tab:xr.DataArray,tab0:xr.DataArray,progress_proxy):
     N,I,J = shape(tab)
     if shape(tab0) != (N,I,J):
         tab0 = torch.unsqueeze(tab0,dim=0)
@@ -137,7 +189,7 @@ def l_2(tab:torch.tensor,tab0:torch.tensor,progress_proxy):
     return res
 
 
-def p_distance(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
+def p_distance(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     # Type of norm
     p = float(kwargs['kwargs'].get('p_norm',2))
     # Get dimensions
@@ -156,7 +208,7 @@ def scipy_optimize(init,function,method,theta):
 
     return f.x
 
-def relative_l_2(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float=None,progress_proxy=None):
+def relative_l_2(tab:xr.DataArray,tab0:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
     N,I,J = shape(tab)
     if shape(tab0) != (N,I,J):
         tab0 = torch.unsqueeze(tab0,dim=0)
@@ -166,29 +218,29 @@ def relative_l_2(tab:torch.tensor,tab0:torch.tensor,normalisation_constant:float
         res = (torch.pow(tab - tab0,2)/normalisation_constant).to(dtype=float32)
     return res
 
-def euclidean_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
+def euclidean_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     return torch.sqrt( torch.sum( torch.pow(((tab1 - tab2)/torch.sum(tab1.ravel())),2) ) )
 
-def l_p_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
+def l_p_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     return torch.linalg.norm( 
         ((tab1 - tab2).ravel()/torch.sum(tab2.ravel())), 
         ord=int(kwargs['ord']) if kwargs['ord'].isnumeric() else kwargs['ord']
     )
 
-def edit_distance_degree_one(tab:torch.tensor,tab0:torch.tensor,**kwargs):
+def edit_distance_degree_one(tab:xr.DataArray,tab0:xr.DataArray,**kwargs):
     dims = kwargs.get('dims',None)
     if dims is not None:
         tab = tab.reshape(dims)
         tab0 = tab0.reshape(dims)
     return torch.sum(torch.absolute(tab - tab0))/2
 
-def edit_degree_one_error(tab:torch.tensor,tab0:torch.tensor,**kwargs):
+def edit_degree_one_error(tab:xr.DataArray,tab0:xr.DataArray,**kwargs):
     return torch.sum(torch.absolute(tab - tab0,dim=0))/2
 
-def edit_distance_degree_higher(tab:torch.tensor,tab0:torch.tensor,**kwargs):
+def edit_distance_degree_higher(tab:xr.DataArray,tab0:xr.DataArray,**kwargs):
     return torch.sum((tab - tab0) > 0,axis=slice(1,None))
 
-def chi_squared_row_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
+def chi_squared_row_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     dims = kwargs.get('dims',None)
     tab1 = tab1.reshape(dims)
     tab2 = tab2.reshape(dims)
@@ -197,7 +249,7 @@ def chi_squared_row_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
     colsums = np.where(tab1.sum(axis=0)<=0,1,tab1.sum(axis=0)).reshape((1,dims[1]))
     return np.sum((tab1/rowsums1 - tab2/rowsums2)**2 / colsums)
 
-def chi_squared_column_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
+def chi_squared_column_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     dims = kwargs.get('dims',None)
     tab1 = tab1.reshape(dims)
     tab2 = tab2.reshape(dims)
@@ -206,21 +258,21 @@ def chi_squared_column_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
     rowsums = np.where(tab1.sum(axis=1)<=0,1,tab1.sum(axis=1)).reshape((dims[0],1))
     return np.sum((tab1/colsums1 - tab2/colsums2)**2 / rowsums)
 
-def chi_squared_distance(tab1:torch.tensor,tab2:torch.tensor,**kwargs):
+def chi_squared_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     dims = kwargs.get('dims',None)
     return chi_squared_column_distance(tab1,tab2,dims) + chi_squared_row_distance(tab1,tab2,dims)
 
 
-def SRMSE(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
+def SRMSE(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     """ Computes standardised root mean square error. See equation (22) of
     "A primer for working with the Spatial Interaction modeling (SpInt) module
     in the python spatial analysis library (PySAL)" for more details.
 
     Parameters
     ----------
-    table : torch.tensor [NxM]
+    table : xr.DataArray [NxM]
         Estimated flows.
-    true_table : torch.tensor [NxM]
+    true_table : xr.DataArray [NxM]
         Actual flows.
 
     Returns
@@ -229,25 +281,23 @@ def SRMSE(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
         Standardised root mean square error of t_hat.
 
     """
-    # Get dimensions
-    dims = shape(tab)[1:]
-    # Compute SRMSE
-    numerator = torch.pow( torch.sum(torch.pow(tab0-tab,2),dim=(1,2)) / torch.tensor((np.prod(dims)),dtype=float32), 0.5)
-    denominator = ( torch.sum(torch.ravel(tab0)) / torch.tensor(np.prod(dims)) ).to(dtype=float32)
+    numerator = np.power( np.power(tab0-tab,2).sum(dim=['origin','destination']) / tab.size, 0.5)
+    denominator = tab0.sum(dim=['origin','destination']) / tab0.size
     srmse = numerator / denominator
+
 
     return srmse
 
-def SSI(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
+def SSI(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     """ Computes Sorensen similarity index. See equation (23) of
     "A primer for working with the Spatial Interaction modeling (SpInt) module
     in the python spatial analysis library (PySAL)" for more details.
 
     Parameters
     ----------
-    table : torch.tensor [NxM]
+    table : xr.DataArray [NxM]
         Estimated flows.
-    true_table : torch.tensor [NxM]
+    true_table : xr.DataArray [NxM]
         Actual flows.
 
     Returns
@@ -258,14 +308,14 @@ def SSI(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
     """
     # Compute denominator
     denominator = (tab0 + tab)
-    denominator[denominator<=0] = torch.tensor(1.)
+    denominator = xr.where(denominator <= 0, 1., denominator)
     # Compute numerator
-    numerator = 2*torch.minimum(tab0,tab)
+    numerator = 2*xr.minimum(tab0,tab)
     # Compute SSI
-    ssi = torch.mean(torch.divide(numerator,denominator))
+    ssi = xr.divide(numerator,denominator).mean(dim=['origin','destination'])
     return ssi
 
-def shannon_entropy(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
+def shannon_entropy(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     """Computes entropy for a table X
     E = sum_{i}^I sum_{j=1}^{J} X_{ij}log(X_{ij})
     
@@ -288,12 +338,7 @@ def shannon_entropy(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
     return res
 
 
-def _shannon_entropy(tab,tab0,distr,progress_proxy):
-    res = distr(tab,tab0)
-    # Take mean
-    return -res/shape(tab)[0]
-
-def von_neumann_entropy(tab:torch.tensor,tab0:torch.tensor,**kwargs):
+def von_neumann_entropy(tab:xr.DataArray,tab0:xr.DataArray,**kwargs):
     N = int(shape(tab)[0])
     # Convert matrix to square
     matrix = (tab@tab.T).astype('float32')
@@ -308,12 +353,12 @@ def von_neumann_entropy(tab:torch.tensor,tab0:torch.tensor,**kwargs):
 
     return res
 
-def sparsity(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
+def sparsity(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     """Computes percentage of zero cells in table
 
     Parameters
     ----------
-    table : torch.tensor
+    table : xr.DataArray
         Description of parameter `table`.
 
     Returns
@@ -323,29 +368,19 @@ def sparsity(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
 
     """
     N,_,_ = shape(tab)
-    res = torch.count_nonzero(tab==0)/np.prod(shape(tab))
+    res = np.count_nonzero(tab==0)/np.prod(tab.size)
     return res
 
 
-def coverage_probability(tab:torch.tensor,tab0:torch.tensor,**kwargs:dict):
+def coverage_probability(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     # High posterior density mass
     alpha = 1-kwargs['kwargs'].get('region_mass',0.95)
-    # Get dimensions of tables
-    dims = list(tab.shape)[1:]
-    dims0 = list(tab0.shape)[1:]
-    N = list(tab.shape)[0]
-    # Reshape table to allow sorting
-    tab = tab.reshape((N,np.prod(dims)))
-    tab0 = tab0.reshape((np.prod(dims0)))
-
     # Get cell of table and sort all samples
-    table_cell_value,_ = tab.sort(dim=1)
+    table_cell_value = tab.sortby(dim=['origin','destination'])
     # Get lower and upper bound high posterior density regions
     lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(table_cell_value,alpha)
     # Compute flag for whether ground truth table is covered
     cell_coverage = torch.logical_and(torch.ge(tab0,lower_bound_hpdr), torch.le(tab0,upper_bound_hpdr))
-    # Add that flag to a table of flags
-    cell_coverage = cell_coverage.reshape((1,*dims))
     return cell_coverage
 
 

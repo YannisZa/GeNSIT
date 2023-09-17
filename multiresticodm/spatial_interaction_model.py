@@ -222,7 +222,7 @@ class SpatialInteraction2D():
         )
     
 
-    def log_intensity(self,**kwargs):
+    def log_intensity(self,data=None,**kwargs):
         """ Reconstruct expected flow matrices (intensity function)
 
         Parameters

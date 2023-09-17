@@ -57,6 +57,10 @@ class OutputSummary(object):
             self.settings,
             unpack_statistics(self.settings)
         )
+        # Update settings to parse slice by argument
+        self.settings['slice_by'] = parse_slice_by(
+            self.settings.get('slice_by',[])
+        )
         # Setup experiments
         self.collect_experiment_metadata()
         # Compile metadata
@@ -160,8 +164,7 @@ class OutputSummary(object):
                 input_slice = []
                 # Loop through key-value pairs used
                 # to subset the output samples
-                for param_tup in self.settings['slice_by']:
-                    name,value = param_tup
+                for name,values in self.settings['slice_by'].items():
                     # Loop through experiment's sweeped parameters
                     for key_path in experiment_metadata['sweeped_params_paths']:
                         # If there is a match between the two
@@ -170,13 +173,13 @@ class OutputSummary(object):
                             # This slices the xarray created from the outputs samples
                             if SWEEPABLE_PARAMS[name]['is_coord']:
                                 if name in list(coordinate_slice.keys()):
-                                    coordinate_slice[name]['value'] = np.append(coordinate_slice[name]['value'],[parse(value)])
+                                    coordinate_slice[name]['values'] = np.append(coordinate_slice[name]['values'],values)
                                 else:
-                                    coordinate_slice[name] = {"path": key_path, "value": [parse(value)]}
+                                    coordinate_slice[name] = {"path": key_path, "values": values}
                             # If is NOT a coordinate add to the input slice
                             # This slices the input data and requires reinstantiating outputs
                             else:
-                                input_slice.append({"value":value,"key_path":key_path})
+                                input_slice.append({"values":values,"key_path":key_path})
                 if len(input_slice) == 0:
                     input_slice = [None]
             else:
@@ -314,16 +317,11 @@ class OutputSummary(object):
                 #                     for sample {sample_name} of experiment {experiment_id} failed")
                 #     print('\n')
                 #     continue
-                if samples_summarised.dim() !=  samples.dim():
-                    samples_summarised = samples_summarised.unsqueeze(dim=0)
+                # if samples_summarised.shape !=  samples.shape:
+                    # samples_summarised = samples_summarised.unsqueeze(dim=0)
                 self.logger.debug(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
-                
-                # Get shape of samples
-                N = np.shape(samples_summarised)[0]
-                dims = np.shape(samples_summarised)[1:]
 
                 for metric in self.settings['metric']:
-                    metric_shape = convert_string_to_numpy_shape(METRICS[metric]['shape'],N=N,dims=dims)
                     # Get all attributes and their values
                     attribute_keys = METRICS[metric]['loop_over']
                     if len(attribute_keys) > 0:
@@ -396,34 +394,24 @@ class OutputSummary(object):
                             self.logger.debug(f"Summarised metric is {np.shape(metric_summarised)}")
                             # Squeeze output
                             metric_summarised = np.squeeze(metric_summarised)
-                            # Make sure metric summarised is not multidimensional
-                            if metric_summarised.dim() > 1:
-                                self.logger.warning(f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}>"+
-                                                    f"{sample_name}>"+
-                                                    f"{metric}>"+
-                                                    f"{attribute_settings_string}>"+
-                                                    f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])} is multidimensional and will not be written to file")
-                                self.logger.warning(f"Shape of summarised metric is {np.shape(metric_summarised)}")
-                                continue
-                            else:
-                                # Add to data records
-                                metric_data_keys = [
-                                    "sample_statistic",
-                                    "sample_name",
-                                    "metric",
-                                    *attribute_settings.keys(),
-                                    "metric_statistic",
-                                    "value"
-                                ]
-                                metric_data_vals = [
-                                    f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}>",
-                                    f"{sample_name}",
-                                    f"{metric}",
-                                    *attribute_settings.values(),
-                                    f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])}>",
-                                    f"{metric_summarised}"
-                                ]
-                                metric_data.append(dict(zip(metric_data_keys,metric_data_vals)))
+                            # Add to data records
+                            metric_data_keys = [
+                                "sample_statistic",
+                                "sample_name",
+                                "metric",
+                                *attribute_settings.keys(),
+                                "metric_statistic",
+                                "value"
+                            ]
+                            metric_data_vals = [
+                                f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}>",
+                                f"{sample_name}",
+                                f"{metric}",
+                                *attribute_settings.values(),
+                                f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])}>",
+                                f"{metric_summarised}"
+                            ]
+                            metric_data.append(dict(zip(metric_data_keys,metric_data_vals)))
                             self.logger.debug(f"Summarised metric is updated to {np.shape(metric_summarised)}")
                     else:                        
                         # Update kwargs specific for each metric
@@ -432,75 +420,66 @@ class OutputSummary(object):
                             outputs,
                             self.settings
                         )
-                        try:
-                            if metric != 'none':
-                                samples_metric = globals()[metric](
-                                    tab=samples_summarised,
+                        # try:
+                        if metric != 'none':
+                            samples_metric = samples_summarised.groupby('sweep').apply(
+                                lambda group: globals()[metric](
+                                    tab=group,
                                     tab0=metric_kwargs['tab0'],
                                     kwargs=metric_kwargs['kwargs']
                                 )
-                            else:
-                                samples_metric = deepcopy(samples_summarised)
-                        except Exception as e:
-                            self.logger.debug(traceback.format_exc())
-                            self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}, {samples_summarised.device}")
-                            self.logger.error(f"tab0 {metric_kwargs['tab0'].shape}, {metric_kwargs['tab0'].dtype}, {metric_kwargs['tab0'].device}")
-                            self.logger.error(f'Applying metric {metric} over sample {sample_name} for experiment {experiment_id} failed')
-                            print('\n')
-                            continue
-                        # Reshape samples metric
-                        try:
-                            samples_metric = samples_metric.reshape(metric_shape)
-                        except Exception as e:
-                            self.logger.debug(traceback.format_exc())
-                            self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
-                            self.logger.error(f"tab0 {np.shape(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}")
-                            self.logger.error(f'Applying metric {metric} over sample {sample_name} for experiment {experiment_id} failed')
-                            print('\n')
-                            continue
-                        self.logger.debug(f"Samples metric is {np.shape(samples_metric)}")
+                            )
+                            # Rename metric xr data array
+                            samples_metric = samples_metric.rename(metric)
+                        else:
+                            samples_metric = deepcopy(samples_summarised)
+                        # except Exception as e:
+                        #     self.logger.debug(traceback.format_exc())
+                        #     self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
+                        #     self.logger.error(f"tab0 {metric_kwargs['tab0'].shape}, {metric_kwargs['tab0'].dtype}")
+                        #     self.logger.error(f'Applying metric {metric} over sample {sample_name} for experiment {experiment_id} failed')
+                        #     print('\n')
+                        #     continue
                         
                         # Apply statistics after metric
-                        try:
-                            metric_summarised = outputs.apply_sample_statistics(samples_metric,metric,metric_statistics_axes)
-                        except Exception as e:
-                            self.logger.debug(traceback.format_exc())
-                            self.logger.error(f"Shape of metric is {np.shape(samples_metric)}")
-                            self.logger.error(f"Applying statistic {'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])}>" + \
-                                              f"over metric {metric} and sample {sample_name} for experiment {experiment_id} failed")
-                            print('\n')
-                            continue
+                        # try:
+                        metric_summarised = outputs.apply_sample_statistics(samples_metric,metric,metric_statistics_axes)
+                        # except Exception as e:
+                        #     self.logger.debug(traceback.format_exc())
+                        #     self.logger.error(f"Shape of metric is {np.shape(samples_metric)}")
+                        #     self.logger.error(f"Applying statistic {'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])}>" + \
+                        #                       f"over metric {metric} and sample {sample_name} for experiment {experiment_id} failed")
+                        #     print('\n')
+                        #     continue
                         self.logger.debug(f"Summarised metric is {np.shape(metric_summarised)}")
-                        # Squeeze output
-                        metric_summarised = torch.squeeze(metric_summarised)
-                        if metric_summarised.dim() > 1:
-                            self.logger.debug(traceback.format_exc())
-                            # Make sure metric summarised is not multidimensional
-                            self.logger.warning(f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}>"+
-                                                f"{sample_name}>"+
-                                                f"{metric}>"+
-                                                f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])} is multidimensional \
-                                                and will not be written to file")
-                            self.logger.warning(f"Shape of summarised metric is {np.shape(metric_summarised)}")
-                            print('\n')
-                            continue
-                        else:
-                            # Add to data records
-                            metric_data_keys = [
-                                "sample_statistic",
-                                "sample_name",
-                                "metric",
-                                "metric_statistic",
-                                "value"
-                            ]
-                            metric_data_vals = [
-                                f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in sample_statistics_axes])}",
-                                f"{sample_name}",
-                                f"{metric}",
-                                f"{'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])}>",
-                                f"{metric_summarised}"
-                            ]                        
-                            metric_data.append(dict(zip(metric_data_keys,metric_data_vals)))
+                        # Get metric data in pandas dataframe
+                        metric_summarised = metric_summarised.to_dataframe().reset_index(drop=True)
+
+                        # Add to data records
+                        metric_data_keys = [
+                            "sample_statistic",
+                            "sample_name",
+                            "metric",
+                            "metric_statistic"
+                        ]
+                        metric_data_vals = [
+                            f"{'|'.join([stringify_statistic(_stat_dim) for _stat_dim in sample_statistics_axes])}",
+                            f"{sample_name}",
+                            f"{metric}",
+                            f"{'|'.join([stringify_statistic(_stat_dim) for _stat_dim in metric_statistics_axes])}",
+                        ]
+                        for _,row in metric_summarised.iterrows():
+                            # Gather all key-value pairs from every row (corresponding to a single sweep setting)
+                            item = {(k if k != metric else 'value'):str(v) for k,v in row.to_dict().items()}
+                            # Add them to list of metric data
+                            metric_data.append(
+                                dict(
+                                    zip(
+                                        metric_data_keys+list(item.keys()),
+                                        metric_data_vals+list(item.values())
+                                    )
+                                )
+                            )
 
                         self.logger.debug(f"Summarised metric is updated to {np.shape(metric_summarised)}")
     
@@ -528,10 +507,10 @@ class OutputSummary(object):
                 print('\n')
                 # raise Exception(f'Arguments for metric {metric} cannot be updated')
             # Pass log intensities as argument
-            metric_arguments['tab0'] = np.log(outputs.load_samples('intensity',slice_samples=True),dtype='float32')
+            metric_arguments['tab0'] = np.log(outputs.get_sample('intensity'),dtype='float32')
         else:
             # Pass ground truth table as argument
-            metric_arguments['tab0'] = outputs.ground_truth_table.to(dtype=int32,device=self.device)
+            metric_arguments['tab0'] = outputs.ground_truth_table
         
         # Pass standard metric arguments
         metric_arguments['kwargs'] = settings_copy
@@ -545,7 +524,6 @@ class Outputs(object):
                  module:str=__name__,
                  settings:dict={}, 
                  output_names:list=['ground_truth_table'], 
-                 slice_samples:bool=True,
                  coordinate_slice:dict={},
                  input_slice:dict={},
                  **kwargs):
@@ -599,7 +577,7 @@ class Outputs(object):
                 for param in self.coordinate_slice.keys():
                     self.config.path_set(
                         settings = self.config.settings,
-                        value = self.coordinate_slice[param]['value'], 
+                        value = self.coordinate_slice[param]['values'], 
                         path = self.coordinate_slice[param]['path']
                     )
             # Update config based on slice of NON-coordinate-like sweeped params
@@ -640,12 +618,30 @@ class Outputs(object):
                             self.settings['table']
                         )
                     )
-                    # Convert to tensor
-                    self.ground_truth_table = torch.tensor(self.ground_truth_table).to(dtype=int32,device=self.device)
+                    # Convert to xarray dataarray
+                    dims = np.shape(self.ground_truth_table)
+                    self.ground_truth_table = xr.DataArray(
+                        data=torch.tensor(self.ground_truth_table).to(dtype=int32,device=self.device),
+                        name='ground_truth_table',
+                        dims=['origin','destination'],
+                        coords=dict(
+                            origin=np.arange(1,dims[0]+1,1,dtype='int32'),
+                            destination=np.arange(1,dims[1]+1,1,dtype='int32')
+                        )
+                    )
+                
                 except:
                     # Try reading it from inputs
                     try:
-                        self.ground_truth_table = self.inputs.table.to(dtype=int32,device=self.device)
+                        self.ground_truth_table = xr.DataArray(
+                            data=self.inputs.table.to(dtype=int32,device=self.device),
+                            name='ground_truth_table',
+                            dims=['origin','destination'],
+                            coords=dict(
+                                origin=np.arange(1,dims[0]+1,1,dtype='int32'),
+                                destination=np.arange(1,dims[1]+1,1,dtype='int32')
+                            )
+                        )
                     except:
                         pass
             
@@ -653,15 +649,17 @@ class Outputs(object):
             if self.ground_truth_table is not None:
                 # Remove it from sample names
                 output_names.remove('ground_truth_table')
-                # Reshape it
-                self.ground_truth_table = self.ground_truth_table.reshape((1,*self.ground_truth_table.shape))
                 # Extract metadata
-                self.settings['table_total'] = self.ground_truth_table.ravel().sum()
+                self.settings['table_total'] = self.ground_truth_table.values.ravel().sum()
                 self.settings['dims'] = list(np.shape(self.ground_truth_table))
                 self.logger.info(f'Ground truth table loaded')
 
             # Load output h5 file to xarrays
-            self.load_h5_data(config,coordinate_slice=self.coordinate_slice)
+            self.load_h5_data(
+                config,
+                coordinate_slice=self.coordinate_slice,
+                slice_samples=kwargs.get('slice_samples',True)
+            )
             
             # Try to load all output data
             for sample_name in output_names:
@@ -670,13 +668,12 @@ class Outputs(object):
                     self.data,
                     sample_name, 
                     self.get_sample(
-                        sample_name,
-                        slice_samples = slice_samples
+                        sample_name
                     )
                 )
-                if sample_name == 'table' and self.settings['table_total'] != 1:
-                    self.settings['table_total'] = torch.sum(torch.tensor(self.data.table).ravel())
-                self.logger.info(f'Sample {sample_name} loaded with shape {list(getattr(self.data,sample_name).shape)}')
+                if sample_name == 'table' and self.settings['table_total'] == 1:
+                    self.settings['table_total'] = self.data.table.sum(dim=['origin','destination']).values[0]
+                self.logger.info(f'Sample {sample_name} loaded with shape {get_dims(getattr(self.data,sample_name))}')
                 # except:
                 #     self.logger.debug(traceback.format_exc())
                 #     self.logger.warning(f'Sample {sample_name} could not be loaded')
@@ -825,7 +822,7 @@ class Outputs(object):
                 self.h5group = self.h5file.create_group(self.experiment_id)
                 # Store sweep configurations as attributes 
                 self.h5group.attrs.create("sweep_params",list(sweep_params.keys()))
-                self.h5group.attrs.create("sweep_values",['' if val is None else val for val in sweep_params.values()])
+                self.h5group.attrs.create("sweep_values",['' if val is None else str(val) for val in sweep_params.values()])
                 # Update log filename
                 if isinstance(self.logger,logging.Logger):
                     for i,hand in enumerate(self.logger.handlers):
@@ -842,7 +839,6 @@ class Outputs(object):
 
 
     def slice_sample_iterations(self,samples):
-
         # Get burnin parameter
         burnin = min(self.settings.get('burnin',1),samples.shape[0])
 
@@ -892,7 +888,7 @@ class Outputs(object):
                     else:
                         # Get iterations
                         iters = np.arange(start=1,stop=sample_data.shape[0]+1,step=1,dtype='int32')
-                    coords['iter'] = iters.tolist()
+                    coords['iter'] = iters
                     # Append
                     self.logger.debug(f'Appending {sample_name}')
                     data_vars[sample_name] = np.array([sample_data[:]])
@@ -928,13 +924,14 @@ class Outputs(object):
                         pbar.update(1)
             # Gather all data
             # self.logger.setLevel(logging.DEBUG)
+
+            # self.logger.info(f"Read coords")
             for filename in tqdm(h5files,desc='Gathering data',leave=False):
                 file_coords = h5data[str(filename)]['coords']
                 file_data_vars = h5data[str(filename)]['data_vars']
                 # print({k:np.shape(v) for k,v in file_coords.items()})
                 # print({k:np.shape(v) for k,v in file_data_vars.items()})
                 # Read coords
-                self.logger.debug(f"Read coords")
                 if len(coords) > 0:
                     for k,v in file_coords.items():
                         self.logger.debug(f"{k}")
@@ -942,18 +939,18 @@ class Outputs(object):
                             coords[k].update(v)
                 else:
                     coords = deepcopy(file_coords)
-                # Read data
-                self.logger.debug(f"Read data")
-                for sample_name,sample_data in file_data_vars.items():
-                    self.logger.debug(f"{sample_name}")
-                    if sample_name in list(data_vars.keys()) and len(data_vars) > 0:
-                        data_vars[sample_name] = np.append(
-                            data_vars[sample_name],
-                            sample_data,
-                            axis=0
-                        )
-                    else:
-                        data_vars[sample_name] = deepcopy(sample_data)
+            # Read data
+            # self.logger.info(f"Read data")
+            for sample_name,sample_data in file_data_vars.items():
+                self.logger.debug(f"{sample_name}")
+                if sample_name in list(data_vars.keys()) and len(data_vars) > 0:
+                    data_vars[sample_name] = np.append(
+                        data_vars[sample_name],
+                        sample_data,
+                        axis=0
+                    )
+                else:
+                    data_vars[sample_name] = deepcopy(sample_data)
         else:
             # Do it sequentially
             for filename in tqdm(h5files,desc='Reading h5 file(s) in sequence',leave=False):
@@ -966,7 +963,8 @@ class Outputs(object):
                 # Read coords
                 if len(coords) > 0:
                     for k,v in file_coords.items():
-                        coords[k].update(v)
+                        if k != 'iter':
+                            coords[k].update(v)
                 else:
                     coords = deepcopy(file_coords)
                 
@@ -989,60 +987,55 @@ class Outputs(object):
         h5files = list(Path(os.path.join(output_path,'samples')).rglob("*.h5"))
         # Sort them by seed
         h5files = sorted(h5files, key = lambda x: int(str(x).split('seed_')[1].split('/',1)[0]) if 'seed' in str(x) else str(x))
-        # Store data attributes for xarray
-        data_variables = {}
         # Read h5 data
         coords,data_vars = self.read_h5_data(h5files,slice_samples=slice_samples)
         # Convert set to list
         coords = {k:np.array(list(v)) for k,v in coords.items()}
-        print(coords['sigma'])
-        print('after',{k:np.shape(v) for k,v in coords.items()})
         # print('coords',coords)
         # print({k:np.shape(v) for k,v in data_vars.items()})
+        
         # Create an xarray dataset for each sample
-        for sample_name,sample_data in tqdm(data_vars.items(),desc='Creating xarray dataset(s)'):
-            # self.logger.debug(sample_name)
-            # Get data dims
-            print(sample_name,np.shape(sample_data))
-            print("\n")
-            # dims = np.shape(sample_data)[1:]
-            # coordinates = {}
-            # # For each dim create coordinate
-            # for i,d in enumerate(dims):
-            #     obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
-            #     # Create coordinate ranges based on schema
-            #     coordinates[XARRAY_SCHEMA[sample_name]['coords'][i]] = deep_call(
-            #         globals()[obj],
-            #         func,
-            #         None,
-            #         start=1,
-            #         stop=d+1,
-            #         step=1
-            #     ).astype(XARRAY_SCHEMA[sample_name]['args_dtype'][i])
+        for sample_name,sample_data in tqdm(data_vars.items(),desc='Creating xarray dataset(s)',leave=False):
+
+            coordinates = {}
+            # Ignore first two dimensions
+            # First dimension is the sweep dimension
+            # Second dimension is the number of iterations per sweep
+            if len(np.shape(sample_data)) > 2:
+                # Get data dims
+                dims = np.shape(sample_data)[2:]
+                # # For each dim create coordinate
+                for i,d in enumerate(dims):
+                    obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
+                    # Create coordinate ranges based on schema
+                    coordinates[XARRAY_SCHEMA[sample_name]['coords'][i]] = deep_call(
+                        globals()[obj],
+                        func,
+                        None,
+                        start=1,
+                        stop=d+1,
+                        step=1
+                    ).astype(XARRAY_SCHEMA[sample_name]['args_dtype'][i])
             
             # Update coordinates to include schema and sweep coordinates
             # print('coordinates',coordinates.keys())
             # print('coords',coords.keys())
-            coordinates = {k:v for k,v in coords.items() if k != sample_name}
+            coordinates = {**{k:v for k,v in coords.items() if k != sample_name},**coordinates}
             
             # For each coordinate name
             # get data variable
-            print(sample_name)
-            print('coordinates')
+            print(sample_name,np.shape(sample_data))
+            print({k:np.shape(v) for k,v in coords.items()})
             print({k:np.shape(v) for k,v in coordinates.items()})
-            print('data')
-            print(np.shape(sample_data),[np.shape(val) for val in coordinates.values()])
-            # if len(coordinates.keys()) > 0:
-            data_variables[sample_name] = (
-                list(coordinates.keys()),
-                sample_data.reshape(tuple([len(val) for val in coordinates.values()]))
-            )
-            # else:
-                # data_variables[sample_name] = sample_data
-            
-            # Create xarray dataset
-            xr_data = xr.Dataset(
-                data_vars = {sample_name:data_variables[sample_name]},
+            data = torch.tensor(sample_data.reshape(tuple([len(val) for val in coordinates.values()]))).to(
+                    dtype=DATA_TYPES[sample_name],
+                    device=self.device
+                )
+
+            # Create xarray dataarray
+            xr_data = xr.DataArray(
+                name = sample_name,
+                data = data,
                 coords = coordinates,
                 attrs = dict(
                     experiment_id = self.experiment_id
@@ -1057,8 +1050,6 @@ class Outputs(object):
             
             # Store dataset
             setattr(self._data,sample_name,xr_data)
-            
-            print(sample_name,getattr(self._data,sample_name).coords,getattr(self._data,sample_name).sizes)
             
 
     def check_data_availability(self,sample_name:str,input_names:list=[],output_names:list=[]):
@@ -1078,7 +1069,7 @@ class Outputs(object):
                 self.logger.error(f"Sample {sample_name} requires output {output} which does not exist in {','.join(vars(self._data))}")
         return available
 
-    def get_sample(self,sample_name:str,slice_samples:bool=True):
+    def get_sample(self,sample_name:str):
 
         if sample_name == 'intensity':
             # Get sim model 
@@ -1093,7 +1084,7 @@ class Outputs(object):
             # Prepare input arguments 
             data = {}
             for input in sim_model.REQUIRED_INPUTS:
-                data[input] = self.get_sample(input,slice_samples)
+                data[input] = self.get_sample(input)
 
             # Compute intensities for all samples
             table_total = self.settings.get('table_total') if self.settings.get('table_total',-1.0) > 0 else 1.0
@@ -1105,25 +1096,28 @@ class Outputs(object):
                 logger=self.logger
             )
             
-            data = {}
+            data = []
             # Prepare output arguments
             for output in sim_model.REQUIRED_OUTPUTS:
-                data[output] = torch.tensor(
-                    self.get_sample(output,slice_samples)
-                ).to(dtype=OUTPUT_TYPES[output],device=self.device)
-
-            # Compute log intensity function
-            samples = sim.log_intensity(
-                grand_total=torch.tensor(table_total,dtype=int32),
-                **data
+                data.append(self.get_sample(output))
+            # Merge into xarray dataset
+            data = xr.merge(data)
+            # Group by non core coordinates and compute log intensity
+            samples = data.groupby('sweep').apply(
+                lambda group: sim.log_intensity(
+                    grand_total = torch.tensor(table_total,dtype=int32),
+                    torch = False,
+                    **group
+                )
             )
-
+            # Create new dataset
+            samples = samples.rename('intensity')
             # Exponentiate
-            samples = torch.exp(samples).to(dtype=float32,device=self.device)
+            samples = samples.groupby('sweep').apply(np.exp)
 
         elif sample_name.endswith("__error"):
             # Load all samples
-            samples = self.get_sample(sample_name.replace("__error",""),slice_samples)
+            samples = self.get_sample(sample_name.replace("__error",""))
             # Make sure you have ground truth
             try:
                 assert self.ground_truth_table is not None
@@ -1140,7 +1134,15 @@ class Outputs(object):
                 log_to_console=False,
                 logger=self.logger
             )
-            samples = torch.tensor(ct.table).int().reshape((1,*ct.dims))
+            samples = xr.DataArray(
+                data=torch.tensor(ct.table).int(),
+                name='ground_truth_table',
+                dims=['origin','destination'],
+                coords=dict(
+                    origin=np.arange(1,ct.dims[0]+1,1,dtype='int32'),
+                    destination=np.arange(1,ct.dims[1]+1,1,dtype='int32')
+                )
+            )
         
         elif str_in_list(sample_name, INPUT_TYPES.keys()):
             # Get sim model 
@@ -1161,35 +1163,21 @@ class Outputs(object):
                 raise Exception(f"{sample_name} not found in output data {','.join(vars(self._data).keys())}")
             
             # Get xarray
-            xr_samples = getattr(self._data,sample_name)
+            samples = getattr(self._data,sample_name)
+            
+            # Find iteration coordinates
+            iter_coords = [x for x in samples.dims if x in ['iter','seed']]
+            # Find sweep coordinates that are not iteration-related
+            sweep_coords = [d for d in samples.dims if d not in CORE_COORDINATES+['N']]
 
-            # Apply burning, thinning and trimming
-            if slice_samples:
-                xr_samples = self.slice_sample_iterations(xr_samples)
-            # Remove non-core coordinates
-            noncore_coords = list(set(xr_samples.dims) - set(XARRAY_SCHEMA[sample_name]['coords']))
             # Stack all non-core coordinates into new coordinate
-            xr_samples = xr_samples.stack(new_iter=(noncore_coords+['iter']))
-            # Get number of samples
-            N = xr_samples['new_iter'].shape[0]
-            # Convert xarray DataSet to DataArray
-            xr_samples = xr_samples[sample_name]
-            # Convert to torch
-            samples = torch.tensor(xr_samples.values)
-            # Cast to specific data type
-            samples = samples.to(OUTPUT_TYPES[sample_name])
-            # Reshape
-            dims = {"N":N,"I":self.inputs.data.dims[0],"J":self.inputs.data.dims[1],"T":self.inputs.data.destination_attraction_ts.shape[0]}
-            # print(sample_name,samples.shape)
-            samples = samples.reshape(*[string_to_numeric(var) if var.isnumeric() else dims.get(var,None) for var in XARRAY_SCHEMA[sample_name]['new_shape']])
-            # print(sample_name,samples.shape)
-            # print('\n')
+            samples = samples.stack(N=tuplize(iter_coords),sweep=tuplize(sweep_coords))
 
             # If parameter is beta, scale it by bmax
             if sample_name == 'beta' and self.intensity_model_class == 'spatial_interaction_model':
                 samples *= self.config.settings[self.intensity_model_class]['parameters']['bmax']
-            
-        return samples.to(device=self.device)
+        
+        return samples
 
     def load_geometry(self,geometry_filename,default_crs:str='epsg:27700'):
         # Load geometry from file
@@ -1226,13 +1214,18 @@ class Outputs(object):
         # filename += f"_N{self.config['mcmc']['N']}"
         return filename
 
-    def compute_sample_statistics(self,data,sample_name,statistic,axis:int=0):
+    def compute_sample_statistics(self,data,sample_name,statistic,**kwargs):
         # print('compute_sample_statistics',sample_name,type(data),statistic,axis)
-        if statistic is None or statistic.lower() == '' or 'sample' in statistic.lower():
+        if statistic is None or statistic.lower() == '' or 'sample' in statistic.lower() or len(kwargs.get('dim',[])) == 0:
             return data
         
         elif not str_in_list(sample_name,OUTPUT_TYPES.keys()):
-            return convert_string_to_torch_function(statistic)(data.float(),dim=axis).to(dtype=float32)
+            return deep_call(
+                data,
+                f".{statistic}(dim)",
+                data,
+                dim=kwargs['dim']
+            )
         
         elif statistic.lower() == 'signedmean' and \
             str_in_list(sample_name,OUTPUT_TYPES.keys()): 
@@ -1240,9 +1233,9 @@ class Outputs(object):
                 and hasattr(self.data,'sign'):
                 signs = self.data.sign.unsqueeze(1)
                 # Compute moments
-                return ( torch.einsum('nk,n...->k...',signs.float(),data.float()) / torch.sum(torch.ravel(signs.float()))).to(dtype=float32)
+                return ( torch.einsum('nk,n...->k...',signs.float(),data.float()) / torch.sum(torch.ravel(signs.float())))
             else:
-                return self.compute_sample_statistics(data,sample_name,'mean',axis)
+                return self.compute_sample_statistics(data,sample_name,'mean',kwargs['axis'])
        
         elif (statistic.lower() == 'signedvariance' or statistic.lower() == 'signedvar') and \
             str_in_list(sample_name,OUTPUT_TYPES.keys()):
@@ -1251,11 +1244,17 @@ class Outputs(object):
                 and hasattr(self.data,'sign'):
                 signs = self.data.sign.unsqueeze(1)
                 # Compute intensity variance
-                samples_mean = self.compute_sample_statistics(data,sample_name,'signedmean',axis)
+                samples_mean = self.compute_sample_statistics(data,sample_name,'signedmean',**kwargs)
                 samples_squared_mean = np.einsum('nk,n...->k...',signs,torch.pow(data.float(),2)) / torch.sum(torch.ravel(signs.float()))
-                return (samples_squared_mean.float() - torch.pow(samples_mean.float(),2)).to(dtype=float32)
+                return (samples_squared_mean.float() - torch.pow(samples_mean.float(),2))
             else:
-                return self.compute_sample_statistics(data,sample_name,'var',axis)
+                return deep_call(
+                    data,
+                    f".var(dim)",
+                    data,
+                    dim=kwargs['dim']
+                )
+                # return self.compute_sample_statistics(data,sample_name,'var',**kwargs)
         
         elif statistic.lower() == 'error' and \
             str_in_list(sample_name,[param for param in OUTPUT_TYPES.keys() if 'error' not in param]):
@@ -1268,56 +1267,59 @@ class Outputs(object):
             )
        
         else:
-            return convert_string_to_torch_function(statistic)(data.float(),dim=axis).to(dtype=float32)
-
-    def apply_sample_statistics(self,samples,sample_name,statistic_axes:Union[List,Tuple]=[]):
+            return deep_call(
+                data,
+                f".{statistic}(dim)",
+                data,
+                dim=kwargs['dim']
+            )
+            # convert_string_to_torch_function(statistic)(data)
+    
+    def apply_sample_statistics(self,samples,sample_name,statistic_dims:Union[List,Tuple]=[]):
         # print('apply_sample_statistics',sample_name,statistic_axes)
         
-        if isinstance(statistic_axes,Tuple):
-            statistic_axes = [statistic_axes]
+        if isinstance(statistic_dims,Tuple):
+            statistic_dims = [statistic_dims]
         sample_statistic = samples
         
         # For every collection of statistic-axes
-        for stats,axes in statistic_axes:
+        for stats,dims in statistic_dims:
             # print('stats',type(stats),stats)
-            # print('axes',type(axes),axes)
+            # print('dims',type(dims),dims)
             # Extract statistics and axes tuples applied to specific sample
             if isinstance(stats,str) and '|' in stats and len(stats):
                 stats_list = [s for s in stats.split('|') if len(s) > 0]
             else:
                 stats_list = [stats]
-            if isinstance(axes,str) and '|' in axes:
-                axes_list = [a if len(a) > 0 else None for a in axes.split('|')]
+            if isinstance(dims,str) and '|' in dims:
+                dims_list = [a if len(a) > 0 else None for a in dims.split('|')]
             else:
-                axes_list = [axes]
+                dims_list = [dims]
             
             # If no stats applied, move on
             if len(stats_list) == 0:
                 continue
 
             # print('stats_list',type(stats_list),stats_list)
-            # print('axes_list',type(axes_list),axes_list)
+            # print('dims_list',type(dims_list),dims_list)
             # Sequentially apply all the statistics along the corresponding axes tuple
             for i in range(len(stats_list)):
-                stat,ax = stats_list[i],axes_list[i]
+                stat,dim = stats_list[i],dims_list[i]
                 
                 # Skip computation if no statistic is provided
                 if isinstance(stat,str) and len(stat) == 0:
                     continue
-
-                # print('stat',type(stat),stat)
-                # print('ax',type(ax),ax)
                 # Convert axes to tuple of integers
-                if isinstance(ax,(str)):
-                    ax = list(map(int,ax.split('_')))
-                elif hasattr(ax,'__len__'):
-                    ax = list(map(int,ax))
+                if isinstance(dim,(str)):
+                    dim = list(map(str,dim.split('_')))
+                elif hasattr(dim,'__len__'):
+                    dim = list(map(str,dim))
 
                 sample_statistic = self.compute_sample_statistics(
                                         data=sample_statistic,
                                         sample_name=sample_name,
                                         statistic=stat,
-                                        axis=tuplize(ax)
+                                        dim=dim
                                     )
                 # print(sample_statistic.shape)
 

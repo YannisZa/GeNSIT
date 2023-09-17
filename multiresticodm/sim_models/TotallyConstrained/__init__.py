@@ -1,5 +1,7 @@
 import torch
+import xarray as xr
 
+from numpy import arange,shape
 from torch import int8,float32,int32,float64,int64,bool
 
 from multiresticodm.global_variables import NUMBA_PARALLELISE
@@ -134,23 +136,50 @@ from multiresticodm.global_variables import NUMBA_PARALLELISE
 
 
 def _log_flow_matrix(**kwargs):
-
     # Get parameters
-    log_destination_attraction = kwargs['log_destination_attraction']
+    device = kwargs.get('device','cpu')
+    tensor = kwargs.get('torch',True)
+    
+    grand_total = kwargs.get('grand_total',None)
     cost_matrix = kwargs['cost_matrix']
+    
+    log_destination_attraction = kwargs['log_destination_attraction']
     alpha = kwargs['alpha']
     beta = kwargs['beta']
-    grand_total = kwargs.get('grand_total',None)
-    device = kwargs.get('device','cpu')
-
+    
     # Extract dimensions
-    nrows,ncols = cost_matrix.size(dim=0), cost_matrix.size(dim=1)
-    N = log_destination_attraction.size(dim=0) if log_destination_attraction.ndim > 2 else 1
-    log_flow = torch.zeros((N,nrows,ncols)).to(dtype=float32,device=device)
+    origin,destination = cost_matrix.size(dim=0), cost_matrix.size(dim=1)
+    
+    # If input is torch use the following code
+    if tensor:
+        N = log_destination_attraction.size(dim=0) if log_destination_attraction.ndim > 2 else 1
+        time = log_destination_attraction.size(dim=1) if log_destination_attraction.ndim > 2 else log_destination_attraction.size(dim=0)
+    # If input is xarray use the following code
+    else:
+        # Extract dimensions
+        N = log_destination_attraction['N'].shape[0]
+        time = log_destination_attraction['time'].shape[0]
+        # Use the .sel() method to select the dimensions you want to convert
+        log_destination_attraction = log_destination_attraction.sel(
+            **{dim: slice(None) for dim in ['N','time','destination']}
+        )
+        alpha = alpha.sel(N=slice(None))
+        beta = beta.sel(N=slice(None))
+        # Convert the selected_data to torch tensor
+        log_destination_attraction = torch.tensor(
+            log_destination_attraction.values
+        ).to(dtype=float32,device=device)
+        alpha = torch.tensor(
+            alpha.values
+        ).to(dtype=float32,device=device)
+        beta = torch.tensor(
+            beta.values
+        ).to(dtype=float32,device=device)
 
+    log_flow = torch.zeros((N,origin,destination)).to(dtype=float32,device=device)
     # Reshape tensors to ensure operations are possible
-    log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,ncols))
-    cost_matrix = torch.reshape(cost_matrix,(1,nrows,ncols))
+    log_destination_attraction = torch.reshape(log_destination_attraction,(N,time,destination))
+    cost_matrix = torch.reshape(cost_matrix,(1,origin,destination))
     alpha = torch.reshape(alpha,(N,1,1))
     beta = torch.reshape(beta,(N,1,1))
 
@@ -163,8 +192,21 @@ def _log_flow_matrix(**kwargs):
     normalisation = torch.reshape(normalisation,(N,1,1))
     # Evaluate log flow scaled
     log_flow = log_utility - normalisation + torch.log(grand_total).to(device=log_utility.device)
-
-    return log_flow
+    
+    if kwargs.get('torch',True):
+        # Return torch tensor
+        return log_flow
+    else:
+        group = {}
+        group['N'] = kwargs['log_destination_attraction'].coords['N']
+        group['origin'] = arange(1,origin+1,1,dtype='int32')
+        group['destination'] = arange(1,destination+1,1,dtype='int32')
+        # Create outputs xr data array
+        return xr.DataArray(
+            data=log_flow.detach().cpu().numpy(), 
+            dims=list(group.keys()),
+            coords=group
+        ) 
 
 def _destination_demand(**kwargs):
     # Compute log flow

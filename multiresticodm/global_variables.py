@@ -15,83 +15,85 @@ PARAMETER_DEFAULTS = {
     'noise_percentage': 3,
 }
 
+CORE_COORDINATES = ['iter','seed','time','origin','destination','N']
+
 XARRAY_SCHEMA = {
     'alpha': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     }, 
     'beta': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     }, 
     'kappa': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     }, 
     'delta': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     }, 
     'sigma': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     }, 
     'log_destination_attraction': {
-        "coords":["iter","time","destination"],
-        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
-        "args_dtype":["int32","int32","int32"],
+        "coords":["time","destination"],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
         "new_shape":["N","T","J"]
     },
     'table': {
-        "coords":["iter","origin","destination"],
-        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
-        "args_dtype":["int32","int32","int32"],
+        "coords":["origin","destination"],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
         "new_shape":["N","I","J"]
     },
     'loss': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     },
     'log_target': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     },
     'theta_acc': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     },
     'log_destination_attraction_acc': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     },
     'table_acc': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     },
     'computation_time': {
-        "coords":["iter"],
-        "funcs":[("np",".arange(start,stop,step)")],
-        "args_dtype":["int32"],
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
         "new_shape":["N","1"]
     },
 }
