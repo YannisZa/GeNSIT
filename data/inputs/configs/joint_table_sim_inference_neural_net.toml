@@ -90,7 +90,7 @@ to_learn = ['alpha', 'beta', 'kappa']
   comment = 'Independent joint Table and Spatial interaction model parameter learning using neural networks'
   disable_tqdm = false
   print_statements = true
-  export_samples = true
+  export_samples = false
   export_metadata = true
   overwrite = true
 
@@ -100,7 +100,7 @@ to_learn = ['alpha', 'beta', 'kappa']
   comment = 'Independent joint Table and Spatial interaction model parameter learning using neural networks'
   disable_tqdm = false
   print_statements = true
-  export_samples = true
+  export_samples = false
   export_metadata = true
   overwrite = true
 
