@@ -7,7 +7,7 @@ import torch.distributions as distr
 from typing import Union, Tuple
 from torch import int32, float32
 
-from multiresticodm.math_utils import log_factorial
+from multiresticodm.math_utils import log_factorial_sum
 
 def uniform_binary_choice(n:int=1):
     choices = [-1,1]
@@ -71,7 +71,7 @@ def log_poisson_pmf_unnormalised(log_intensity:torch.tensor,table:torch.tensor) 
     # Compute log intensity total
     log_total = torch.logsumexp(log_intensity.ravel(),dim=0)
     # Compute log pmf
-    return -torch.exp(log_total) + (table.to(dtype=float32)*log_intensity).sum() - log_factorial(1,table.ravel()).sum()
+    return -torch.exp(log_total) + (table.to(dtype=float32)*log_intensity).sum() - log_factorial_sum(table.ravel())
 
 
 def log_poisson_pmf_normalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
@@ -93,11 +93,11 @@ def log_multinomial_pmf_unnormalised(log_intensity:torch.tensor,table:torch.tens
     # Normalise log intensites by log rowsums to create multinomial probabilities
     log_probabilities = (log_intensity - torch.logsumexp(log_intensity.ravel(),dim=0))
     # Compute log pmf
-    return (table.to(dtype=float32).ravel()*log_probabilities.ravel()).sum() - log_factorial(1,table.ravel()).sum()
+    return (table.to(dtype=float32).ravel()*log_probabilities.ravel()).sum() - log_factorial_sum(table.ravel())
 
 def log_multinomial_pmf_normalised(log_intensity:torch.tensor,table:torch.tensor,) -> float:
     # Return log pmf
-    return ((log_multinomial_pmf_unnormalised(log_intensity,table)) + log_factorial(1,table.sum())).to(dtype=float32)
+    return ((log_multinomial_pmf_unnormalised(log_intensity,table)) + log_factorial_sum(table.sum())).to(dtype=float32)
 
 
 def multinomial_pmf_ground_truth(log_intensity:torch.tensor,table:torch.tensor,axis:int=None) -> float:
@@ -118,13 +118,13 @@ def log_product_multinomial_pmf_unnormalised(log_intensity:torch.tensor,table:to
     # Normalise log intensites by log rowsums to create multinomial probabilities
     log_probabilities = (log_intensity - log_rowsums)
     # Compute log pmf
-    return (table.to(dtype=float32).ravel()*log_probabilities.ravel()).sum() - log_factorial(1,table.ravel()).sum()
+    return (table.to(dtype=float32).ravel()*log_probabilities.ravel()).sum() - log_factorial_sum(table.ravel())
 
 
 def log_product_multinomial_pmf_normalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
     # Return log pmf
     log_target = log_product_multinomial_pmf_unnormalised(log_intensity,table) + \
-        log_factorial(1,table.sum(dim=1).to(dtype=int32)).sum()    
+        log_factorial_sum(table.sum(dim=1).to(dtype=int32))
     return log_target
 
 
@@ -151,12 +151,12 @@ def log_fishers_hypergeometric_pmf_unnormalised(log_intensity:torch.tensor,table
     log_or_colsums = torch.logsumexp(log_or,dim=0).unsqueeze(0).to(dtype=float32)
     log_or_probabilities = log_or - log_or_colsums
     # Compute log pmf
-    return (table.to(dtype=float32).ravel() * log_or_probabilities.ravel()).sum() - log_factorial(1,table.ravel()).sum()
+    return (table.to(dtype=float32).ravel() * log_or_probabilities.ravel()).sum() - log_factorial_sum(1,table.ravel()).sum()
 
 def log_fishers_hypergeometric_pmf_normalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
     # Return log pmf
     return  log_fishers_hypergeometric_pmf_unnormalised(log_intensity,table) + \
-        log_factorial(1,table.sum(dim=0).to(dtype=int32)).sum()
+        log_factorial_sum(1,table.sum(dim=0).to(dtype=int32))
 
 
 def fishers_hypergeometric_pmf_ground_truth(log_intensity:torch.tensor,table:torch.tensor,axis:int=None) -> float:

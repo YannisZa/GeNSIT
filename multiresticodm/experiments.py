@@ -59,7 +59,7 @@ class ExperimentHandler(object):
 
     def __init__(self, config:Config, **kwargs):
         # Import logger
-        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
         self.logger = setup_logger(
             __name__,
             level = level,
@@ -68,7 +68,7 @@ class ExperimentHandler(object):
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
         self.logger.setLevel(level)
-
+        
         # Get configuration
         self.config = config
         # Store experiment name to list index dictionary
@@ -127,7 +127,7 @@ class ExperimentHandler(object):
 class Experiment(object):
     def __init__(self, config:Config, **kwargs):
         # Create logger
-        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
             level = level,
@@ -199,6 +199,9 @@ class Experiment(object):
         # if self.device == 'cuda':
             # set_device_id(f"cuda:{device_id}")
         # print('currrent_device',torch.cuda.current_device())
+
+        # Disable tqdm if needed
+        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
 
         # Count the number of gradient descent steps
         self._time = 0
@@ -356,130 +359,133 @@ class Experiment(object):
         )
         return parameter_inits,parameter_acceptances
 
-    def initialise_data_structures(self):        
-        # Get dimensions
-        dims = self.config['inputs']['dims']
-        
-        # Setup neural net loss
-        if str_in_list('loss',self.output_names):
-            # Setup chunked dataset to store the state data in
-            self.losses = self.outputs.h5group.create_dataset(
-                'loss',
-                (0,),
-                maxshape=(None,),
-                chunks=True,
-                compression=3,
-            )
-            self.losses.attrs['dim_names'] = XARRAY_SCHEMA['loss']['coords']
-            self.losses.attrs['coords_mode__time'] = 'start_and_step'
-            self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
-        
-        # Setup sampled/predicted log destination attractions
-        if str_in_list('log_destination_attraction',self.output_names):
-            self.log_destination_attractions = self.outputs.h5group.create_dataset(
-                "log_destination_attraction",
-                (0,self.inputs.data.destination_attraction_ts.shape[0],dims[1]),
-                maxshape=(None,self.inputs.data.destination_attraction_ts.shape[0],dims[1]),
-                chunks=True,
-                compression=3,
-            )
-            self.log_destination_attractions.attrs["dim_names"] = XARRAY_SCHEMA['log_destination_attraction']['coords']
-            self.log_destination_attractions.attrs["coords_mode__time"] = "start_and_step"
-            self.log_destination_attractions.attrs["coords__time"] = [self._write_start, self._write_every]
-        
-        # Setup computation time
-        if str_in_list('computation_time',self.output_names):
-            self.compute_time = self.outputs.h5group.create_dataset(
-                'computation_time',
-                (0,),
-                maxshape=(None,),
-                chunks=True,
-                compression=3,
-            )
-            self.compute_time.attrs['dim_names'] = XARRAY_SCHEMA['computation_time']['coords']
-            self.compute_time.attrs['coords_mode__epoch'] = 'trivial'
+    def initialise_data_structures(self):
 
-        # Setup sampled/predicted theta
-        if str_in_list('theta',self.output_names):
-            predicted_thetas = []
-            for p_name in self.theta_names:
-                dset = self.outputs.h5group.create_dataset(
-                    p_name, 
-                    (0,), 
-                    maxshape=(None,), 
-                    chunks=True, 
-                    compression=3
-                )
-                dset.attrs['dim_names'] = XARRAY_SCHEMA[p_name]['coords']
-                dset.attrs['coords_mode__time'] = 'start_and_step'
-                dset.attrs['coords__time'] = [self._write_start, self._write_every]
+        if self.config.settings.get('export_samples',True):
 
-                predicted_thetas.append(dset)
-            self.thetas = predicted_thetas
-        
-        # Setup sampled signs
-        if str_in_list('sign',self.output_names):
-            self.signs = self.outputs.h5group.create_dataset(
-                "sign",
-                (0,),
-                maxshape=(None,),
-                chunks=True,
-                compression=3,
-            )
-            self.signs.attrs["dim_names"] = XARRAY_SCHEMA['sign']['coords']
-            self.signs.attrs["coords_mode__time"] = "start_and_step"
-            self.signs.attrs["coords__time"] = [self._write_start, self._write_every]
-
-        # Setup sampled tables
-        if str_in_list('table',self.output_names):
-            self.tables = self.outputs.h5group.create_dataset(
-                "table",
-                (0,*dims),
-                maxshape=(None,*dims),
-                chunks=True,
-                compression=3,
-            )
-            self.tables.attrs["dim_names"] = ["origin","destination","iter"]
-            self.tables.attrs["coords_mode__time"] = "start_and_step"
+            # Get dimensions
+            dims = self.config['inputs']['dims']
             
-        # Setup acceptances
-        if str_in_list('theta_acc',self.output_names):
-            # Setup chunked dataset to store the state data in
-            self.theta_acc = self.outputs.h5group.create_dataset(
-                'theta_acceptance',
-                (0,),
-                maxshape=(None,),
-                chunks=True,
-                compression=3,
-            )
-            self.losses.attrs['dim_names'] = XARRAY_SCHEMA['theta_acceptance']['coords']
-            self.losses.attrs['coords_mode__time'] = 'start_and_step'
-            self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
-        if str_in_list('log_destination_attraction_acc',self.output_names):
-            # Setup chunked dataset to store the state data in
-            self.log_destination_attraction_acc = self.outputs.h5group.create_dataset(
-                'log_destination_attraction_acceptance',
-                (0,),
-                maxshape=(None,),
-                chunks=True,
-                compression=3,
-            )
-            self.losses.attrs['dim_names'] = XARRAY_SCHEMA['log_destination_attraction_acc']['coords']
-            self.losses.attrs['coords_mode__time'] = 'start_and_step'
-            self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
-        if str_in_list('table_acc',self.output_names):
-            # Setup chunked dataset to store the state data in
-            self.table_acc = self.outputs.h5group.create_dataset(
-                'table_acceptance',
-                (0,),
-                maxshape=(None,),
-                chunks=True,
-                compression=3,
-            )
-            self.losses.attrs['dim_names'] = XARRAY_SCHEMA['table_acc']['coords']
-            self.losses.attrs['coords_mode__time'] = 'start_and_step'
-            self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
-    
+            # Setup neural net loss
+            if str_in_list('loss',self.output_names):
+                # Setup chunked dataset to store the state data in
+                self.losses = self.outputs.h5group.create_dataset(
+                    'loss',
+                    (0,),
+                    maxshape=(None,),
+                    chunks=True,
+                    compression=3,
+                )
+                self.losses.attrs['dim_names'] = XARRAY_SCHEMA['loss']['coords']
+                self.losses.attrs['coords_mode__time'] = 'start_and_step'
+                self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+            
+            # Setup sampled/predicted log destination attractions
+            if str_in_list('log_destination_attraction',self.output_names):
+                self.log_destination_attractions = self.outputs.h5group.create_dataset(
+                    "log_destination_attraction",
+                    (0,self.inputs.data.destination_attraction_ts.shape[0],dims[1]),
+                    maxshape=(None,self.inputs.data.destination_attraction_ts.shape[0],dims[1]),
+                    chunks=True,
+                    compression=3,
+                )
+                self.log_destination_attractions.attrs["dim_names"] = XARRAY_SCHEMA['log_destination_attraction']['coords']
+                self.log_destination_attractions.attrs["coords_mode__time"] = "start_and_step"
+                self.log_destination_attractions.attrs["coords__time"] = [self._write_start, self._write_every]
+            
+            # Setup computation time
+            if str_in_list('computation_time',self.output_names):
+                self.compute_time = self.outputs.h5group.create_dataset(
+                    'computation_time',
+                    (0,),
+                    maxshape=(None,),
+                    chunks=True,
+                    compression=3,
+                )
+                self.compute_time.attrs['dim_names'] = XARRAY_SCHEMA['computation_time']['coords']
+                self.compute_time.attrs['coords_mode__epoch'] = 'trivial'
+
+            # Setup sampled/predicted theta
+            if str_in_list('theta',self.output_names):
+                predicted_thetas = []
+                for p_name in self.theta_names:
+                    dset = self.outputs.h5group.create_dataset(
+                        p_name, 
+                        (0,), 
+                        maxshape=(None,), 
+                        chunks=True, 
+                        compression=3
+                    )
+                    dset.attrs['dim_names'] = XARRAY_SCHEMA[p_name]['coords']
+                    dset.attrs['coords_mode__time'] = 'start_and_step'
+                    dset.attrs['coords__time'] = [self._write_start, self._write_every]
+
+                    predicted_thetas.append(dset)
+                self.thetas = predicted_thetas
+            
+            # Setup sampled signs
+            if str_in_list('sign',self.output_names):
+                self.signs = self.outputs.h5group.create_dataset(
+                    "sign",
+                    (0,),
+                    maxshape=(None,),
+                    chunks=True,
+                    compression=3,
+                )
+                self.signs.attrs["dim_names"] = XARRAY_SCHEMA['sign']['coords']
+                self.signs.attrs["coords_mode__time"] = "start_and_step"
+                self.signs.attrs["coords__time"] = [self._write_start, self._write_every]
+
+            # Setup sampled tables
+            if str_in_list('table',self.output_names):
+                self.tables = self.outputs.h5group.create_dataset(
+                    "table",
+                    (0,*dims),
+                    maxshape=(None,*dims),
+                    chunks=True,
+                    compression=3,
+                )
+                self.tables.attrs["dim_names"] = ["origin","destination","iter"]
+                self.tables.attrs["coords_mode__time"] = "start_and_step"
+                
+            # Setup acceptances
+            if str_in_list('theta_acc',self.output_names):
+                # Setup chunked dataset to store the state data in
+                self.theta_acc = self.outputs.h5group.create_dataset(
+                    'theta_acceptance',
+                    (0,),
+                    maxshape=(None,),
+                    chunks=True,
+                    compression=3,
+                )
+                self.losses.attrs['dim_names'] = XARRAY_SCHEMA['theta_acceptance']['coords']
+                self.losses.attrs['coords_mode__time'] = 'start_and_step'
+                self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+            if str_in_list('log_destination_attraction_acc',self.output_names):
+                # Setup chunked dataset to store the state data in
+                self.log_destination_attraction_acc = self.outputs.h5group.create_dataset(
+                    'log_destination_attraction_acceptance',
+                    (0,),
+                    maxshape=(None,),
+                    chunks=True,
+                    compression=3,
+                )
+                self.losses.attrs['dim_names'] = XARRAY_SCHEMA['log_destination_attraction_acc']['coords']
+                self.losses.attrs['coords_mode__time'] = 'start_and_step'
+                self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+            if str_in_list('table_acc',self.output_names):
+                # Setup chunked dataset to store the state data in
+                self.table_acc = self.outputs.h5group.create_dataset(
+                    'table_acceptance',
+                    (0,),
+                    maxshape=(None,),
+                    chunks=True,
+                    compression=3,
+                )
+                self.losses.attrs['dim_names'] = XARRAY_SCHEMA['table_acc']['coords']
+                self.losses.attrs['coords_mode__time'] = 'start_and_step'
+                self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+        
     def update_and_export(
             self,
             batch_size: int,
@@ -487,6 +493,7 @@ class Experiment(object):
             t: int,
             **kwargs
         ):
+        self.logger.progress('Update and export')
         # Update the model parameters after every batch and clear the loss
         if t % batch_size == 0 or t == data_size - 1:
             # Update time
@@ -517,6 +524,7 @@ class Experiment(object):
         extend the dataset size prior to writing; this way, the newly written
         data is always in the last row of the dataset.
         '''
+        self.logger.debug('Writing data')
         if self._time >= self._write_start and self._time % self._write_every == 0:
             if 'loss' in self.output_names:
                 # Store samples
@@ -1637,9 +1645,6 @@ class Table_MCMC(Experiment):
         # Enable garbage collections
         gc.enable()
 
-        # Disable tqdm if needed
-        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
-
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
@@ -2017,9 +2022,6 @@ class SIM_NN(Experiment):
         # Enable garbage collections
         gc.enable()
 
-        # Disable tqdm if needed
-        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
-
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
@@ -2182,9 +2184,6 @@ class NonJointTableSIM_NN(Experiment):
         # Enable garbage collections
         gc.enable()
 
-        # Disable tqdm if needed
-        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
-
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
@@ -2323,7 +2322,7 @@ class NonJointTableSIM_NN(Experiment):
 
             # Count the number of batch items processed
             self.n_processed_steps = 0
-
+            
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
 
@@ -2397,7 +2396,7 @@ class NonJointTableSIM_NN(Experiment):
 
 class JointTableSIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
-        
+
         # Initalise superclass
         super().__init__(config,**kwargs)
 
@@ -2406,9 +2405,6 @@ class JointTableSIM_NN(Experiment):
 
         # Enable garbage collections
         gc.enable()
-
-        # Disable tqdm if needed
-        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -2483,11 +2479,10 @@ class JointTableSIM_NN(Experiment):
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
-
+        
         # Update config
         if config is not None:
             self.config = config
-
         # Create outputs
         self.outputs = Outputs(
             self.config,
@@ -2549,7 +2544,6 @@ class JointTableSIM_NN(Experiment):
 
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
-                self.logger.progress('Neural net training')
                 # Perform neural net training
                 loss_sample, \
                 theta_sample, \
@@ -2564,14 +2558,13 @@ class JointTableSIM_NN(Experiment):
                 # with the functions used below
                 theta_sample_expanded = torch.unsqueeze(theta_sample,0)
                 log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0).unsqueeze(0)
-                self.logger.progress('Compute log intensity')
+
                 # Compute log intensity
                 log_intensity = self.harris_wilson_nn.physics_model.sim.log_intensity(
                     log_destination_attraction = log_destination_attraction_sample_expanded,
                     grand_total = self.ct_mcmc.ct.margins[tuplize(range(self.ct_mcmc.ct.ndims()))],
                     **dict(zip(self.harris_wilson_nn.parameters_to_learn,theta_sample_expanded.split(1,dim=1)))
                 ).squeeze()
-                self.logger.progress('table_sample')
                 # Sample table
                 if e == 0:
                     table_sample = self.ct_mcmc.initialise_table(
@@ -2583,13 +2576,13 @@ class JointTableSIM_NN(Experiment):
                         table_prev = table_sample,
                         log_intensity = log_intensity
                     )
-                self.logger.progress('table_loss_update')
+                self.logger.progress('table loss update')
                 # Update table loss
                 loss_sample += self.ct_mcmc.table_loss_function(
                     log_intensity = log_intensity,
                     table = table_sample
                 )
-                self.logger.progress('update_and_export')
+
                 # Clean and write to file
                 loss_sample = self.update_and_export(
                     loss = loss_sample,
@@ -2673,6 +2666,9 @@ class ExperimentSweep():
         # Enable it again
         deep_updates(self.config.settings,{'export_samples':True})
 
+        # If contingency table sampling is activated
+        
+
         # Write metadata
         if self.config.get('export_metadata',True):
             self.outputs.write_metadata(
@@ -2720,7 +2716,6 @@ class ExperimentSweep():
         # For each configuration update experiment config 
         # and instantiate new experiment
         self.prepare_experiments_sequential(sweep_configurations)
-
         # Decide whether to run sweeps in parallel or not
         if self.n_workers > 1:
             # self.run_parallel()
@@ -2735,7 +2730,7 @@ class ExperimentSweep():
             # Deactivate sweep             
             new_config.settings["sweep_mode"] = False
             # Deactivate logging
-            new_config.level = 'EMPTY'
+            # self.logger.setLevel('ERROR')
             # Activate sample exports
             new_config.settings['export_samples'] = True
             # Update config
@@ -2750,6 +2745,7 @@ class ExperimentSweep():
             self.experiment_configs.append({"config":new_config,"sweep":sval})
     
     def instantiate_and_run(self,instance_num:int,config_and_sweep:dict,semaphore=None):
+        self.logger.info(f'Instance = {instance_num} START')
         # Create new experiment
         new_experiment = instantiate_experiment(
             experiment_type=config_and_sweep['config'].settings['experiments'][0]['type'],
@@ -2763,9 +2759,11 @@ class ExperimentSweep():
             device_id=(instance_num%self.n_workers),
             logger=self.logger
         )
+        self.logger.debug('New experiment set up')
         new_experiment.run()
         if semaphore is not None:
             semaphore.release()
+        self.logger.info(f'Instance = {instance_num} DONE')
 
     def run_sequential(self):
         self.logger.info("Running Parameter Sweep in sequence...")

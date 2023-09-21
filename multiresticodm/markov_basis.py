@@ -28,6 +28,9 @@ class MarkovBasis(object):
             log_to_console=kwargs.get('log_to_console',True),
         ) if kwargs.get('logger',None) is None else kwargs['logger']
 
+        # Enable/disable tqdm
+        self.tqdm_disabled = not kwargs.get('log_to_console',False)
+
         # Get contingency table
         self.ct = ct
         
@@ -112,9 +115,11 @@ class MarkovBasis(object):
                 torch.all(self.ct.table_cell_constraint_summary_statistic(full_tab)==0)
         
     def check_markov_basis_validity(self) -> bool:
-        # NOTE: THE FOLLOWING TAKES TWO MUCH TIME
-        # CONSIDER MOVING IT SOMEWHERE ELSE
-        for i in tqdm(range(len(self.basis_dictionaries))):
+        for i in tqdm(
+            range(len(self.basis_dictionaries)),
+            disable=self.tqdm_disabled,
+            leave=False
+        ):
             if not self.basis_function_admissible(self.basis_dictionaries[i]):
                 return False
         return True
@@ -148,7 +153,12 @@ class MarkovBasis(object):
         sorted_cells = sorted(self.ct.cells)
 
         # Loop through each pair combination and keep only ones that don't share a row OR column
-        for index,tup1 in tqdm(enumerate(sorted_cells),total=len(sorted_cells),disable=False):
+        for index,tup1 in tqdm(
+            enumerate(sorted_cells),
+            total=len(sorted_cells),
+            disable=self.tqdm_disabled,
+            leave=False
+        ):
             # Get all active candidate cells
             inactive_candidate_cells = []
             if index < len(sorted_cells)-1:
@@ -162,7 +172,11 @@ class MarkovBasis(object):
         self.basis_dictionaries = []
         # Define active cells i.e. cells of a basis function that map to non-zero values
         self.basis_active_cells = []
-        for index in tqdm(range(len(basis_cells)),disable=False):
+        for index in tqdm(
+            range(len(basis_cells)),
+            disable=self.tqdm_disabled,
+            leave=False
+        ):
             # Make sure that no cell in the basis is a constrained cell
             if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
                 continue
@@ -191,7 +205,12 @@ class MarkovBasis(object):
         sorted_cells = sorted(self.ct.cells)
 
         # Loop through each pair combination and keep only ones that don't share a row OR column
-        for index,tup1 in tqdm(enumerate(sorted_cells),total=len(sorted_cells),disable=False):
+        for index,tup1 in tqdm(
+            enumerate(sorted_cells),
+            total=len(sorted_cells),
+            disable=self.tqdm_disabled,
+            leave=False
+        ):
             # Get all active candidate cells
             inactive_candidate_cells = []
             if index < len(sorted_cells)-1:
@@ -205,7 +224,11 @@ class MarkovBasis(object):
         self.basis_dictionaries = []
         # Define active cells i.e. cells of a basis function that map to non-zero values
         self.basis_active_cells = []
-        for index in tqdm(range(len(basis_cells)),disable=False):
+        for index in tqdm(
+            range(len(basis_cells)),
+            disable=self.tqdm_disabled,
+            leave=False
+        ):
             # Make sure that no cell in the basis is a constrained cell
             if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
                 continue
@@ -303,7 +326,11 @@ class MarkovBasis(object):
     def update_markov_basis(self):
         # Exclude the functions changing any fixed cells
         updated_basis_dictionaries = [] 
-        for i in tqdm(range(len(self.basis_dictionaries))):
+        for i in tqdm(
+            range(len(self.basis_dictionaries)),
+            disable=self.tqdm_disabled,
+            leave=False
+        ):
             if self.basis_function_admissible(self.basis_dictionaries[i]):
                 updated_basis_dictionaries.append(self.basis_dictionaries[i])
         self.basis_dictionaries = updated_basis_dictionaries

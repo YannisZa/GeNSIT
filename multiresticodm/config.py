@@ -16,15 +16,16 @@ class Config:
         Config object constructor.
         :param path: Path to configuration TOML file
         """
-        # Setup logger
+        # Import logger
+        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
         self.logger = setup_logger(
             __name__,
-            log_to_file=True,
-            log_to_console=True
+            level = level,
+            log_to_console = kwargs.get('log_to_console',False),
+            log_to_file = kwargs.get('log_to_file',False),
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        level = kwargs.get('level','info').upper()
-        self.logger.setLevel(level.upper())
+        self.logger.setLevel(level)
         
         # Load config
         if path:

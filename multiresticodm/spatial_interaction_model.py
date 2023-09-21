@@ -44,7 +44,7 @@ class SpatialInteraction2D():
     ):
         '''  Constructor '''
         # Setup logger
-        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
             level=level,
@@ -236,6 +236,7 @@ class SpatialInteraction2D():
             Continuous intensity matrix (non-integer).
 
         """
+        self.logger.debug('Computing intensity')
         
         # Update input kwargs if required
         updated_kwargs = self.get_input_kwargs(kwargs)

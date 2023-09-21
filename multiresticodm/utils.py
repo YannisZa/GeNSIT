@@ -226,16 +226,16 @@ def get_dims(data):
         res = list(data.dims)
     return res
 
-def parse(value):
+def parse(value,default=None):
     if isinstance(value,str):
         if len(value) <= 0:
-            return None
+            return default
         try:
             value = string_to_numeric(value)
         except:
             pass
     elif hasattr(value,'__len__') and len(value) <= 0:
-        return None
+        return default
     
     return value
 
@@ -845,7 +845,7 @@ def get_value_from_path(d, path=[]):
 def string_to_numeric(s):
     f = np.float32(s)
     i = np.int32(f)
-    return i if i == f else f
+    return i if i == f else np.round(f,5)
 
 
 def setup_logger(name,level,log_to_file:bool=False,log_to_console:bool=False):
@@ -856,10 +856,10 @@ def setup_logger(name,level,log_to_file:bool=False,log_to_console:bool=False):
     # Silence warnings from other packages
     numba_logger = logging.getLogger('numba')
     numba_logger.setLevel(logging.WARNING)
-        
+    
     # Get root logger
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(level)
 
     # Formatter
     string_formatter = logging.Formatter(

@@ -294,10 +294,9 @@ class OutputSummary(object):
         metric_data = []
 
         for sample_name in self.settings['sample']:
-            # Read samples
+            # Get samples
             try:
-                assert hasattr(outputs.data,sample_name)
-                samples = getattr(outputs.data,sample_name)
+                samples = outputs.get_sample(sample_name)
             except Exception as e:
                 self.logger.error(f'Experiment {os.path.basename(experiment_id)} does not have sample {sample_name}')
                 continue
@@ -358,8 +357,7 @@ class OutputSummary(object):
                                 if metric != 'none':
                                     samples_metric = globals()[metric](
                                         tab=samples_summarised,
-                                        tab0=metric_kwargs['tab0'],
-                                        kwargs=metric_kwargs['kwargs']
+                                        **metric_kwargs
                                     )
                                 else:
                                     samples_metric = deepcopy(samples_summarised)
@@ -425,8 +423,7 @@ class OutputSummary(object):
                             samples_metric = samples_summarised.groupby('sweep').apply(
                                 lambda group: globals()[metric](
                                     tab=group,
-                                    tab0=metric_kwargs['tab0'],
-                                    kwargs=metric_kwargs['kwargs']
+                                    **metric_kwargs
                                 )
                             )
                             # Rename metric xr data array
@@ -513,7 +510,7 @@ class OutputSummary(object):
             metric_arguments['tab0'] = outputs.ground_truth_table
         
         # Pass standard metric arguments
-        metric_arguments['kwargs'] = settings_copy
+        metric_arguments.update(settings_copy)
 
         return metric_arguments
 
@@ -528,7 +525,7 @@ class Outputs(object):
                  input_slice:dict={},
                  **kwargs):
         # Setup logger
-        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
         self.logger = setup_logger(
             module,
             level=level,
@@ -661,28 +658,19 @@ class Outputs(object):
                 slice_samples=kwargs.get('slice_samples',True)
             )
             
-            # Try to load all output data
-            for sample_name in output_names:
-                # try:
-                setattr(
-                    self.data,
-                    sample_name, 
-                    self.get_sample(
-                        sample_name
-                    )
-                )
-                if sample_name == 'table' and self.settings['table_total'] == 1:
-                    self.settings['table_total'] = self.data.table.sum(dim=['origin','destination']).values[0]
-                self.logger.info(f'Sample {sample_name} loaded with shape {get_dims(getattr(self.data,sample_name))}')
-                # except:
-                #     self.logger.debug(traceback.format_exc())
-                #     self.logger.warning(f'Sample {sample_name} could not be loaded')
-                    # sys.exit()
+            # Try to update metadata on table samples
+            try:
+                if 'table' in output_names and self.settings['table_total'] == 1:
+                    table = self.get_sample('table')
+                    self.settings['table_total'] = table.sum(dim=['origin','destination']).values[0]
+            except:
+                self.logger.debug(traceback.format_exc())
+                self.logger.warning(f'Sample table could not be loaded')
+                sys.exit()
 
             if self.settings['table_total'] == 0:
                 print(self.ground_truth_table)
                 self.logger.warning('Ground truth missing')
-            
             
         elif isinstance(config,Config):
             # Store config
@@ -864,7 +852,8 @@ class Outputs(object):
         return samples,iters
 
     def read_h5_file(self,filename,**kwargs):
-        coords = {}
+        local_coords = {}
+        global_coords = {}
         data_vars = {}
         try:
             with h5.File(filename) as h5data:
@@ -877,34 +866,35 @@ class Outputs(object):
                     # Loop through each sweep parameters and add it as a coordinate
                     for (k,v) in zip(h5data[self.experiment_id].attrs['sweep_params'],
                                 h5data[self.experiment_id].attrs['sweep_values']):
-                        coords[k] = {parse(v)}
+                        local_coords[k] = {parse(v,np.float32(-1.0))}
                 self.logger.debug('Store dataset')
                 # Store dataset
                 for sample_name,sample_data in h5data[self.experiment_id].items():
                     # Apply burning, thinning and trimming
-                    self.logger.debug(f'Slicing {sample_name}')
+                    self.logger.debug(f'Data {sample_name} {np.shape(sample_data)}')
                     if kwargs.get('slice_samples',True):
+                        # self.logger.debug(f'Before slicing {sample_name}: {np.shape(sample_data)}')
                         sample_data,iters = self.slice_sample_iterations(sample_data)
+                        # self.logger.debug(f'After slicing {sample_name}: {np.shape(sample_data)}')
                     else:
                         # Get iterations
                         iters = np.arange(start=1,stop=sample_data.shape[0]+1,step=1,dtype='int32')
-                    coords['iter'] = iters
+                    global_coords['iter'] = iters
                     # Append
                     self.logger.debug(f'Appending {sample_name}')
                     data_vars[sample_name] = np.array([sample_data[:]])
                 self.logger.debug(f'Done with file')
         except BlockingIOError:
             self.logger.debug(f"Skipping in-use file: {filename}")
-            return {str(filename):{"coords":{},"data_vars":{}}}
+            return {str(filename):{"local_coords":{},"global_coords":{},"data_vars":{}}}
         except Exception:
             self.logger.debug(traceback.format_exc())
             raise Exception(f'Cannot read file {filename}')
-        
-        return {str(filename):{"coords":coords,"data_vars":data_vars}}
+        return {str(filename):{"local_coords":local_coords,"global_coords":global_coords,"data_vars":data_vars}}
 
     def read_h5_data(self,h5files:list,**kwargs):
         # Get each file and add it to the new dataset
-        h5data, coords, data_vars = {},{},{}
+        h5data, local_coords, data_vars = {},{},{}
         if self.settings['n_workers'] > 1:
             # Do it concurrently
             # Use the Pool to parallelize loading
@@ -923,50 +913,50 @@ class Outputs(object):
                         # Update the progress bar for each completed task
                         pbar.update(1)
             # Gather all data
-            # self.logger.setLevel(logging.DEBUG)
-
-            # self.logger.info(f"Read coords")
             for filename in tqdm(h5files,desc='Gathering data',leave=False):
-                file_coords = h5data[str(filename)]['coords']
+                file_global_coords = h5data[str(filename)]['global_coords']
+                file_local_coords = h5data[str(filename)]['local_coords']
                 file_data_vars = h5data[str(filename)]['data_vars']
-                # print({k:np.shape(v) for k,v in file_coords.items()})
+                # print('global',{k:np.shape(v) for k,v in file_global_coords.items()})
+                # print('local',{k:np.shape(v) for k,v in file_local_coords.items()})
                 # print({k:np.shape(v) for k,v in file_data_vars.items()})
+
                 # Read coords
-                if len(coords) > 0:
-                    for k,v in file_coords.items():
+                # self.logger.debug(f"Reading coordinates")
+                if len(local_coords) > 0:
+                    for k,v in file_local_coords.items():
                         self.logger.debug(f"{k}")
-                        if k != 'iter':
-                            coords[k].update(v)
+                        local_coords[k].update(v)
                 else:
-                    coords = deepcopy(file_coords)
-            # Read data
-            # self.logger.info(f"Read data")
-            for sample_name,sample_data in file_data_vars.items():
-                self.logger.debug(f"{sample_name}")
-                if sample_name in list(data_vars.keys()) and len(data_vars) > 0:
-                    data_vars[sample_name] = np.append(
-                        data_vars[sample_name],
-                        sample_data,
-                        axis=0
-                    )
-                else:
-                    data_vars[sample_name] = deepcopy(sample_data)
+                    local_coords = deepcopy(file_local_coords)
+                # Read data
+                # self.logger.debug(f"Reading data")
+                for sample_name,sample_data in file_data_vars.items():
+                    # self.logger.debug(f"{sample_name} {np.shape(sample_data)}")
+                    if sample_name in list(data_vars.keys()) and len(data_vars[sample_name]) > 0:
+                        data_vars[sample_name].append(sample_data)
+                    else:
+                        data_vars[sample_name] = [sample_data]
+            
+            # Convert data to numpy
+            for sample_name in data_vars.keys():
+                data_vars[sample_name] = np.concatenate(data_vars[sample_name])
         else:
             # Do it sequentially
             for filename in tqdm(h5files,desc='Reading h5 file(s) in sequence',leave=False):
 
                 # Read h5 file
                 h5data = self.read_h5_file(filename,**kwargs)
-                file_coords = h5data[str(filename)]['coords']
+                file_global_coords = h5data[str(filename)]['global_coords']
+                file_local_coords = h5data[str(filename)]['local_coords']
                 file_data_vars = h5data[str(filename)]['data_vars']
                 
                 # Read coords
-                if len(coords) > 0:
-                    for k,v in file_coords.items():
-                        if k != 'iter':
-                            coords[k].update(v)
+                if len(local_coords) > 0:
+                    for k,v in file_local_coords.items():
+                        local_coords[k].update(v)
                 else:
-                    coords = deepcopy(file_coords)
+                    local_coords = deepcopy(file_local_coords)
                 
                 # Read data
                 for sample_name,sample_data in file_data_vars.items():
@@ -978,7 +968,7 @@ class Outputs(object):
                         )
                     else:
                         data_vars[sample_name] = deepcopy(sample_data)
-        return coords,data_vars
+        return local_coords,file_global_coords,data_vars
 
     def load_h5_data(self,output_path,coordinate_slice:dict={},slice_samples:bool=True):
         self.logger.info('Loading h5 data into xarrays...')
@@ -988,11 +978,16 @@ class Outputs(object):
         # Sort them by seed
         h5files = sorted(h5files, key = lambda x: int(str(x).split('seed_')[1].split('/',1)[0]) if 'seed' in str(x) else str(x))
         # Read h5 data
-        coords,data_vars = self.read_h5_data(h5files,slice_samples=slice_samples)
+        local_coords,global_coords,data_vars = self.read_h5_data(h5files,slice_samples=slice_samples)
         # Convert set to list
-        coords = {k:np.array(list(v)) for k,v in coords.items()}
-        # print('coords',coords)
-        # print({k:np.shape(v) for k,v in data_vars.items()})
+        local_coords = {k:np.array(
+                            list(v),
+                            dtype=TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
+                        ) for k,v in local_coords.items()}
+        global_coords = {k:np.array(
+                            list(v),
+                            dtype=TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
+                        ) for k,v in global_coords.items()}
         
         # Create an xarray dataset for each sample
         for sample_name,sample_data in tqdm(data_vars.items(),desc='Creating xarray dataset(s)',leave=False):
@@ -1020,18 +1015,17 @@ class Outputs(object):
             # Update coordinates to include schema and sweep coordinates
             # print('coordinates',coordinates.keys())
             # print('coords',coords.keys())
-            coordinates = {**{k:v for k,v in coords.items() if k != sample_name},**coordinates}
-            
+            coordinates = {
+                **{k:v for k,v in local_coords.items() if k != sample_name},
+                **global_coords,
+                **coordinates
+            }
             # For each coordinate name
             # get data variable
-            print(sample_name,np.shape(sample_data))
-            print({k:np.shape(v) for k,v in coords.items()})
-            print({k:np.shape(v) for k,v in coordinates.items()})
             data = torch.tensor(sample_data.reshape(tuple([len(val) for val in coordinates.values()]))).to(
-                    dtype=DATA_TYPES[sample_name],
-                    device=self.device
-                )
-
+                dtype=DATA_TYPES[sample_name],
+                device=self.device
+            )
             # Create xarray dataarray
             xr_data = xr.DataArray(
                 name = sample_name,
@@ -1047,7 +1041,6 @@ class Outputs(object):
                 print('coordinate_slice',{k:(v['value'] if len(v['value']) > 1 else v['value'][0]) for k,v in coordinate_slice.items()})
                 xr_data = xr_data.sel(**{k:(v['value'] if len(v['value']) > 1 else v['value'][0]) for k,v in coordinate_slice.items()})
 
-            
             # Store dataset
             setattr(self._data,sample_name,xr_data)
             
@@ -1160,15 +1153,16 @@ class Outputs(object):
 
         else:
             if not hasattr(self._data,sample_name):
-                raise Exception(f"{sample_name} not found in output data {','.join(vars(self._data).keys())}")
+                raise Exception(f"{sample_name} not found in output data [{','.join(vars(self._data).keys())}]")
             
             # Get xarray
             samples = getattr(self._data,sample_name)
             
             # Find iteration coordinates
             iter_coords = [x for x in samples.dims if x in ['iter','seed']]
+            
             # Find sweep coordinates that are not iteration-related
-            sweep_coords = [d for d in samples.dims if d not in CORE_COORDINATES+['N']]
+            sweep_coords = [d for d in samples.dims if d not in list(CORE_COORDINATES_DTYPES.keys())+['N']]
 
             # Stack all non-core coordinates into new coordinate
             samples = samples.stack(N=tuplize(iter_coords),sweep=tuplize(sweep_coords))
@@ -1314,7 +1308,6 @@ class Outputs(object):
                     dim = list(map(str,dim.split('_')))
                 elif hasattr(dim,'__len__'):
                     dim = list(map(str,dim))
-
                 sample_statistic = self.compute_sample_statistics(
                                         data=sample_statistic,
                                         sample_name=sample_name,

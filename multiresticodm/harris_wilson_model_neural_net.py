@@ -222,7 +222,7 @@ class HarrisWilson_NN:
             config: settings regarding model (hyper)parameters and other settings
         '''
         # Setup logger
-        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
             level=level,
@@ -336,14 +336,16 @@ class HarrisWilson_NN:
         :param dt: (optional) the time differential to use during training
         :param __: other parameters (ignored)
         '''
+        self.logger.debug('Running neural net')
         predicted_theta = self._neural_net(torch.flatten(nn_data))
+        self.logger.debug('Forward pass on SDE')
         predicted_dest_attraction = self.physics_model.run_single(
             curr_destination_attractions=nn_data,
             free_parameters=predicted_theta,
             dt=dt,
             requires_grad=True,
         )
-
+        self.logger.debug('Loss function update')
         # Update loss
         loss = loss + self.loss_function(predicted_dest_attraction, nn_data)
         

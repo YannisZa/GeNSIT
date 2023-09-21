@@ -37,7 +37,7 @@ class HarrisWilson:
         """
 
         # Setup logger
-        level = config.level if hasattr(config,'level') else kwargs.get('level','INFO')
+        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
             level=level,

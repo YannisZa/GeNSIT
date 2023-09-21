@@ -15,8 +15,6 @@ PARAMETER_DEFAULTS = {
     'noise_percentage': 3,
 }
 
-CORE_COORDINATES = ['iter','seed','time','origin','destination','N']
-
 XARRAY_SCHEMA = {
     'alpha': {
         "coords":[],
@@ -122,6 +120,8 @@ NUMPY_TO_TORCH_DTYPE = {
     'bool':tbool
 }
 
+TORCH_TO_NUMPY_DTYPE = {v:k for k,v in NUMPY_TO_TORCH_DTYPE.items()}
+
 
 INPUT_TYPES = {
     'cost_matrix':torch.float32,
@@ -158,6 +158,18 @@ OUTPUT_TYPES = {
 }
 
 DATA_TYPES = {**INPUT_TYPES,**OUTPUT_TYPES}
+
+CORE_COORDINATES_DTYPES = {
+ 'iter':torch.int32,
+ 'seed':torch.int32,
+ 'time':torch.int32,
+ 'origin':torch.int32,
+ 'destination':torch.int32,
+ 'N':object
+}
+
+COORDINATES_DTYPES = {**CORE_COORDINATES_DTYPES,**DATA_TYPES}
+
 
 NUMPY_TYPE_TO_DAT_TYPE = {
     'float':'%f',

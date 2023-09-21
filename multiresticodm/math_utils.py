@@ -11,57 +11,16 @@ from itertools import chain, combinations
 from multiresticodm.utils import flatten
 
 
-def log_factorial(start:int32,end:int32,is_torch:bool=True):
-    if is_torch:
-        return log_factorial_torch(start,end)
-    else:
-        return log_factorial_xarray(start,end)
+def log_factorial_sum(arr,is_torch:bool=True):
+    # if is_torch:
+    return log_factorial_sum_torch(arr)
+    # else:
+        # return log_factorial_sum_xarray(arr)
 
-def log_factorial_torch(start:int32,end:int32):
-    # Check if inputs are integers or tensors
-    if isinstance(start, int):
-        start = torch.tensor(start,dtype=int32)
-    if isinstance(end, int):
-        end = torch.tensor(end,dtype=int32)
-    if len(start.shape) == 0 and len(end.shape) == 0:
-        start = start.item()
-        end = end.item()
-        if start+1 > end:
-            return torch.tensor(0,dtype=int32)
-        else:
-            # Create a range of integers from start to end (inclusive)
-            integers = torch.range(start, end, 1)
-            # Compute the log factorial for each integer
-            log_factorials = torch.cumsum(torch.log(integers.float()), dim=0)
-            return log_factorials[-1]
-    
-    else:
-        start_len = start.shape[0] if len(start.shape) > 0 else 0
-        end_len = end.shape[0] if len(end.shape) > 0 else 0
-        try: 
-            assert (start_len == end_len) or \
-                    (start_len == 0) or \
-                    (end_len == 0)
-        except:
-            raise Exception(f"Start and end arguments must have either the same number of elements or one element.")
-        
-        # If either start or end is a tensor, compute the log factorial for each element
-        # Initialize an empty tensor to store the results
-        log_factorials = torch.zeros(max(start_len,end_len))
-        
-        # Iterate through the elements of the tensors and compute log factorials
-        for i in range(max(start_len,end_len)):
-            s = start[i] if (1 < start_len) else start.item()
-            e = end[i] if (1 < end_len) else end.item()
-            if s + 1 > e:
-                # Set 0.0 for invalid range
-                log_factorials[i] = 0.0
-            else:
-                integers = torch.range(s, e, 1)
-                log_factorials[i] = torch.sum(torch.log(integers)).item()
-        return log_factorials
+def log_factorial_sum_torch(arr:torch.tensor):
+    return torch.lgamma(arr+1).sum()
 
-def log_factorial_xarray(start:int32,end:int32):
+def log_factorial_sum_xarray(arr):
     # Check if inputs are integers or tensors
     if isinstance(start, int):
         start = xr.DataArray(start)
@@ -76,8 +35,8 @@ def log_factorial_xarray(start:int32,end:int32):
             # Create a range of integers from start to end (inclusive)
             integers = torch.range(start, end, 1)
             # Compute the log factorial for each integer
-            log_factorials = torch.cumsum(torch.log(integers.float()), dim=0)
-            return log_factorials[-1]
+            log_factorial_sums = torch.cumsum(torch.log(integers.float()), dim=0)
+            return log_factorial_sums[-1]
     
     else:
         try: 
@@ -89,7 +48,7 @@ def log_factorial_xarray(start:int32,end:int32):
         
         # If either start or end is a tensor, compute the log factorial for each element
         # Initialize an empty tensor to store the results
-        log_factorials = torch.zeros(max(start.numel(),end.numel()))
+        log_factorial_sums = torch.zeros(max(start.numel(),end.numel()))
         
         # Iterate through the elements of the tensors and compute log factorials
         for i in range(max(start.numel(),end.numel())):
@@ -97,12 +56,12 @@ def log_factorial_xarray(start:int32,end:int32):
             e = end[i] if (1 < end.numel()) else end.item()
             if s + 1 > e:
                 # Set 0.0 for invalid range
-                log_factorials[i] = 0.0
+                log_factorial_sums[i] = 0.0
             else:
                 integers = torch.range(s, e, 1)
-                log_factorials[i] = torch.sum(torch.log(integers)).item()
+                log_factorial_sums[i] = torch.sum(torch.log(integers)).item()
         
-        return log_factorials
+        return log_factorial_sums
     
 
 def positive_sigmoid(x,scale:float=1.0):
@@ -281,9 +240,28 @@ def SRMSE(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
         Standardised root mean square error of t_hat.
 
     """
-    numerator = np.power( np.power(tab0-tab,2).sum(dim=['origin','destination']) / tab.size, 0.5)
+    tab = tab.astype('float32')
+    tab0 = tab0.astype('float32')
+    tab,tab0 = xr.broadcast(tab, tab0)
+    tab,tab0 = xr.align(tab, tab0, join='exact')
+    numerator = ( ((tab0-tab)**2).sum(dim=['origin','destination']) / tab.size) ** 0.5
     denominator = tab0.sum(dim=['origin','destination']) / tab0.size
     srmse = numerator / denominator
+    
+    if np.any(srmse <= 0):
+        print('ZERO')
+        # print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in tab.values[0:5,0:5]]))
+        # print('\n')
+        # print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in tab0.values[0:5,0:5]]))
+        # print('ZERO')
+        # print('\n')
+    else:
+        print('POSITIVE')
+        # print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in tab.values[0:5,0:5]]))
+        # print('\n')
+        # print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in tab0.values[0:5,0:5]]))
+        # print('POSITIVE')
+        # print('\n')
 
 
     return srmse

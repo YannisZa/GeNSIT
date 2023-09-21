@@ -200,7 +200,7 @@ def exec(logger,settings,config_path,**kwargs):
     # Import all modules
     from multiresticodm.experiments import ExperimentHandler
     from multiresticodm.utils import deep_updates,update_device
-
+    
     # Read config
     config = Config(
         path=config_path,
@@ -230,7 +230,6 @@ def exec(logger,settings,config_path,**kwargs):
         config.settings.setdefault('run_experiments', list(kwargs.get('run_experiments',[])))
     else:
         config.settings.setdefault('run_experiments', available_experiments)
-
     # Create output folder if it does not exist
     if not os.path.exists(config.settings['outputs']['output_path']):
         logger.info(f"Creating new output directory {config.settings['outputs']['output_path']}")
@@ -245,12 +244,11 @@ def exec(logger,settings,config_path,**kwargs):
         config,
         logger = logger
     )
-
     # Run experiments
     eh.run_and_write_experiments_sequentially()
 
     logger.success('Done')
-
+    
 
 @cli.command('run')
 # @click.command(context_settings=dict(help_option_names=['-h', '--help']))
@@ -371,7 +369,6 @@ def run(
         log_to_file=True,
         log_to_console=True
     )
-
     exec(logger,settings=settings,config_path=config_path,run_experiments=run_experiments)
 
 
