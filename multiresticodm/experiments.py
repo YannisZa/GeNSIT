@@ -2716,12 +2716,14 @@ class ExperimentSweep():
         # For each configuration update experiment config 
         # and instantiate new experiment
         self.prepare_experiments_sequential(sweep_configurations)
-        # Decide whether to run sweeps in parallel or not
-        if self.n_workers > 1:
-            # self.run_parallel()
-            self.run_concurrent()
-        else:
-            self.run_sequential()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            # Decide whether to run sweeps in parallel or not
+            if self.n_workers > 1:
+                self.run_parallel()
+                # self.run_concurrent()
+            else:
+                self.run_sequential()
         
     def prepare_experiments_sequential(self,sweep_configurations):
         for j,sval in tqdm(enumerate(sweep_configurations),total=len(sweep_configurations)):
@@ -2730,7 +2732,7 @@ class ExperimentSweep():
             # Deactivate sweep             
             new_config.settings["sweep_mode"] = False
             # Deactivate logging
-            # self.logger.setLevel('ERROR')
+            self.logger.setLevel('ERROR')
             # Activate sample exports
             new_config.settings['export_samples'] = True
             # Update config
