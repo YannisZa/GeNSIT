@@ -318,3 +318,14 @@ def random_tensor(
 
     else:
         raise ValueError(f"Unrecognised distribution type {distribution}!")
+    
+def sample_multinomial_row(i,msum,margin_probabilities,free_cells,axis_uncostrained_flat,device:str='cpu',ndims:int=2):
+    # Get cells for specific row
+    current_cells = free_cells[free_cells[:,axis_uncostrained_flat].ravel() == i,:]
+    free_indices = [ current_cells[:,i] for i in range(ndims) ]
+    updated_cells = distr.multinomial.Multinomial(
+        total_count = msum.item(),
+        probs = margin_probabilities[free_indices].ravel()
+    ).sample()
+    # Update free cells
+    return updated_cells.to(device=device,dtype=int32)
