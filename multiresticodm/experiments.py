@@ -2773,16 +2773,23 @@ class ExperimentSweep():
             self.instantiate_and_run(instance,conf_and_sweep)
     
     def run_parallel(self):
-        # Run experiments in parallel
+        # Run experiments in parallell
         semaphore = mp.Semaphore(self.n_workers)
         processes = []
-        for instance,conf_and_sweep in tqdm(enumerate(self.experiment_configs),
-                                                      total=len(self.experiment_configs)):
+        for instance,conf_and_sweep in tqdm(
+            enumerate(self.experiment_configs),
+            total = len(self.experiment_configs)
+        ):
             semaphore.acquire()
-            p = mp.Process(target=self.instantiate_and_run, args=(instance,conf_and_sweep, semaphore))
+            p = mp.Process(
+                target=self.instantiate_and_run, 
+                args=(instance,conf_and_sweep, semaphore)
+            )
             p.start()
             processes.append(p)
-    
+            # semaphore.release()
+        semaphore.release()
+
         for p in processes:
             p.join()
     

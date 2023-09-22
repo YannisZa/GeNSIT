@@ -151,12 +151,12 @@ def log_fishers_hypergeometric_pmf_unnormalised(log_intensity:torch.tensor,table
     log_or_colsums = torch.logsumexp(log_or,dim=0).unsqueeze(0).to(dtype=float32)
     log_or_probabilities = log_or - log_or_colsums
     # Compute log pmf
-    return (table.to(dtype=float32).ravel() * log_or_probabilities.ravel()).sum() - log_factorial_sum(1,table.ravel()).sum()
+    return (table.to(dtype=float32).ravel() * log_or_probabilities.ravel()).sum() - log_factorial_sum(table.ravel()).sum()
 
 def log_fishers_hypergeometric_pmf_normalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
     # Return log pmf
     return  log_fishers_hypergeometric_pmf_unnormalised(log_intensity,table) + \
-        log_factorial_sum(1,table.sum(dim=0).to(dtype=int32))
+        log_factorial_sum(table.sum(dim=0).to(dtype=int32))
 
 
 def fishers_hypergeometric_pmf_ground_truth(log_intensity:torch.tensor,table:torch.tensor,axis:int=None) -> float:
