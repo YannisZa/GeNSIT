@@ -248,22 +248,6 @@ def SRMSE(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     denominator = tab0.sum(dim=['origin','destination']) / tab0.size
     srmse = numerator / denominator
     
-    if np.any(srmse <= 0):
-        print('ZERO')
-        # print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in tab.values[0:5,0:5]]))
-        # print('\n')
-        # print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in tab0.values[0:5,0:5]]))
-        # print('ZERO')
-        # print('\n')
-    else:
-        print('POSITIVE')
-        # print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in tab.values[0:5,0:5]]))
-        # print('\n')
-        # print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in tab0.values[0:5,0:5]]))
-        # print('POSITIVE')
-        # print('\n')
-
-
     return srmse
 
 def SSI(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
