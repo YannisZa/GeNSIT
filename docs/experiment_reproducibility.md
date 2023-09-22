@@ -452,7 +452,7 @@ clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re NonJointTableSIM_NN -nw 4 -nt 4 -n 1000 -et total_constrained -ax '[0,1]' -dev cpu
+ -re NonJointTableSIM_NN -nw 4 -nt 8 -n 1000 -et total_constrained -ax '[0,1]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
@@ -470,7 +470,7 @@ clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt \
  -p degree_higher -re NonJointTableSIM_NN -nw 4 -nt 8 -n 1000 -et both_margin_constrained_20%\_cells -ax '[1]' -ax '[0]' -dev cpu
 
-### Dependent Non-joint Table and SIM
+### Dependent (joint) Table and SIM
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
@@ -482,7 +482,7 @@ clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -p degree_higher -re JointTableSIM_NN -nw 4 -nt 8 -n 1000 -et row_constrained -ax '[1]' -dev cpu
+ -re JointTableSIM_NN -nw 4 -nt 8 -n 1000 -et row_constrained -ax '[1]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
