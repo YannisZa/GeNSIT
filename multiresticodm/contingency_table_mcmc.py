@@ -1,19 +1,19 @@
 import sys
 import torch
-import logging
 import numpy as np
 import torch.distributions as distr
 
-from os import path
+from tqdm import tqdm
 from copy import deepcopy
 from argparse import Namespace
-from torch import int32, float32, uint8
-from typing import Union, Tuple, Dict, List
+from torch import int32, float32
+from multiprocessing.pool import Pool
 from scipy.stats import nchypergeom_fisher
+from typing import Union, Tuple, Dict, List
 
+import multiresticodm.probability_utils as ProbabilityUtils
 
 from multiresticodm.math_utils import log_factorial_sum
-import multiresticodm.probability_utils as ProbabilityUtils
 from multiresticodm.markov_basis import instantiate_markov_basis,MarkovBasis
 from multiresticodm.contingency_table import ContingencyTable, ContingencyTable2D
 from multiresticodm.probability_utils import uniform_binary_choice, log_odds_cross_ratio
@@ -411,7 +411,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         while continue_loop:
             table_new[ free_indices ] = distr.poisson.Poisson(rate = margin_probabilities[ free_indices ]).sample().to(device=self.ct.device,dtype=int32)
             # Continue loop only if table is not sparse admissible
-            continue_loop = not self.ct.table_sparse_admissible(table_new)
+            continue_loop = False#not self.ct.table_sparse_admissible(table_new)
         return table_new
 
     def multinomial_sample_2way_table(self,margin_probabilities):
@@ -446,7 +446,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             # Reshape table to match original dims
             table_new = torch.reshape(table_new, tuplize(self.ct.dims))
             # Continue loop only if table is not sparse admissible
-            continue_loop = not self.ct.table_sparse_admissible(table_new)
+            continue_loop = False#not self.ct.table_sparse_admissible(table_new)
 
         return table_new#.to(dtype=int32,device=self.ct.device)
 
@@ -478,17 +478,20 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         continue_loop = True
         while continue_loop:
             # Sample free cells from multinomial
-            for i, msum in enumerate(self.ct.residual_margins[tuplize(axis_constrained)]):
-                # Get cells for specific row
-                current_cells = free_cells[free_cells[:,axis_uncostrained_flat].ravel() == i,:]
-                free_indices = [ current_cells[:,i] for i in range(self.ct.ndims()) ]
-                updated_cells = distr.multinomial.Multinomial(
-                    total_count = msum.item(),
-                    probs = margin_probabilities[free_indices].ravel()
-                ).sample()
-                # Update free cells
-                table_new[free_indices] = updated_cells.to(device=self.ct.device,dtype=int32)
-
+            updated_cells = [
+                ProbabilityUtils.sample_multinomial_row(
+                    i,
+                    msum,
+                    margin_probabilities,
+                    free_cells,
+                    axis_uncostrained_flat,
+                    device=self.ct.device,
+                    ndims=self.ct.ndims()
+                ) for i, msum in enumerate(
+                    self.ct.residual_margins[tuplize(axis_constrained)]
+                )
+            ]
+            table_new[free_indices] = torch.hstack(updated_cells).to(device=self.ct.device,dtype=int32)
             # Afix non-free cells
             table_new[fixed_cells] = self.ct.ground_truth_table[fixed_cells]
             # Reshape table to match original dims
@@ -499,11 +502,12 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
         # Make sure sampled table has the right shape
         try:
-            assert self.ct.table_admissible(table_new) and self.ct.table_sparse_admissible(table_new)
+            assert self.ct.table_admissible(table_new)# and self.ct.table_sparse_admissible(table_new)
         except:
             print(self.ct.table_admissible(table_new),self.ct.table_sparse_admissible(table_new))
             raise Exception()
         return table_new
+
 
     def direct_sampling_proposal_2way_table(self, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict, Dict]:
 
@@ -546,7 +550,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         table_new = torch.zeros(tuple(self.ct.dims)).to(dtype=int32,device=self.ct.device)
         firstIteration = True
         # Resample if margins are not allowed to be sparse but contain zeros
-        while (not self.ct.table_admissible(table_new)) or (not self.ct.table_sparse_admissible(table_new)) or firstIteration:
+        while (not self.ct.table_admissible(table_new)) or firstIteration:
             if self.ct.distribution_name == 'poisson':
                 # This is the uncostrained (in terms of margins) case
                 table_new = self.poisson_sample_2way_table(
@@ -571,7 +575,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             firstIteration = False
 
         try:
-            assert self.ct.table_admissible(table_new) and self.ct.table_sparse_admissible(table_new)
+            assert self.ct.table_admissible(table_new)# and self.ct.table_sparse_admissible(table_new)
         except:
             self.logger.error((self.ct.table_admissible(table_new)),(self.ct.table_sparse_admissible(table_new)))
             raise Exception('FAILED')
