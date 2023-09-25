@@ -663,7 +663,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         positive_cells = [cell for cell in non_zero_cells if self.markov_basis.basis_dictionaries[func_index][cell] > 0]
 
         # Copy previous table
-        tab_new = torch.zeros(np.shape(tab_prev),dtype=int32)
+        tab_new = torch.zeros(np.shape(tab_prev),dtype=int32,device=self.ct.device)
         tab_new[:] = tab_prev
 
         # Compute log odds ratio for 2x2 table
@@ -691,7 +691,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         tab_new[non_zero_cells[1]] = torch.tensor(rsum - new_val,dtype=int32)
         tab_new[non_zero_cells[2]] = torch.tensor(csum - new_val,dtype=int32)
         tab_new[non_zero_cells[3]] = torch.tensor(total - rsum - csum + new_val,dtype=int32)
-        
+
         return tab_new.to(device=self.ct.device,dtype=int32), \
             None, \
             self.markov_basis.basis_dictionaries[func_index], \

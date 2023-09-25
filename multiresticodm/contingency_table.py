@@ -1013,12 +1013,14 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 updated_cells = np.minimum(
                     *[broadcast(residual_margins[tuplize((ax,))],self.dims) for ax in range(self.ndims())]
                 )
+                updated_cells = torch.tensor(updated_cells,dtype=int32)
                 # Update cells at locations where there is residual value left
                 min_residual[min_residual > 0] = updated_cells[min_residual > 0]
             else:
                 # Find singleton axis that is constraints
                 ax = min(ax_constraints,key=len)
                 updated_cells = broadcast(residual_margins[ax],self.dims)
+                updated_cells = torch.tensor(updated_cells,dtype=int32)
                 # Update cells at locations where there is residual value left
                 min_residual[min_residual > 0] = updated_cells[min_residual > 0]
             
@@ -1179,24 +1181,29 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         if margins is not None:
             self.update_margins(margins)
 
-        # Non fixed (free) indices
-        free_cells = np.array(self.cells)
-        # Fixed indices
-        fixed_cells = np.array(self.constraints['cells'])
         # Initialise table to zero
-        table0 = torch.zeros(tuple(self.dims)).to(device = self.device, dtype=int32)
-        # Fix table cells
-        table0[tuple(fixed_cells.T)] = self.ground_truth_table[tuple(fixed_cells.T)]
+        table0 = torch.zeros(tuple(self.dims)).to(dtype=int32)
+        # Minimum residual table
+        min_residual = np.iinfo(np.int32).max*np.ones(tuple(self.dims),dtype='int32')
+
+        # Get fixed cells
+        fixed_cells = np.array(self.constraints['cells'])
+        # Apply cell constaints if at least one cell is fixed
+        if len(fixed_cells) > 0:
+            # Extract indices,
+            fixed_indices = [ fixed_cells[:,i] for i in range(self.ndims()) ]
+            # Fix table cells
+            table0[ fixed_indices ] = self.ground_truth_table[ fixed_indices ]
+            # Set minimum residual to zero
+            min_residual[fixed_indices] = 0
 
         # Keep a copy of row and column sums
         residual_margins = deepcopy(self.residual_margins)
         # Get only constrained residual margins
         residual_margins = {k:v for k,v in residual_margins.items() if k in self.constraints['constrained_axes']}
 
-        # Minimum residual table
-        min_residual = np.iinfo(np.int32).max*np.ones(tuple(self.dims),dtype='int32')
-        min_residual[tuple(fixed_cells.T)] = 0
-        min_residual = self.minres_given_constraints(min_residual,residual_margins)
+        # Update minimum residual
+        min_residual = torch.tensor(self.minres_given_constraints(min_residual,residual_margins),dtype=int32)
         
         # Count number of steps run max entropy updates
         counter = 0
@@ -1205,8 +1212,10 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             # In first iteration
             if counter == 0:
                 cells = np.array(self.cells)
+                # Extract indices,
+                indices = [ cells[:,i] for i in range(self.ndims()) ]
                 # Update table
-                table0[tuple(cells.T)] += (min_residual[tuple(cells.T)]).to(dtype=int32,device=self.device)
+                table0[indices] += (min_residual[indices]).to(dtype=int32,device=self.device)
                 # Update residual margins
                 residual_margins = self.update_residual_margins_from_cells(
                     residual_margins=residual_margins, 
