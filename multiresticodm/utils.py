@@ -526,8 +526,10 @@ def parse_slice_by(slice_by:list):
         key,val = key_val
 
         # Convert value to appropriate data_type
-        if isinstance(val,str) and "_" in val:
-            val = val.split("_")
+        if isinstance(val,str):
+            if "_" in val:
+                val = val.split("_")
+            # Parse data
             val = list(map(parse,val))
         
         if key in list(slices.keys()):
@@ -544,7 +546,6 @@ def parse_slice_by(slice_by:list):
     
     # Map set values to list
     slices = {k:list(v) for k,v in slices.items()}
-    
     return slices
 
 

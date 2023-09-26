@@ -1,17 +1,16 @@
 import os
 import torch
-import logging
 import h5py as h5
 import numpy as np
 
 from pathlib import Path
-from pandas import read_csv
+from typing import Tuple
 
 from multiresticodm import ROOT
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger, str_in_list
 from multiresticodm.probability_utils import random_tensor
-from multiresticodm.global_variables import PARAMETER_DEFAULTS,Dataset
+from multiresticodm.global_variables import PARAMETER_DEFAULTS,INPUT_SCHEMA,Dataset
 
 class Inputs:
     def __init__(
@@ -20,13 +19,16 @@ class Inputs:
             synthetic_data:bool = False,
             **kwargs
     ):  
-        # Setup logger
+        # Import logger
+        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
         self.logger = setup_logger(
-            __name__+kwargs.get('instance',''),
-            config.level,
-            log_to_file=True,
-            log_to_console=True
+            __name__,
+            level = level,
+            log_to_console = kwargs.get('log_to_console',False),
+            log_to_file = kwargs.get('log_to_file',False),
         ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update logger level
+        self.logger.setLevel(level)
 
         # Store config
         self.config = config
@@ -35,18 +37,11 @@ class Inputs:
         self.data = Dataset()
 
         # Store attributes and their associated dims
-        self.schema = {
-            "origin_demand":{"axes":[0],"dtype":"float32", "ndmin":1},
-            "destination_demand":{"axes":[1],"dtype":"float32", "ndmin":1},
-            "origin_attraction_ts":{"axes":[0],"dtype":"float32", "ndmin":1},
-            "destination_attraction_ts":{"axes":[1],"dtype":"float32", "ndmin":2},
-            "cost_matrix":{"axes":[0,1],"dtype":"float32", "ndmin":2},
-            "ground_truth_table":{"axes":[0,1],"dtype":"int32", "ndmin":2},
-            "dims":{},
-            "grand_total":{}
-        }
+        self.schema = INPUT_SCHEMA
 
-        if not synthetic_data:
+        if synthetic_data:
+            self.generate_synthetic_data()
+        else:
             self.read_data()
 
     def validate_dims(self):
@@ -59,9 +54,8 @@ class Inputs:
                         except:
                             raise Exception(f"{attr.replace('_',' ').capitalize()} has dim {list(getattr(self.data,attr).shape)[ax]} instead of {getattr(self.data,'dims')[ax]}.")
     
-    def read_data(
-        self,
-    ):
+    def read_data(self):
+        
         self.logger.note("Loading Harris Wilson data ...")
         if not str_in_list('dataset',self.config.settings['inputs']):
             raise Exception('Input dataset NOT provided. Harris Wilson model cannot be created.')
@@ -296,79 +290,77 @@ class Inputs:
         edge_weights[:] = torch.reshape(cost_matrix, (np.prod(dims),))
 
 
-#     def generate_synthetic_data(
-#     *, cfg, device: str
-# ) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
+    def generate_synthetic_data(*, device: str) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
 
-#     """Generates synthetic Harris-Wilson using a numerical solver.
+        """Generates synthetic Harris-Wilson using a numerical solver.
 
-#     :param cfg: the configuration file
-#     :returns the origin sizes, cost_matrix, and the time series
-#     """
+        :param cfg: the configuration file
+        :returns the origin sizes, cost_matrix, and the time series
+        """
 
-#     log.note("Generating synthetic data ...")
+        self.logger.note("Generating synthetic data ...")
 
-#     # Get run configuration properties
-#     data_cfg = cfg["synthetic_data"]
-#     N_origin, N_destination = data_cfg["N_origin"], data_cfg["N_destination"]
-#     num_steps = data_cfg["num_steps"]
+        # Get run configuration properties
+        data_cfg = self.config.settings["synthetic_data"]
+        N_origin, N_destination = data_cfg["N_origin"], data_cfg["N_destination"]
+        num_steps = data_cfg["num_steps"]
 
-#     # Generate the initial origin sizes
-#     or_sizes = torch.abs(
-#         random_tensor(
-#             **data_cfg.get("origin_sizes"), size=(N_origin, 1), device=device
-#         )
-#     )
+        # Generate the initial origin sizes
+        or_sizes = torch.abs(
+            random_tensor(
+                **data_cfg.get("origin_sizes"), size=(N_origin, 1), device=device
+            )
+        )
 
-#     # Generate the edge weights
-#     cost_matrix = torch.exp(
-#         -1
-#         * torch.abs(
-#             random_tensor(
-#                 **data_cfg.get("init_weights"),
-#                 size=(N_origin, N_destination),
-#                 device=device
-#             )
-#         )
-#     )
+        # Generate the edge weights
+        cost_matrix = torch.exp(
+            -1
+            * torch.abs(
+                random_tensor(
+                    **data_cfg.get("init_weights"),
+                    size=(N_origin, N_destination),
+                    device=device
+                )
+            )
+        )
 
-#     # Generate the initial destination zone sizes
-#     init_dest_sizes = torch.abs(
-#         random_tensor(
-#             **data_cfg.get("init_dest_sizes"), size=(N_destination, 1), device=device
-#         )
-#     )
+        # Generate the initial destination zone sizes
+        init_dest_sizes = torch.abs(
+            random_tensor(
+                **data_cfg.get("init_dest_sizes"), size=(N_destination, 1), device=device
+            )
+        )
 
-#     # Extract the underlying parameters from the config
-#     true_parameters = {
-#         "alpha": data_cfg["alpha"],
-#         "beta": data_cfg["beta"],
-#         "kappa": data_cfg["kappa"],
-#         "sigma": data_cfg["sigma"],
-#     }
+        # Extract the underlying parameters from the config
+        true_parameters = {
+            "alpha": data_cfg["alpha"],
+            "beta": data_cfg["beta"],
+            "kappa": data_cfg["kappa"],
+            "sigma": data_cfg["sigma"],
+        }
 
-#     # Initialise the ABM
-#     ABM = HarrisWilson(
-#         origin_sizes=or_sizes,
-#         cost_matrix=cost_matrix,
-#         true_parameters=true_parameters,
-#         M=data_cfg["N_destination"],
-#         epsilon=data_cfg["epsilon"],
-#         dt=data_cfg["dt"],
-#         device="cpu",
-#     )
+        # Initialise the ABM
+        ABM = HarrisWilson(
+            origin_sizes=or_sizes,
+            cost_matrix=cost_matrix,
+            true_parameters=true_parameters,
+            M=data_cfg["N_destination"],
+            epsilon=data_cfg["epsilon"],
+            dt=data_cfg["dt"],
+            device="cpu",
+        )
 
-#     # Run the ABM for n iterations, generating the entire time series
-#     dset_sizes_ts = ABM.run(
-#         init_data=init_dest_sizes,
-#         input_data=None,
-#         n_iterations=num_steps,
-#         generate_time_series=True,
-#         requires_grad=False,
-#     )
+        # Run the ABM for n iterations, generating the entire time series
+        dset_sizes_ts = ABM.run(
+            init_data=init_dest_sizes,
+            input_data=None,
+            n_iterations=num_steps,
+            generate_time_series=True,
+            requires_grad=False,
+        )
 
-#     # Return all three
-#     return or_sizes, dset_sizes_ts, cost_matrix
+        # Return all three
+        return or_sizes, dset_sizes_ts, cost_matrix
 
     def __str__(self):
         od = Path(self.config.settings['inputs']['data_files'].get('origin_demand',''))

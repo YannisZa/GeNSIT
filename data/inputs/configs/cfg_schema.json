@@ -382,11 +382,20 @@
       }
     },
     "num_steps": {
-      "sweepable": false,
+      "sweepable": true,
       "optional": true,
-      "dtype": "int",
-      "default-value": 1,
-      "valid-range": [1, null]
+      "sweep": {
+        "default": {
+          "dtype": "int",
+          "default-value": 1,
+          "valid-range": [1, null]
+        },
+        "range": {
+          "dtype": "list",
+          "list-dtype": "int",
+          "list-length": [1, null]
+        }
+      }
     },
     "batch_size": {
       "sweepable": false,

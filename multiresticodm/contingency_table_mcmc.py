@@ -691,6 +691,11 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         tab_new[non_zero_cells[1]] = torch.tensor(rsum - new_val,dtype=int32)
         tab_new[non_zero_cells[2]] = torch.tensor(csum - new_val,dtype=int32)
         tab_new[non_zero_cells[3]] = torch.tensor(total - rsum - csum + new_val,dtype=int32)
+        
+        # non_zero_cells = np.array(non_zero_cells)
+        # non_zero_indices = [non_zero_cells[:,i] for i in range(self.ct.ndims())]
+        # print(tab_new[non_zero_indices]-tab_prev[non_zero_indices])
+        # print('\n')
 
         return tab_new.to(device=self.ct.device,dtype=int32), \
             None, \
@@ -799,7 +804,6 @@ class ContingencyTableMarkovChainMonteCarlo(object):
                 table_prev, 
                 log_intensity
         )
-        
 
         # Accept/reject
         if (log_acc >= 0) or (np.log(np.random.uniform(0, 1)) < log_acc):

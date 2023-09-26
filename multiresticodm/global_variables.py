@@ -122,6 +122,16 @@ NUMPY_TO_TORCH_DTYPE = {
 
 TORCH_TO_NUMPY_DTYPE = {v:k for k,v in NUMPY_TO_TORCH_DTYPE.items()}
 
+INPUT_SCHEMA = {
+    "origin_demand":{"axes":[0],"dtype":"float32", "ndmin":1},
+    "destination_demand":{"axes":[1],"dtype":"float32", "ndmin":1},
+    "origin_attraction_ts":{"axes":[0],"dtype":"float32", "ndmin":1},
+    "destination_attraction_ts":{"axes":[1],"dtype":"float32", "ndmin":2},
+    "cost_matrix":{"axes":[0,1],"dtype":"float32", "ndmin":2},
+    "ground_truth_table":{"axes":[0,1],"dtype":"int32", "ndmin":2},
+    "dims":{},
+    "grand_total":{}
+}
 
 INPUT_TYPES = {
     'cost_matrix':torch.float32,

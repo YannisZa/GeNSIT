@@ -7,12 +7,14 @@ n_threads = [+6,+6]
 device = 'cpu'
 dataset = './data/inputs/synthetic_2x3_N_100/'
 load_experiment = ''
-dims = [+69,+13]
 to_learn = ['alpha', 'beta', 'kappa']
 seed = 1
 # [inputs.seed.sweep]
 #   default = 1
 #   range = "1:10:1"
+[inputs.dims]
+  origin = +69
+  destination = +13
 
 [inputs.data_files]
     origin_demand = 'rowsums.txt'

@@ -462,15 +462,15 @@ clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -p degree_higher -re NonJointTableSIM_NN -nw 8 -nt 2 -n 1000 -et both_margin_constrained -ax '[1]' -ax '[0]' -dev cpu
+ -p degree_higher -re NonJointTableSIM_NN -nw 5 -nt 2 -n 1000 -et both_margin_constrained -ax '[1]' -ax '[0]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt \*\*\*\*
--p degree_higher -re NonJointTableSIM_NN -nw 8 -nt 8 -n 1000 -et both_margin_constrained_10%\_cells -ax '[1]' -ax '[0]' -dev cpu
+ -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt \
+-p degree_higher -re NonJointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained_10%\_cells -ax '[1]' -ax '[0]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt \
- -p degree_higher -re NonJointTableSIM_NN -nw 8 -nt 8 -n 1000 -et both_margin_constrained_20%\_cells -ax '[1]' -ax '[0]' -dev cpu
+ -p degree_higher -re NonJointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained_20%\_cells -ax '[1]' -ax '[0]' -dev cpu
 
 ### Dependent (joint) Table and SIM
 
@@ -478,7 +478,7 @@ clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
  -p degree_higher -re JointTableSIM_NN -nw 8 -nt 8 -n 1000 -et unconstrained -ax '[]' -sm -dev cpu
 
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
+clear;multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
  -p degree_higher -re JointTableSIM_NN -nw 8 -nt 8 -n 1000 -et total_constrained -ax '[0,1]' -dev cpu
 
@@ -488,21 +488,32 @@ clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -p degree_higher -re JointTableSIM_NN -nw 8 -nt 8 -n 1000 -et both_margin_constrained -ax '[1]' -ax '[0]' -dev cpu
+ -p degree_higher -re JointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained -ax '[1]' -ax '[0]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt \
- -p degree_higher -re JointTableSIM_NN -nw 8 -nt 8 -n 1000 -et both_margin_constrained_10%\_cells -ax '[1]' -ax '[0]' -dev cpu
+ -p degree_higher -re JointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained_10%\_cells -ax '[1]' -ax '[0]' -dev cpu
 
 clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt \
- -p degree_higher -re JointTableSIM_NN -nw 8 -nt 8 -n 1000 -et both_margin_constrained_20%\_cells -ax '[1]' -ax '[0]' -dev cpu
+ -p degree_higher -re JointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained_20%\_cells -ax '[1]' -ax '[0]' -dev cpu
 
 ## Summaries and metrics
 
 ### SRMSE
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e NonJointTableSIM_NN -e JointTableSIM_NN -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 10 -t 2 -n 1000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 1 -nt 1
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e NonJointTableSIM_NN -e JointTableSIM_NN -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 0 -t 1 -n 1000000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 12 -nt 1
+
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -d JointTableSIM_NN_SweepedNoise_both_margin_constrained_10%\_cells_25_09_2023_10_39_46 \
+-d JointTableSIM_NN_SweepedNoise_both_margin_constrained_20%\_cells_25_09_2023_10_40_06 \
+-d JointTableSIM_NN_SweepedNoise_both_margin_constrained_25_09_2023_10_36_25 \
+-d NonJointTableSIM_NN_SweepedNoise_both_margin_constrained_10%\_cells_25_09_2023_10_38_14 \
+-d NonJointTableSIM_NN_SweepedNoise_both_margin_constrained_20%\_cells_25_09_2023_10_39_06 \
+-d NonJointTableSIM_NN_SweepedNoise_both_margin_constrained_25_09_2023_10_33_53 \
+-m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 0 -t 1 -n 1000000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 12 -nt 12
+
+clear; memray run -m multiresticodm -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -d JointTableSIM_NN_SweepedNoise_both_margin_constrained_10%\_cells_25_09_2023_10_39_46 \
+-m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 0 -t 1 -n 1000000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 12 -nt 12
 
 ### SSI
 

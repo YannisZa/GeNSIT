@@ -112,7 +112,7 @@ class OptionEatAll(click.Option):
 @click.group('multiresticodm')
 def cli():
     """
-    Command line tool for running data augmentation on spatial Interaction models.
+    Command line tool for running multiresolution origin-destination matrix reconstruction
     """
     pass
 
@@ -129,8 +129,7 @@ _common_options = [
     click.option('--n','-n', type=click.IntRange(min=1), help = 'Overwrites number of MCMC samples'),
     click.option('--table','-tab', type=click.STRING,default=None, help = 'Overwrites input table filename in config'),
     click.option('--device','-dev', type=click.Choice(['cpu', 'cuda', 'mps']), default='cpu', 
-            help=f'Type of device used for torch operations.'),
-    
+            help=f'Type of device used for torch operations.'),   
 ]
 
 
@@ -373,9 +372,9 @@ def run(
 
 
 _output_options = [
-    click.option('--directories','-d', multiple=True, required=False, type=click.Path(exists=True)),
-    click.option('--output_directory', '-o', type=click.STRING,cls=NotRequiredIf, default='./data/outputs/', not_required_if='directories'),
-    click.option('--dataset_name', '-dn', multiple=True, type=click.STRING,cls=NotRequiredIf, not_required_if='directories'),
+    click.option('--output_directory', '-o', required=True, type=click.Path(exists=True), default='./data/outputs/'),
+    click.option('--dataset_name', '-dn', required=True, multiple=True, type=click.STRING),
+    click.option('--directories','-d', multiple=True, required=False, type=click.Path(exists=False)),
     click.option('--experiment_type','-e', multiple=True, type=click.STRING ,cls=NotRequiredIf, not_required_if='directories'),
     click.option('--experiment_title','-et', multiple=True, type=click.STRING, default = [''], cls=NotRequiredIf, not_required_if='directories'),
     click.option('--exclude','-exc', type=click.STRING, default = '',cls=NotRequiredIf, not_required_if='directories'),
@@ -722,4 +721,5 @@ def summarise(
     logger.info('Done')
 
 if __name__ == '__main__':
-    run()
+    # run()
+    summarise()

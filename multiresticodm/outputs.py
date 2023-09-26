@@ -3,6 +3,7 @@ import re
 import gc
 import sys
 import logging
+import time
 import traceback
 import h5py as h5
 import numpy as np
@@ -69,13 +70,16 @@ class OutputSummary(object):
     @classmethod
     def find_matching_output_folders(cls,__self__):
         if str_in_list('directories',__self__.settings.keys()) and len(__self__.settings['directories']) > 0:
-            output_dirs = list(__self__.settings['directories'])
-
-            for _dir in output_dirs:
-                path_dir = Path(_dir)
-                __self__.settings['dataset_name'] = [os.path.basename(path_dir.parents[0])]
-                __self__.settings['output_directory'] = path_dir.parents[1].absolute()
-                
+            output_dirs = []
+            for _dir in list(__self__.settings['directories']):
+                for dataset_name in __self__.settings['dataset_name']:
+                    path_dir = os.path.join(
+                        __self__.settings['output_directory'],
+                        dataset_name,
+                        _dir
+                    )
+                    if os.path.exists(path_dir):
+                        output_dirs.append(path_dir)
         else:
             # Search metadata based on search parameters
             # Get output directory
@@ -92,17 +96,8 @@ class OutputSummary(object):
                 dates = ['']
             else:
                 dates = list(__self__.settings.get('dates',['']))
-                # dates = []
-                # Read dates
-                # for dt in __self__.settings['dates']:
-                    # dates.append(dt)
-                    # # Try different formats
-                    # for format in DATE_FORMATS:
-                    #     try:
-                    #         dates.append(dt.strftime(format))
-                    #         break
-                    #     except:
-                    #         pass
+
+            
             # Grab all output directories
             folder_patterns = []
             for data_name in dataset_names:
@@ -140,9 +135,9 @@ class OutputSummary(object):
     def collect_experiment_metadata(self):
         # Find matching directories
         output_dirs = self.find_matching_output_folders(self)
-        for i,output_folder in tqdm(enumerate(output_dirs),total=len(output_dirs)):
+        for i,output_folder in tqdm(enumerate(output_dirs),total=len(output_dirs),desc='Collecting metadata'):
             
-            self.logger.info(f'Collecting metadata from {output_folder}')
+            self.logger.info(f'{output_folder}')
             
             # Get name of folder
             folder_name = Path(output_folder).stem
@@ -186,6 +181,7 @@ class OutputSummary(object):
                 coordinate_slice = {}
                 input_slice = [None]
             
+
             for path_value in input_slice:
                 
                 # Get outputs and unpack its statistics
@@ -220,7 +216,7 @@ class OutputSummary(object):
                     metric_data[j]['folder'] = folder_name
                     for k,v in useful_metadata.items():
                         metric_data[j][k] = v
-                
+                print('metric_data')
                 # Store useful metadata
                 if not str_in_list(output_folder,self.experiment_metadata.keys()):
                     self.experiment_metadata[output_folder] = metric_data
@@ -230,8 +226,11 @@ class OutputSummary(object):
                         metric_data,
                         axis=0
                     )
-
-                print('\n')
+                
+                safe_delete(outputs)
+                gc.collect()
+                print('sleep')
+                time.sleep(15)
 
     def write_metadata_summaries(self):
         if len(self.experiment_metadata.keys()) > 0:
@@ -254,23 +253,19 @@ class OutputSummary(object):
             )
             makedir(output_directory)
 
-            # Get filepath experiment filepath
-            # date_strings = []
-            # for dt in self.settings['dates']:
-                # Try different formats
-                # for format in DATE_FORMATS:
-                #     try:
-                #         date_strings.append(dt.strftime(format))
-                #         break
-                #     except:
-                #         pass
             date_strings = '__'.join(self.settings['dates'])
             if str_in_list('directories',self.settings.keys()) and len(self.settings['directories']) > 0:
-                filepath = os.path.join(
-                    output_directory,
-                    f"{'_'.join(os.path.basename(folder) for folder in set(list(self.experiment_metadata.keys())))}_"+\
-                    f"{self.settings['filename_ending']}.csv"
-                )
+                if str_in_list('filename_ending',self.settings.keys()):
+                    filepath = os.path.join(
+                        output_directory,
+                        f"{self.settings['filename_ending']}.csv"
+                    )
+                else:
+                    filepath = os.path.join(
+                        output_directory,
+                        f"{'_'.join(os.path.basename(folder) for folder in set(list(self.experiment_metadata.keys())))}_"+\
+                        f"{self.settings['filename_ending']}.csv"
+                    )
             else:
                 filepath = os.path.join(
                     output_directory,
@@ -290,11 +285,16 @@ class OutputSummary(object):
     
     def apply_metrics(self,experiment_id,outputs):
         # Get outputs and unpack its statistics
+        self.logger.info('Applying metrics...')
         
         metric_data = []
 
         for sample_name in self.settings['sample']:
             # Get samples
+            self.logger.info(f'Getting sample {sample_name}...')
+            print(outputs.data.table.dtype)
+            print(outputs.data.table.coords)
+            print(outputs.data.table.shape)
             try:
                 samples = outputs.get_sample(sample_name)
             except Exception as e:
@@ -307,17 +307,15 @@ class OutputSummary(object):
                 metric_statistics_axes = statistics[1]
                 # Compute statistic before applying metric
                 # samples_summarised = None
-                # try:
-                samples_summarised = outputs.apply_sample_statistics(samples,sample_name,sample_statistics_axes)
-                # except Exception as e:
-                #     self.logger.debug(traceback.format_exc())
-                #     self.logger.error(f"samples {np.shape(samples)}, {samples.dtype}")
-                #     self.logger.error(f"Applying statistic {' over axes '.join([str(s) for s in sample_statistics_axes])} \
-                #                     for sample {sample_name} of experiment {experiment_id} failed")
-                #     print('\n')
-                #     continue
-                # if samples_summarised.shape !=  samples.shape:
-                    # samples_summarised = samples_summarised.unsqueeze(dim=0)
+                try:
+                    samples_summarised = outputs.apply_sample_statistics(samples,sample_name,sample_statistics_axes)
+                except Exception as e:
+                    self.logger.debug(traceback.format_exc())
+                    self.logger.error(f"samples {np.shape(samples)}, {samples.dtype}")
+                    self.logger.error(f"Applying statistic {' over axes '.join([str(s) for s in sample_statistics_axes])} \
+                                    for sample {sample_name} of experiment {experiment_id} failed")
+                    print('\n')
+                    continue
                 self.logger.debug(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
 
                 for metric in self.settings['metric']:
@@ -551,8 +549,6 @@ class Outputs(object):
         # Store coordinate slice
         self.coordinate_slice = coordinate_slice
         # Create semi-private xarray data 
-        self._data = Dataset()
-        # Create public xarray data 
         self.data = Dataset()
         # Enable garbage collector
         gc.enable()
@@ -990,7 +986,7 @@ class Outputs(object):
                         ) for k,v in global_coords.items()}
         
         # Create an xarray dataset for each sample
-        for sample_name,sample_data in tqdm(data_vars.items(),desc='Creating xarray dataset(s)',leave=False):
+        for sample_name,sample_data in tqdm(data_vars.items(),disable=True,desc='Creating xarray dataset(s)',leave=False):
 
             coordinates = {}
             # Ignore first two dimensions
@@ -1037,12 +1033,10 @@ class Outputs(object):
             )
             # Slice according to coordinate slice
             if len(coordinate_slice) > 0:
-                print('xr_data.coords',xr_data.coords)
-                print('coordinate_slice',{k:(v['value'] if len(v['value']) > 1 else v['value'][0]) for k,v in coordinate_slice.items()})
-                xr_data = xr_data.sel(**{k:(v['value'] if len(v['value']) > 1 else v['value'][0]) for k,v in coordinate_slice.items()})
+                xr_data = xr_data.sel(**{k:(v['values'] if len(v['values']) > 1 else v['values'][0]) for k,v in coordinate_slice.items()})
 
             # Store dataset
-            setattr(self._data,sample_name,xr_data)
+            setattr(self.data,sample_name,xr_data)
             
 
     def check_data_availability(self,sample_name:str,input_names:list=[],output_names:list=[]):
@@ -1056,10 +1050,10 @@ class Outputs(object):
                                   which does not exist in {','.join(self.inputs.data.vars())}")
         for output in output_names:
             try:
-                assert hasattr(self._data,output)
+                assert hasattr(self.data,output)
             except:
                 available = False
-                self.logger.error(f"Sample {sample_name} requires output {output} which does not exist in {','.join(vars(self._data))}")
+                self.logger.error(f"Sample {sample_name} requires output {output} which does not exist in {','.join(vars(self.data))}")
         return available
 
     def get_sample(self,sample_name:str):
@@ -1152,11 +1146,11 @@ class Outputs(object):
             )
 
         else:
-            if not hasattr(self._data,sample_name):
-                raise Exception(f"{sample_name} not found in output data [{','.join(vars(self._data).keys())}]")
+            if not hasattr(self.data,sample_name):
+                raise Exception(f"{sample_name} not found in output data [{','.join(vars(self.data).keys())}]")
             
             # Get xarray
-            samples = getattr(self._data,sample_name)
+            samples = getattr(self.data,sample_name)
             
             # Find iteration coordinates
             iter_coords = [x for x in samples.dims if x in ['iter','seed']]
@@ -1223,9 +1217,9 @@ class Outputs(object):
         
         elif statistic.lower() == 'signedmean' and \
             str_in_list(sample_name,OUTPUT_TYPES.keys()): 
-            if str_in_list(sample_name,INTENSITY_TYPES.keys()) \
-                and hasattr(self.data,'sign'):
-                signs = self.data.sign.unsqueeze(1)
+            if str_in_list(sample_name,INTENSITY_TYPES.keys()):
+                signs = self.get_sample('sign')
+                print(signs)
                 # Compute moments
                 return ( torch.einsum('nk,n...->k...',signs.float(),data.float()) / torch.sum(torch.ravel(signs.float())))
             else:
@@ -1234,12 +1228,13 @@ class Outputs(object):
         elif (statistic.lower() == 'signedvariance' or statistic.lower() == 'signedvar') and \
             str_in_list(sample_name,OUTPUT_TYPES.keys()):
 
-            if str_in_list(sample_name,INTENSITY_TYPES.keys()) \
-                and hasattr(self.data,'sign'):
-                signs = self.data.sign.unsqueeze(1)
-                # Compute intensity variance
+            if str_in_list(sample_name,INTENSITY_TYPES.keys()):
+                # Compute mean
                 samples_mean = self.compute_sample_statistics(data,sample_name,'signedmean',**kwargs)
+                # Compute squared mean
+                signs = self.get_sample('sign')
                 samples_squared_mean = np.einsum('nk,n...->k...',signs,torch.pow(data.float(),2)) / torch.sum(torch.ravel(signs.float()))
+                # Compute intensity variance
                 return (samples_squared_mean.float() - torch.pow(samples_mean.float(),2))
             else:
                 return deep_call(

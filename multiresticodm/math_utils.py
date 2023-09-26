@@ -11,58 +11,8 @@ from itertools import chain, combinations
 from multiresticodm.utils import flatten
 
 
-def log_factorial_sum(arr,is_torch:bool=True):
-    # if is_torch:
-    return log_factorial_sum_torch(arr)
-    # else:
-        # return log_factorial_sum_xarray(arr)
-
-def log_factorial_sum_torch(arr:torch.tensor):
+def log_factorial_sum(arr):
     return torch.lgamma(arr+1).sum()
-
-def log_factorial_sum_xarray(arr):
-    # Check if inputs are integers or tensors
-    if isinstance(start, int):
-        start = xr.DataArray(start)
-    if isinstance(end, int):
-        end = xr.DataArray(end)
-        
-    if start.numel() == 1 and end.numel() == 1:
-        
-        if start+1 > end:
-            return xr.DataArray(0,dtype=int32)
-        else:
-            # Create a range of integers from start to end (inclusive)
-            integers = torch.range(start, end, 1)
-            # Compute the log factorial for each integer
-            log_factorial_sums = torch.cumsum(torch.log(integers.float()), dim=0)
-            return log_factorial_sums[-1]
-    
-    else:
-        try: 
-            assert (start.numel() == end.numel()) or \
-                    (start.numel() == 1) or \
-                    (end.numel() == 1)
-        except:
-            raise Exception(f"Start and end arguments must have either the same number of elements or one element.")
-        
-        # If either start or end is a tensor, compute the log factorial for each element
-        # Initialize an empty tensor to store the results
-        log_factorial_sums = torch.zeros(max(start.numel(),end.numel()))
-        
-        # Iterate through the elements of the tensors and compute log factorials
-        for i in range(max(start.numel(),end.numel())):
-            s = start[i] if (1 < start.numel()) else start.item()
-            e = end[i] if (1 < end.numel()) else end.item()
-            if s + 1 > e:
-                # Set 0.0 for invalid range
-                log_factorial_sums[i] = 0.0
-            else:
-                integers = torch.range(s, e, 1)
-                log_factorial_sums[i] = torch.sum(torch.log(integers)).item()
-        
-        return log_factorial_sums
-    
 
 def positive_sigmoid(x,scale:float=1.0):
     return 2/(1+torch.exp(-x/scale)) - 1
@@ -301,7 +251,6 @@ def shannon_entropy(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
 
 
 def von_neumann_entropy(tab:xr.DataArray,tab0:xr.DataArray,**kwargs):
-    N = int(shape(tab)[0])
     # Convert matrix to square
     matrix = (tab@tab.T).astype('float32')
     # Add jitter
