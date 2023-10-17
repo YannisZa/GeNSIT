@@ -4,9 +4,7 @@
 '''
 
 import sys
-import time
 import torch
-import logging
 import numpy as np
 
 from torch import nn
@@ -156,10 +154,19 @@ class NeuralNet(nn.Module):
 
         # Get architecture, activation functions, and layer bias
         self.architecture = get_architecture(
-            input_size, output_size, num_layers, nodes_per_layer
+            input_size, 
+            output_size, 
+            num_layers, 
+            nodes_per_layer
         )
-        self.activation_funcs = get_activation_funcs(num_layers, activation_funcs)
-        self.bias = get_bias(num_layers, biases)
+        self.activation_funcs = get_activation_funcs(
+            num_layers, 
+            activation_funcs
+        )
+        self.bias = get_bias(
+            num_layers, 
+            biases
+        )
 
         # Add the neural net layers
         self.layers = nn.ModuleList()
@@ -206,7 +213,6 @@ class HarrisWilson_NN:
         neural_net: NeuralNet,
         loss_function: dict,
         physics_model: HarrisWilson,
-        to_learn: list,
         config: Config = None,
         **kwargs,
     ):
@@ -218,11 +224,10 @@ class HarrisWilson_NN:
             neural_net: The neural cost_matrix
             loss_function (dict): the loss function to use
             physics_model: The numerical solver
-            to_learn: the list of parameter names to learn
             config: settings regarding model (hyper)parameters and other settings
         '''
         # Setup logger
-        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
+        level = kwargs['logger'].level if 'logger' in kwargs else physics_model.config.get('level','INFO').upper()
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
             level=level,
@@ -234,25 +239,21 @@ class HarrisWilson_NN:
         # Store random number generator
         self._rng = rng
 
-        # The numerical solver
+        # The numeric    solver
         self.physics_model = physics_model
 
-        # Parameters to learn
-        self.parameters_to_learn = to_learn
-
         # Config file
-        if config is not None:
-            self.config = config
+        self.config = config
 
         # Initialise neural net, loss tracker and prediction tracker
         self._neural_net = neural_net
         self._neural_net.optimizer.zero_grad()
-        self.loss_function = LOSS_FUNCTIONS[loss_function.get('name').lower()](
+        self.loss_function = LOSS_FUNCTIONS[loss_function.get('loss_name').lower()](
             loss_function.get('args', None), **loss_function.get('kwargs', {})
         )
         self._loss_sample = torch.tensor(0.0, requires_grad=False)
         self._theta_sample = torch.stack(
-            [torch.tensor(0.0, requires_grad=False)] * len(to_learn)
+            [torch.tensor(0.0, requires_grad=False)] * len(self.physics_model.params_to_learn)
         )
 
 
@@ -308,8 +309,6 @@ class HarrisWilson_NN:
                 )
                 self._theta_sample = predicted_theta.clone().detach().cpu()
                 self._log_destination_attraction_sample = torch.log(predicted_dest_attraction).clone().detach().cpu()
-                # Write data
-                experiment.write()
                 del loss
                 loss = torch.tensor(0.0, requires_grad=True)
                 experiment.n_processed_steps = 0
@@ -355,13 +354,13 @@ class HarrisWilson_NN:
 
 
     def __repr__(self):
-        return f"{self.physics_model.noise_regime}Noise HarrisWilson NeuralNet( {self.sim.sim_type}(SpatialInteraction2D) )"
+        return f"{self.physics_model.noise_regime}Noise HarrisWilson NeuralNet( {self.physics_model.intensity_model.name}(SpatialInteraction2D) )"
 
     def __str__(self):
 
         return f"""
-            {'x'.join([str(d) for d in self.physics_model.sim.dims])} Harris Wilson Neural Network using {self.physics_model.sim.sim_type} Constrained Spatial Interaction Model
-            Learned parameters: {', '.join(self.parameters_to_learn)}
+            {'x'.join([str(d) for d in self.physics_model.intensity_model.dims])} Harris Wilson Neural Network using {self.physics_model.intensity_model.name} Constrained Spatial Interaction Model
+            Learned parameters: {', '.join(self.physics_model.params_to_learn)}
             dt: {self.config['harris_wilson_model'].get('dt',0.001) if hasattr(self,'config') else ''}
             Noise regime: {self.physics_model.noise_regime}
         """
