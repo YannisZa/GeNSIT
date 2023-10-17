@@ -53,12 +53,29 @@
       "default-value": "cpu",
       "is-any-of": ["cpu", "mps", "cuda"]
     },
-    "dataset": {
+    "in_directory": {
       "sweepable": false,
       "optional": false,
       "dtype": "directory",
       "directory-exists": true,
-      "default-value": "./data/inputs/synthetic_2x3_N_100/"
+      "default-value": "./data/inputs/"
+    },
+    "dataset": {
+      "sweepable": true,
+      "optional": false,
+
+      "sweep": {
+        "default": {
+          "dtype": "str",
+          "default-value": "synthetic_2x3_N_100/"
+        },
+        "range": {
+          "dtype": "list",
+          "list-length": [1, null],
+          "list-dtype": "str",
+          "default-value": ["synthetic_2x3_N_100/"]
+        }
+      }
     },
     "load_experiment": {
       "sweepable": false,
@@ -66,82 +83,573 @@
       "dtype": "str",
       "default-value": ""
     },
-    "dims": {
-      "sweepable": false,
-      "optional": true,
-      "dtype": "list",
-      "list-length": 2,
-      "list-dtype": "int",
-      "default-value": [1, 1],
-      "valid-range": [1, null]
-    },
-    "data_files": {
+    "data": {
       "sweepable": false,
       "optional": false,
 
-      "origin_demand": {
-        "sweepable": true,
-        "optional": false,
+      "data_generation_seed": {
+        "sweepable": false,
+        "optional": true,
 
-        "sweep": {
-          "default": {
-            "dtype": "file",
-            "file-exists": false,
-            "file-extension": "txt",
-            "default-value": "origin_demand.txt"
+        "dtype": "int",
+        "default-value": 1234,
+        "valid-range": [1, null]
+      },
+
+      "dims": {
+        "sweepable": false,
+        "optional": true,
+
+        "origin": {
+          "sweepable": true,
+          "optional": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "int",
+              "default-value": 1,
+              "valid-range": [1, null]
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "int",
+              "default-value": [1]
+            }
+          }
+        },
+
+        "destination": {
+          "sweepable": true,
+          "optional": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "int",
+              "default-value": 1,
+              "valid-range": [1, null]
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "list-length": [1, null],
+              "default-value": [1]
+            }
+          }
+        }
+      },
+      "origin_demand": {
+        "sweepable": false,
+        "optional": true,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "origin_demand.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": ["origin_demand.txt"],
+              "unique-vals": true
+            }
+          }
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "list",
+              "list-list-dtype": "int",
+              "default-value": [[]]
+            }
+          }
+        },
+        "distribution": {
+          "sweepable": false,
+          "optional": true,
+
+          "dtype": "str",
+          "default-value": ["uniform"],
+          "is-any-of": ["uniform", "normal"]
+        },
+        "parameters": {
+          "sweepable": false,
+          "optional": true,
+
+          "upper": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
           },
-          "range": {
-            "dtype": "list",
-            "list-length": [1, null],
-            "list-dtype": "file",
-            "file-exists": false,
-            "file-extension": "txt",
-            "default-value": ["origin_demand.txt"],
-            "unique-vals": true
+          "lower": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "mean": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "std": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          }
+        }
+      },
+      "destination_demand": {
+        "sweepable": false,
+        "optional": true,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "destination_demand.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": ["destination_demand.txt"],
+              "unique-vals": true
+            }
+          }
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "list",
+              "list-list-dtype": "int",
+              "default-value": [[]]
+            }
+          }
+        },
+        "distribution": {
+          "sweepable": false,
+          "optional": true,
+
+          "dtype": "str",
+          "default-value": ["uniform"],
+          "is-any-of": ["uniform", "normal"]
+        },
+        "parameters": {
+          "sweepable": false,
+          "optional": true,
+
+          "upper": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "lower": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "mean": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "std": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          }
+        }
+      },
+      "origin_attraction_ts": {
+        "sweepable": false,
+        "optional": true,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "origin_attraction_ts.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": ["origin_attraction_ts.txt"],
+              "unique-vals": true
+            }
+          }
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "list",
+              "list-list-dtype": "int",
+              "default-value": [[]]
+            }
+          }
+        },
+        "distribution": {
+          "sweepable": false,
+          "optional": true,
+
+          "dtype": "str",
+          "default-value": ["uniform"],
+          "is-any-of": ["uniform", "normal"]
+        },
+        "parameters": {
+          "sweepable": false,
+          "optional": true,
+
+          "upper": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "lower": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "mean": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "std": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
           }
         }
       },
       "destination_attraction_ts": {
-        "sweepable": true,
-        "optional": false,
+        "sweepable": false,
+        "optional": true,
 
-        "sweep": {
-          "default": {
-            "dtype": "file",
-            "file-exists": false,
-            "file-extension": "txt",
-            "default-value": "destination_attraction_ts.txt"
+        "file": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "destination_attraction_ts.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": ["destination_attraction_ts.txt"],
+              "unique-vals": true
+            }
+          }
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "list",
+              "list-list-dtype": "int",
+              "default-value": [[]]
+            }
+          }
+        },
+        "distribution": {
+          "sweepable": false,
+          "optional": true,
+
+          "dtype": "str",
+          "default-value": ["uniform"],
+          "is-any-of": ["uniform", "normal"]
+        },
+        "parameters": {
+          "sweepable": false,
+          "optional": true,
+
+          "upper": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
           },
-          "range": {
-            "dtype": "list",
-            "list-length": [1, null],
-            "list-dtype": "file",
-            "file-exists": false,
-            "file-extension": "txt",
-            "default-value": ["destination_attraction_ts.txt"],
-            "unique-vals": true
+          "lower": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "mean": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "std": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
           }
         }
       },
       "cost_matrix": {
-        "sweepable": true,
+        "sweepable": false,
         "optional": false,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "cost_matrix.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": ["cost_matrix.txt"],
+              "unique-vals": true
+            }
+          }
+        },
+        "distribution": {
+          "sweepable": false,
+          "optional": true,
+
+          "dtype": "str",
+          "default-value": ["uniform"],
+          "is-any-of": ["uniform", "normal"]
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "list",
+              "list-list-dtype": "int",
+              "default-value": [[]]
+            }
+          }
+        },
+        "parameters": {
+          "sweepable": false,
+          "optional": true,
+
+          "upper": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "lower": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "mean": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          },
+          "std": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          }
+        }
+      },
+      "table": {
+        "sweepable": false,
+        "optional": true,
+
+        "dtype": "file",
+        "file-exists": false,
+        "file-extension": "txt",
+        "default-value": "ground_truth_table.txt"
+      },
+      "margins": {
+        "sweepable": false,
+        "optional": true,
+
+        "dtype": "list",
+        "list-dtype": "customDict",
+        "dict-key-dtype": "str",
+        "dict-value-schema": {
+          "file": {
+            "sweepable": true,
+            "optional": true,
+
+            "sweep": {
+              "default": {
+                "dtype": "file",
+                "file-extension": "txt",
+                "default-value": "margins.txt"
+              },
+              "range": {
+                "dtype": "list",
+                "list-dtype": "file",
+                "file-extension": "txt",
+                "default-value": ["margins.txt"]
+              }
+            }
+          },
+          "value": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": []
+          }
+        }
+      },
+      "cells": {
+        "sweepable": true,
+        "optional": true,
 
         "sweep": {
           "default": {
             "dtype": "file",
             "file-exists": false,
             "file-extension": "txt",
-            "default-value": "cost_matrix.txt"
+            "default-value": ""
           },
           "range": {
             "dtype": "list",
-            "list-length": [1, null],
             "list-dtype": "file",
             "file-exists": false,
             "file-extension": "txt",
-            "default-value": ["cost_matrix.txt"],
-            "unique-vals": true
+            "default-value": [""]
           }
         }
       }
@@ -172,11 +680,22 @@
       }
     },
     "grand_total": {
-      "sweepable": false,
+      "sweepable": true,
       "optional": true,
-      "dtype": "int",
-      "default-value": 1,
-      "valid-range": [1, null]
+
+      "sweep": {
+        "default": {
+          "dtype": "int",
+          "default-value": 1,
+          "valid-range": [1, null]
+        },
+        "range": {
+          "dtype": "list",
+          "list-length": [1, null],
+          "list-dtype": "int",
+          "default-value": [1]
+        }
+      }
     },
     "parameters": {
       "sweepable": false,
@@ -260,8 +779,8 @@
         "range": {
           "dtype": "list",
           "list-dtype": "float",
-          "default-value": [0.001],
           "valid-range": [0, 1],
+          "default-value": [0.001],
           "unique-vals": true
         }
       }
@@ -354,12 +873,254 @@
       }
     }
   },
+  "mcmc": {
+    "sweepable": false,
+    "optional": false,
+
+    "disable_tqdm": {
+      "sweepable": false,
+      "optional": false,
+      "dtype": "bool",
+      "default-value": true
+    },
+    "mcmc_workers": {
+      "sweepable": false,
+      "optional": true,
+
+      "dtype": "int",
+      "default-value": 1,
+      "value-range": [1, null],
+      "inclusive": false
+    },
+    "parameters": {
+      "sweepable": false,
+      "optional": false,
+
+      "theta_steps": {
+        "sweepable": false,
+        "optional": false,
+
+        "dtype": "int",
+        "default-value": 1,
+        "value-range": [1, null],
+        "inclusive": false
+      },
+      "covariance": {
+        "sweepable": true,
+        "optional": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "list2D",
+            "default-value": [
+              [1.0, 0.0],
+              [0.0, 1.0]
+            ],
+            "list2D-nrows": 2,
+            "list2D-ncols": 2,
+            "list2D-dtype": "float",
+            "value-range": [0.0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "default-value": [
+              [
+                [1.0, 0.0],
+                [0.0, 1.0]
+              ]
+            ],
+            "list-dtype": "list2D",
+            "list2D-nrows": 2,
+            "list2D-ncols": 2,
+            "list2D-dtype": "float",
+            "value-range": [0.0, null]
+          }
+        }
+      },
+      "step_size": {
+        "sweepable": true,
+        "optional": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 1.0,
+            "value-range": [0.0, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "default-value": [1.0],
+            "list-dtype": "float",
+            "value-range": [0.0, null],
+            "inclusive": false
+          }
+        }
+      }
+    },
+    "destination_attraction": {
+      "sweepable": false,
+      "optional": false,
+
+      "log_destination_attraction_steps": {
+        "sweepable": false,
+        "optional": false,
+
+        "dtype": "int",
+        "default-value": 1,
+        "value-range": [1, null],
+        "inclusive": false
+      },
+      "leapfrog_steps": {
+        "sweepable": true,
+        "optional": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "value-range": [0, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "default-value": [1],
+
+            "list-dtype": "int",
+            "value-range": [0, null],
+            "inclusive": false
+          }
+        }
+      },
+      "ais_leapfrog_steps": {
+        "sweepable": true,
+        "optional": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "value-range": [0, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "default-value": [1],
+            "list-dtype": "int",
+            "value-range": [0, null],
+            "inclusive": false
+          }
+        }
+      },
+      "ais_samples": {
+        "sweepable": true,
+        "optional": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "value-range": [0, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "default-value": [1],
+            "list-dtype": "int",
+            "value-range": [0, null],
+            "inclusive": false
+          }
+        }
+      },
+      "n_bridging_distributions": {
+        "sweepable": true,
+        "optional": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "value-range": [0, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "default-value": [1],
+            "list-dtype": "int",
+            "value-range": [0, null],
+            "inclusive": false
+          }
+        }
+      },
+      "leapfrog_step_size": {
+        "sweepable": true,
+        "optional": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 0.01,
+            "value-range": [0.0, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "default-value": [0.01],
+            "list-dtype": "float",
+            "value-range": [0.0, null],
+            "inclusive": false
+          }
+        }
+      },
+      "ais_leapfrog_step_size": {
+        "sweepable": true,
+        "optional": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 0.2,
+            "value-range": [0.0, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "default-value": [0.2],
+            "list-dtype": "float",
+            "value-range": [0.0, null],
+            "inclusive": false
+          }
+        }
+      }
+    }
+  },
   "training": {
     "table_inference": {
       "sweepable": false,
       "optional": false,
       "dtype": "bool",
       "default-value": false
+    },
+    "data_size": {
+      "sweepable": true,
+      "optional": false,
+
+      "sweep": {
+        "default": {
+          "dtype": "int",
+          "default-value": 1,
+          "valid-range": [0.0, null],
+          "inclusive": false
+        },
+        "range": {
+          "dtype": "list",
+          "list-dtype": "int",
+          "list-length": [1, null],
+          "default-value": [1],
+          "valid-range": [0.0, null],
+          "inclusive": false
+        }
+      }
     },
     "N": {
       "sweepable": true,
@@ -376,14 +1137,14 @@
           "list-dtype": "int",
           "list-length": [1, null],
           "default-value": [1],
-          "valid-range": [1, null],
-          "unique-vals": true
+          "valid-range": [1, null]
         }
       }
     },
     "num_steps": {
       "sweepable": true,
       "optional": true,
+
       "sweep": {
         "default": {
           "dtype": "int",
@@ -727,6 +1488,7 @@
   "experiments": {
     "sweepable": false,
     "optional": false,
+
     "dtype": "list",
     "list-dtype": "customDict",
     "dict-key-dtype": "str",
@@ -740,6 +1502,7 @@
           "SIM_NN",
           "SIM_MCMC",
           "Table_MCMC",
+          "DataGeneration",
           "NonJointTableSIM_NN",
           "JointTableSIM_NN",
           "JointTableSIM_MCMC"
@@ -803,7 +1566,7 @@
       "default-value": 1,
       "valid-range": [1, null]
     },
-    "directory": {
+    "out_directory": {
       "sweepable": false,
       "optional": false,
 

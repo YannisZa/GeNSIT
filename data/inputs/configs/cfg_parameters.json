@@ -11,26 +11,122 @@
     "n_workers": true,
     "n_threads": true,
     "device": true,
-    "dataset": true,
+    "in_directory": true,
+    "dataset": {
+      "sweep": {
+        "default": true,
+        "range": true
+      }
+    },
     "load_experiment": true,
-    "dims": true,
-    "data_files": {
+    "data": {
+      "data_generation_seed": true,
       "origin_demand": {
-        "sweep": {
-          "default": true,
-          "range": true
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        },
+        "distribution": false,
+        "parameters": {
+          "lower": false,
+          "upper": false,
+          "mean": false,
+          "std": false
+        }
+      },
+      "destination_demand": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        },
+        "distribution": false,
+        "parameters": {
+          "lower": false,
+          "upper": false,
+          "mean": false,
+          "std": false
+        }
+      },
+      "origin_attraction_ts": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        },
+        "distribution": false,
+        "parameters": {
+          "lower": false,
+          "upper": false,
+          "mean": false,
+          "std": false
         }
       },
       "destination_attraction_ts": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        },
+        "distribution": false,
+        "parameters": {
+          "lower": false,
+          "upper": false,
+          "mean": false,
+          "std": false
+        }
+      },
+      "cost_matrix": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        },
+        "distribution": false,
+        "parameters": {
+          "lower": false,
+          "upper": false,
+          "mean": false,
+          "std": false
+        }
+      },
+      "table": true,
+      "margins": [
+        {
+          "axis": true,
+          "file": {
+            "sweep": {
+              "default": true,
+              "range": true
+            }
+          },
+          "value": true
+        }
+      ],
+      "cells": {
         "sweep": {
           "default": true,
           "range": true
         }
       },
-      "cost_matrix": {
-        "sweep": {
-          "default": true,
-          "range": true
+      "dims": {
+        "origin": {
+          "sweep": {
+            "default": true,
+            "range": true
+          }
+        },
+        "destination": {
+          "sweep": {
+            "default": true,
+            "range": true
+          }
         }
       }
     }
@@ -42,7 +138,12 @@
         "range": true
       }
     },
-    "grand_total": true,
+    "grand_total": {
+      "sweep": {
+        "default": true,
+        "range": true
+      }
+    },
     "parameters": {
       "alpha": {
         "sweep": {
@@ -105,9 +206,78 @@
         "range": true
       }
     },
-    "num_steps": true,
+    "num_steps": {
+      "sweep": {
+        "default": true,
+        "range": true
+      }
+    },
+    "data_size": {
+      "sweep": {
+        "default": true,
+        "range": true
+      }
+    },
     "batch_size": true,
     "table_inference": true
+  },
+  "mcmc": {
+    "disable_tqdm": true,
+    "mcmc_workers": true,
+    "parameters": {
+      "theta_steps": true,
+      "covariance": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "step_size": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      }
+    },
+    "destination_attraction": {
+      "log_destination_attraction_steps": true,
+      "leapfrog_steps": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "ais_leapfrog_steps": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "ais_samples": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "n_bridging_distributions": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "leapfrog_step_size": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "ais_leapfrog_step_size": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      }
+    }
   },
   "neural_network": {
     "disable_tqdm": true,
@@ -172,7 +342,7 @@
   "outputs": {
     "write_start": true,
     "write_every": true,
-    "directory": true,
+    "out_directory": true,
     "experiment_title": true
   }
 }
