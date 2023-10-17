@@ -3,15 +3,13 @@
 """
 import sys
 import torch
-import logging
 
-from torch import int32, float32, uint8
+from torch import float32
 
 from multiresticodm.config import Config
-# from multiresticodm.utils import safe_delete,str_in_list
-from multiresticodm.global_variables import PARAMETER_DEFAULTS
+from multiresticodm.global_variables import PARAMETER_DEFAULTS,Dataset
 from multiresticodm.spatial_interaction_model import SpatialInteraction2D
-from multiresticodm.utils import setup_logger, sigma_to_noise_regime
+from multiresticodm.utils import set_seed, setup_logger, sigma_to_noise_regime, to_json_format
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
 
@@ -20,7 +18,7 @@ class HarrisWilson:
     def __init__(
         self,
         *,
-        sim: SpatialInteraction2D = None,
+        intensity_model: SpatialInteraction2D = None,
         config: Config = None,
         dt: float = 0.001,
         true_parameters: dict = None,
@@ -30,14 +28,13 @@ class HarrisWilson:
         """The Harris and Wilson model of economic activity.
 
         :param sim: the Spatial interaction model with all necessary data
-        :param params_to_learn: (optional) the names of free parameters to learn
         :param dt: (optional) the time differential to use for the solver
         :param true_parameters: (optional) a dictionary of the true parameters
         :param device: the training device to use
         """
 
         # Setup logger
-        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
+        level = kwargs['logger'].level if 'logger' in kwargs else config.get('level','INFO').upper()
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
             level=level,
@@ -48,19 +45,16 @@ class HarrisWilson:
         self.logger.setLevel(level)
 
         # Store SIM and its config separately
-        self.sim = sim
-
-        if config is not None:
-            self.config = config
+        self.intensity_model = intensity_model
+        self.config = config
+        self.name = 'HarrisWilson'
 
         # Device name
         self.device = self.config['inputs']['device']
 
         # Model parameters
-        self.aux_param_names = ['noise_var','epsilon']
-        self.main_param_names = ['alpha','beta','kappa','sigma','delta']
+        self.param_names = ['alpha','beta','kappa','sigma','delta','epsilon','bmax']
         self.true_parameters = {k:v for k,v in true_parameters.items() if v is not None}
-
         # Add parameters to learn if None is provided as true parameter
         for key,value in true_parameters.items():
             if value is None and key not in self.config.settings['inputs']['to_learn']:
@@ -68,214 +62,175 @@ class HarrisWilson:
         
         # Check that learnable parameters are in valid set
         try:
-            assert set(self.config.settings['inputs']['to_learn']).issubset(set(self.main_param_names))
+            assert set(self.config.settings['inputs']['to_learn']).issubset(set(self.param_names))
         except:
             self.logger.error(f"Some parameters in {','.join(self.config.settings['inputs']['to_learn'])} cannot be learned.")
-            self.logger.error(f"Acceptable parameters are {','.join(self.main_param_names)}.")
+            self.logger.error(f"Acceptable parameters are {','.join(self.param_names)}.")
             raise Exception('Cannot instantiate Harris Wilson Model.')
         
-
-        params_to_learn = {}
-        idx = 0
+        # Set parameters to learn based on
+        # kwargs or parameter defaults
+        self.params_to_learn = {}
         for param in self.config.settings['inputs']['to_learn']:
-            if self.true_parameters is not None and param not in list(self.true_parameters.keys()):
-                params_to_learn[param] = idx
-                idx += 1
-        self.params_to_learn = params_to_learn
+            self.params_to_learn[param] = kwargs.get(param,PARAMETER_DEFAULTS[param])
 
-
-        # Auxiliary hyperparameters
+        # Fixed hyperparameters
+        self.params = Dataset()
         for param in PARAMETER_DEFAULTS.keys():
-            true_param = self.true_parameters.get(param,PARAMETER_DEFAULTS[param])
-            if true_param is None:
+            if not param in list(self.params_to_learn.keys()):
+                true_param = self.true_parameters.get(param,PARAMETER_DEFAULTS[param])
                 setattr(
-                    self,
+                    self.params,
                     param,
-                    torch.tensor(PARAMETER_DEFAULTS[param]).float().to(device)
+                    torch.tensor(true_param).to(device=device,dtype=float32)
                 )
-            else:
-                setattr(
-                    self,
-                    param,
-                    torch.tensor(true_param).float().to(device)
-                )
-            if hasattr(self,'config'):
-                self.config.settings['harris_wilson_model']['parameters'][param] = self.true_parameters.get(param,PARAMETER_DEFAULTS[param])
+                if self.config is not None:
+                    self.config.settings['harris_wilson_model']['parameters'][param] = to_json_format(
+                        self.true_parameters.get(param,PARAMETER_DEFAULTS[param])
+                    )
+        # Update gamma for MCMC
+        if hasattr(self.params,'sigma'):
+            self.params.gamma = 2/(self.params.sigma)**2
         
         # Time discretisation step size
         self.dt = torch.tensor(dt).float().to(device)
 
         # Error noise on log destination attraction
-        noise_percentage = self.true_parameters.get('noise_percentage',PARAMETER_DEFAULTS['noise_percentage'])
+        self.noise_percentage = torch.tensor(
+            self.true_parameters.get('noise_percentage',PARAMETER_DEFAULTS['noise_percentage'])
+            ).to(
+                dtype=float32,
+                device=self.device
+            )
         self.noise_var = torch.pow(
             (
-                torch.tensor(noise_percentage).float() / \
+                self.noise_percentage / \
                 torch.tensor(100).float()
             ) * \
-            torch.log(torch.tensor(self.sim.dims[1]).float()),
+            torch.log(torch.tensor(self.intensity_model.dims['destination']).float()),
             2
+        ).to(
+            dtype=float32,
+            device=self.device
         )
         if hasattr(self,'config'):
-            self.config.settings['harris_wilson_model']['noise_percentage'] = noise_percentage
+            self.config.settings['harris_wilson_model']['parameters']['noise_var'] = to_json_format(self.noise_var)
 
         # Update noise regime
-        if 'sigma' in self.params_to_learn:
+        self.noise_regime = self.config['harris_wilson_model']['parameters'].get('sigma',None)
+        if 'sigma' in list(self.params_to_learn.keys()) or self.noise_regime is None:
             self.noise_regime = 'variable'
+        elif isinstance(self.noise_regime,list):
+            self.noise_regime = 'sweeped'
+        elif self.noise_regime >= 0.1:
+            self.noise_regime = 'high'
         else:
-            # Get true sigma
-            self.noise_regime = sigma_to_noise_regime(self.true_parameters['sigma'])
+            self.noise_regime = 'low'
         self.config.settings['noise_regime'] = self.noise_regime
 
+
+    def sde_potential(self,log_destination_attraction,**kwargs):
+
+        # Update input kwargs if required
+        kwargs['log_destination_attraction'] = log_destination_attraction
+        updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
+        updated_kwargs.update(**vars(self.params))
+        
+        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['gamma'])
+
+        self.intensity_model.check_sample_availability(
+            required,
+            updated_kwargs
+        )
+        return self.intensity_model.sde_pot(**updated_kwargs)
     
-    def elicit_delta_and_kappa(self):
-        # Update delta and kappa 
-        delta = self.true_parameters.get('delta',None)
-        kappa = self.true_parameters.get('kappa',None)
-        if delta is None and kappa is None:
-            self.kappa = (torch.sum(self.sim.origin_demand)).float()/(torch.sum(torch.exp(self.log_destination_attraction))-torch.min(torch.exp(self.log_destination_attraction)).float()*self.sim.dims[1])
-            self.delta = torch.min(torch.exp(self.log_destination_attraction)).float() * self.kappa
-        elif self.kappa is None and self.delta is not None:
-            self.kappa = (torch.sum(self.sim.origin_demand) + self.delta*self.sim.dims[1])/torch.sum(torch.exp(self.sim.log_destination_attraction))
-        elif self.kappa is not None and self.delta is None:
-            self.delta = self.kappa * torch.min(torch.exp(self.sim.log_destination_attraction)).float()
-        for param in ['delta','kappa']:
-            if hasattr(self,'config'):
-                self.config['harris_wilson_model']['parameters'][param] = getattr(self,param)
-    
+    def sde_potential_and_gradient(self,log_destination_attraction,**kwargs):
 
+        # Update input kwargs if required
+        kwargs['log_destination_attraction'] = log_destination_attraction
+        updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
+        updated_kwargs.update(**vars(self.params))
 
-    # ... Harris Wilson SDE drift potential and its gradients .....................................
+        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['gamma'])
 
-    # def negative_destination_attraction_log_likelihood_and_gradient(self,xx,s2_inv:float=100.):
-    #     """ Log of potential function of the likelihood =  log(pi(y|x)).
-
-    #     Parameters
-    #     ----------
-    #     xx : torch.tensor
-    #         Log destination sizes
-    #     s2_inv : float
-    #         Inverse sigma^2 where sigma is the noise of the observation model.
-
-    #     Returns
-    #     -------
-    #     float,torch.tensor
-    #         log Likelihood value and log of its gradient with respect to xx
-
-    #     """
-    #     log_likelihood,\
-    #     log_likelihood_gradient = self.destination_attraction_log_likelihood_and_jacobian(
-    #         xx,
-    #         self.log_destination_attraction,
-    #         s2_inv
-    #     )
-    #     return -log_likelihood, -log_likelihood_gradient
-
-    # def sde_potential(self,xx,theta):
-    #     """ Computes the potential function of singly constrained model
-
-    #     Parameters
-    #     ----------
-    #     xx : torch.tensor[Mx1]
-    #         Log destination attraction
-    #     theta : torch.tensor[]
-    #         List of parameters (alpha,beta,delta,kappa,epsilon)
-
-    #     Returns
-    #     -------
-    #     float
-    #         Potential function value at xx.
-    #     torch.tensor[Mx1]
-    #         Potential function Jacobian at xx.
-
-    #     """
-    #     return self.sde_pot(xx,theta,self.origin_demand,self.cost_matrix)
-
-    
-    # def sde_potential_gradient(self,xx,theta):
-    #     return self.sde_pot_jacobian(xx,theta,self.origin_demand,self.cost_matrix)
-    
-
-    # def sde_potential_and_gradient(self,xx,theta):
-    #     return self.sde_pot_and_jacobian(xx,theta,self.origin_demand,self.cost_matrix)
-
-
-    # def sde_potential_hessian(self,xx,theta):
-    #     """ Computes Hessian matrix of potential function for the singly constrained model.
-
-    #     Parameters
-    #     ----------
-    #     xx : torch.tensor
-    #         Log destination attraction
-    #     theta : torch.tensor
-    #         List of parameters (alpha,beta,delta,kappa,epsilon)
-
-    #     Returns
-    #     -------
-    #     torch.tensor
-    #         Hessian matrix of potential function
-
-    #     """
-
-    #     return self.sde_pot_hessian(xx,theta,self.origin_demand,self.cost_matrix)
+        self.intensity_model.check_sample_availability(
+            required,
+            updated_kwargs
+        )
+        potential,jacobian = self.intensity_model.sde_pot_and_jacobian(**updated_kwargs)
+        return potential,jacobian[0]
         
 
-    # def sde_potential_and_gradient_annealed_importance_sampling(self,xx):
-    #     """ Potential function for annealed importance sampling (no flows model)
-    #     -gamma*V_{theta}'(x)
-    #     where V_{theta}'(x) is equal to the potential function in the limit of alpha -> 1, beta -> 0
+    def sde_potential_jacobian(self,log_destination_attraction,**kwargs):
 
-    #     Parameters
-    #     ----------
-    #     xx : torch.tensor
-    #         Log destination sizes
-    #     theta : torch.tensor
-    #         List of parameters
+        # Update input kwargs if required
+        kwargs['log_destination_attraction'] = log_destination_attraction
+        updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
+        updated_kwargs.update(**vars(self.params))
 
-    #     Returns
-    #     -------
-    #     float, torch.tensor
-    #         AIS potential value and its gradient
+        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['gamma'])
 
-    #     """
-    #     return self.sde_ais_pot_and_jacobian(xx=xx,theta=torch.tensor([self.delta,self.gamma,self.kappa]),J=self.dims[1])
-    # def ode_log_stationary_points_update(self,xx,theta):
+        self.intensity_model.check_sample_availability(
+            required,
+            updated_kwargs
+        )
+        return self.intensity_model.sde_pot_jacobian(**updated_kwargs)[0]
 
-    #     # Get dimensions of cost matrix
-    #     kappa = theta[4]
-    #     delta = theta[2]
+    
+    def sde_potential_hessian(self,log_destination_attraction,**kwargs):
 
-    #     # Compute lambdas
-    #     log_intensity = self.log_intensity(xx,theta,1)
-    #     # Get log stationary points
-    #     log_stationary_points = np.log((np.sum(np.exp(log_intensity),axis=0) + delta)) - np.log(kappa)
+        # Update input kwargs if required
+        kwargs['log_destination_attraction'] = log_destination_attraction
+        updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
+        updated_kwargs.update(**vars(self.params))
 
-    #     return log_stationary_points
+        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['gamma'])
 
+        self.intensity_model.check_sample_availability(
+            required,
+            updated_kwargs
+        )
+        return self.intensity_model.sde_pot_hessian(**updated_kwargs)[0][0]
+    
+    def negative_destination_attraction_log_likelihood_and_gradient(self,xx_data,xx,s2_inv:float=100.):
+        """ Log of potential function of the likelihood =  log(pi(y|x)).
 
-    # def ode_log_stationary_equations(self,xx,theta):
+        Parameters
+        ----------
+        xx : torch.tensor
+            Log destination sizes
+        s2_inv : float
+            Inverse sigma^2 where sigma is the noise of the observation model.
 
-    #     # Get dimensions of cost matrix
-    #     kappa = theta[4]
-    #     delta = theta[2]
+        Returns
+        -------
+        float,torch.tensor
+            log Likelihood value and log of its gradient with respect to xx
 
-    #     # Compute lambdas
-    #     log_intensity = self.log_intensity(xx,theta,1)
-    #     # Solve equation for equilibrium points
-    #     return np.sum(np.exp(log_intensity),axis=0) - kappa*np.exp(xx) + delta
+        """
+        # Compute difference
+        diff = (xx - xx_data).flatten()
+        # Compute gradient of log likelihood
+        negative_log_likelihood_gradient = -s2_inv*diff
+        # Compute log likelihood (without constant factor)
+        negative_log_likelihood = -0.5*s2_inv*(diff.dot(diff))
+        return -negative_log_likelihood, -negative_log_likelihood_gradient
+    
+    def sde_ais_potential_and_jacobian(self,**kwargs):
+        
+        Ndestinations = self.intensity_model.dims['destination']
+        delta = self.params.delta
+        kappa = self.params.kappa
+        xx = kwargs['log_destination_attraction']
+        gamma = kwargs['gamma'] if kwargs['gamma'] is not None else self.params.gamma
+        # Note that lim_{beta->0, alpha->0} gamma*V_{theta}(x) = gamma*kappa*\sum_{j=1}^J \exp(x_j) - gamma*(delta+1/J) * \sum_{j=1}^J x_j
+        gamma_kk_exp_xx = gamma*kappa*torch.exp(xx)
+        # Function proportional to the potential function in the limit of alpha -> 0, beta -> 0
+        V = -gamma*(delta+1./Ndestinations)*xx.sum() + gamma_kk_exp_xx.sum()
+        # Gradient of function above
+        gradV = -gamma*(delta+1./Ndestinations)*torch.ones(Ndestinations,dtype=float32,device=self.device) + gamma_kk_exp_xx
 
-    # def ode_stationary_points_iterative_solver(self,xx,theta,convergence_threshold:float=1e-9):
-    #     # Extract necessary data
-    #     # Perform update for stationary points
-    #     xx_new = self.ode_log_stationary_points_update(xx,theta)
-    #     xxs = xx.reshape(1,np.shape(xx)[0])
-    #     # Solve equation until successive solutions do not change signficantly (equilibrium point identified)
-    #     while (np.absolute(xx_new-xx) > convergence_threshold).any():
-    #         xx = xx_new
-    #         xx_new = self.ode_log_stationary_points_update(xx,theta)
-    #         xxs = np.append(xxs,xx_new.reshape(1,np.shape(xx_new)[0]),axis=0)
-
-    #     return xxs
-
+        return V, gradV
 
     # ... Model run functions ..........................................................................................
     
@@ -299,27 +254,32 @@ class HarrisWilson:
         """
         # Parameters to learn
         alpha = (
-            self.true_parameters["alpha"]
+            self.params.alpha
             if 'alpha' not in self.params_to_learn.keys()
             else free_parameters[self.params_to_learn["alpha"]]
         )
         beta = (
-            self.true_parameters["beta"]
+            self.params.beta
             if "beta" not in self.params_to_learn.keys()
             else free_parameters[self.params_to_learn["beta"]]
         )
         kappa = (
-            self.true_parameters["kappa"]
+            self.params.kappa
             if "kappa" not in self.params_to_learn.keys()
             else free_parameters[self.params_to_learn["kappa"]]
         )
         delta = (
-            self.true_parameters["delta"]
+            self.params.delta
             if "delta" not in self.params_to_learn.keys()
             else free_parameters[self.params_to_learn["delta"]]
         )
+        epsilon = (
+            self.params.epsilon
+            if "epsilon" not in self.params_to_learn.keys()
+            else free_parameters[self.params_to_learn["epsilon"]]
+        )
         sigma = (
-            self.true_parameters["sigma"]
+            self.params.sigma
             if "sigma" not in self.params_to_learn.keys()
             else free_parameters[self.params_to_learn["sigma"]]
         )
@@ -332,25 +292,24 @@ class HarrisWilson:
 
 
         # Calculate the vector of demands
-        demand = self.sim.intensity_demand(
+        demand = self.intensity_model.intensity_demand(
             alpha = alpha,
             beta = beta,
             log_destination_attraction = torch.log(new_sizes),
             grand_total = torch.tensor(1.)
         )
-        # print(alpha,beta,kappa)
         # Update the current values
         new_sizes = (
             new_sizes + \
             +torch.mul(
                 curr_destination_attractions,
-                self.epsilon * (demand - kappa * curr_destination_attractions + delta)
+                epsilon * (demand - kappa * curr_destination_attractions + delta)
                 + sigma
                 * 1
                 / torch.sqrt(torch.tensor(2, dtype=torch.float) * torch.pi * dt).to(
                     self.device
                 )
-                * torch.normal(0, 1, size=(1, self.sim.dims[1])).to(self.device),
+                * torch.normal(0, 1, size=(1, self.intensity_model.dims['destination'])).to(self.device),
             )
             * dt
         )
@@ -364,7 +323,11 @@ class HarrisWilson:
         dt: float = None,
         free_parameters=None,
         requires_grad: bool = True,
-        generate_time_series: bool = False
+        generate_time_series: bool = False,
+        seed: int = None,
+        semaphore = None,
+        samples = None,
+        pbar = None
     ) -> torch.tensor:
 
         """Runs the model for n_iterations.
@@ -377,6 +340,14 @@ class HarrisWilson:
         :return: the time series data
 
         """
+        if semaphore is not None:
+            semaphore.acquire()
+        if seed is not None:
+            set_seed(seed)
+        
+        # Training parameters
+        dt = self.dt if dt is None else dt
+
         if not generate_time_series:
             sizes = init_destination_attraction.clone()
             for _ in range(n_iterations):
@@ -386,7 +357,7 @@ class HarrisWilson:
                     dt=dt,
                     requires_grad=requires_grad,
                 )
-                return torch.stack(sizes)
+                sizes = torch.stack(sizes)
 
         else:
             sizes = [init_destination_attraction.clone()]
@@ -399,20 +370,26 @@ class HarrisWilson:
                         requires_grad=requires_grad,
                     )
                 )
-            sizes = torch.stack(sizes)
-            return torch.reshape(sizes, (sizes.shape[0], sizes.shape[1], 1))
+            sizes = torch.squeeze(torch.stack(tuple(sizes)))
+
+        if semaphore is not None:
+            semaphore.release()
+        if samples is not None:
+            samples[seed] = sizes
+        if pbar is not None:
+            pbar.update(1)
+        return sizes
 
 
     def __repr__(self):
-        return f"HarrisWilson( {self.sim.sim_type}(SpatialInteraction2D) )"
+        return f"HarrisWilson( {self.intensity_model.sim_type}(SpatialInteraction2D) )"
 
     def __str__(self):
 
         return f"""
-            {'x'.join([str(d.cpu().detach().numpy()) for d in self.sim.dims])} Harris Wilson model using {self.sim.sim_type} Constrained Spatial Interaction Model
+            {'x'.join([str(d.cpu().detach().numpy()) for d in self.intensity_model.dims])} Harris Wilson model using {self.intensity_model.sim_type} Constrained Spatial Interaction Model
             Learned parameters: {', '.join(self.params_to_learn.keys())}
-            Epsilon: {self.epsilon}
-            Kappa: {self.kappa}
-            Delta: {self.delta}
-            Sigma: {self.sigma}
+            Epsilon: {self.main_params.epsilon}
+            Kappa: {self.main_params.kappa}
+            Delta: {self.main_params.delta}
         """
