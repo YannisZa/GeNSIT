@@ -3,6 +3,7 @@ import ast
 import sys
 import json
 import click
+import torch
 import psutil
 
 from copy import deepcopy
@@ -13,12 +14,13 @@ from multiresticodm.utils import print_json, setup_logger
 from multiresticodm.global_variables import TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
 
 
-def set_numpy_threads(n_threads):
+def set_threads(n_threads):
     os.environ['OMP_NUM_THREADS'] = str(n_threads)
     os.environ['MKL_NUM_THREADS'] = str(n_threads)
     os.environ['NUMEXPR_NUM_THREADS'] = str(n_threads)
     os.environ['OPENBLAS_NUM_THREADS'] = str(n_threads)
     os.environ['VECLIB_MAXIMUM_THREADS'] = str(n_threads)
+    torch.set_num_threads(int(os.environ["OMP_NUM_THREADS"]))
 
 
 
@@ -132,9 +134,31 @@ _common_options = [
             help=f'Type of device used for torch operations.'),   
 ]
 
+_create_and_run_options = [
+    click.argument('config_path', type=click.Path(exists=True), required=True),
+    click.option('--data_generation_seed','-dgseed', type=click.IntRange(min=0), show_default=True,
+               default=None, help = 'Overwrites random number generation seed for synthetic data generation.'),
+    click.option('--alpha','-alpha', type=click.FloatRange(min=0,max=2), default = None,
+            help = 'Overwrites alpha parameter in Spatial Interaction Model.'),
+    click.option('--beta','-beta', type=click.FloatRange(min=0,max=2), default = None,
+            help = 'Overwrites beta parameter in Spatial Interaction Model.'),
+    click.option('--bmax','-bmax', type=click.FloatRange(min=1), default = None,
+            help = 'Overwrites bmax parameter in Spatial Interaction Model.'),
+    click.option('--delta','-delta', type=click.FloatRange(min=0), default = None,
+            help = 'Overwrites delta parameter in Spatial Interaction Model.'),
+    click.option('--kappa','-kappa', type=click.FloatRange(min=0), default = None,
+            help = 'Overwrites kappa parameter in Spatial Interaction Model.'),
+    click.option('--epsilon','-epsilon', type=click.FloatRange(min=1), default = None,
+            help = 'Overwrites epsilon parameter in Spatial Interaction Model.'),
+    click.option('--sigma','-sigma', type=click.FloatRange(min=0.0), default = None,
+            help = 'Overwrites sigma parameter in arris Wilson Model.'),
+    click.option('--dt','-dt', type=click.FloatRange(min=0.0), default = None,
+            help = 'Overwrites dt parameter in Harris Wilson Model.'),
+    click.option('--noise_percentage','-np', type=click.FloatRange(min=0.0), default = None,
+            help = 'Overwrites noise_percentage parameter in Harris Wilson Model.')
+]
 
 _common_run_options = [
-    click.argument('config_path', type=click.Path(exists=True), required=True),
     click.option('--load_experiment','-le', multiple=False, type=click.Path(exists=True), default=None, 
                    help='Defines path to existing experiment output in order to load it and resume experimentation.'),
     click.option('--run_experiments','-re', type=click.STRING, multiple=True,
@@ -143,11 +167,14 @@ _common_run_options = [
                default = '', help = 'Title appended to output filename of experiment'),
     click.option('--sweep_mode', default=False,is_flag=True, show_default=True,
               help=f'Flag for whether parameter sweep mode is activated or not.'),
-    click.option('--dataset','-d', type=click.Path(exists=True),
-               default=None, help = 'Overwrites inputs dataset in config'),
+    click.option('--dataset','-d', type=click.Path(exists=False),
+               default=None, help = 'Overwrites dataset name in config'),
+    click.option('--in_directory','-id', type=click.Path(exists=True),
+                default=None, help = 'Overwrites inputs directory in config'),
     click.option('--to_learn','-tl', type=click.Choice(['alpha','beta','kappa','sigma']), default = None,
            help = 'Overwrites parameters to learn.'),
-    click.option('--sim_type','-sim', type=click.Choice(['TotallyConstrained','ProductionConstrained']),
+    click.option('--mcmc_workers','-mcmcnw', type=click.IntRange(min=1,max=AVAILABLE_CORES), help = 'Overwrites number of MCMC workers'),
+    click.option('--name','-nm', type=click.Choice(['TotallyConstrained','ProductionConstrained']),
                default=None, help = 'Overwrites spatial interaction model of choice (intensity function)'),
     click.option('--origin_demand','-od', type=click.STRING,
                default=None, help = 'Overwrites input origin demand filename in config'),
@@ -175,14 +202,7 @@ _common_run_options = [
     click.option('--cells','-c', type=click.STRING, default = None,
                help = 'Overwrites constrained cells filename in config. '),
     click.option('--seed','-seed', type=click.IntRange(min=0), show_default=True,
-               default=None, help = 'Overwrites random number generation seed.'),
-    click.option('--dims','-dims', type=click.IntRange(min=1), cls=OptionEatAll,
-                default=None, help = 'Overwrites input table column size'),
-    click.option('--delta','-delta', type=click.FloatRange(min=0), default = None,
-            help = 'Overwrites delta parameter in Spatial Interaction Model.'),
-    click.option('--kappa','-kappa', type=click.FloatRange(min=0), default = None,
-            help = 'Overwrites kappa parameter in Spatial Interaction Model.')
-
+               default=None, help = 'Overwrites random number generation seed for model runs.')
 ]
 
 def common_options(func):
@@ -192,6 +212,11 @@ def common_options(func):
 
 def common_run_options(func):
     for option in reversed(_common_run_options):
+        func = option(func)
+    return func
+
+def create_and_run_options(func):
+    for option in reversed(_create_and_run_options):
         func = option(func)
     return func
 
@@ -220,24 +245,30 @@ def exec(logger,settings,config_path,**kwargs):
     # Update root
     config.path_sets_root()
     
+    # Get list of experiments to run provided through command line
+    experiment_types = list(kwargs.get('run_experiments',[]))
+
     # Maintain a dictionary of available experiments and their list index
-    available_experiments = {exp.get('type',''):i for i,exp in enumerate(config.settings['experiments']) if len(exp.get('type','')) > 0}
-    config.settings.setdefault('available_experiments',available_experiments)
+    run_experiments = {
+        exp.get('type',''):i 
+        for i,exp in enumerate(config.settings['experiments']) 
+        if len(exp.get('type','')) > 0 and \
+            (
+            (len(experiment_types) > 0 and exp.get('type','') in experiment_types) or \
+            len(experiment_types) <= 0
+            )
+    }
+    config.settings.setdefault('run_experiments',run_experiments)
     
-    # Keep experiment ids argument
-    if len(kwargs.get('run_experiments',[])) > 0:
-        config.settings.setdefault('run_experiments', list(kwargs.get('run_experiments',[])))
-    else:
-        config.settings.setdefault('run_experiments', available_experiments)
     # Create output folder if it does not exist
-    if not os.path.exists(config.settings['outputs']['output_path']):
-        logger.info(f"Creating new output directory {config.settings['outputs']['output_path']}")
-        os.makedirs(config.settings['outputs']['output_path'])
+    if not os.path.exists(config.out_directory):
+        logger.info(f"Creating new output directory {config.out_directory}")
+        os.makedirs(config.out_directory)
 
     logger.info(f"Validating config provided...")
     # Validate config
     config.validate_config()
-    
+
     # Intialise experiment handler
     eh = ExperimentHandler(
         config,
@@ -248,6 +279,98 @@ def exec(logger,settings,config_path,**kwargs):
 
     logger.success('Done')
     
+
+@cli.command('create')
+@common_options
+@create_and_run_options
+@click.option('--dims','-dims', type=(str, int), multiple=True,
+                default=None, help = 'Overwrites input dimensions size')
+@click.option('--synthesis_method','-smthd', type=click.Choice(['sde_solver','sde_potential']),
+                default='sde_solver', help = 'Determines method for synthesing data')
+@click.option('--synthesis_n_samples','-sn', type=click.IntRange(min=1),
+                default=None, help = 'Determines number of times sde solver will be run to create synthetic data')
+def create(
+    norm,
+    n_workers,
+    n_threads,
+    logging_mode,
+    n,
+    table,
+    device,
+    config_path,
+    data_generation_seed,
+    alpha,
+    beta,
+    bmax,
+    delta,
+    kappa,
+    epsilon,
+    sigma,
+    dt,
+    noise_percentage,
+    dims,
+    synthesis_method,
+    synthesis_n_samples
+):
+    
+    # Unpack dimensions
+    dims = {v[0]:v[1] for v in dims}
+
+    # Gather all arguments in dictionary
+    settings = {k:v for k,v in locals().items() if k != 'ctx'}
+    # Remove all nulls
+    settings = {k: v for k, v in settings.items() if v}
+
+    # Import all modules
+    from multiresticodm.utils import deep_updates
+    from multiresticodm.experiments import ExperimentHandler
+
+    # Capitalise all single-letter arguments
+    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
+
+    # Setup logger
+    logger = setup_logger(
+        __name__,
+        settings.get('logging_mode','info').upper(),
+        log_to_file=True,
+        log_to_console=True
+    )
+
+    # Read config
+    config = Config(
+        path=config_path,
+        settings=None,
+        level=settings.get('logging_mode','info').upper(),
+        logger=logger
+    )
+    # Update settings with overwritten values
+    deep_updates(config.settings,settings,overwrite=True)
+
+    # Maintain a dictionary of available experiments and their list index
+    run_experiments = {
+        exp.get('type',''):i  
+        for i,exp in enumerate(config.settings['experiments']) 
+        if exp.get('type','') == 'DataGeneration'
+    }
+    config.settings.setdefault('run_experiments',run_experiments)
+
+    # Update root
+    config.path_sets_root()
+    
+    logger.info(f"Validating config provided...")
+    
+    # Validate config
+    config.validate_config()
+
+
+    # Intialise experiment handler
+    eh = ExperimentHandler(
+        config,
+        logger = logger,
+        skip_output_prep = True
+    )
+    # Run experiments
+    eh.run_and_write_experiments_sequentially()
 
 @cli.command('run')
 # @click.command(context_settings=dict(help_option_names=['-h', '--help']))
@@ -286,6 +409,7 @@ def exec(logger,settings,config_path,**kwargs):
 @click.option('--n_bridging_distributions','-nb', type=click.IntRange(min=1), default = None,
             help = 'Overwrites number of temperatures in tempered distribution in AIS (normalising constant sampling)')
 @common_options
+@create_and_run_options
 @common_run_options
 def run(
         log_destination_attraction,
@@ -306,11 +430,12 @@ def run(
         ais_leapfrog_step_size,
         ais_samples,
         n_bridging_distributions,
-        config_path,
         load_experiment,
         dataset,
+        in_directory,
         to_learn,
-        sim_type,
+        mcmc_workers,
+        name,
         origin_demand,
         cost_matrix,
         run_experiments,
@@ -327,9 +452,17 @@ def run(
         sparse_margins,
         k,
         seed,
-        dims,
+        config_path,
+        data_generation_seed,
+        alpha,
+        beta,
+        bmax,
         delta,
         kappa,
+        epsilon,
+        sigma,
+        dt,
+        noise_percentage,
         logging_mode,
         n_workers,
         n_threads,
@@ -349,7 +482,7 @@ def run(
     settings['n_threads'] = int(settings.get('n_threads',1))
     settings['n_workers'] = settings.get('n_workers',1)
     # Update number of workers
-    set_numpy_threads(settings['n_threads'])
+    set_threads(settings['n_threads'])
 
     # Import all modules
     from numpy import asarray
@@ -372,7 +505,7 @@ def run(
 
 
 _output_options = [
-    click.option('--output_directory', '-o', required=True, type=click.Path(exists=True), default='./data/outputs/'),
+    click.option('--out_directory', '-o', required=True, type=click.Path(exists=True), default='./data/outputs/'),
     click.option('--dataset_name', '-dn', required=True, multiple=True, type=click.STRING),
     click.option('--directories','-d', multiple=True, required=False, type=click.Path(exists=False)),
     click.option('--experiment_type','-e', multiple=True, type=click.STRING ,cls=NotRequiredIf, not_required_if='directories'),
@@ -393,7 +526,7 @@ _output_options = [
             help='Every argument corresponds to a list of sweeped parameters that the outputs will be grouped by.'),
     click.option('--metric','-m', multiple=True, type=click.Choice(METRICS.keys()), required=False, default=['none'],
                 help=f'Sets list of metrics to compute over samples.'),
-    click.option('--dates','-dt', type=click.STRING, default=[''], multiple=True, required=False),
+    click.option('--dates','-date', type=click.STRING, default=[''], multiple=True, required=False),
                 #  type=click.DateTime(formats=DATE_FORMATS), multiple=True, required=False),
     click.option('--epsilon_threshold', '-eps', default=0.001, show_default=True,
         type=click.FLOAT, help=f'Sets error norm threshold below which convergence is achieved. Used only in convergence plots.')
@@ -600,7 +733,7 @@ def plot(
     settings = {**settings, **undefined_settings}
 
     # Update number of workers
-    set_numpy_threads(settings['n_threads'])
+    set_threads(settings['n_threads'])
     
     # Import modules
     from multiresticodm.plot import Plot
@@ -696,7 +829,7 @@ def summarise(
     settings = {**settings, **undefined_settings}
     
     # Update number of workers
-    set_numpy_threads(settings['n_threads'])
+    set_threads(settings['n_threads'])
 
     # Import modules
     from multiresticodm.outputs import OutputSummary
