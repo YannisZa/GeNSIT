@@ -523,7 +523,7 @@ class Outputs(object):
                  input_slice:dict={},
                  **kwargs):
         # Setup logger
-        level = kwargs['logger'].level if 'logger' in kwargs else kwargs.get('level','INFO').upper()
+        level = kwargs['logger'].level if 'logger' in kwargs else config.get('level','INFO').upper()
         self.logger = setup_logger(
             module,
             level=level,
@@ -587,8 +587,6 @@ class Outputs(object):
             
             # Define config experiment path to directory
             self.outputs_path = config
-            assert str_in_list('input_path',list(self.config['inputs'].keys()))
-            self.inputs_path = self.config['inputs'].get('input_path',None)
 
             # Import all input data
             self.inputs = Inputs(
@@ -683,11 +681,11 @@ class Outputs(object):
             
             # Update experiment id
             self.experiment_id = self.update_experiment_directory_id(kwargs.get('experiment_id',None))
-            
+
             # Define output experiment path to directory
             self.outputs_path = os.path.join(
-                    self.config['outputs']['directory'],
-                    self.config['experiment_data'],
+                    self.config['outputs']['out_directory'],
+                    self.config['inputs']['dataset'],
                     self.experiment_id
             )
     
@@ -775,9 +773,6 @@ class Outputs(object):
         
 
     def write_metadata(self,dir_path:str,filename:str) -> None:
-        # settings_copy = deepcopy(self.config.settings)
-        # settings_copy = deep_apply(settings_copy, type)
-        # print(settings_copy)
         # Define filepath
         filepath = os.path.join(self.outputs_path,dir_path,f"{filename.split('.')[0]}.json")
         # print('writing metadata',filepath)
@@ -798,7 +793,6 @@ class Outputs(object):
             export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
             export_samples = export_samples[0] if len(export_samples) > 0 else True
             export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
-            
             # Write to file
             if export_samples:
                 self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
@@ -1060,7 +1054,7 @@ class Outputs(object):
 
         if sample_name == 'intensity':
             # Get sim model 
-            sim_model = globals()[self.config.settings['spatial_interaction_model']['sim_type']+'SIM']
+            sim_model = globals()[self.config.settings['spatial_interaction_model']['name']+'SIM']
             # Check that required data is available
             self.check_data_availability(
                 sample_name=sample_name,
@@ -1078,7 +1072,7 @@ class Outputs(object):
 
             # Instantiate ct
             sim = instantiate_sim(
-                sim_type = next(deep_get(key='sim_type',value=self.config.settings), None),
+                sim_type = next(deep_get(key='name',value=self.config.settings), None),
                 **data,
                 logger=self.logger
             )
@@ -1133,7 +1127,7 @@ class Outputs(object):
         
         elif str_in_list(sample_name, INPUT_TYPES.keys()):
             # Get sim model 
-            sim_model = globals()[self.config.settings['spatial_interaction_model']['sim_type']+'SIM']
+            sim_model = globals()[self.config.settings['spatial_interaction_model']['name']+'SIM']
             self.check_data_availability(
                 sample_name=sample_name,
                 input_names=sim_model.REQUIRED_INPUTS
