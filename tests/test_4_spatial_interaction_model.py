@@ -142,7 +142,7 @@ def sim_default_config2():
 def production_constrained_sim(sim_default_config):
     # Build a contingency table
     sim_default_config['table_distribution_name'] = "product_multinomial"
-    sim_default_config['sim_type'] = "ProductionConstrained"
+    sim_default_config['name'] = "ProductionConstrained"
     sim = instantiate_sim(sim_default_config)
     return sim
 
@@ -150,7 +150,7 @@ def production_constrained_sim(sim_default_config):
 def totally_constrained_sim(sim_default_config):
     # Build a contingency table
     sim_default_config['table_distribution_name'] = "multinomial"
-    sim_default_config['sim_type'] = "TotallyConstrained"
+    sim_default_config['name'] = "TotallyConstrained"
     sim = instantiate_sim(sim_default_config)
     sim.noise_var = (0.03*np.log(sim.dims[1]))**2
     return sim

@@ -134,7 +134,7 @@ def table_2x3_n100():
 def sim_default_config(cost_matrix_2x3,log_destination_attraction_2x3,origin_demand_2x3):
     # Import config
     sim_default_config = {
-        "sim_type":"TotallyConstrained",
+        "name":"TotallyConstrained",
         "cost_matrix":cost_matrix_2x3,
         "log_destination_attraction":log_destination_attraction_2x3,
         "origin_demand":origin_demand_2x3
