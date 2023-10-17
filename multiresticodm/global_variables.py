@@ -5,15 +5,16 @@ from torch import int32, float32, uint8, int8, float64, int64, int16
 from torch import bool as tbool
 
 PARAMETER_DEFAULTS = {
-    'alpha': 0, 
-    'beta': 1, 
+    'alpha': 1, 
+    'beta': 0, 
+    'delta': 0.1,
     'kappa': 2, 
-    'delta': 0,
-    'sigma': 3, 
-    'bmax': 1,
     'epsilon': 1,
+    'bmax': 1,
     'noise_percentage': 3,
+    'sigma': 3,
 }
+MCMC_PARAMETERS = ['alpha','beta','delta','gamma','kappa','epsilon']
 
 XARRAY_SCHEMA = {
     'alpha': {
@@ -123,15 +124,17 @@ NUMPY_TO_TORCH_DTYPE = {
 TORCH_TO_NUMPY_DTYPE = {v:k for k,v in NUMPY_TO_TORCH_DTYPE.items()}
 
 INPUT_SCHEMA = {
-    "origin_demand":{"axes":[0],"dtype":"float32", "ndmin":1},
-    "destination_demand":{"axes":[1],"dtype":"float32", "ndmin":1},
-    "origin_attraction_ts":{"axes":[0],"dtype":"float32", "ndmin":1},
-    "destination_attraction_ts":{"axes":[1],"dtype":"float32", "ndmin":2},
-    "cost_matrix":{"axes":[0,1],"dtype":"float32", "ndmin":2},
-    "ground_truth_table":{"axes":[0,1],"dtype":"int32", "ndmin":2},
+    "origin_demand":{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":1},
+    "destination_demand":{"dims":['destination'],"axes":[1],"dtype":"float32", "ndmin":1},
+    "origin_attraction_ts":{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":2},
+    "destination_attraction_ts":{"dims":['destination'],"axes":[1],"dtype":"float32", "ndmin":2},
+    "cost_matrix":{"dims":['origin','destination'],"axes":[0,1],"dtype":"float32", "ndmin":2},
+    "ground_truth_table":{"dims":['origin','destination'],"axes":[0,1],"dtype":"int32", "ndmin":2},
     "dims":{},
     "grand_total":{}
 }
+
+TABLE_INFERENCE_EXPERIMENTS = ['nonjointtablesim_nn','jointtablesim_nn','jointtablesim_mcmc','table_mcmc','table_mcmc','tablesummaries_mcmcconvergence']
 
 INPUT_TYPES = {
     'cost_matrix':torch.float32,
@@ -157,6 +160,7 @@ INTENSITY_TYPES = {
     'delta':torch.float32,
     'kappa':torch.float32,
     'sigma':torch.float32,
+    'gamma':torch.float32,
 }
 
 OUTPUT_TYPES = {
@@ -262,7 +266,7 @@ SWEEPABLE_PARAMS = {
     "cost_matrix": {
         "is_coord":False
     },
-    "sim_type": {
+    "name": {
         "is_coord":False
     },
     "alpha": {
