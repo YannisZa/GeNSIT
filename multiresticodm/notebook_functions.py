@@ -704,7 +704,7 @@ def prepare_config_for_export(barebone_config,metadata_config):
         updated_config = {
                 'N':sim_metadata_config['num_epochs']*(sim_metadata_config['seed']+1),
                 'gamma':gamma,
-                'sim_type':sim_type,
+                'name':sim_type,
                 'axes': [[1]] if sim_type == 'ProductionConstrained' else [[0,1]],
                 'noise_regime':str(noise_regime),
                 'experiment_title':SIM_TYPE_CONSTRAINTS[sim_type],
@@ -734,7 +734,7 @@ def export_competitive_method_outputs(
         metadata['datetime']
     output_path = os.path.join(
         f".{metadata['outputs']['directory']}",
-        metadata['experiment_data'],
+        metadata['inputs']['dataset'],
         output_folder
     )
     print('Exporting to',output_path)
