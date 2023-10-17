@@ -436,7 +436,15 @@ multiresticodm run ./data/inputs/configs/joint_table_sim_inference_high_noise_mc
  -re exp14 -nw 16 -nt 1 -nt 8 -et both_margins_permuted_cells_20% \
  -n 100000 -sp 0.05
 
-## Neural Network
+## Create synthetic data
+
+clear; multiresticodm create ./data/inputs/configs/synthetic_data_generation.toml -mthd sde_solver -sn 30 -nw 1 -nt 1 -log debug
+
+## Neural Network (synthetic data)
+
+clear; multiresticodm run ./data/inputs/configs/synthetic_data_learning.toml -nw 1 -nt 1 -log debug
+
+## Neural Network (real data)
 
 Set ulimit -n 8000
 
