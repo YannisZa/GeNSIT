@@ -24,7 +24,6 @@ load_experiment = ''
     cell_values = ''
 
 [contingency_table]
-  ct_type = 'ContingencyTable2D'
   sparse_margins = false
   [contingency_table.constraints]
     axes = [[1]]

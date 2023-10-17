@@ -496,7 +496,10 @@ class Plot(object):
 
             # Load contingency table
             dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False)
+            ct = instantiate_ct(
+                config=dummy_config,
+                log_to_console=False
+            )
             # If no table is provided
             if ct.table is None:
                 # Remove experiment from output directories
@@ -526,7 +529,10 @@ class Plot(object):
                 
                 # Instantiate contingency table
                 dummy_config = Namespace(**{'settings':outputs.experiment.config})
-                ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False)
+                ct = instantiate_ct(
+                    config=dummy_config,
+                    log_to_console=False
+                )
                 
                 # Load samples and apply moving averages
                 table_rolling_mean = running_average(outputs.experiment.results['table'])
@@ -2545,7 +2551,10 @@ class Plot(object):
                     )
                 if sample == 'table':
                     dummy_config = Namespace(**{'settings':outputs.experiment.config})
-                    ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False)  
+                    ct = instantiate_ct(
+                        config=dummy_config,
+                        log_to_console=False
+                    )
                     # for cell in ct.constraints['cells']:
                         # print('ground truth', ct.table[cell[0],cell[1]])
                         # print('min',min(outputs.experiment.results['table'][:,cell[0],cell[1]]))

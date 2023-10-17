@@ -1,7 +1,6 @@
 import os
 import sys
 import torch
-import logging
 import numpy as np
 import torch.distributions as distr
 
@@ -17,26 +16,25 @@ from typing import List, Union, Callable
 from multiresticodm.config import Config
 from multiresticodm.global_variables import *
 from multiresticodm.math_utils import powerset
-from multiresticodm.utils import ndims, setup_logger, str_in_list, write_txt, extract_config_parameters, makedir, read_json, tuplize, flatten, tuple_contained, depth, broadcast
+from multiresticodm.utils import ndims, setup_logger, str_in_list, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast
 
 # -> Union[ContingencyTable,None]:
-def instantiate_ct(table, config: Config, **kwargs):
-    if hasattr(sys.modules[__name__], config.settings['contingency_table']['ct_type']):
-        return getattr(sys.modules[__name__], config.settings['contingency_table']['ct_type'])(
-                table=table, 
+def instantiate_ct(config: Config, **kwargs):
+    ct_type = f"ContingencyTable{len(kwargs.get('dims',{}).keys())}D"
+    if hasattr(sys.modules[__name__], ct_type):
+        return getattr(sys.modules[__name__], ct_type)(
                 config=config,
                 **kwargs
         )
     else:
         raise Exception(
-            f"Input class {config.settings['contingency_table']['ct_type']} not found")
+            f"Input class {ct_type} not found")
 
 
 class ContingencyTable(object):
 
     def __init__(
             self, 
-            table = None, 
             config: Config = None, 
             **kwargs: dict
         ):
@@ -77,7 +75,7 @@ class ContingencyTable(object):
         # Flag for whether to allow sparse margins or not
         self.sparse_margins = False
 
-    def build(self, table, config, **kwargs):
+    def build(self, config, **kwargs):
         # Build contingency table
         if config is not None:
             # Store flag for whether to allow sparse margins or not
@@ -86,12 +84,12 @@ class ContingencyTable(object):
             # Read tabular data
             self.import_tabular_data()
 
-        elif table is not None:
+        elif self.data.ground_truth_table is not None:
             # Read table and dimensions
-            if torch.is_tensor(table):
-                self.data.ground_truth_table = table.int().to(dtype=int32,device=self.device)
+            if torch.is_tensor(self.data.ground_truth_table):
+                self.data.ground_truth_table = self.data.ground_truth_table.int().to(dtype=int32,device=self.device)
             else:
-                self.data.ground_truth_table = torch.from_numpy(table).int().to(dtype=int32,device=self.device)
+                self.data.ground_truth_table = torch.from_numpy(self.data.ground_truth_table).int().to(dtype=int32,device=self.device)
             # Read margin sparsity
             self.sparse_margins = bool(kwargs['sparse_margins']) if str_in_list('sparse_margins', kwargs.keys()) else False
             # Update table properties
@@ -270,9 +268,9 @@ class ContingencyTable(object):
     def __len__(self):
         return np.prod([dim for dim in self.data.dims.values() if dim > 0])
     
-    def reset(self, table, config, **kwargs) -> None:
+    def reset(self, config, **kwargs) -> None:
         # Rebuild table
-        self.build(table=table, config=config, **kwargs)
+        self.build(config=config, **kwargs)
     
     def constraint_table(self,with_margins:bool=False):
         if self.data.ground_truth_table is not None:
@@ -370,9 +368,9 @@ class ContingencyTable(object):
                 if not tuplize(axis) in self.data.margins.keys():
                     if tuplize(axis) == tuplize(range(ndims(self))):
                         self.data.margins[tuplize(axis)] = torch.tensor(
-                            np.random.randint(
+                            torch.randn(
                                 low=1,
-                                high=None
+                                high=50_000
                             ),
                             dtype=int32,
                             device=self.device
@@ -755,24 +753,24 @@ class ContingencyTable(object):
             return getattr(self, solver_name)
 
 class ContingencyTableIndependenceModel(ContingencyTable):
-    def __init__(self, table=None, config: Config = None, **kwargs: dict):
+    def __init__(self, config: Config = None, **kwargs: dict):
         # Set configuration file
-        super().__init__(table, config, **kwargs)
+        super().__init__(config, **kwargs)
 
 
 class ContingencyTableDependenceModel(ContingencyTable):
-    def __init__(self, table=None, config: Config = None, **kwargs: dict):
+    def __init__(self, config: Config = None, **kwargs: dict):
         # Set configuration file
-        super().__init__(table, config, **kwargs)
+        super().__init__(config, **kwargs)
 
 
 class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDependenceModel):
 
-    def __init__(self, table=None, config: Config = None, **kwargs: dict):
+    def __init__(self, config: Config = None, **kwargs: dict):
         # Set configuration file
-        super().__init__(table, config, **kwargs)
+        super().__init__(config, **kwargs)
         # Build
-        self.build(table=table, config=config, **kwargs)        
+        self.build(config=config, **kwargs)        
 
     def admissibility_debugging(self,sampler_name,table0):
         try:

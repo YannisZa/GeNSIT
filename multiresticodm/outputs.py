@@ -11,10 +11,9 @@ import xarray as xr
 import pandas as pd
 import geopandas as gpd
 
-from glob import glob
+from tqdm import tqdm
 from pathlib import Path
 from copy import deepcopy
-from tqdm import tqdm
 from functools import partial
 from datetime import datetime
 from argparse import Namespace
@@ -487,7 +486,6 @@ class OutputSummary(object):
         if metric.lower() == 'shannon_entropy':
             dummy_config = Namespace(**{'settings':outputs.config})
             ct = instantiate_ct(
-                table=None,
                 config=dummy_config,
                 log_to_console=False,
                 logger=self.logger
@@ -694,7 +692,24 @@ class Outputs(object):
             sweep_params = kwargs.get('sweep_params',{})
             self.sweep_id = ''
             if len(sweep_params) > 0 and isinstance(sweep_params,dict):
-                self.sweep_id = os.path.join(*[str(k)+"_"+str(v) for k,v in sweep_params.items()])
+                # Create sweep id by grouping coupled sweep vars together
+                # and isolated sweep vars separately
+                sweep_id = []
+                for v in set(list(self.config.target_names_by_sweep_var.values())).difference(set(['dataset'])):
+                    # Map sigma to noise regime
+                    if str(v) == 'sigma':
+                        value = sigma_to_noise_regime(sweep_params[v])
+                    # Else use passed sweep value
+                    else:
+                        value = sweep_params[v]
+                    # Add to key-value pair to unique sweep id
+                    sweep_id.append(f"{str(v)}_{str(value)}")
+                # Join all grouped sweep vars into one sweep id 
+                # which will be used to create an output folder
+                if len(sweep_id) > 0:
+                    self.sweep_id = os.path.join(*sweep_id)
+                else:
+                    self.sweep_id = ''
 
             # Create output directories if necessary
             self.create_output_subdirectories(sweep_id=self.sweep_id)
@@ -750,7 +765,6 @@ class Outputs(object):
         export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
         export_samples = export_samples[0] if len(export_samples) > 0 else True
         export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
-        
         if export_samples or export_metadata:
             # Create output directories
             makedir(os.path.join(self.outputs_path,'samples'))
@@ -1110,7 +1124,6 @@ class Outputs(object):
             # Get config and sim
             dummy_config = Namespace(**{'settings':self.config})
             ct = instantiate_ct(
-                table=None,
                 config=dummy_config,
                 log_to_console=False,
                 logger=self.logger

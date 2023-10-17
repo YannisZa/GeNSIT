@@ -1,5 +1,5 @@
 log_level = 'info'
-sweep_mode = false
+sweep_mode = true
 
 [inputs]
 n_workers = +1
@@ -12,23 +12,24 @@ seed = 8888
 # [inputs.seed.sweep]
 #   default = 1
 #   range = "1:30:1"
+# dataset = "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.01" 
 [inputs.dataset.sweep]
-  default = "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.01" 
+  default = "synthetic_100x25_using_sde_solver_n _30_N_1_sigma_0.01" 
   range = [
     "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.01",
-    # "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.14",
-    # "synthetic_100x50_using_sde_solver_n_30_N_1_sigma_0.01",
-    # "synthetic_100x50_using_sde_solver_n_30_N_1_sigma_0.14",
-    # "synthetic_100x75_using_sde_solver_n_30_N_1_sigma_0.01",
-    # "synthetic_100x75_using_sde_solver_n_30_N_1_sigma_0.14",
-    # "synthetic_500x25_using_sde_solver_n_30_N_1_sigma_0.01",
-    # "synthetic_500x25_using_sde_solver_n_30_N_1_sigma_0.14",
-    # "synthetic_500x50_using_sde_solver_n_30_N_1_sigma_0.01",
-    # "synthetic_500x50_using_sde_solver_n_30_N_1_sigma_0.14",
-    # "synthetic_500x75_using_sde_solver_n_30_N_1_sigma_0.01",
-    # "synthetic_500x75_using_sde_solver_n_30_N_1_sigma_0.14",
-    # "synthetic_500x100_using_sde_solver_n_30_N_1_sigma_0.01",
-    # "synthetic_500x100_using_sde_solver_n_30_N_1_sigma_0.14"
+    "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.14",
+    "synthetic_100x50_using_sde_solver_n_30_N_1_sigma_0.01",
+    "synthetic_100x50_using_sde_solver_n_30_N_1_sigma_0.14",
+    "synthetic_100x75_using_sde_solver_n_30_N_1_sigma_0.01",
+    "synthetic_100x75_using_sde_solver_n_30_N_1_sigma_0.14",
+    "synthetic_500x25_using_sde_solver_n_30_N_1_sigma_0.01",
+    "synthetic_500x25_using_sde_solver_n_30_N_1_sigma_0.14",
+    "synthetic_500x50_using_sde_solver_n_30_N_1_sigma_0.01",
+    "synthetic_500x50_using_sde_solver_n_30_N_1_sigma_0.14",
+    "synthetic_500x75_using_sde_solver_n_30_N_1_sigma_0.01",
+    "synthetic_500x75_using_sde_solver_n_30_N_1_sigma_0.14",
+    "synthetic_500x100_using_sde_solver_n_30_N_1_sigma_0.01",
+    "synthetic_500x100_using_sde_solver_n_30_N_1_sigma_0.14"
   ]
 
 [inputs.data]
@@ -40,20 +41,17 @@ seed = 8888
     file = 'cost_matrix.txt'
   [[inputs.data.margins]]
     axis = [0,1]
-    # file = 'origin_demand.txt'
     value = [+10000]
 
 [contingency_table]
-  ct_type = 'ContingencyTable2D'
   sparse_margins = false
   [contingency_table.constraints]
     axes = [[0,1]]
     # cells = [[0,1],[1,2]]
 
 [spatial_interaction_model]
-  # sim_type = 'ProductionConstrained','TotallyConstrained'
-  name = 'TotallyConstrained'
   grand_total = +1
+  name = 'TotallyConstrained'
   [spatial_interaction_model.parameters]
     bmax = +1.0
     alpha = +1.0
@@ -64,21 +62,20 @@ seed = 8888
   [harris_wilson_model.parameters]
     epsilon = 1.0
     kappa = 0.1
-    sigma = 0.0141421356
-    # [harris_wilson_model.parameters.sigma.sweep]
-    #   default = 0.0141421356
-    #   range = [0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356,
-    #   0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356]
-    #   coupled = true
-    #   target_name = 'dataset'
+    # sigma = 0.0141421356
+    [harris_wilson_model.parameters.sigma.sweep]
+      default = 0.0141421356
+      range = [
+      0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356,
+      0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356
+      ]
 
 [training]
   batch_size = +1
   num_steps = +1
   [training.N.sweep]
     default = +1000
-    # range = [1000,1000,1000,1000,1000,1000,5000,5000,5000,5000,5000,5000,5000,5000]
-    range = [10000]#,10000,10000,10000,10000,10000,50000,50000,50000,50000,50000,50000,50000,50000]
+    range = [10000,10000,10000,10000,10000,10000,50000,50000,50000,50000,50000,50000,50000,50000]
     coupled = true
     target_name = 'dataset'
 
@@ -91,19 +88,19 @@ seed = 8888
         [mcmc.parameters.covariance.sweep]
             default = [[0.0149674,0.00182529],[0.00182529,0.0109968]]
             range = [
-              [[0.0149674,0.00182529],[0.00182529,0.0109968]]#,[[ 1.0,  0.00], [ 0.00,  1.0]],
-              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]]
+              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]]
             ]
             coupled = true
             target_name = 'dataset'
         [mcmc.parameters.step_size.sweep]
             default = 1.0
-            range = [1.0]#,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2]
+            range = [1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2]
             coupled = true
             target_name = 'dataset'
     [mcmc.destination_attraction]

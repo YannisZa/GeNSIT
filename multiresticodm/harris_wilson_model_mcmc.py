@@ -1,5 +1,3 @@
-from copy import deepcopy
-import os
 import sys
 import torch
 import numpy as np
@@ -8,9 +6,9 @@ import multiprocessing as mp
 
 from os import path
 from tqdm import tqdm
-from typing import Union
+from torch import float32
+from copy import deepcopy
 from functools import partial
-from torch import int32, float32
 from pathlib import Path as PathLib
 from joblib import Parallel, delayed
 from multiresticodm.global_variables import TABLE_INFERENCE_EXPERIMENTS
@@ -18,8 +16,8 @@ from multiresticodm.global_variables import TABLE_INFERENCE_EXPERIMENTS
 import multiresticodm.probability_utils as ProbabilityUtils
 
 from multiresticodm.config import Config
+from multiresticodm.math_utils import torch_optimize
 from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.math_utils import torch_optimize, logsumexp
 from multiresticodm.utils import setup_logger, makedir, set_seed
 
 AIS_SAMPLE_ARGS = ['alpha','beta','gamma','n_temperatures','ais_samples','leapfrog_steps','epsilon_step','semaphore','pbar']
@@ -72,7 +70,7 @@ class HarrisWilsonMarkovChainMonteCarlo():
         # Number of parallelisation workers
         self.mcmc_workers = self.config.settings['mcmc'].get('mcmc_workers',1)
 
-        self.logger.info(f'Building {self.physics_model.noise_regime} {self.physics_model.intensity_model._type} Markov Chain Monte Carlo Engine')
+        self.logger.info(f'Building {self.physics_model.noise_regime} {self.physics_model.intensity_model.name} Markov Chain Monte Carlo Engine')
 
     def __repr__(self):
         return "MarkovChainMonteCarlo(SpatialInteraction)"
@@ -129,11 +127,11 @@ class HarrisWilsonMarkovChainMonteCarlo():
 class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
     def __init__(
-            self, 
-            config:Config,
-            physics_model:HarrisWilson,
-            **kwargs
-        ):
+        self, 
+        config:Config,
+        physics_model:HarrisWilson,
+        **kwargs
+    ):
         
         # Instantiate superclass
         super().__init__(
@@ -231,23 +229,23 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
     
     def negative_table_log_likelihood(
         self,
-        log_intensity,
-        table,
+        log_intensity:torch.tensor,
+        table:torch.tensor,
     ):
         """ Computes log likelihood of table (augemented latent variable)
 
         Parameters
         ----------
-        xx : Union[np.array,np.ndarray]
+        xx : torch.tensor
             Log destination attraction
-        theta : Union[np.array,np.ndarray]
+        theta : torch.tensor
             List of parameters (alpha)
-        table : np.ndarray
+        table : torch.tensor
             Table of integer flows
 
         Returns
         -------
-        np.float,np.ndarray(float32)
+        torch.float,torch.ndarray(float32)
             log table likelihood
 
         """
@@ -261,25 +259,25 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
     
     def negative_table_log_likelihood_expanded(
         self,
-        log_destination_attraction,
-        table,
-        alpha,
-        beta
+        log_destination_attraction:torch.tensor,
+        table:torch.tensor,
+        alpha:torch.tensor,
+        beta:torch.tensor
     ):
         """ Computes log likelihood of table (augemented latent variable)
 
         Parameters
         ----------
-        xx : Union[np.array,np.ndarray]
+        xx : torch.tensor 1D
             Log destination attraction
-        theta : Union[np.array,np.ndarray]
+        theta : torch.tensor 1D
             List of parameters (alpha)
-        table : np.ndarray
+        table : torch.tensor 2D
             Table of integer flows
 
         Returns
         -------
-        np.float,np.ndarray(float32)
+        torch.float,torch.tensor
             log table likelihood
 
         """
@@ -330,16 +328,16 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
     
     def annealed_importance_sampling_log_z_expanded(
         self,
-        index,
-        alpha,
-        beta,
-        gamma,
-        n_temperatures,
-        ais_samples,
-        leapfrog_steps,
-        epsilon_step,
-        semaphore,
-        pbar
+        index:int,
+        alpha:torch.tensor,
+        beta:torch.tensor,
+        gamma:torch.tensor,
+        n_temperatures:int,
+        ais_samples:int,
+        leapfrog_steps:int,
+        epsilon_step:torch.tensor,
+        semaphore:torch.multiprocessing.Semaphore,
+        pbar:tqdm
     ):
         return self.annealed_importance_sampling_log_z(
             index,
@@ -360,7 +358,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
     # Random seed is only allowed to take integer inputs in numba's jit decorator
     def annealed_importance_sampling_log_z(
         self,
-        index,
+        index:int,
         **kwargs
     ):
         semaphore = kwargs.get('semaphore',None)
@@ -474,7 +472,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
     
     def annealed_importance_sampling_log_z_parallel(
         self,
-        N,
+        N:int,
         **kwargs
     ):
         # Run experiments in parallel
@@ -501,7 +499,11 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
         return torch.tensor(results)
 
-    def biased_z_inverse(self,index:int,theta:dict):
+    def biased_z_inverse(
+        self,
+        index:int,
+        theta:dict
+    ):
         self.logger.debug('Biased Z inverse')
         # compute 1/z(theta) using Saddle point approximation
         # Create partial function
@@ -576,7 +578,11 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
         return ret
     
-    def unbiased_z_inverse(self,index:int,theta:Union[np.ndarray,list]):
+    def unbiased_z_inverse(
+        self,
+        index:int,
+        theta:dict
+    ):
         # Debiasing scheme - returns unbiased esimates of 1/z(theta)
 
         # Extract stopping time
@@ -588,7 +594,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             # Multiprocessing
             # self.logger.debug(f"Multiprocessing with workers = {min(self.n_workers,N+1)}")
             # with joblib_progress(f"Multiprocessing {min(self.n_workers,N+1)}", total=(N+1)):
-            # log_weights = np.asarray(
+            # log_weights = torch.asarray(
             #     Parallel(n_jobs=min(self.n_workers,N+1))(
             #         delayed(self.annealed_importance_sampling_log_z_partial)(i,theta) for i in range(N+1)
             #     )
@@ -631,11 +637,11 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
 
     def theta_gibbs_step(
-            self,
-            index:int,
-            theta_prev:Union[list,np.array,np.ndarray],
-            log_destination_attraction:Union[list,np.array,np.ndarray],
-            values:list
+        self,
+        index:int,
+        theta_prev:torch.tensor,
+        log_destination_attraction:torch.tensor,
+        values:list
     ):
 
         self.logger.debug('Theta Gibbs step')
@@ -648,7 +654,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
         ''' Theta update '''
         # Multiply beta by total cost
-        # theta_scaled_and_expanded = np.concatenate([theta_prev,np.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
+        # theta_scaled_and_expanded = torch.concatenate([theta_prev,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
         # theta_scaled_and_expanded[1] *= self.physics_model.intensity_model.data.bmax
         # print('theta',theta_scaled_and_expanded)
         # print('xx',log_destination_attraction)
@@ -719,12 +725,12 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
 
     def theta_given_table_gibbs_step(
-            self,
-            index:int,
-            theta_prev:Union[list,np.array,np.ndarray],
-            log_destination_attraction:Union[list,np.array,np.ndarray],
-            table:Union[dict,None], 
-            values:list
+        self,
+        index:int,
+        theta_prev:torch.tensor,
+        log_destination_attraction:torch.tensor,
+        table:torch.tensor, 
+        values:list
     ):
 
         ''' Theta update '''
@@ -803,19 +809,19 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
     
         # UNCOMMENT
         # Multiply beta by total cost
-        # theta_scaled_and_expanded_prev = np.concatenate([theta_prev,np.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
+        # theta_scaled_and_expanded_prev = torch.concatenate([theta_prev,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
         # theta_scaled_and_expanded_prev[1] *= self.physics_model.params.bmax
         # log_intensities_prev = self.physics_model.intensity_model.log_intensity(
         #                     log_destination_attraction,
         #                     theta_scaled_and_expanded_prev,
-        #                     total_flow=np.sum(table.ravel())
+        #                     total_flow=torch.sum(table.ravel())
         #                 )
-        # theta_scaled_and_expanded_new = np.concatenate([theta_new,np.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
+        # theta_scaled_and_expanded_new = torch.concatenate([theta_new,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
         # theta_scaled_and_expanded_new[1] *= self.physics_model.params.bmax
         # log_intensities_new = self.physics_model.intensity_model.log_intensity(
         #                     log_destination_attraction,
         #                     theta_scaled_and_expanded_new,
-        #                     total_flow=np.sum(table.ravel())
+        #                     total_flow=torch.sum(table.ravel())
         #                 )
         # print(("Proposing " + str(theta_new)))
         # print(("Current sample " + str(theta_prev)))
@@ -833,7 +839,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # print('log_z_inverse_new',log_z_inverse_new)
         # print('\n')
         
-        if np.log(np.random.uniform(0, 1)) < log_target_new - log_target:
+        if torch.log(torch.rand(1)) < log_target_new - log_target:
             self.logger.debug("Accepted")
             return theta_new, \
                     1, \
@@ -857,7 +863,13 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         #     return theta_prev, 0, V, gradV, log_z_inverse, negative_log_table_likelihood, negative_gradient_log_table_likelihood, sign
 
 
-    def log_destination_attraction_gibbs_step(self,theta,log_destination_attraction_data,log_destination_attraction_prev,values:list):
+    def log_destination_attraction_gibbs_step(
+        self,
+        theta,
+        log_destination_attraction_data,
+        log_destination_attraction_prev,
+        values:list
+    ):
 
         self.logger.debug('Log destination attraction Gibbs step')
 
@@ -872,8 +884,8 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         ''' Log destination demand update '''
 
         # Initialize leapfrog integrator for HMC proposal
-        momentum = torch.randn(self.physics_model.intensity_model.dims['destination'],dtype=float32,device=self.device)
-        # Compute log(\pi(y|x))
+        momentum = torch.randn(size=(self.physics_model.intensity_model.dims['destination'],),dtype=float32,device=self.device)
+        # Compute -log(\pi(y|x))
         negative_log_data_likelihood, \
         negative_gradient_log_data_likelihood = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
                 log_destination_attraction_data,
@@ -941,7 +953,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
                             gradV_new + negative_gradient_log_data_likelihood_new
 
             # print('',momentum_new.shape)
-            # print('destination_attraction_new',np.exp(log_destination_attraction_new).sum())
+            # print('destination_attraction_new',torch.exp(log_destination_attraction_new).sum())
             # print('V_new',V_new)
             # print('gradV_new',gradV_new)
             # print('------------')
@@ -951,14 +963,14 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             momentum_new = momentum_new - 0.5*self.destination_attraction_step_size*gradW_new
 
             # UNCOMMENT
-            # H_new = 0.5*np.dot(momentum_new, momentum_new) + W_new
+            # H_new = 0.5*torch.dot(momentum_new, momentum_new) + W_new
             # print('log_destination_attraction_prev',log_destination_attraction_prev)
-            # print('log_destination_attraction_new',log_destination_attraction_new)
+            # print('log_destiation_attraction_new',log_destination_attraction_new)
             # print('V',V,'V_new',V_new)
             # print('negative_log_data_likelihood',negative_log_data_likelihood)
             # print('negative_log_data_likelihood_new',negative_log_data_likelihood_new)
-            # print('0.5*np.dot(momentum, momentum)',0.5*np.dot(momentum, momentum))
-            # print('0.5*np.dot(momentum_new, momentum_new)',0.5*np.dot(momentum_new, momentum_new))
+            # print('0.5*torch.dot(momentum, momentum)',0.5*torch.dot(momentum, momentum))
+            # print('0.5*torch.dot(momentum_new, momentum_new)',0.5*torch.dot(momentum_new, momentum_new))
             # print('H-H_new',H-H_new)
             # print('gradient without poisson likelihood new ',gradV_new + negative_gradient_log_data_likelihood_new)
             # print('gradient of poisson likelihood new ',negative_gradient_log_table_likelihood_new)
@@ -974,7 +986,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # print("Proposing " + str(log_destination_attraction_new) + ' with ' + str(H_new))
         # print(str(log_destination_attraction_prev) + ' vs ' + str(H))
         # print(("Difference log target " + str(H-H_new)))
-        # print(np.exp(log_destination_attraction_new).sum())
+        # print(torch.exp(log_destination_attraction_new).sum())
         # print('H-H_new',H-H_new)
         # print('\n')
 
@@ -985,7 +997,14 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             return log_destination_attraction_prev, 0, V, gradV
 
 
-    def log_destination_attraction_given_table_gibbs_step(self,theta,log_destination_attraction_data,log_destination_attraction_prev,table,values:list):
+    def log_destination_attraction_given_table_gibbs_step(
+            self,
+            theta:torch.tensor,
+            log_destination_attraction_data:torch.tensor,
+            log_destination_attraction_prev:torch.tensor,
+            table:torch.tensor,
+            values:list
+        ):
 
         self.logger.debug('Log destination attraction Gibbs step given table')
 
@@ -1001,13 +1020,13 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
         ''' Log destination demand update '''
 
-        # print('total intensity',np.sum(np.exp(log_intensity)))
+        # print('total intensity',torch.sum(torch.exp(log_intensity)))
         # negative_log_table_likelihood_copy = self.negative_table_log_likelihood(log_intensity,table)
         # print('negative_log_table_likelihood',negative_log_table_likelihood)
         # print('negative_log_table_likelihood copy',negative_log_table_likelihood_copy)
         
         # Initialize leapfrog integrator for HMC proposal
-        momentum = torch.randn(size=(self.physics_model.intensity_model.dims['destination'],))
+        momentum = torch.randn(size=(self.physics_model.intensity_model.dims['destination'],),dtype=float32,device=self.device)
         # Compute -log(\pi(y|x))
         negative_log_data_likelihood, \
         negative_gradient_log_data_likelihood = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
@@ -1038,7 +1057,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             negative_gradient_log_data_likelihood + \
             negative_gradient_log_table_likelihood
         # Initial total log Hamiltonian energy (kinetic + potential)
-        H = 0.5*np.dot(momentum, momentum) + W
+        H = 0.5*torch.dot(momentum, momentum) + W
 
         # UNCOMMENT
         # print('STARTING')
@@ -1062,13 +1081,13 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # Initial log potential energy and its gradient weighted by the likelihood function \pi(y|x)
         W_new, gradW_new = W, gradW
 
-        # print('xx',np.exp(log_destination_attraction_prev).sum())
+        # print('xx',torch.exp(log_destination_attraction_prev).sum())
         # print('\n')
 
         # print('gradW_new',gradW_new.shape)
         # print('momentum_new',momentum_new.shape)
         # print('V',V)
-        # print('destination_attraction_new',np.exp(log_destination_attraction_new).sum())
+        # print('destination_attraction_new',torch.exp(log_destination_attraction_new).sum())
         # print('negative_log_data_likelihood',negative_log_data_likelihood)
         # print('gradV',gradV)
         # print('negative_gradient_log_data_likelihood',negative_gradient_log_data_likelihood)
@@ -1100,7 +1119,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
                 **theta_scaled_dict
             )
 
-            # print('xx',np.exp(log_destination_attraction_new).sum())
+            # print('xx',torch.exp(log_destination_attraction_new).sum())
             # print('intensity')
             # print(log_intensity)
             # print('\n ')
@@ -1127,17 +1146,17 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
             # UNCOMMENT
             H_new = 0.5*torch.dot(momentum_new, momentum_new) + W_new
-            # print('destination_attraction_prev',np.exp(log_destination_attraction_prev),np.exp(log_destination_attraction_prev).sum())
-            # print('destination_attraction_new',np.exp(log_destination_attraction_new),np.exp(log_destination_attraction_new).sum())
-            # print('destination_attraction_prev',np.exp(log_destination_attraction_prev).sum())
-            # print('destination_attraction_new',np.exp(log_destination_attraction_new).sum())
+            # print('destination_attraction_prev',torch.exp(log_destination_attraction_prev),torch.exp(log_destination_attraction_prev).sum())
+            # print('destination_attraction_new',torch.exp(log_destination_attraction_new),torch.exp(log_destination_attraction_new).sum())
+            # print('destination_attraction_prev',torch.exp(log_destination_attraction_prev).sum())
+            # print('destination_attraction_new',torch.exp(log_destination_attraction_new).sum())
             # print('V',V,'V_new',V_new)            
             # print('gradV_new',gradV_new)
             # print('negative_gradient_log_data_likelihood_new',negative_gradient_log_data_likelihood_new)
             # print('negative_gradient_log_table_likelihood_new',negative_gradient_log_table_likelihood_new)
             # print('gradW_new',gradW_new)
-            # print('W_new',np.shape(W_new))
-            # print('momentum_new',np.shape(momentum_new))
+            # print('W_new',torch.shape(W_new))
+            # print('momentum_new',torch.shape(momentum_new))
             # print('negative_log_data_likelihood',negative_log_data_likelihood)
             # print('negative_log_data_likelihood_new',negative_log_data_likelihood_new)
             # print('gradient without table likelihood new ',gradV_new + negative_gradient_log_data_likelihood_new)
@@ -1145,12 +1164,12 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             # print('V-V_new',V-V_new)
             # print('log data likelihood difference',negative_log_data_likelihood_new-negative_log_data_likelihood)
             # print('log table likelihood difference',negative_log_table_likelihood-negative_log_table_likelihood_new)
-            # print('log target difference without table likelihood',(V + negative_log_data_likelihood + 0.5*np.dot(momentum, momentum))-(V_new + negative_log_data_likelihood_new + 0.5*np.dot(momentum_new, momentum_new)))
+            # print('log target difference without table likelihood',(V + negative_log_data_likelihood + 0.5*torch.dot(momentum, momentum))-(V_new + negative_log_data_likelihood_new + 0.5*torch.dot(momentum_new, momentum_new)))
             # print('H-H_new',H-H_new)
             # print('Index',j)
             # print('W_new',W_new)
             # print('gradW_new',gradW_new)
-            # print(np.sum(np.exp(self.destination_attraction_step_size*momentum_new)-1))
+            # print(torch.sum(torch.exp(self.destination_attraction_step_size*momentum_new)-1))
             # print('\n')
 
             # print("Proposing " + str(log_destination_attraction_new))
@@ -1165,26 +1184,26 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             raise Exception('Nulls appeared in log_destination_attraction_given_table_gibbs_step')
 
         # Compute variances
-        # print('Data variance',np.repeat(self.physics_model.noise_var,self.physics_model.intensity_model.dims['destination']))
+        # print('Data variance',torch.repeat(self.physics_model.noise_var,self.physics_model.intensity_model.dims['destination']))
         # table_rowsums = table.sum(axis=1).reshape((self.physics_model.intensity_model.dims[0],1))
-        # intensity_rowsums = np.array([logsumexp(log_intensity[i,:]) for i in range(self.physics_model.intensity_model.dims[0])]).reshape((self.physics_model.intensity_model.dims[0],1))
-        # intensity_probs = np.exp( log_intensity - intensity_rowsums )
-        # table_variance = np.sum(table_rowsums*intensity_probs*(1-intensity_probs),axis=0)
+        # intensity_rowsums = torch.array([logsumexp(log_intensity[i,:]) for i in range(self.physics_model.intensity_model.dims[0])]).reshape((self.physics_model.intensity_model.dims[0],1))
+        # intensity_probs = torch.exp( log_intensity - intensity_rowsums )
+        # table_variance = torch.sum(table_rowsums*intensity_probs*(1-intensity_probs),axis=0)
         # print('Table variance',table_variance)
 
         # UNCOMMENT
-        # print('log_destination_attraction_new',np.exp(log_destination_attraction_new).sum())
+        # print('log_destination_attraction_new',torch.exp(log_destination_attraction_new).sum())
         # print('V-V_new',V-V_new)
         # print('log data likelihood difference',negative_log_data_likelihood-negative_log_data_likelihood_new)
         # print('negative_log_table_likelihood',negative_log_table_likelihood)
         # print('negative_log_table_likelihood_new',negative_log_table_likelihood_new)
         # print('log table likelihood difference',negative_log_table_likelihood-negative_log_table_likelihood_new)
-        # print('log target difference without table likelihood',(V + negative_log_data_likelihood + 0.5*np.dot(momentum, momentum))-(V_new + negative_log_data_likelihood_new + 0.5*np.dot(momentum_new, momentum_new)))
+        # print('log target difference without table likelihood',(V + negative_log_data_likelihood + 0.5*torch.dot(momentum, momentum))-(V_new + negative_log_data_likelihood_new + 0.5*torch.dot(momentum_new, momentum_new)))
         # print('H-H_new',H-H_new)
         # print('\n')
         
         # Accept/reject
-        if np.log(np.random.uniform(0, 1)) < H - H_new:
+        if torch.log(torch.rand(1)) < H - H_new:
             return log_destination_attraction_new,\
                     1,\
                     V_new,\

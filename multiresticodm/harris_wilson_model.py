@@ -76,9 +76,9 @@ class HarrisWilson:
 
         # Fixed hyperparameters
         self.params = Dataset()
-        for param in PARAMETER_DEFAULTS.keys():
+        for param,default in PARAMETER_DEFAULTS.items():
             if not param in list(self.params_to_learn.keys()):
-                true_param = self.true_parameters.get(param,PARAMETER_DEFAULTS[param])
+                true_param = self.true_parameters.get(param,default)
                 setattr(
                     self.params,
                     param,
@@ -86,7 +86,7 @@ class HarrisWilson:
                 )
                 if self.config is not None:
                     self.config.settings['harris_wilson_model']['parameters'][param] = to_json_format(
-                        self.true_parameters.get(param,PARAMETER_DEFAULTS[param])
+                        self.true_parameters.get(param,default)
                     )
         # Update gamma for MCMC
         if hasattr(self.params,'sigma'):

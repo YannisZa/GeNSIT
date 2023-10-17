@@ -1,7 +1,6 @@
 import json
-import os.path
-import sys
 import toml
+import os.path
 
 from operator import mul
 from copy import deepcopy
@@ -10,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, safe_delete, setup_logger, str_in_list, read_json, expand_tuple
+from multiresticodm.utils import deep_apply, setup_logger, str_in_list, read_json, expand_tuple
 
 class Config:
 
@@ -378,6 +377,9 @@ class Config:
         # Compute all combinations of sweep parameters
         # Isolated sweep parameters are cross multiplied
         isolated_sweep_configurations = [val['values'] for val in sweep_params['isolated'].values()]
+
+        # Keep track of the target name for each sweeped variable
+        self.target_names_by_sweep_var = dict(zip(list(sweep_params['isolated'].keys()),list(sweep_params['isolated'].keys())))
         # Group all coupled sweep parameters by target name
         if len(sweep_params['coupled'].values()) > 0:
             # Coupled sweep parameters are merged and then cross multiplied
@@ -393,6 +395,16 @@ class Config:
                     "length":len(target_sweep_configurations[0]),
                     "vars":[sweep_val['var'] for sweep_val in target_name_vals.values()]
                 }
+                # Add coupled variable's target name to dict
+                sweeped_vars = [sweep_val['var'] for sweep_val in target_name_vals.values()]
+                self.target_names_by_sweep_var.update(
+                    dict(
+                        zip(
+                            sweeped_vars,
+                            [target_name]*len(sweeped_vars)
+                        )
+                    )
+                )
             # Cross multiple both sweep configurations
             sweep_configurations = list(product(*(isolated_sweep_configurations+coupled_sweep_configurations)))
         else:

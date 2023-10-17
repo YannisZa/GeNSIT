@@ -832,6 +832,7 @@ class SIM_MCMC(Experiment):
             else:
                 dir_path = ""
                 filename = 'config'
+
             self.outputs.write_metadata(
                 dir_path=dir_path,
                 filename=filename
@@ -881,7 +882,11 @@ class SIM_MCMC(Experiment):
         M = self.harris_wilson_mcmc.theta_steps
         L = self.harris_wilson_mcmc.log_destination_attraction_steps
 
-        for i in tqdm(range(N),disable=self.config.settings['mcmc']['disable_tqdm'],leave=False):
+        for i in tqdm(
+            range(N),
+            disable=self.config.settings['mcmc']['disable_tqdm'],
+            leave=False
+        ):
 
             # Track the epoch training time
             start_time = time.time()
@@ -1026,7 +1031,6 @@ class JointTableSIM_MCMC(Experiment):
 
         # Build contingency table
         ct = instantiate_ct(
-            table = None,
             config = config,
             logger = self.logger,
             **vars(self.inputs.data)
@@ -1067,6 +1071,7 @@ class JointTableSIM_MCMC(Experiment):
             else:
                 dir_path = ""
                 filename = 'config'
+
             self.outputs.write_metadata(
                 dir_path=dir_path,
                 filename=filename
@@ -1277,9 +1282,9 @@ class Table_MCMC(Experiment):
 
         # Build contingency table
         ct = instantiate_ct(
-            table = None,
             config = config,
-            logger=self.logger
+            logger = self.logger,
+            **vars(self.inputs.data)
         )
         # Update table distribution
         config.settings['contingency_table']['distribution_name'] = ct.distribution_name
@@ -1437,9 +1442,9 @@ class TableSummaries_MCMCConvergence(Experiment):
 
         # Setup table
         ct = instantiate_ct(
-            table = None,
             config = self.config,
-            logger=self.logger
+            logger = self.logger,
+            **vars(self.inputs.data)
         )
         # Update table distribution
         self.config.settings['inputs']['contingency_table']['distribution_name'] = ct.distribution_name
@@ -1562,7 +1567,11 @@ class TableSummaries_MCMCConvergence(Experiment):
         N = self.samplers['0'].ct.config.settings['mcmc']['N']
 
         print('Running MCMC')
-        for i in tqdm(range(1,N),disable=self.config['disable_tqdm'],leave=False):
+        for i in tqdm(
+            range(1,N),
+            disable=self.config['disable_tqdm'],
+            leave=False
+        ):
             # Run MCMC for one step in all chains in ensemble
             # Do it in parallel
             if self.samplers['0'].n_workers > 1:
@@ -1731,6 +1740,7 @@ class SIM_NN(Experiment):
             else:
                 dir_path = ""
                 filename = 'config'
+
             self.outputs.write_metadata(
                 dir_path=dir_path,
                 filename=filename
@@ -1890,9 +1900,9 @@ class NonJointTableSIM_NN(Experiment):
 
         # Build contingency table
         ct = instantiate_ct(
-            table = None,
             config = config,
-            logger=self.logger
+            logger = self.logger,
+            **vars(self.inputs.data)
         )
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
@@ -2111,9 +2121,9 @@ class JointTableSIM_NN(Experiment):
 
         # Build contingency table
         ct = instantiate_ct(
-            table = None,
             config = config,
-            logger=self.logger
+            logger = self.logger,
+            **vars(self.inputs.data)
         )
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(

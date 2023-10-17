@@ -1,13 +1,10 @@
-import sys
 import torch
 import numpy as np
 import torch.distributions as distr
 
-from tqdm import tqdm
 from copy import deepcopy
 from argparse import Namespace
 from torch import int32, float32
-from multiprocessing.pool import Pool
 from scipy.stats import nchypergeom_fisher
 from typing import Union, Tuple, Dict, List
 
@@ -357,7 +354,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             log_intensities_colsums = torch.logsumexp(log_intensity,dim=0)
         else:
             raise Exception(
-                f'Cannot handle log_intensity with dimensions {len(np.shape(log_intensity))}')
+                f'Cannot handle log_intensity with dimensions {len(log_intensity.shape)}')
 
         # Get total intensities (normalising factor in log space)
         total_log_intensities = torch.logsumexp(log_intensities_colsums)
@@ -611,47 +608,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             func_index, \
             {'support': [-1, 1], 'probs': [0.5, 0.5]}
 
-    def degree_higher_proposal_2way_table_multinomial(self, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict, Dict]:
-        return self.degree_higher_proposal_2way_table_product_multinomial(
-            table_prev=table_prev,
-            log_intensity=log_intensity
-        )
-
-    def degree_higher_proposal_2way_table_product_multinomial(self, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict, Dict]:
-
-        self.logger.debug('2way table degree higher move product multinomial')
-
-        # Sample Markov basis function index uniformly at random
-        func_index = np.random.randint(len(self.markov_basis))
-        
-        # Get non-zero cells of Markov basis and sort them lexicographically
-        non_zero_cells = sorted(list(self.markov_basis.basis_dictionaries[func_index].keys()))
-
-        # Normalise intensities at basis function cells
-        log_total_intensity = torch.logsumexp(log_intensity[non_zero_cells])
-        log_probabilities = np.array([log_intensity[cell] - log_total_intensity for cell in non_zero_cells])
-
-        # Copy previous table
-        table_new = np.zeros(table_prev.shape).to(dtype=int32,device=self.ct.device)
-        table_new[:] = table_prev
-
-        # Get total of previous table evaluated at basis functions
-        table_prev_total = int(np.sum([table_prev[cell] for cell in non_zero_cells]))
-
-        # Sample new cells of basis functions
-        updated_cells = np.random.multinomial(n=table_prev_total, pvals=np.exp(log_probabilities)).astype('int32')
-
-        # Update cells in new table
-        for i,cell in enumerate(non_zero_cells):
-            table_new[cell] = updated_cells[i]
-
-        return table_new.astype('int32'), \
-            None, \
-            self.markov_basis.basis_dictionaries[func_index], \
-            func_index, \
-            None
-        
-
+    
     def degree_higher_proposal_2way_table_fishers_hypergeometric(self, tab_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict]:
 
         self.logger.debug('2way table degree higher move Fishers hypergeometric')
@@ -665,7 +622,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         positive_cells = [cell for cell in non_zero_cells if self.markov_basis.basis_dictionaries[func_index][cell] > 0]
 
         # Copy previous table
-        tab_new = torch.zeros(np.shape(tab_prev),dtype=int32,device=self.ct.device)
+        tab_new = torch.zeros(tab_prev.shape,dtype=int32,device=self.ct.device)
         tab_new[:] = tab_prev
 
         # Compute log odds ratio for 2x2 table
@@ -732,7 +689,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         if self.ct.table_nonnegative(table_new):
             return log_acc
         else:
-            return -np.infty
+            return -torch.tensor([float('inf')])
 
     def gibbs_log_acceptance_ratio_2way_table(self, table_new: torch.tensor, table_prev: torch.tensor, log_intensity: torch.tensor) -> float:
         ''' Acceptance ratio for higher degree proposals
@@ -745,7 +702,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         else:
             self.logger.error(
                 f'Proposed table {table_new} is inadmissible or non positive')
-            return -np.infty
+            return -torch.tensor([float('inf')])
 
     def direct_sampling_log_acceptance_ratio_2way_table(self, table_new: torch.tensor, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict]:
         return 0
@@ -808,7 +765,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         )
 
         # Accept/reject
-        if (log_acc >= 0) or (np.log(np.random.uniform(0, 1)) < log_acc):
+        if (log_acc >= 0) or (torch.log(torch.rand(1)) < log_acc):
             # Update unconstrained margins
             self.ct.update_unconstrained_margins_from_table(table_new)
             return table_new, 1

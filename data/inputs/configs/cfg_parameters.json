@@ -132,7 +132,7 @@
     }
   },
   "spatial_interaction_model": {
-    "sim_type": {
+    "name": {
       "sweep": {
         "default": true,
         "range": true
@@ -218,8 +218,7 @@
         "range": true
       }
     },
-    "batch_size": true,
-    "table_inference": true
+    "batch_size": true
   },
   "mcmc": {
     "disable_tqdm": true,
@@ -288,7 +287,7 @@
       }
     },
     "loss_function": {
-      "name": {
+      "loss_name": {
         "sweep": {
           "default": true,
           "range": true
