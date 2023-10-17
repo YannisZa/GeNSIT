@@ -7,6 +7,7 @@ from scipy import optimize
 from torch import int32, float32
 from numba_progress import ProgressBar
 from itertools import chain, combinations
+from multiresticodm.global_variables import DATA_TYPES
 
 from multiresticodm.utils import flatten
 
@@ -109,13 +110,26 @@ def p_distance(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     
     return torch.pow(torch.abs(tab-tab0),p).float().reshape(dims)
 
-def scipy_optimize(init,function,method,theta):
-    try: 
-        f = optimize.minimize(function, init, method=method, args=(theta.detach().numpy()), jac=True, options={'disp': False})
+def torch_optimize(init,**kwargs):
+    function = kwargs['function']
+
+    def fit(xx):
+        xx = torch.tensor(xx,dtype=float32,device=kwargs.get('device','cpu'),requires_grad=True)
+        # Convert torch to numpy
+        y,y_grad = function(xx,**kwargs)
+        return y.detach().cpu().numpy(), y_grad.detach().cpu().numpy()
+
+    try:
+        res = optimize.minimize(
+            fit,
+            init,
+            jac=True,
+            options={'disp': False}
+        )
+        return res.x
     except:
         return None
 
-    return f.x
 
 def relative_l_2(tab:xr.DataArray,tab0:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
     N,I,J = shape(tab)
@@ -318,3 +332,13 @@ def calculate_min_interval(x, alpha):
     hdi_min = x.gather(0, min_idx.unsqueeze(1))
     hdi_max = x.gather(0, (min_idx+interval_index0).unsqueeze(1))
     return hdi_min.squeeze(1), hdi_max.squeeze(1)
+
+
+def logsumexp(input, dim=None, keepdim=False):
+    max_val, _ = input.max(dim=dim, keepdim=True)
+    output = max_val + (input - max_val).exp().sum(dim=dim, keepdim=True).log()
+    
+    if not keepdim:
+        output = output.squeeze(dim)
+    
+    return output

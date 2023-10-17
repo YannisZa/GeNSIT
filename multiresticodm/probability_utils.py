@@ -7,6 +7,7 @@ import torch.distributions as distr
 from typing import Union, Tuple
 from torch import int32, float32
 
+from multiresticodm.utils import set_seed
 from multiresticodm.math_utils import log_factorial_sum
 
 def uniform_binary_choice(n:int=1):
@@ -232,58 +233,69 @@ def multinomial_mode(n,p):
 
 def generate_stopping_times(N:int,k_power:float,seed:int):
     if seed is not None:
-        np.random.seed(seed)
+        set_seed(seed)
     # Get number of stopping times
-    stopping_times = np.empty(N)
+    stopping_times = torch.empty(N)
 
     for i in range(N):
         n = 1
-        u = np.random.uniform(0, 1)
-        while(u < torch.pow(n+1, -k_power)):
+        u = torch.rand(1)
+        while(u < torch.pow(torch.tensor(n+1).float(), -k_power)):
             n += 1
         stopping_times[i] = n
     return stopping_times
 
-def compute_truncated_infinite_series(N:int,log_weights:torch.tensor,k_power:float) -> torch.tensor:
+def compute_truncated_infinite_series(N:int,log_weights:torch.tensor,k_power:float,device:str) -> torch.tensor:
 
-    # Compute S = Y[0] + sum_i (Y[i] - Y[i-1])/P(N > i) using logarithms
-    ln_Y = torch.empty(N+1)
-    ln_Y_pos = torch.empty(N+1)
-    ln_Y_neg = torch.empty(N)
+    # Compute S = Y[0] + sum_{i>1} (Y[i] - Y[i-1])/P(N > i) using logarithms
     
     # Compute increasing averages estimator (Appendix C5)
+    ln_Y = torch.log(torch.range(1, N+2,device=device))
     for i in range(0, N+1):
-        ln_Y[i] = torch.log(i+1) - torch.logsumexp(log_weights[:i+1])
-    # Compute first term in series
-    ln_Y_pos[0] = ln_Y[0]
+        ln_Y[i] -=  torch.logsumexp(log_weights[:i+1].ravel(),dim=0)
     # Compute log of Y[i]/P(N > i) and Y[i-1]/P(N > i)
-    for i in range(1, N+1):
-        ln_Y_pos[i] = ln_Y[i] + k_power*torch.log(i)
-        ln_Y_neg[i-1] = ln_Y[i-1] + k_power*torch.log(i)
+    ln_Y_pos = ln_Y + torch.cat((torch.tensor([0],device=device),k_power*torch.log(torch.range(1, N+1,device=device))))
+    ln_Y_neg = ln_Y[:(N+1)] + k_power*torch.log(torch.range(1, N+1,device=device))
+    
     # Sum of all positive and negative terms and convert back to log
-    positive_sum = torch.logsumexp(ln_Y_pos)
-    negative_sum = torch.logsumexp(ln_Y_neg)
+    positive_sum = torch.logsumexp(ln_Y_pos,dim=0)
+    negative_sum = torch.logsumexp(ln_Y_neg,dim=0)
 
-    ret = torch.empty(2)
+    ret = torch.empty(2,device=device)
     # If positive terms are larger in magnitude than negative terms
     if(positive_sum >= negative_sum):
         # This is just computing log(exp(positive_sum) - exp(negative_sum))
-        ret[0] = positive_sum + torch.log(1. - torch.exp(negative_sum - positive_sum))
+        ret[0] = positive_sum + torch.log(torch.tensor(1.) - torch.exp(negative_sum - positive_sum))
         ret[1] = 1.
+
+        if not torch.all(torch.isfinite(ret[0])):
+            print(log_weights)
+            print(positive_sum,negative_sum)
+            print(torch.exp(negative_sum - positive_sum))
+            print(torch.log(torch.tensor(1.) - torch.exp(negative_sum - positive_sum)))
+            raise Exception('Positive >= Negative')
+
     # Otherwise return a negative sign
     else:
         # This is just computing log(exp(negative_sum) - exp(positive_sum))
-        ret[0] = negative_sum + torch.log(1. - torch.exp(positive_sum - negative_sum))
+        ret[0] = negative_sum + torch.log(torch.tensor(1.) - torch.exp(positive_sum - negative_sum))
         ret[1] = -1.
+
+        if not torch.all(torch.isfinite(ret[0])):
+            print(log_weights)
+            print(positive_sum,negative_sum)
+            print(torch.exp(positive_sum - negative_sum))
+            print( torch.log(torch.tensor(1.) - torch.exp(positive_sum - negative_sum)))
+            raise Exception('Negative >= Positive')
 
     return ret
 
 
-def random_tensor(
-    *, distribution: str, parameters: dict, size: tuple, device: str = "cpu", **__
-) -> torch.Tensor:
+def random_vector(
+    *, distribution: str, parameters: dict, size: tuple, **__
+) -> np.ndarray:
 
-    """Generates a random tensor according to a distribution.
+    """Generates a random vector according to a distribution.
 
     :param distribution: the type of distribution. Can be 'uniform' or 'normal'.
     :param parameters: the parameters relevant to the respective distribution
@@ -296,25 +308,21 @@ def random_tensor(
     # Uniform distribution in an interval
     if distribution == "uniform":
 
-        l, u = parameters.get("lower"), parameters.get("upper")
+        l, u = parameters.get("lower",0.0), parameters.get("upper",1.0)
         if l > u:
             raise ValueError(
                 f"Upper bound must be greater or equal to lower bound; got {l} and {u}!"
             )
 
-        return torch.tensor((u - l), dtype=torch.float) * torch.rand(
-            size, dtype=torch.float, device=device
-        ) + torch.tensor(l, dtype=torch.float)
+        return (u - l) * np.random.uniform(size=size,dtype='float32') + l
 
     # Normal distribution
     elif distribution == "normal":
-        return torch.normal(
-            parameters.get("mean"),
-            parameters.get("std"),
-            size=size,
-            device=device,
-            dtype=torch.float,
-        )
+        return np.random.normal(
+            loc=parameters.get("mean",1.0),
+            scale=parameters.get("std",0.1),
+            size=size
+        ).astype('float32')
 
     else:
         raise ValueError(f"Unrecognised distribution type {distribution}!")
