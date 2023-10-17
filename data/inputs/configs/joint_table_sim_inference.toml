@@ -5,15 +5,15 @@ sweep_mode = true
 n_workers = +1
 n_threads = [+6,+6]
 device = 'cpu'
-dataset = './data/inputs/synthetic_2x3_N_100/'
+to_learn = ['alpha', 'beta']
+in_directory = './data/inputs/'
+dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
-dims = [+69,+13]
-to_learn = ['alpha', 'beta', 'kappa']
 [inputs.seed.sweep]
   default = 1
   range = "1:1000:1"
 
-[inputs.data_files]
+[inputs.data]
     origin_demand = 'origin_demand_sum_normalised.txt'
     destination_attraction_ts='destination_attraction_time_series_sum_normalised.txt'
     cost_matrix = """cost_matrices/clustered_facilities_sample_20x20_20_01_2023_\
@@ -21,9 +21,7 @@ to_learn = ['alpha', 'beta', 'kappa']
     prob_origin_destination_adjusted_normalised_boundary_only_\
     edge_corrected_cost_matrix_max_normalised.txt"""
     ground_truth_table = 'table_lsoas_to_msoas.txt'
-    # margins = ['colsums.txt','rowsums.txt']
-    # cell_values = ''
-
+    cell_values = ''
 
 [contingency_table]
   ct_type = 'ContingencyTable2D'
@@ -31,45 +29,66 @@ to_learn = ['alpha', 'beta', 'kappa']
   [contingency_table.constraints]
     axes = [[1]]
     # cells = [[0,1],[1,2]]
-
-[training]
-  N = +1000 # number of epochs
-  table_inference = true
-  num_steps = +1
-  batch_size = +1
-
-[mcmc.contingency_table]
-  table_steps = 1
-  disable_tqdm = true
-  proposal = 'direct_sampling' # ['degree_one','degree_higher','direct_sampling']
-  table0 = 'maximum_entropy_solution' #['direct_sampling','random_sample','maximum_entropy_solution']
-  margin0 = 'multinomial' # ['multinomial','import']
-
-
+  
 [spatial_interaction_model]
   # sim_type = 'ProductionConstrained','TotallyConstrained'
-  sim_type = 'TotallyConstrained'
-  grand_total = +1
+  name = 'TotallyConstrained'
+  grand_total = +33704
   [spatial_interaction_model.parameters]
     bmax = +1.0
-    # alpha = 1.0
-    # beta = 0.0
+    alpha = +1.0
+    beta = +1.0
   
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
     epsilon = 1.0
-    # kappa = 0
-    # delta = 0
-    # sigma = 0.0141421356 
+    # kappa = 0.0
+    # delta = 0.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356
       range = [0.0141421356, 0.1414213562, nan]
 
+[training]
+  N = +10000 # number of epochs or mcmc samples
+  num_steps = +1
+  batch_size = +1
+
+[mcmc]
+    disable_tqdm = true
+    mcmc_workers = 1
+    [mcmc.parameters]
+      theta_steps = 1
+      step_size = 1.0
+      [mcmc.parameters.covariance.sweep]
+        default = [[0.0149674,0.00182529],[0.00182529,0.0109968]]
+        range = [
+          [[0.0149674,0.00182529],[0.00182529,0.0109968]],
+          [[1.0,0.0],[0.0,1.0]],
+          [[1.0,0.0],[0.0,1.0]]
+        ]
+        coupled = true
+        target_name = 'sigma'
+      #[[ 0.0349674,  0.00], [ 0.00,  0.0349968]]
+    [mcmc.destination_attraction]
+      log_destination_attraction_steps = 1
+      leapfrog_steps = 3#10
+      leapfrog_step_size = 0.01 #0.02
+      ais_leapfrog_steps = 3#10
+      ais_leapfrog_step_size = 0.2#0.1
+      ais_samples = 10
+      n_bridging_distributions = 50
+
+    [mcmc.contingency_table]
+      table_steps = 1
+      proposal = 'direct_sampling' # ['degree_one','degree_higher','direct_sampling']
+      table0 = 'maximum_entropy_solution' #['direct_sampling','random_sample','maximum_entropy_solution']
+      margin0 = 'multinomial' # ['multinomial','import']
+
 [neural_network]
   disable_tqdm = true
   [neural_network.loss_function] 
-  name = 'mseloss'
+    loss_name = 'mseloss'
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
@@ -87,7 +106,7 @@ to_learn = ['alpha', 'beta', 'kappa']
 
 [[experiments]]
   type = 'NonJointTableSIM_NN'
-  comment = 'Independent joint Table and Spatial interaction model parameter learning using neural networks'
+  comment = 'Non-independent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
   disable_tqdm = false
   print_statements = true
   export_samples = true
@@ -97,7 +116,16 @@ to_learn = ['alpha', 'beta', 'kappa']
 
 [[experiments]]
   type = 'JointTableSIM_NN'
-  comment = 'Independent joint Table and Spatial interaction model parameter learning using neural networks'
+  comment = 'dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = false
+  print_statements = true
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+
+[[experiments]]
+  type = 'JointTableSIM_MCMC'
+  comment = 'Joint Table and Spatial Interaction Model parameter learning using Markov Chain Monte Carlo'
   disable_tqdm = false
   print_statements = true
   export_samples = true

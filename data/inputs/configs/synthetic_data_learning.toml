@@ -1,0 +1,195 @@
+log_level = 'info'
+sweep_mode = false
+
+[inputs]
+n_workers = +1
+n_threads = [+6,+6]
+device = 'cpu'
+load_experiment = ''
+to_learn = ['alpha', 'beta']
+in_directory = './data/inputs/synthetic/'
+seed = 8888
+# [inputs.seed.sweep]
+#   default = 1
+#   range = "1:30:1"
+[inputs.dataset.sweep]
+  default = "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.01" 
+  range = [
+    "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.01",
+    # "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.14",
+    # "synthetic_100x50_using_sde_solver_n_30_N_1_sigma_0.01",
+    # "synthetic_100x50_using_sde_solver_n_30_N_1_sigma_0.14",
+    # "synthetic_100x75_using_sde_solver_n_30_N_1_sigma_0.01",
+    # "synthetic_100x75_using_sde_solver_n_30_N_1_sigma_0.14",
+    # "synthetic_500x25_using_sde_solver_n_30_N_1_sigma_0.01",
+    # "synthetic_500x25_using_sde_solver_n_30_N_1_sigma_0.14",
+    # "synthetic_500x50_using_sde_solver_n_30_N_1_sigma_0.01",
+    # "synthetic_500x50_using_sde_solver_n_30_N_1_sigma_0.14",
+    # "synthetic_500x75_using_sde_solver_n_30_N_1_sigma_0.01",
+    # "synthetic_500x75_using_sde_solver_n_30_N_1_sigma_0.14",
+    # "synthetic_500x100_using_sde_solver_n_30_N_1_sigma_0.01",
+    # "synthetic_500x100_using_sde_solver_n_30_N_1_sigma_0.14"
+  ]
+
+[inputs.data]
+  [inputs.data.origin_demand]
+    file = 'origin_demand.txt'
+  [inputs.data.destination_attraction_ts]
+    file = 'destination_attraction_ts.txt'
+  [inputs.data.cost_matrix]
+    file = 'cost_matrix.txt'
+  [[inputs.data.margins]]
+    axis = [0,1]
+    # file = 'origin_demand.txt'
+    value = [+10000]
+
+[contingency_table]
+  ct_type = 'ContingencyTable2D'
+  sparse_margins = false
+  [contingency_table.constraints]
+    axes = [[0,1]]
+    # cells = [[0,1],[1,2]]
+
+[spatial_interaction_model]
+  # sim_type = 'ProductionConstrained','TotallyConstrained'
+  name = 'TotallyConstrained'
+  grand_total = +1
+  [spatial_interaction_model.parameters]
+    bmax = +1.0
+    alpha = +1.0
+    beta = +1.0
+  
+[harris_wilson_model]
+  dt = +0.001
+  [harris_wilson_model.parameters]
+    epsilon = 1.0
+    kappa = 0.1
+    sigma = 0.0141421356
+    # [harris_wilson_model.parameters.sigma.sweep]
+    #   default = 0.0141421356
+    #   range = [0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356,
+    #   0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356]
+    #   coupled = true
+    #   target_name = 'dataset'
+
+[training]
+  batch_size = +1
+  num_steps = +1
+  [training.N.sweep]
+    default = +1000
+    # range = [1000,1000,1000,1000,1000,1000,5000,5000,5000,5000,5000,5000,5000,5000]
+    range = [10000]#,10000,10000,10000,10000,10000,50000,50000,50000,50000,50000,50000,50000,50000]
+    coupled = true
+    target_name = 'dataset'
+
+
+[mcmc]
+    disable_tqdm = false
+    mcmc_workers = 1
+    [mcmc.parameters]
+        theta_steps = 1
+        [mcmc.parameters.covariance.sweep]
+            default = [[0.0149674,0.00182529],[0.00182529,0.0109968]]
+            range = [
+              [[0.0149674,0.00182529],[0.00182529,0.0109968]]#,[[ 1.0,  0.00], [ 0.00,  1.0]],
+              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
+              # [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]]
+            ]
+            coupled = true
+            target_name = 'dataset'
+        [mcmc.parameters.step_size.sweep]
+            default = 1.0
+            range = [1.0]#,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2]
+            coupled = true
+            target_name = 'dataset'
+    [mcmc.destination_attraction]
+        log_destination_attraction_steps = 1
+        leapfrog_steps = 3#10
+        leapfrog_step_size = 0.01 #0.02
+        ais_leapfrog_steps = 3#10
+        ais_leapfrog_step_size = 0.2#0.1
+        ais_samples = 10
+        n_bridging_distributions = 50
+    [mcmc.contingency_table]
+      table_steps = 1
+      proposal = 'direct_sampling' # ['degree_one','degree_higher','direct_sampling']
+      table0 = 'maximum_entropy_solution' #['direct_sampling','random_sample','maximum_entropy_solution']
+      margin0 = 'multinomial' # ['multinomial','import']
+
+[neural_network]
+  disable_tqdm = true
+  [neural_network.loss_function]
+    loss_name = 'mseloss'
+  [neural_network.hyperparameters]
+    num_layers = +1
+    optimizer = 'Adam'
+    learning_rate = +0.002
+    [neural_network.hyperparameters.biases]
+      default = [+0.0, +4.0]
+      [neural_network.hyperparameters.biases.layer_specific]
+    [neural_network.hyperparameters.nodes_per_layer]
+      default = +20
+      [neural_network.hyperparameters.nodes_per_layer.layer_specific]
+    [neural_network.hyperparameters.activation_funcs]
+      default = 'linear'
+      [neural_network.hyperparameters.activation_funcs.layer_specific]
+        1 = 'abs'
+
+
+[[experiments]]
+  type = 'SIM_NN'
+  comment = 'Spatial interaction model parameter learning using neural networks'
+  disable_tqdm = false
+  print_statements = true
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+
+
+[[experiments]]
+  type = 'SIM_MCMC'
+  comment = 'Spatial interaction model parameter learning using MCMC'
+  disable_tqdm = false
+  print_statements = true
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+
+[[experiments]]
+  type = 'NonJointTableSIM_NN'
+  comment = 'Independent Table and Spatial interaction model parameter learning using neural networks'
+  disable_tqdm = false
+  print_statements = true
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+
+
+[[experiments]]
+  type = 'JointTableSIM_NN'
+  comment = 'Joint Table and Spatial interaction model parameter learning using neural networks'
+  disable_tqdm = false
+  print_statements = true
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+
+
+[[experiments]]
+  type = 'JointTableSIM_MCMC'
+  comment = 'Joint Table and Spatial interaction model parameter learning using Markov Chain Monte Carlo'
+  disable_tqdm = false
+  print_statements = true
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+
+[outputs]
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/synthetic/'
+    experiment_title = ''

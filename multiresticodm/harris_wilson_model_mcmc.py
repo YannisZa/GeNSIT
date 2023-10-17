@@ -55,6 +55,10 @@ class HarrisWilsonMarkovChainMonteCarlo():
         
         # Store sim model but not its config
         self.physics_model = physics_model
+
+        # Cannot learn sigma with MCMC
+        if 'sigma' in list(self.physics_model.params_to_learn.keys()):
+            raise Exception(f"Cannot learn sigma using existing MCMC schemes")
         
         # Store config
         self.config = config

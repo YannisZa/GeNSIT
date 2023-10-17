@@ -5,7 +5,8 @@ cuda = false
 # seed = 1234
 n_workers = 1
 n_threads = 6
-dataset = './data/inputs/synthetic_2x3_N_100'
+in_directory = './data/inputs/synthetic'
+dataset = 'synthetic_2x3_N_100'
 load_experiment = ''
 dims = [10,10]
 

@@ -1,0 +1,93 @@
+log_level = 'info'
+sweep_mode = true
+
+[inputs]
+n_workers = +1
+n_threads = [+6,+6]
+device = 'cpu'
+load_experiment = ''
+to_learn = []
+seed = 1
+in_directory = './data/inputs/synthetic/'
+dataset = 'synthetic/'
+# [inputs.seed.sweep]
+#   default = 1
+#   range = "1:10:1"
+
+
+[inputs.data]
+  data_generation_seed = 4321
+  synthesis_method = 'sde_solver'
+  synthesis_n_samples = 100
+  [inputs.data.dims.origin.sweep]
+    default = +10
+    range = [100,100,100,500,500,500,500]
+  [inputs.data.dims.destination.sweep]
+    default = +25
+    range = [25,50,75,25,50,75,100]
+    coupled = true
+    target_name = 'origin'
+  [inputs.data.origin_demand]
+    distribution = 'normal'
+    [inputs.data.origin_demand.parameters]
+        mean = 0.1
+        std = 0.01
+  [inputs.data.destination_attraction_ts]
+    distribution = 'normal'
+    [inputs.data.destination_attraction_ts.parameters]
+        mean = 0.1
+        std = 0.01
+  [inputs.data.cost_matrix]
+    distribution = 'normal'
+    [inputs.data.cost_matrix.parameters]
+        mean = 1.2
+        std = 1.2
+
+[spatial_interaction_model]
+  # sim_type = 'ProductionConstrained','TotallyConstrained'
+  sim_type = 'TotallyConstrained'
+  grand_total = +1 #+33704
+  [spatial_interaction_model.parameters]
+    bmax = +100000.0
+    alpha = +1.1
+    beta = +0.2
+  
+[harris_wilson_model]
+  dt = +0.001
+  [harris_wilson_model.parameters]
+    # sigma = 0.0141421356 # 0.0141421356, 0.1414213562
+    epsilon = 1.0
+    kappa = 0.1
+    # delta = 0
+    [harris_wilson_model.parameters.sigma.sweep]
+      default = 0.0141421356
+      range = [0.0141421356,0.141421356]
+
+[training]
+  N = +1000
+  batch_size = +1
+  table_inference = false
+  [training.num_steps.sweep]
+    default = +3000
+    range = [1000,1000,1000,3000,3000,3000,3000]
+    coupled = true
+    target_name = 'origin'
+  # [training.N.sweep]
+  #   default = 100
+  #   range = [100,1000,10000]
+
+
+[[experiments]]
+  type = 'DataGeneration'
+  comment = 'Generates synthetic datasets and store them to file'
+  disable_tqdm = false
+  print_statements = true
+  export_samples = false
+  export_metadata = false
+  overwrite = true
+
+[outputs]
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/'
+    experiment_title = ''
