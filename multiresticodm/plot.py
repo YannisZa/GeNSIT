@@ -777,7 +777,7 @@ class Plot(object):
         # Get filepath
         figure_filepath = os.path.join(
             outputs.experiment.config['outputs']['directory'],
-            outputs.experiment.config['experiment_data'],
+            outputs.experiment.config['inputs']['dataset'],
             output_dir,
             filename
         )
