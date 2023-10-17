@@ -252,6 +252,10 @@ def str_to_tuple(s:str) -> Tuple[int,int]:
     return (int(s.split('(')[1].split(',')[0]),int(s.split(',')[1].split(')')[0]))
 
 
+def ndims(__self__):
+    return np.sum([1 for dim in __self__.data.dims.values() if dim > 1],dtype='uint8')
+
+
 def deep_get(key, value):
     for k, v in (value.items() if isinstance(value, dict) else
        enumerate(value) if isinstance(value, list) else []):
@@ -816,7 +820,12 @@ def in_range(v,limits:list,allow_nan:bool=False,inclusive:bool=False):
     return within_range
 
 def is_null(v):
-    return v is None or np.isnan(v)
+    if isinstance(v,str):
+        return v == ''
+    elif isinstance(v,list):
+        return len(v) <= 0
+    else:
+        return v is None or np.isnan(v)
 
 def dict_inverse(d:dict):
     return {v:k for k,v in d.items()}
@@ -969,3 +978,39 @@ def broadcast(arr,shape):
         arr_reshaped = np.repeat(arr_reshaped,shape[ax],axis=ax)
 
     return arr_reshaped
+
+def expand_tuple(t):
+    result = []
+    for item in t:
+        if isinstance(item, tuple):
+            result.extend(expand_tuple(item))
+        else:
+            result.append(item)
+    return tuple(result)
+
+def unpack_dims(self):
+    try:
+        dims = tuple(list(self.dims.values()))
+    except:
+        try:
+            dims = tuple(list(self['dims'].values()))
+        except:
+            raise Exception(f"Cannot unpack dimensions from {self}")
+    return dims
+
+def to_json_format(x):
+    if torch.is_tensor(x):
+        if x.size == 1:
+            x = x.cpu().detach().item()
+        else:
+            x = x.cpu().detach().numpy()
+    if isinstance(x,np.ndarray):
+        x = x.tolist()
+    return x
+
+def tuple_dim(x,dims=()):
+    if isinstance(x,tuple):
+        dims = (*dims,len(x))
+        return tuple_dim(x[0],dims=dims)
+    else:
+        return dims
