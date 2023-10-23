@@ -6,7 +6,7 @@ from copy import deepcopy
 from collections.abc import Iterable,Sequence
 from numpy import arange, isfinite, isnan, shape
 
-from multiresticodm.utils import in_range, str_in_list,string_to_numeric,is_null
+from multiresticodm.utils import in_range,string_to_numeric,is_null
 
 def instantiate_data_type(
     data,
@@ -341,7 +341,7 @@ class List(NonPrimitiveEntry):
         # Remove 'dtype' key
         self.schema = {} 
         for k,v in schema.items():
-            if str_in_list(k,['dtype','sweepable','target_name','optional']):
+            if k in ['dtype','sweepable','target_name','optional']:
                 continue
             # Remove all non-primitive entry names from preffix
             stored = False
@@ -387,7 +387,7 @@ class List2D(NonPrimitiveEntry):
         # Remove 'dtype' key
         self.schema = {}
         for k,v in schema.items():
-            if str_in_list(k,['dtype','sweepable','target_name','optional']):
+            if k in ['dtype','sweepable','target_name','optional']:
                 continue
             # Remove all non-primitive entry names from preffix
             stored = False
@@ -460,7 +460,7 @@ class CustomList(NonPrimitiveEntry):
         # Remove 'dtype' key
         self.schema = {} 
         for k,v in schema.items():
-            if str_in_list(k,['dtype','sweepable','target_name','optional']):
+            if k ['dtype','sweepable','target_name','optional']:
                 continue
             # Remove all non-primitive entry names from preffix
             stored = False
@@ -534,7 +534,7 @@ class Dict(NonPrimitiveEntry):
         # Remove 'dtype' key
         self.schema = {} 
         for k,v in schema.items():
-            if str_in_list(k,['dtype','sweepable','target_name','optional']):
+            if k in ['dtype','sweepable','target_name','optional']:
                 continue
             # Remove all non-primitive entry names from preffix
             stored = False
@@ -584,7 +584,7 @@ class CustomDict(NonPrimitiveEntry):
         # Remove all key prefixes that start with 'list'
         self.schema = {} 
         for k,v in schema.items():
-            if str_in_list(k,['dtype','sweepable','target_name','optional']):
+            if k in ['dtype','sweepable','target_name','optional']:
                 continue
             # Remove all non-primitive entry names from preffix
             stored = False

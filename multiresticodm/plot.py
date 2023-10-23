@@ -1,4 +1,6 @@
 import os
+
+from multiresticodm.config import Config
 os.environ['USE_PYGEOS'] = '0'
 import gc
 import sys
@@ -24,13 +26,13 @@ from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
 from statsmodels.graphics.tsaplots import plot_acf
 
 from multiresticodm.utils import *
-from multiresticodm.global_variables import *
 from multiresticodm.colormaps import *
+from multiresticodm.global_variables import *
 from multiresticodm.outputs import Outputs,OutputSummary
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.spatial_interaction_model import instantiate_sim
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
-from multiresticodm.math_utils import running_average,apply_norm,positive_sigmoid,map_distance_name_to_function,coverage_probability,calculate_min_interval
+from multiresticodm.math_utils import apply_norm,map_distance_name_to_function,coverage_probability
 
 latex_preamble = r'''
 \usepackage{amsmath}
@@ -43,13 +45,12 @@ mpl.rcParams['text.latex.preamble'] = latex_preamble
 
 class Plot(object):
 
-    def __init__(self,plot_ids:List[str],outputs_directories:List[str],settings:dict,**kwargs):
+    def __init__(self,plot_ids:List[str],settings:dict,**kwargs):
         # Setup logger
+        level = kwargs['console_level'] if kwargs.get('console_level',None) is not None else None
         self.logger = setup_logger(
             __name__,
-            settings.get('logging_mode','info').upper(),
-            log_to_file=True,
-            log_to_console=True
+            console_handler_level = level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
 
         # Enable garbage collector
@@ -64,6 +65,7 @@ class Plot(object):
         # Run plots
         for plot_id in plot_ids:
             self.compile_plot(plot_id)
+        
 
     def compile_plot(self,visualiser_name):
         if hasattr(self, PLOT_HASHMAP[visualiser_name]):
@@ -358,7 +360,7 @@ class Plot(object):
             elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
                 ax.set_ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size']) 
             # Legend
-            if str_in_list('legend_label_size',self.settings.keys()):
+            if 'legend_label_size' in list(self.settings.keys()):
                 leg = plt.legend(prop={'size': self.settings['legend_label_size']},loc = 'upper left')
             else:
                 leg = plt.legend(loc = 'upper left')
@@ -376,9 +378,14 @@ class Plot(object):
                 groupby=['sample_name'],
                 **self.settings
             )
-            write_figure(fig,filepath,**self.settings)
+            write_figure(
+                fig,
+                filepath,
+                **self.settings
+            )
 
-            self.logger.info(f"Figure exported to {filepath}")
+            self.logger.info(f"Figure exported to {Path(filepath).parent}")
+            self.logger.info(f"Filename: {Path(filepath).parent}")
 
         else:
             raise Exception(f"Cannot handled embedded data of dimension {embedded_data.shape[1]}")
@@ -392,7 +399,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
             if not valid_experiment_type(outputs.experiment_id,['tablesummariesmcmcconvergence','table_mcmc_convergence']):
                 self.logger.info(f'Experiment {outputs.experiment_id} is not of type Table(Summaries)MCMCConvergence')
@@ -431,7 +439,8 @@ class Plot(object):
                     output_directory,
                     self.settings,
                     output_names=['tableerror'],
-                    log_to_console=False
+                    log_to_console=False,
+                    logger = self.logger
                 )
                 # Apply statistic to error norm
                 table_error_statistic = outputs.compute_sample_statistics(
@@ -487,7 +496,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
             if not valid_experiment_type(outputs.experiment_id,['jointtablesim_mcmc']):
                 self.logger.info(f'Experiment {outputs.experiment_id} is not of type JointTableSIM_MCMC')
@@ -524,7 +534,8 @@ class Plot(object):
                     self.settings,
                     output_names=['intensity','table','sign'],
                     slice_samples=False,
-                    log_to_console=False
+                    log_to_console=False,
+                    logger = self.logger
                 )
                 
                 # Instantiate contingency table
@@ -607,7 +618,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
             # If experiment is not of the right type
             if 'tablesummariesmcmcconvergence' not in outputs.experiment_id.lower():
@@ -666,7 +678,8 @@ class Plot(object):
             self.settings,
             ['ground_truth_table'],
             slice_samples=False,
-            log_to_console=False
+            log_to_console=False,
+            logger = self.logger
         )
         # Store sample name, the actual sample (y), and its size (x)
         dims = np.shape(np.squeeze(outputs.ground_truth_table))
@@ -688,7 +701,8 @@ class Plot(object):
                 self.settings,
                 list(self.settings.get('sample')),
                 slice_samples=True,
-                log_to_console=True
+                log_to_console=True,
+                logger = self.logger
             )
             # Make sure the right experiments are provided
             try:
@@ -710,14 +724,14 @@ class Plot(object):
             except:
                 label = outputs.experiment_id
             # Get only first n_samples as specified by settings
-            if str_in_list('table',list(outputs.experiment.results.keys())):
+            if 'table' in list(outputs.experiment.results.keys()):
                 table_samples = outputs.experiment.results['table']
                 table_samples = table_samples.reshape((table_samples.shape[0], np.prod(table_samples.shape[1:])))
                 # Add to data
                 embedded_data_ids = np.append(embedded_data_ids,np.repeat(("table"+label),table_samples.shape[0]))
                 embedded_data_vals = np.append(embedded_data_vals,table_samples,axis=0)
                 
-            if str_in_list('intensity',list(outputs.experiment.results.keys())):
+            if 'intensity' in list(outputs.experiment.results.keys()):
                 intensity_samples = outputs.experiment.results['intensity']
                 intensity_samples = intensity_samples.reshape((intensity_samples.shape[0], np.prod(intensity_samples.shape[1:])))
                 # Get only the first n_samples after burnin
@@ -807,7 +821,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
 
             self.parameter_grid_plot(i,outputs.experiment_id,'r2',r'$R^2$')
@@ -821,7 +836,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
 
             if not valid_experiment_type(outputs.experiment_id,["logtargetanalysis"]):
@@ -837,7 +853,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
 
             if not valid_experiment_type(outputs.experiment_id,["absoluteerroranalysis"]):
@@ -865,7 +882,8 @@ class Plot(object):
         outputs = Outputs(
             output_directory,
             self.settings,
-            log_to_console=False
+            log_to_console=False,
+            logger = self.logger
         )
         dummy_config = Namespace(**{'settings':outputs.experiment.config})
         sim = instantiate_sim(dummy_config)
@@ -883,7 +901,7 @@ class Plot(object):
         # Store values for upper and lower bounds of colorbar
         colorbar_min = None
         colorbar_max = None
-        if str_in_list("colorbar_limit",self.settings.keys()):
+        if "colorbar_limit" in list(self.settings.keys()):
             colorbar_min = self.settings['colorbar_limit'][0]
             colorbar_max = self.settings['colorbar_limit'][1]
         
@@ -969,7 +987,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
             # Convert to path object
             output_directory = Path(output_directory)
@@ -1045,7 +1064,8 @@ class Plot(object):
             # Save figure
             write_figure(fig,filepath,**self.settings)
             
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures',filename)}")
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
     
     def parameter_acf(self):
 
@@ -1057,7 +1077,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
 
             # Get only first n_samples as specified by settings
@@ -1105,7 +1126,8 @@ class Plot(object):
             # Save figure
             write_figure(fig,filepath,**self.settings)
             
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures',filename)}")
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
 
     def parameter_2d_contours(self):
 
@@ -1117,7 +1139,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
             # dummy_config = Namespace(**{'settings':outputs.experiment.config})
             # sim = instantiate_sim(dummy_config)
@@ -1139,7 +1162,7 @@ class Plot(object):
              # Store values for upper and lower bounds of colorbar
             colorbar_min = None
             colorbar_max = None
-            if str_in_list("colorbar_limit",self.settings.keys()):
+            if "colorbar_limit" in list(self.settings.keys()):
                 colorbar_min = self.settings['colorbar_limit'][0]
                 colorbar_max = self.settings['colorbar_limit'][1]
                 # Get colormap
@@ -1208,7 +1231,8 @@ class Plot(object):
             # Save figure
             write_figure(fig,filepath,**self.settings)
             
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures',filename)}")
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
 
     def parameter_histogram(self):
 
@@ -1220,7 +1244,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
             dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
@@ -1300,19 +1325,22 @@ class Plot(object):
             # Save figure
             write_figure(fig,filepath,**self.settings)
             
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures',filename)}")
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
     
     def destination_attraction_mixing(self):
 
-        self.logger.info('Running destination_attraction_mixing')
+        self.logger.note('Running destination_attraction_mixing')
+
 
         for output_directory in tqdm(self.outputs_directories): 
             self.logger.debug(f"Experiment id {output_directory}")
             # Load contingency table
             outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False
+                config=output_directory,
+                settings=self.settings,
+                output_names=['log_destination_attraction'],
+                logger = self.logger
             )
             dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
@@ -1369,7 +1397,8 @@ class Plot(object):
             # Save figure
             write_figure(fig,filepath,**self.settings)
             
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures',filename)}")
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
 
     def plot_predictions(self,prediction_data):
         # Axes limits from settings (read only x limit)
@@ -1436,21 +1465,35 @@ class Plot(object):
                     f"burnin_{self.settings['burnin']}_" + \
                     f"thinning_{self.settings['thinning']}"
             # Define filepath
-            parent_directory = Path(prediction_data[experiment_id]['outputs_path'])
-            filepath = os.path.join(parent_directory.parent.absolute(),'paper_figures',filename)
+            parent_directory = Path(prediction_data[experiment_id]['outputs'].outputs_path)
+            if 'synthetic' in str(parent_directory):
+                parent_directory = prediction_data[experiment_id]['outputs'].config.out_directory
+            else:
+                parent_directory.parent.absolute()
+            dirpath = os.path.join(parent_directory,'paper_figures')
+            filepath = os.path.join(dirpath,filename)
         else:
 
             # Get filename
-            filename = f"table_{prediction_data[experiment_id]['config']['table_dim']}_" + \
-                    f"gamma_{prediction_data[experiment_id]['config']['spatial_interaction_model']['gamma']}" + \
-                    f"{prediction_data[experiment_id]['config']['type']}_{self.settings['experiment_title']}_log_destination_attraction_predictions_"+\
-                    f"burnin_{self.settings['burnin']}_" + \
-                    f"thinning_{self.settings['thinning']}_" + \
-                    f"N_{prediction_data[experiment_id]['config']['mcmc']['N']}"
+            dims = unpack_dims(
+                prediction_data[experiment_id]['outputs'].inputs.data.dims,
+                time_dims=False
+            )
+            filename = f"table_{'x'.join(list(map(str,list(dims))))}_" + \
+                    f"{experiment_id[:-21]}_log_destination_attraction_predictions_"+ \
+                    f"burnin_{self.settings.get('burnin',0)}_" + \
+                    f"thinning_{self.settings.get('thinning',1)}_" + \
+                    f"N_{prediction_data[experiment_id]['outputs'].config['training']['N']}"
 
             # Define filepath
-            filepath = os.path.join(prediction_data[experiment_id]['outputs_path'],'figures',filename)
+            dirpath = os.path.join(
+                prediction_data[experiment_id]['outputs'].outputs_path,
+                'figures'
+            )
+            filepath = os.path.join(dirpath,filename)
 
+        # Make outputs directories (if necessary)
+        makedir(dirpath)
         # Write figure
         write_figure(
             fig,
@@ -1465,7 +1508,8 @@ class Plot(object):
             **self.settings
         )
         
-        self.logger.info(f"Figure exported to {filepath}")
+        self.logger.info(f"Figure exported to {dirpath}")
+        self.logger.info(f"Filename: {filename}")
         
     def destination_attraction_predictions(self):
 
@@ -1480,44 +1524,48 @@ class Plot(object):
                 output_names=['log_destination_attraction','sign'],
                 settings=self.settings,
                 slice_samples=True,
-                log_to_console=False
+                output_dir=self.settings.get('out_directory',''),
+                logger = self.logger,
             )
-            dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            sim = instantiate_sim(dummy_config)
+            # Receive outputs
+            outputs.inputs.receive_from_device()
 
             # Create label
             label,\
             _, \
             _ = create_dynamic_data_label(
                 __self__=self,
-                data=outputs.experiment.config
+                data=outputs.config.settings
             )
             
+            # Get sample values
+            log_destination_attraction = outputs.get_sample('log_destination_attraction')
             # Get mean 
-            xxs = outputs.experiment.results['log_destination_attraction']
-            ss = outputs.experiment.results['sign']
-            mu_x = (np.dot(xxs.T,ss)/np.sum(ss)).flatten()
-
+            mu_x = outputs.compute_sample_statistics(
+                log_destination_attraction,
+                'log_destination_attraction',
+                'signedmean',
+                dim=['id']
+            )
             # Compute R squared
             # Total sum squares
-            w_data = np.exp(sim.log_destination_attraction)
-            w_pred = np.exp(mu_x)
+            w_data = np.exp(outputs.inputs.data.log_destination_attraction).squeeze()
+            w_pred = np.exp(mu_x).squeeze()
             w_data_centred = w_data - np.mean(w_data)
             ss_tot = np.dot(w_data_centred, w_data_centred)
-            # Residiual sum squares
+            # Residual sum squares
             res = w_pred - w_data
-            ss_res = np.dot(res, res)
+            ss_res = np.dot(res.squeeze(), res.squeeze())
             # Regression sum squares
             r2 = 1. - ss_res/ss_tot
 
             # Add data
             predictions[outputs.experiment_id] =  {
                 'label':label,
-                'x':mu_x,
-                'y':sim.log_destination_attraction,
+                'x':mu_x.squeeze(),
+                'y':outputs.inputs.data.log_destination_attraction.squeeze(),
                 'title':r2,
-                'config':outputs.experiment.config,
-                'outputs_path':outputs.outputs_path
+                'outputs':outputs
             }
 
         self.plot_predictions(
@@ -1534,7 +1582,8 @@ class Plot(object):
             outputs = Outputs(
                 output_directory,
                 self.settings,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
             dummy_config = Namespace(**{'settings':outputs.experiment.config})
             sim = instantiate_sim(dummy_config)
@@ -1602,7 +1651,8 @@ class Plot(object):
             # Write figure
             write_figure(fig,filepath,**self.settings)
             
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures',filename)}")
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
     
     # def origin_destination_table_spatial(self):
         
@@ -1688,12 +1738,12 @@ class Plot(object):
     #             )
 
     #         flow_colorbar_min,flow_colorbar_max = None, None
-    #         if str_in_list("main_colorbar_limit",self.settings.keys()):
+    #         if "main_colorbar_limit" in list(self.settings.keys()
     #             flow_colorbar_min,flow_colorbar_max = self.settings['main_colorbar_limit']
             
     #         origin_colorbar_min,origin_colorbar_max = None, None
     #         destination_colorbar_min,destination_colorbar_max = None, None
-    #         if str_in_list("auxiliary_colorbar_limit",self.settings.keys()):
+    #         if "auxiliary_colorbar_limit" in list(self.settings.keys()
     #             if len(np.shape(self.settings['auxiliary_colorbar_limit'])) == 1:
     #                 origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit']
     #             elif len(np.shape(self.settings['auxiliary_colorbar_limit'])) > 1:
@@ -2010,7 +2060,8 @@ class Plot(object):
                 # order is important in output_names
                 output_names = (['ground_truth_table']+list(self.settings['sample'])),
                 slice_samples=True,
-                log_to_console=False
+                log_to_console=False,
+                logger = self.logger
             )
 
             for sample in self.settings['sample']:
@@ -2568,7 +2619,7 @@ class Plot(object):
                             fixed_cells.append(cell)
                     
                     
-                    if str_in_list('cells',ct.constraints.keys()):
+                    if 'cells' in list(ct.constraints.keys()):
                         fixed_cells = {
                             "x":np.array([c[0] for c in ct.constraints['cells']],dtype='int32'),
                             "y":np.array([c[1] for c in ct.constraints['cells']],dtype='int32'),
@@ -2607,12 +2658,12 @@ class Plot(object):
     #         filepath = os.path.join(outputs.outputs_path,'figures',filename)
 
     #         flow_colorbar_min,flow_colorbar_max = None, None
-    #         if str_in_list("main_colorbar_limit",self.settings.keys()):
+    #         if "main_colorbar_limit" in list(self.settings.keys()
     #             flow_colorbar_min,flow_colorbar_max = self.settings['main_colorbar_limit']
             
     #         origin_colorbar_min,origin_colorbar_max = None, None
     #         destination_colorbar_min,destination_colorbar_max = None, None
-    #         if str_in_list("auxiliary_colorbar_limit",self.settings.keys()):
+    #         if "auxiliary_colorbar_limit" in list(self.settings.keys()
     #             if len(np.shape(self.settings['auxiliary_colorbar_limit'])) == 1:
     #                 origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit']
     #             elif len(np.shape(self.settings['auxiliary_colorbar_limit'])) > 1:

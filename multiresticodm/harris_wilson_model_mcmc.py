@@ -41,15 +41,16 @@ class HarrisWilsonMarkovChainMonteCarlo():
             **kwargs
         ):
         # Setup logger
-        level = kwargs['logger'].level if 'logger' in kwargs else config.get('level','INFO').upper()
+        level = kwargs['logger'].level if 'logger' in list(kwargs.keys()) else config.get('level','INFO')
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            level=level,
-            log_to_file=False,
-            log_to_console=kwargs.get('log_to_console',True),
+            console_handler_level = level,
+            
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevel(level)
+        self.logger.setLevels(
+            console_handler_level = level
+        )
         
         # Store sim model but not its config
         self.physics_model = physics_model
@@ -308,7 +309,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         return -torch.autograd.functional.jacobian(
             self.negative_table_log_likelihood_expanded, 
             inputs=tuple([kwargs[k].to(dtype=float32) for k in ['log_destination_attraction','table','alpha','beta']]), 
-            create_graph=False
+            create_graph=True
         )[0]
     
     def negative_table_log_likelihood_and_gradient(

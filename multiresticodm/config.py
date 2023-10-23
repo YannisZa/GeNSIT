@@ -9,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, setup_logger, str_in_list, read_json, expand_tuple
+from multiresticodm.utils import deep_apply, setup_logger, read_json, expand_tuple
 
 class Config:
 
@@ -19,15 +19,11 @@ class Config:
         :param path: Path to configuration TOML file
         """
         # Import logger
-        self.level = kwargs.get('level','INFO').upper()
+        self.level = kwargs.get('level','INFO')
         self.logger = setup_logger(
             __name__,
-            level = self.level,
-            log_to_console = kwargs.get('log_to_console',False),
-            log_to_file = kwargs.get('log_to_file',False),
+            console_handler_level = self.level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
-        # Update logger level
-        self.logger.setLevel(self.level)
         
         # Sweep mode activated is set to false
         self.sweep_active = False
@@ -51,6 +47,8 @@ class Config:
             self.load_schema()
             # Load parameter positions
             self.load_parameters()
+            # Update root
+            self.path_sets_root(**kwargs)
 
         elif settings:
             self.settings = settings
@@ -103,13 +101,17 @@ class Config:
         self.settings[key] = value
 
 
-    def path_sets_root(self)  -> None:
+    def path_sets_root(self,**kwargs)  -> None:
         """
         Add root path to all configured paths (inputs, output directories).
         """
         # Store absolute paths
+        out_dir = kwargs.get('output_dir','')
         self.in_directory = os.path.join(ROOT,self.settings['inputs']['in_directory'].replace('./',''))
-        self.out_directory = os.path.join(ROOT,self.settings['outputs']['out_directory'].replace('./',''))
+        if len(out_dir) > 0:
+            self.out_directory = out_dir
+        else:
+            self.out_directory = os.path.join(ROOT,self.settings['outputs']['out_directory'].replace('./',''))
 
 
     def deep_apply(self,func,**kwargs):
@@ -132,7 +134,7 @@ class Config:
         return data.value()
 
     def has_sweep(self,key_path):
-        return str_in_list('sweep',list(key_path))
+        return 'sweep' in list(key_path)
     
     def path_exists(self, key, value, found:bool=False):
         for k, v in (value.items() if isinstance(value, dict) else
@@ -258,7 +260,7 @@ class Config:
                     
                     # 1: Check if argument is optional in case it is not included in settings
                     # and it is not part of a sweep
-                    if not str_in_list("sweep",key_path) and not settings_found:
+                    if not "sweep" in key_path and not settings_found:
                         if isinstance(schema_val,dict) and not schema_val['optional']:
                             raise Exception(f"""
                                 Key {'>'.join(key_path)} is compulsory but not included
@@ -278,8 +280,8 @@ class Config:
                         # a default and a range configuration
                         try:
                             assert isinstance(settings_val,dict) \
-                                and str_in_list("default",settings_val.keys()) \
-                                and str_in_list("range",settings_val.keys())
+                                and "default" in list(settings_val.keys()) \
+                                and "range" in list(settings_val.keys())
                         except:
                             raise Exception(f"""
                                 Key {'>'.join(key_path)} is not a dictionary 
@@ -290,7 +292,7 @@ class Config:
                         # a target name and that target name exists as a key
                         if settings_val.get('coupled',False):
                             try:
-                                assert str_in_list("target_name",settings_val.keys()) and \
+                                assert "target_name" in list(settings_val.keys()) and \
                                     self.path_exists(settings_val['target_name'],self.settings)
                             except:
                                 raise Exception(f"""
@@ -298,7 +300,7 @@ class Config:
                                     'target_name' configuration for a sweep
                                 """)
                             target_name = settings_val['target_name']
-                            if str_in_list(target_name,self.coupled_sweep_paths.keys()):
+                            if target_name in list(self.coupled_sweep_paths.keys()):
                                 # Add path to coupled sweeps
                                 self.coupled_sweep_paths[target_name][key_path[-2]] = deepcopy(key_path[:-1])
                             else:
@@ -378,8 +380,6 @@ class Config:
         # Isolated sweep parameters are cross multiplied
         isolated_sweep_configurations = [val['values'] for val in sweep_params['isolated'].values()]
 
-        # Keep track of the target name for each sweeped variable
-        self.target_names_by_sweep_var = dict(zip(list(sweep_params['isolated'].keys()),list(sweep_params['isolated'].keys())))
         # Group all coupled sweep parameters by target name
         if len(sweep_params['coupled'].values()) > 0:
             # Coupled sweep parameters are merged and then cross multiplied
@@ -395,16 +395,7 @@ class Config:
                     "length":len(target_sweep_configurations[0]),
                     "vars":[sweep_val['var'] for sweep_val in target_name_vals.values()]
                 }
-                # Add coupled variable's target name to dict
-                sweeped_vars = [sweep_val['var'] for sweep_val in target_name_vals.values()]
-                self.target_names_by_sweep_var.update(
-                    dict(
-                        zip(
-                            sweeped_vars,
-                            [target_name]*len(sweeped_vars)
-                        )
-                    )
-                )
+
             # Cross multiple both sweep configurations
             sweep_configurations = list(product(*(isolated_sweep_configurations+coupled_sweep_configurations)))
         else:
@@ -434,6 +425,8 @@ class Config:
         for k in list(common_keys):
             del self.isolated_sweep_paths[k]
         sweep_params = {"coupled":{},"isolated":{}}
+        # Keep track of the target name for each sweeped variable
+        self.target_names_by_sweep_var = {}
         for key_path in self.isolated_sweep_paths.values():
             # print('isolated',key_path)
             # Get sweep configuration
@@ -449,6 +442,8 @@ class Config:
                 "path": key_path,
                 "values": sweep_vals
             }
+            # Isolated sweeps have themselves as the target name
+            self.target_names_by_sweep_var[key_path[-1]] = key_path[-1]
         coupled_val_lens = {}
         for target_name,coupled_paths in self.coupled_sweep_paths.items():
             # Monitor length of sweep values by target name
@@ -469,6 +464,8 @@ class Config:
                 }
                 # Add key path length to dict
                 coupled_val_lens[target_name][key_path[-1]] = len(sweep_vals)
+                # Coupled sweeps have a common target name
+                self.target_names_by_sweep_var[key_path[-1]] = target_name
         # Make sure all coupled parameters have the same length
         for target_name,keypaths in coupled_val_lens.items():
             try:

@@ -1,18 +1,16 @@
 import os
 import re
 import gc
+import sys
 import zlib
 import gzip
 import json
 import h5py
 import torch
 import random
-import string
-import random
 import numexpr
 import logging
 import operator
-import coloredlogs
 import tikzplotlib
 import numpy as np
 import pandas as pd
@@ -48,11 +46,6 @@ def depth(seq):
             seq = chain.from_iterable(s for s in seq if isinstance(s, Sequence))
     except StopIteration:
         return level
-
-def str_in_list(text:str,l:Iterable) -> bool:
-    # Exact match of string in any of list elements
-    return any([text == s for s in list(l)])
-
 
 def write_csv(data:pd.DataFrame,filepath:str,**kwargs:Dict) -> None:
     # Write pandas to csv
@@ -249,8 +242,8 @@ def str_to_tuple(s:str) -> Tuple[int,int]:
     return (int(s.split('(')[1].split(',')[0]),int(s.split(',')[1].split(')')[0]))
 
 
-def ndims(__self__):
-    return np.sum([1 for dim in __self__.data.dims.values() if dim > 1],dtype='uint8')
+def ndims(__self__,time_dims):
+    return np.sum([1 for dim in unpack_dims(__self__.data.dims.values(),time_dims=time_dims) if dim > 1],dtype='uint8')
 
 
 def deep_get(key, value):
@@ -455,10 +448,10 @@ def extract_config_parameters(conf,fields=dict):
 
     for f,v in fields.items():
         if v == "":
-            if str_in_list(f,conf):
+            if f in conf:
                 trimmed_conf[f] = conf[f]
         else:
-            if str_in_list(f,conf):
+            if f in conf:
                 trimmed_conf[f] = extract_config_parameters(conf[f],v)
     return trimmed_conf
 
@@ -471,7 +464,7 @@ def safe_delete(variable,instance=None):
 
 def unpack_statistics(settings):
     # Unpack statistics if they exist
-    if str_in_list('statistic',settings) and len(settings['statistic']) > 0:
+    if 'statistic' in list(settings.keys()) and len(settings['statistic']) > 0:
         statistics = []
         for stat,dim in settings['statistic']:
             # print('stat',stat)
@@ -781,11 +774,13 @@ def str_to_array(s:str,dims:Tuple):
         return np.reshape(np.asarray(s.split(','),dtype = int),newshape=dims)
     
 
-def create_dynamic_data_label(__self__,data):
+def create_dynamic_data_label(__self__,data,**kwargs):
     # Read label(s) from settings
     label_by_key,label_by_value = [],[]
     for k in list(__self__.settings['label_by']):
-        v = list(deep_get(key=k,value=data))
+        v = list(deep_get(key=k,value=data))[0]
+        if k == 'dims':
+            v = 'x'.join(list(map(str,list(unpack_dims(v,kwargs.get('time_dims',False))))))
         # If label not included in metadata ignore it
         if len(v) > 0 and v[0] is not None:
             label_by_key.append(''.join(list(map(str,k))))
@@ -854,71 +849,29 @@ def string_to_numeric(s):
     i = np.int32(f)
     return i if i == f else np.round(f,5)
 
-
-def setup_logger(name,level,log_to_file:bool=False,log_to_console:bool=False):
+def setup_logger(
+        name,
+        console_handler_level:str=None,
+        file_handler_level:str=None,
+    ):
     print('setting up new logger',name)
-    # Set logger class
-    logging.setLoggerClass(CustomLogger)
 
     # Silence warnings from other packages
     numba_logger = logging.getLogger('numba')
     numba_logger.setLevel(logging.WARNING)
     
-    # Get root logger
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-
-    # Formatter
-    string_formatter = logging.Formatter(
-        fmt='%(asctime)s.%(msecs)03d %(module)-s %(levelname)-s %(message)s',
-        datefmt='%M:%S',
-    )   
-
-    # Setup coloring
-    coloredlogs.install(
-        fmt='%(asctime)s.%(msecs)03d %(module)-s %(levelname)-3s %(message)s',
-        datefmt='%M:%S',
-        logger=logger
+    # Get logger
+    logger = DualLogger(
+        name = name,
+        level = console_handler_level
     )
-    
-    
-    if len(logger.handlers) > 1:
-        # print(name)
-        # Update handler levels
-        for i,hand in enumerate(logger.handlers):
-            if isinstance(hand,CustomFileHandler):
-                if log_to_file:
-                    logger.handlers[i].setLevel(logging.DEBUG)
-                else:
-                    logger.handlers[i].setLevel(logging.CRITICAL)
-            else:
-                if log_to_console:
-                    logger.handlers[i].setLevel(level.upper())
-                else:
-                    logger.handlers[i].setLevel(logging.CRITICAL)
-    else:
 
-        # Configure standard error handler
-        if log_to_console:
-            logger.handlers[0].setLevel(level.upper())
-        else:
-            logger.handlers[0].setLevel(logging.CRITICAL)
-
-        # Setup file handler
-        string_handler = CustomFileHandler(f'logs/temp_{name}_{random_string(10)}.log',name=name)
-        if log_to_file:
-            string_handler.setLevel(logging.DEBUG)
-        else:
-            string_handler.setLevel(logging.CRITICAL)
-        string_handler.setFormatter(string_formatter)
-
-        logger.addHandler(string_handler)
-
+    logger.setLevels(
+        console_level = console_handler_level,
+        file_level = file_handler_level
+    )
 
     return logger
-
-def random_string(N:int=10):
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=N))
 
 def sigma_to_noise_regime(sigma=None):
     if sigma:
@@ -985,14 +938,17 @@ def expand_tuple(t):
             result.append(item)
     return tuple(result)
 
-def unpack_dims(self):
+def unpack_dims(self,time_dims:bool=True):
     try:
-        dims = tuple(list(self.dims.values()))
+        dims = tuple([v for k,v in self.dims.items() if (k != 'time' or time_dims)])
     except:
         try:
-            dims = tuple(list(self['dims'].values()))
+            dims = tuple([v for k,v in self['dims'].items() if (k != 'time' or time_dims)])
         except:
-            raise Exception(f"Cannot unpack dimensions from {self}")
+            try:
+                dims = tuple([v for k,v in self.items() if (k != 'time' or time_dims)])
+            except:
+                raise Exception(f"Cannot unpack dimensions from {self}")
     return dims
 
 def to_json_format(x):

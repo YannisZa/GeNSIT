@@ -49,15 +49,16 @@ class ExperimentHandler(object):
 
     def __init__(self, config:Config, **kwargs):
         # Import logger
-        level = kwargs['logger'].level if 'logger' in kwargs else config.get('level','INFO').upper()
+        level = kwargs['logger'].level if 'logger' in list(kwargs.keys()) else config.get('level','INFO')
         self.logger = setup_logger(
             __name__,
-            level = level,
-            log_to_console = kwargs.get('log_to_console',False),
-            log_to_file = kwargs.get('log_to_file',False),
+            console_handler_level = level, 
+            
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevel(level)
+        self.logger.setLevels(
+            console_handler_level = level
+        )
         
         # Get configuration
         self.config = config
@@ -87,8 +88,6 @@ class ExperimentHandler(object):
             experiment = instantiate_experiment(
                 experiment_type=experiment_type,
                 config=experiment_config,
-                log_to_file=True,
-                log_to_console=False,
                 logger=self.logger
             )
             # Append it to list of experiments
@@ -109,15 +108,16 @@ class ExperimentHandler(object):
 class Experiment(object):
     def __init__(self, config:Config, **kwargs):
         # Create logger
-        level = kwargs['logger'].level if 'logger' in kwargs else config.get('level','INFO').upper()
+        level = kwargs['logger'].level if 'logger' in list(kwargs.keys()) else config.get('level','INFO')
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            level = level,
-            log_to_console = kwargs.get('log_to_console',True),
-            log_to_file = kwargs.get('log_to_file',True),
+            console_handler_level = level, 
+            
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger lever
-        self.logger.setLevel(level)
+        self.logger.setLevels(
+            console_handler_level = level
+        )
         
         self.logger.debug(f"{self}")
         # Make sure you are reading a config
@@ -178,7 +178,7 @@ class Experiment(object):
         self.device = self.config['inputs']['device']
         # Get device id
         self.device_id = kwargs.get('device_id',0)
-        # print('currrent_device',torch.cuda.current_device())
+        # print('current_device',torch.cuda.current_device())
 
         # Disable tqdm if needed
         self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
@@ -189,7 +189,7 @@ class Experiment(object):
         self._write_start = self.config['outputs'].get('write_start',1)
         self.n_processed_steps = 0
 
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
         pass
 
     def reset(self,metadata:bool=False) -> None:
@@ -304,7 +304,7 @@ class Experiment(object):
             dims = self.config['inputs']['dims']
             
             # Setup neural net loss
-            if str_in_list('loss',self.output_names):
+            if 'loss' in self.output_names:
                 # Setup chunked dataset to store the state data in
                 self.losses = self.outputs.h5group.create_dataset(
                     'loss',
@@ -318,7 +318,7 @@ class Experiment(object):
                 self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
             
             # Setup sampled/predicted log destination attractions
-            if str_in_list('log_destination_attraction',self.output_names):
+            if 'log_destination_attraction' in self.output_names:
                 self.log_destination_attractions = self.outputs.h5group.create_dataset(
                     "log_destination_attraction",
                     (0,self.inputs.data.destination_attraction_ts.shape[0],dims['destination']),
@@ -331,7 +331,7 @@ class Experiment(object):
                 self.log_destination_attractions.attrs["coords__time"] = [self._write_start, self._write_every]
             
             # Setup computation time
-            if str_in_list('computation_time',self.output_names):
+            if 'computation_time' in self.output_names:
                 self.compute_time = self.outputs.h5group.create_dataset(
                     'computation_time',
                     (0,),
@@ -343,7 +343,7 @@ class Experiment(object):
                 self.compute_time.attrs['coords_mode__epoch'] = 'trivial'
 
             # Setup sampled/predicted theta
-            if str_in_list('theta',self.output_names):
+            if 'theta' in self.output_names:
                 predicted_thetas = []
                 for p_name in self.theta_names:
                     dset = self.outputs.h5group.create_dataset(
@@ -361,7 +361,7 @@ class Experiment(object):
                 self.thetas = predicted_thetas
             
             # Setup sampled signs
-            if str_in_list('sign',self.output_names):
+            if 'sign' in self.output_names:
                 self.signs = self.outputs.h5group.create_dataset(
                     "sign",
                     (0,),
@@ -374,7 +374,7 @@ class Experiment(object):
                 self.signs.attrs["coords__time"] = [self._write_start, self._write_every]
 
             # Setup sampled tables
-            if str_in_list('table',self.output_names):
+            if 'table' in self.output_names:
                 self.tables = self.outputs.h5group.create_dataset(
                     "table",
                     (0,*dims),
@@ -386,7 +386,7 @@ class Experiment(object):
                 self.tables.attrs["coords_mode__time"] = "start_and_step"
                 
             # Setup acceptances
-            if str_in_list('theta_acc',self.output_names):
+            if 'theta_acc' in self.output_names:
                 # Setup chunked dataset to store the state data in
                 self.theta_acc = self.outputs.h5group.create_dataset(
                     'theta_acceptance',
@@ -398,7 +398,7 @@ class Experiment(object):
                 self.losses.attrs['dim_names'] = XARRAY_SCHEMA['theta_acceptance']['coords']
                 self.losses.attrs['coords_mode__time'] = 'start_and_step'
                 self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
-            if str_in_list('log_destination_attraction_acc',self.output_names):
+            if 'log_destination_attraction_acc' in self.output_names:
                 # Setup chunked dataset to store the state data in
                 self.log_destination_attraction_acc = self.outputs.h5group.create_dataset(
                     'log_destination_attraction_acceptance',
@@ -410,7 +410,7 @@ class Experiment(object):
                 self.losses.attrs['dim_names'] = XARRAY_SCHEMA['log_destination_attraction_acc']['coords']
                 self.losses.attrs['coords_mode__time'] = 'start_and_step'
                 self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
-            if str_in_list('table_acc',self.output_names):
+            if 'table_acc' in self.output_names:
                 # Setup chunked dataset to store the state data in
                 self.table_acc = self.outputs.h5group.create_dataset(
                     'table_acceptance',
@@ -531,7 +531,6 @@ class Experiment(object):
 
     
     def update_metadata(self):
-        
         if hasattr(self,'theta_acc'):
             self.config['theta_acceptance'] = int(100*self.theta_acc[:].mean(axis=0))
             self.logger.progress('Theta acceptance:',self.config['theta_acceptance'])
@@ -554,10 +553,10 @@ class DataGeneration(Experiment):
         super().__init__(config,**kwargs)
         
         self.config = config
-        self.instance = kwargs['instance']
+        self.instance = int(kwargs['instance'])
 
-    def run(self) -> None:
-        # Prepare inputs
+    def run(self,**kwargs) -> None:
+        # Generate inputs
         Inputs(
             config = self.config,
             synthetic_data = True,
@@ -577,7 +576,7 @@ class RSquaredAnalysis(Experiment):
         self.amin,self.amax = config['a_range']
         self.bmin,self.bmax = config['b_range']
 
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
         
         # Initialize search grid
         alpha_values = np.linspace(self.amin, self.amax, self.grid_size,endpoint=True)
@@ -677,7 +676,7 @@ class LogTargetAnalysis(Experiment):
         self.harris_wilson_mcmc = instantiate_harris_wilson_mcmc(sim)
         self.harris_wilson_mcmc.build(**kwargs)
 
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
         # Initialize search grid
         self.bmin *= self.sim.bmax
         self.bmax *= self.sim.bmax
@@ -815,14 +814,11 @@ class SIM_MCMC(Experiment):
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
             experiment_id=self.sweep_experiment_id,
-            log_to_file=True,
-            log_to_console=True,
             logger = self.logger
         )
 
         # Prepare writing to file
         self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
-
         # Write metadata
         if self.config.settings.get('export_metadata',True):
             self.logger.debug("Writing metadata ...")
@@ -839,12 +835,13 @@ class SIM_MCMC(Experiment):
             )
         
         self.logger.note(f"{self.harris_wilson_mcmc}")
-        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        self.logger.info(f"Experiment: {self.outputs.experiment_id}")
+        # self.logger.critical(f"{json.dumps(kwargs.get('sweep_params',{}),indent=2)}")
 
         self.output_names = ['log_destination_attraction','theta','sign','log_target','computation_time']
         self.theta_names = config['inputs']['to_learn']
         
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
 
         self.logger.info(f"Running MCMC inference of {self.harris_wilson_mcmc.physics_model.noise_regime} noise SpatialInteraction.")
 
@@ -885,7 +882,9 @@ class SIM_MCMC(Experiment):
         for i in tqdm(
             range(N),
             disable=self.config.settings['mcmc']['disable_tqdm'],
-            leave=False
+            leave=False,
+            position=(self.device_id+1),
+            desc = f"SIM_MCMC device id: {self.device_id}"
         ):
 
             # Track the epoch training time
@@ -893,10 +892,10 @@ class SIM_MCMC(Experiment):
         
             # Run theta sampling
             for j in tqdm(
-                        range(M),
-                        disable=True,
-                        leave=(not self.harris_wilson_mcmc.logger.disabled)
-                ):
+                range(M),
+                disable=True,
+                leave=False
+            ):
 
                 # Gather all additional values
                 auxiliary_values = [V,
@@ -926,10 +925,11 @@ class SIM_MCMC(Experiment):
             
             # Run x sampling
             for l in tqdm(
-                        range(L),
-                        disable=True,
-                        leave=(not self.harris_wilson_mcmc.logger.disabled)
-                ):
+                range(L),
+                disable=True,
+                leave=False
+            ):
+                
                 # Gather all additional values
                 auxiliary_values = [V, 
                                 gradV]
@@ -968,6 +968,7 @@ class SIM_MCMC(Experiment):
             self.outputs.h5file.close()
             # Write log file
             self.outputs.write_log(self.logger)
+        
         self.logger.note("Simulation run finished.")
 
 class JointTableSIM_MCMC(Experiment):
@@ -1054,8 +1055,6 @@ class JointTableSIM_MCMC(Experiment):
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
             experiment_id=self.sweep_experiment_id,
-            log_to_file=True,
-            log_to_console=True,
             logger = self.logger
         )
 
@@ -1083,7 +1082,7 @@ class JointTableSIM_MCMC(Experiment):
         self.output_names = ['log_destination_attraction','theta','sign','table','log_target','computation_time']
         self.theta_names = config['inputs']['to_learn']
         
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
 
         self.logger.info(f"Running MCMC inference of {self.harris_wilson_mcmc.physics_model.noise_regime} noise {self.harris_wilson_mcmc.physics_model.name}.")
 
@@ -1134,8 +1133,9 @@ class JointTableSIM_MCMC(Experiment):
         for i in tqdm(
             range(N),
             disable=self.config.settings['mcmc']['disable_tqdm'],
-            leave=True,
-            position=(self.device_id+1)
+            leave=False,
+            position=(self.device_id+1),
+            desc = f"JointTableSIM_MCMC device id: {self.device_id}"
         ):
 
             # Track the epoch training time
@@ -1145,7 +1145,7 @@ class JointTableSIM_MCMC(Experiment):
             for j in tqdm(
                 range(M),
                 disable=True,
-                leave=(not self.harris_wilson_mcmc.logger.disabled)
+                leave=False
             ):
 
                 # Gather all additional values
@@ -1179,10 +1179,11 @@ class JointTableSIM_MCMC(Experiment):
             
             # Run x sampling
             for l in tqdm(
-                        range(L),
-                        disable=True,
-                        leave=(not self.harris_wilson_mcmc.logger.disabled)
-                ):
+                range(L),
+                disable=True,
+                leave=False
+            ):
+                
                 # Gather all additional values
                 auxiliary_values = [V,
                                 gradV,
@@ -1215,10 +1216,11 @@ class JointTableSIM_MCMC(Experiment):
 
             # Run table sampling
             for k in tqdm(
-                    range(self.config.settings['mcmc']['contingency_table']['table_steps']),
-                    disable=True,
-                    leave=(not self.ct_mcmc.logger.disabled)
-                ):
+                range(self.config.settings['mcmc']['contingency_table']['table_steps']),
+                disable=True,
+                leave=False
+            ):
+                
                 # Take step
                 table_sample, table_accepted = self.ct_mcmc.table_gibbs_step(
                     table_sample,
@@ -1255,6 +1257,7 @@ class JointTableSIM_MCMC(Experiment):
             self.outputs.h5file.close()
             # Write log file
             self.outputs.write_log(self.logger)
+        
         self.logger.note("Simulation run finished.")
 
 class Table_MCMC(Experiment):
@@ -1346,8 +1349,6 @@ class Table_MCMC(Experiment):
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
             experiment_id=self.sweep_experiment_id,
-            log_to_file=True,
-            log_to_console=True,
             logger = self.logger
         )
 
@@ -1374,7 +1375,7 @@ class Table_MCMC(Experiment):
 
         self.output_names = ['table']
 
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
 
         self.logger.note(f"Running Table MCMC.")
 
@@ -1385,7 +1386,13 @@ class Table_MCMC(Experiment):
         num_epochs = self.config['training']['N']
 
         # For each epoch
-        for e in tqdm(range(num_epochs),disable=self.tqdm_disabled,leave=False):
+        for e in tqdm(
+            range(num_epochs),
+            disable=self.tqdm_disabled,
+            leave=False,
+            position=(self.device_id+1),
+            desc = f"NonJointTableSIM_NN device id: {self.device_id}"
+        ):
 
             # Track the epoch training time
             self.start_time = time.time()
@@ -1433,6 +1440,7 @@ class Table_MCMC(Experiment):
             self.outputs.h5file.close()
             # Write log file
             self.outputs.write_log(self.logger)
+        
         self.logger.note("Simulation run finished.")
 
 class TableSummaries_MCMCConvergence(Experiment):
@@ -1539,7 +1547,7 @@ class TableSummaries_MCMCConvergence(Experiment):
         return tables0
 
     
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
 
         # Time run
         self.start_time = time.time()
@@ -1570,7 +1578,9 @@ class TableSummaries_MCMCConvergence(Experiment):
         for i in tqdm(
             range(1,N),
             disable=self.config['disable_tqdm'],
-            leave=False
+            leave=False,
+            position=(self.device_id+1),
+            desc = f"TableSummaries_MCMCConvergence device id: {self.device_id}"
         ):
             # Run MCMC for one step in all chains in ensemble
             # Do it in parallel
@@ -1723,8 +1733,6 @@ class SIM_NN(Experiment):
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
             experiment_id=self.sweep_experiment_id,
-            log_to_file=True,
-            log_to_console=True,
             logger = self.logger
         )
 
@@ -1753,7 +1761,7 @@ class SIM_NN(Experiment):
         self.output_names = ['log_destination_attraction','theta','loss']
         self.theta_names = config['inputs']['to_learn']
         
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
 
         self.logger.note(f"Running Neural Network training of Harris Wilson model.")
 
@@ -1762,9 +1770,14 @@ class SIM_NN(Experiment):
         
         # Store number of samples
         num_epochs = self.config['training']['N']
-
         # For each epoch
-        for e in tqdm(range(num_epochs),disable=self.tqdm_disabled,leave=True):
+        for e in tqdm(
+            range(num_epochs),
+            disable=self.tqdm_disabled,
+            leave=False,
+            position=(self.device_id+1),
+            desc = f"SIM_NN device id: {self.device_id}"
+        ):
 
             # Track the epoch training time
             start_time = time.time()
@@ -1823,6 +1836,7 @@ class SIM_NN(Experiment):
             self.outputs.h5file.close()
             # Write log file
             self.outputs.write_log(self.logger)
+        
         self.logger.note("Simulation run finished.")
 
 class NonJointTableSIM_NN(Experiment):
@@ -1922,8 +1936,6 @@ class NonJointTableSIM_NN(Experiment):
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
             experiment_id=self.sweep_experiment_id,
-            log_to_file=True,
-            log_to_console=True,
             logger = self.logger
         )
 
@@ -1953,7 +1965,7 @@ class NonJointTableSIM_NN(Experiment):
         self.output_names = ['log_destination_attraction','theta','loss', 'table']
         self.theta_names = config['inputs']['to_learn']
         
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
 
         self.logger.note(f"Running Disjoint Table Inference and Neural Network training of Harris Wilson model.")
 
@@ -1964,7 +1976,13 @@ class NonJointTableSIM_NN(Experiment):
         num_epochs = self.config['training']['N']
 
         # For each epoch
-        for e in tqdm(range(num_epochs),disable=self.tqdm_disabled,leave=False):
+        for e in tqdm(
+            range(num_epochs),
+            disable=self.tqdm_disabled,
+            leave=False,
+            position=(self.device_id+1),
+            desc = f"Table MCMC device id: {self.device_id}"
+        ):
 
             # Track the epoch training time
             start_time = time.time()
@@ -2044,6 +2062,7 @@ class NonJointTableSIM_NN(Experiment):
             self.outputs.h5file.close()
             # Write log file
             self.outputs.write_log(self.logger)
+        
         self.logger.note("Simulation run finished.")
 
 class JointTableSIM_NN(Experiment):
@@ -2143,8 +2162,6 @@ class JointTableSIM_NN(Experiment):
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
             experiment_id=self.sweep_experiment_id,
-            log_to_file=True,
-            log_to_console=True,
             logger = self.logger
         )
 
@@ -2174,7 +2191,7 @@ class JointTableSIM_NN(Experiment):
         self.output_names = ['log_destination_attraction','theta','loss', 'table']
         self.theta_names = config['inputs']['to_learn']
         
-    def run(self) -> None:
+    def run(self,**kwargs) -> None:
 
         self.logger.note(f"Running Joint Table Inference and Neural Network training of Harris Wilson model.")
 
@@ -2185,7 +2202,13 @@ class JointTableSIM_NN(Experiment):
         num_epochs = self.config['training']['N']
 
         # For each epoch
-        for e in tqdm(range(num_epochs),disable=self.tqdm_disabled,leave=False):
+        for e in tqdm(
+            range(num_epochs),
+            disable=self.tqdm_disabled,
+            leave=False,
+            position=(self.device_id+1),
+            desc = f"JointTableSIM_NN device id: {self.device_id}"
+        ):
 
             # Track the epoch training time
             start_time = time.time()
@@ -2220,6 +2243,7 @@ class JointTableSIM_NN(Experiment):
                     grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))],
                     **dict(zip(self.harris_wilson_nn.parameters_to_learn,theta_sample_expanded.split(1,dim=1)))
                 ).squeeze()
+                
                 # Sample table
                 if e == 0:
                     table_sample = self.ct_mcmc.initialise_table(
@@ -2269,6 +2293,7 @@ class JointTableSIM_NN(Experiment):
             self.outputs.h5file.close()
             # Write log file
             self.outputs.write_log(self.logger)
+        
         self.logger.note("Simulation run finished.")
 
 class ExperimentSweep():
@@ -2282,9 +2307,8 @@ class ExperimentSweep():
         # Setup logger
         self.logger = setup_logger(
             __name__,
-            level = config.level,
-            log_to_file = True,
-            log_to_console = True,
+            console_handler_level = config.level,
+            
         ) if kwargs.get('logger',None) is None else kwargs['logger']
 
         self.logger.info(f"Performing parameter sweep")
@@ -2349,7 +2373,7 @@ class ExperimentSweep():
         """
 
 
-    def run(self):
+    def run(self,**kwargs):
         # Create sweep configurations
         sweep_configurations, \
         param_sizes_str, \
@@ -2372,13 +2396,22 @@ class ExperimentSweep():
                 self.run_sequential()
         
     def prepare_experiments_sequential(self,sweep_configurations):
-        for sval in tqdm(sweep_configurations,total=len(sweep_configurations),leave=False,desc='Preparing experiments'):
+        for sval in tqdm(
+            sweep_configurations,
+            total=len(sweep_configurations),
+            leave=False,
+            desc='Preparing experiments'
+        ):
             # Create new config
             new_config = deepcopy(self.config)
             # Deactivate sweep             
             new_config.settings["sweep_mode"] = False
             # Deactivate logging
+            self.logger.setLevels(
+                console_handler_level = level
+            )
             self.logger.setLevel('ERROR')
+            
             # Activate sample exports
             new_config.settings['export_samples'] = True
             # Create sweep dictionary
@@ -2407,7 +2440,8 @@ class ExperimentSweep():
             # Append to experiments
             self.experiment_configs.append({"config":new_config,"sweep":sweep})
     
-    def instantiate_and_run(self,instance_num:int,config_and_sweep:dict,semaphore=None,pbar=None):
+    def instantiate_and_run(self,instance_num:int,config_and_sweep:dict,semaphore=None,counter=None):
+    
         self.logger.info(f'Instance = {str(instance_num)} START')
         if semaphore is not None:
             semaphore.acquire()
@@ -2416,46 +2450,70 @@ class ExperimentSweep():
             experiment_type=config_and_sweep['config'].settings['experiment_type'],
             config=config_and_sweep['config'],
             sweep_params=config_and_sweep['sweep'],
-            log_to_file=True,
-            log_to_console=False,
             instance=str(instance_num),
             experiment_id=self.outputs.experiment_id,
-            tqdm_disabled=True,
+            tqdm_disabled=False,
             device_id=(instance_num%self.n_workers),
-            logger=self.logger
+            logger=self.logger,
         )
         self.logger.debug('New experiment set up')
         new_experiment.run()
         if semaphore is not None:
             semaphore.release()
-        if pbar is not None:
-            pbar.update(1)
+        if counter is not None:
+            with counter.get_lock():
+                counter.value += 1
         self.logger.info(f'Instance = {str(instance_num)} DONE')
 
     def run_sequential(self):
-        pbar = tqdm(total=len(self.experiment_configs), desc='Running sweeps in sequence',leave=False)
-        for instance,conf_and_sweep in enumerate(self.experiment_configs):
-            self.instantiate_and_run(instance_num=instance,config_and_sweep=conf_and_sweep,semaphore=None,pbar=pbar)
+        for instance,conf_and_sweep in tqdm(
+            enumerate(self.experiment_configs),
+            total=len(self.experiment_configs),
+            desc='Running sweeps in sequence',
+            leave=False,
+            position=0
+        ):
+            self.instantiate_and_run(
+                instance_num=instance,
+                config_and_sweep=conf_and_sweep,
+                semaphore=None,
+                counter=None
+            )
     
     def run_parallel(self):
         # Run experiments in parallel
         semaphore = mp.Semaphore(self.n_workers)
+        counter = mp.Value('i', 0, lock=True)
         processes = []
-        pbar = tqdm(total=len(self.experiment_configs), desc='Running sweeps in parallel',leave=False)
-        for instance,conf_and_sweep in enumerate(self.experiment_configs):
-            p = mp.Process(
-                target=self.instantiate_and_run, 
-                args=(instance, conf_and_sweep, semaphore, pbar)
-            )
-            processes.append(p)
+        with tqdm(
+            total=len(self.experiment_configs), 
+            desc='Running sweeps in parallel',
+            leave=False,
+            position=0
+        ) as pbar:
+            for instance,conf_and_sweep in enumerate(self.experiment_configs):
+                p = mp.Process(
+                    target=self.instantiate_and_run, 
+                    args=(
+                        instance, 
+                        conf_and_sweep, 
+                        semaphore,
+                        counter
+                    )
+                )
+                processes.append(p)
 
-        for p in processes:
-            p.start()
+            for p in processes:
+                p.start()
 
-        for p in processes:
-            p.join()
+            while counter.value < len(self.experiment_configs):
+                pbar.update(counter.value - pbar.n)
 
-        pbar.close()
+            for p in processes:
+                p.join()
+
+            for p in processes:
+                p.close()
             
     def run_process(self,process):
         process.run()

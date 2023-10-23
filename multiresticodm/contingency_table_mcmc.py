@@ -14,7 +14,7 @@ from multiresticodm.math_utils import log_factorial_sum
 from multiresticodm.markov_basis import instantiate_markov_basis,MarkovBasis
 from multiresticodm.contingency_table import ContingencyTable, ContingencyTable2D
 from multiresticodm.probability_utils import uniform_binary_choice, log_odds_cross_ratio
-from multiresticodm.utils import  ndims, set_seed, setup_logger, str_in_list, tuplize, flatten
+from multiresticodm.utils import  ndims, set_seed, setup_logger, tuplize, flatten, unpack_dims
 
 
 class ContingencyTableMarkovChainMonteCarlo(object):
@@ -25,15 +25,16 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
     def __init__(self, ct: ContingencyTable, rng: np.random.Generator, table_mb:MarkovBasis=None, **kwargs):
         # Setup logger
-        level = kwargs['logger'].level if 'logger' in kwargs else ct.config.get('level','INFO').upper()
+        level = kwargs['logger'].level if 'logger' in list(kwargs.keys()) else ct.config.get('level','INFO')
         self.logger = setup_logger(
             __name__,
-            level = level,
-            log_to_console = kwargs.get('log_to_console',False),
-            log_to_file = kwargs.get('log_to_file',False),
+            console_handler_level = level, 
+            
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevel(level)
+        self.logger.setLevels(
+            console_handler_level = level
+        )
         
         if isinstance(ct, ContingencyTable2D):
 
@@ -124,7 +125,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             # Default to direct sampling - cell constraints can be handled here
             # No need to use markov bases
             self.proposal_type == 'direct_sampling'
-        elif str_in_list(self.ct.distribution_name,['multinomial','product_multinomial']) and \
+        elif self.ct.distribution_name in ['multinomial','product_multinomial'] and \
             len(self.ct.constraints['cells']) > 0:
             # Direct sampling for these distributions is not possible when cell constraints exist
             if self.proposal_type == 'direct_sampling':
@@ -175,7 +176,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # If no intensity provided 
         # Use uniform intensity for every cell
         if intensity is None:
-            intensity = torch.ones(tuplize(list(self.ct.data.dims.values())),dtype=float32)
+            intensity = torch.ones(tuplize(list(unpack_dims(self.ct.data.dims.values(),time_dims=False))),dtype=float32)
 
         # Sample uncostrained margins
         self.sample_unconstrained_margins(intensity)
@@ -198,7 +199,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
         # Set probabilities to uniform
         if intensity is None:
-            intensity = torch.ones(tuple(list(self.ct.data.dims.values())),dtype=float32)
+            intensity = torch.ones(tuple(list(unpack_dims(self.ct.data.dims.values(),time_dims=False))),dtype=float32)
 
         _ = set_seed(self.ct.config['inputs']['seed'])
 
@@ -327,7 +328,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
         # Number of steps to skip storing a sample (thinning)
         self.table_thinning = 1
-        if str_in_list('thinning', self.ct.config.settings['contingency_table'].keys()):
+        if 'thinning' in list(self.ct.config.settings['contingency_table'].keys()):
             self.table_thinning = int(self.ct.config.settings['contingency_table']['thinning'])
 
         if len(self.ct.distribution_name) > 0:
@@ -391,7 +392,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
     
     def poisson_sample_2way_table(self,margin_probabilities):
         # Initialise table to zero
-        table_new = torch.zeros(tuple(list(self.ct.data.dims.values()))).to(dtype=int32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims.values(),time_dims=False)))).to(dtype=int32,device=self.ct.device)
         # Get fixed cells
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
@@ -417,7 +418,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # This is the case with the grand total fixed
         # Initialise table to zero
         # Get fixed cells
-        table_new = torch.zeros(tuple(list(self.ct.data.dims.values()))).to(dtype=int32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims.values(),time_dims=False)))).to(dtype=int32,device=self.ct.device)
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
         if len(fixed_cells) > 0:
@@ -443,7 +444,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             # Update free cells
             table_new[free_indices] = updated_cells.to(dtype=int32,device=self.ct.device)
             # Reshape table to match original dims
-            table_new = torch.reshape(table_new, tuplize(list(self.ct.data.dims.values())))
+            table_new = torch.reshape(table_new, tuplize(list(unpack_dims(self.ct.data.dims.values(),time_dims=False))))
             # Continue loop only if table is not sparse admissible
             continue_loop = False#not self.ct.table_sparse_admissible(table_new)
 
@@ -452,7 +453,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
     def product_multinomial_sample_2way_table(self,margin_probabilities):
         # This is the case with either margins fixed (but not both)
         # Initialise table to zero
-        table_new = torch.zeros(tuple(list(self.ct.data.dims.values()))).to(dtype=int32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims.values(),time_dims=False)))).to(dtype=int32,device=self.ct.device)
         # Get fixed cells
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
@@ -494,7 +495,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             # Afix non-free cells
             table_new[fixed_cells] = self.ct.ground_truth_table[fixed_cells]
             # Reshape table to match original dims
-            table_new = torch.reshape(table_new, tuplize(list(self.ct.data.dims.values()))).to(device=self.ct.device,dtype=int32)
+            table_new = torch.reshape(table_new, tuplize(list(unpack_dims(self.ct.data.dims.values(),time_dims=False)))).to(device=self.ct.device,dtype=int32)
 
             # Continue loop only if table is not sparse admissible
             continue_loop = not self.ct.table_admissible(table_new)
@@ -546,7 +547,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         )
 
         # Initialise table
-        table_new = torch.zeros(tuple(list(self.ct.data.dims.values()))).to(dtype=int32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims.values(),time_dims=False)))).to(dtype=int32,device=self.ct.device)
         firstIteration = True
         # Resample if margins are not allowed to be sparse but contain zeros
         while (not self.ct.table_admissible(table_new)) or firstIteration:
@@ -593,7 +594,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         epsilon = torch.tensor(uniform_binary_choice(),dtype=int32)
 
         # initialise new table
-        table_new = torch.zeros(tuple(list(self.ct.data.dims.values()))).to(dtype=int32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims.values(),time_dims=False)))).to(dtype=int32,device=self.ct.device)
 
         # Store old table
         table_new[:] = table_prev

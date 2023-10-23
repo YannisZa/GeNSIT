@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from copy import deepcopy
 from multiresticodm.config import Config
-from multiresticodm.utils import str_in_list,f_to_array,deep_updates
+from multiresticodm.utils import ,f_to_array,deep_updates
 from multiresticodm.contingency_table import ContingencyTable2D
 from multiresticodm.markov_basis import instantiate_markov_basis
 
@@ -190,7 +190,7 @@ def test_2d_table_row_margin_preserving_markov_basis_length(default_config):
 
         # Change generated table size
         updated_config.settings = deep_updates(d=updated_config.settings,u=config_update,overwrite=True)
-        if str_in_list('outputs',updated_config.settings.keys()):
+        if 'outputs' in list(updated_config.settings.keys()
             del updated_config.settings['outputs']
 
         # Generate new table
@@ -232,7 +232,7 @@ def test_2d_table_column_margin_preserving_markov_basis_length(default_config):
 
         # Change generated table size
         updated_config.settings = deep_updates(d=updated_config.settings,u=config_update,overwrite=True)
-        if str_in_list('outputs',updated_config.settings.keys()):
+        if 'outputs' in list(updated_config.settings.keys()
             del updated_config.settings['outputs']
 
         # Generate new table

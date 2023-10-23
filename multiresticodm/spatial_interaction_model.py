@@ -11,13 +11,14 @@ from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
 from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
 
 def instantiate_sim(
-        name:str,
-        config:Config=None,
-        true_parameters=None,
+        config:Config,
+        name:str=None,
+        true_parameters={},
         **kwargs
     ):
-    
-    if name is not None and hasattr(sys.modules[__name__], name):
+    if name is None:
+        name = config.settings['spatial_interaction_model']['name']
+    if hasattr(sys.modules[__name__], name):
         name += 'SIM'
     else:
         raise ValueError(f"Input class '{name}' not found")
@@ -44,15 +45,16 @@ class SpatialInteraction2D():
     ):
         '''  Constructor '''
         # Setup logger
-        level = kwargs['logger'].level if 'logger' in kwargs else config.get('level','INFO').upper()
+        level = kwargs['logger'].level if 'logger' in list(kwargs.keys()) else config.get('level','INFO')
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            level=level,
-            log_to_file=kwargs.get('log_to_file',True),
-            log_to_console=kwargs.get('log_to_console',True),
+            console_handler_level = level,
+            
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevel(level)
+        self.logger.setLevels(
+            console_handler_level = level
+        )
 
         # SIM name
         self.dims_names = ['origin','destination']
@@ -98,7 +100,7 @@ class SpatialInteraction2D():
         if self.dims is None and \
             hasattr(self.data,'cost_matrix') and \
             self.data.cost_matrix is not None:
-            self.dims = dict(zip(['origin','destination'],array(list(self.data.cost_matrix.size()))))
+            self.dims = dict(zip(self.dims_names,array(list(self.data.cost_matrix.size()))))
         # Update config
         self.config.settings['inputs']['dims'] = self.dims
 

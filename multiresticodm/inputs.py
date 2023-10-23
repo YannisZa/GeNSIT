@@ -1,5 +1,5 @@
-from copy import deepcopy
 import os
+import sys
 import torch
 import h5py as h5
 import numpy as np
@@ -8,36 +8,35 @@ from tqdm import tqdm
 from pathlib import Path
 from typing import Tuple
 from functools import partial
-from torch import int8,float32,int32
+from torch import float32,int32
 import torch.multiprocessing as mp
 
+from copy import deepcopy
 from multiresticodm.config import Config
 from multiresticodm.math_utils import torch_optimize
 from multiresticodm.probability_utils import random_vector
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.spatial_interaction_model import instantiate_sim
-from multiresticodm.harris_wilson_model_mcmc import instantiate_harris_wilson_mcmc
-from multiresticodm.utils import makedir, read_json, set_seed, setup_logger, str_in_list, tuplize, unpack_dims, write_txt
-from multiresticodm.global_variables import INPUT_TYPES, PARAMETER_DEFAULTS,INPUT_SCHEMA,Dataset
+from multiresticodm.global_variables import INPUT_TYPES, NUMPY_TO_TORCH_DTYPE, PARAMETER_DEFAULTS,INPUT_SCHEMA,Dataset
+from multiresticodm.utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt
 
 class Inputs:
     def __init__(
             self,
             config:Config,
             synthetic_data:bool = False,
-            synthesis_method:str='sde_solver',
             **kwargs
     ):  
         # Import logger
-        level = kwargs['logger'].level if 'logger' in kwargs else config.get('level','INFO').upper()
+        level = kwargs['console_level'] if kwargs.get('console_level',None) is not None else None
         self.logger = setup_logger(
             __name__,
-            level = level,
-            log_to_console = kwargs.get('log_to_console',False),
-            log_to_file = kwargs.get('log_to_file',False),
+            console_handler_level = level, 
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevel(level)
+        self.logger.setLevels(
+            console_level = level
+        )
 
         # Store config
         self.config = config
@@ -53,14 +52,14 @@ class Inputs:
 
         # Get instance of experiment 
         # this is relevant in the case of the DataGeneration experiment
-        self.instance = kwargs['instance']
+        self.instance = kwargs.get('instance',1)
 
         self.seed = None
-        if str_in_list('data_generation_seed', self.config.settings['inputs']['data'].keys()):
+        if 'data_generation_seed' in list(self.config.settings['inputs']['data'].keys()):
             self.seed = int(self.config.settings['inputs']['data']['data_generation_seed'])
-
+        
         if synthetic_data:
-            self.generate_synthetic_data(method = synthesis_method)
+            self.generate_synthetic_data()
         else:
             self.read_data()
 
@@ -77,7 +76,7 @@ class Inputs:
     def read_data(self):
         
         self.logger.note("Loading Harris Wilson data ...")
-        if not str_in_list('dataset',self.config.settings['inputs']):
+        if not 'dataset' in list(self.config.settings['inputs']):
             raise Exception('Input dataset NOT provided. Harris Wilson model cannot be created.')
 
         # Initialise all
@@ -85,13 +84,12 @@ class Inputs:
             # setattr(self.data,attr,None)
 
         # Import dims
-        setattr(self.data,'dims',self.config.settings['inputs'].get('dims',{"origin":None,"destination":None}))
-        setattr(self.data,'time_dim',(1,))
+        setattr(self.data,'dims',self.config.settings['inputs'].get('dims',{"origin":None,"destination":None,"time":None}))
 
         # Import all data
         for attr,schema in self.schema.items():
             if len(schema) > 0:
-                if str_in_list(attr,self.config.settings['inputs']['data'].keys()):
+                if attr in list(self.config.settings['inputs']['data'].keys()):
                     filename = self.config.settings['inputs']['data'][attr]
                     filename = filename.get('file','') if isinstance(filename,dict) else filename
                     filepath = os.path.join(
@@ -131,6 +129,8 @@ class Inputs:
             # Compute grand total
             self.data.grand_total = np.sum(self.data.ground_truth_table,dtype='float32')
             self.config.settings['spatial_interaction_model']['grand_total'] = self.data.grand_total
+        if hasattr(self.data,'dims') and self.data.dims is not None and len(self.data.dims) > 0:
+            self.config.settings['inputs']['dims'] = self.data.dims
 
         # Extract parameters to learn
         if 'to_learn' in list(self.config.settings['inputs'].keys()):
@@ -138,7 +138,10 @@ class Inputs:
         else:
             params_to_learn = ['alpha','beta']
         # Extract the underlying parameters from the config
-        parameter_settings = {**self.config.settings['spatial_interaction_model']['parameters'],**self.config.settings['harris_wilson_model']['parameters']}
+        parameter_settings = {
+            **self.config.settings['spatial_interaction_model']['parameters'],
+            **self.config.settings['harris_wilson_model']['parameters']
+        }
         self.true_parameters = {
             k: parameter_settings.get(k,v) \
                 for k,v in PARAMETER_DEFAULTS.items() \
@@ -157,7 +160,7 @@ class Inputs:
             smallest_zone_size = np.min(self.data.destination_attraction_ts)
             total_zone_sizes = np.sum(self.data.destination_attraction_ts)
         else:
-            smallest_zone_size = 0.1
+            smallest_zone_size = (1/self.data.dims['destination'])*0.9
             total_zone_sizes = 1.0
 
         if hasattr(self.data,'origin_demand'):
@@ -181,30 +184,21 @@ class Inputs:
         device = self.config.settings['inputs']['device']
 
         if not self.data_in_device:
-            if hasattr(self.data,'origin_demand') and getattr(self.data,'origin_demand') is not None:
-                self.data.origin_demand = torch.from_numpy(self.data.origin_demand).float().to(device)
-            if hasattr(self.data,'destination_attraction_ts') and getattr(self.data,'destination_attraction_ts') is not None:
-                self.data.destination_attraction_ts = torch.unsqueeze(
-                    torch.from_numpy(self.data.destination_attraction_ts).float(),
-                    0
-                ).to(device)
+            for input,schema in INPUT_SCHEMA.items():
+                if input not in ['dims','grand_total','margins','true_parameters'] and \
+                    hasattr(self.data,input) and \
+                    getattr(self.data,input) is not None:
+                        setattr(
+                            self.data,
+                            input, 
+                            torch.reshape(
+                                torch.from_numpy(getattr(self.data,input)).to(dtype=NUMPY_TO_TORCH_DTYPE[schema['dtype']]),
+                                tuple([self.data.dims[name] for name in schema['dims']])
+                            ).to(device)
+                        )
+
             if hasattr(self.data,'log_destination_attraction') and getattr(self.data,'log_destination_attraction') is not None:
-                self.data.log_destination_attraction = torch.from_numpy(self.data.log_destination_attraction).float().to(device)
-            if hasattr(self.data,'origin_attraction_ts') and getattr(self.data,'origin_attraction_ts') is not None:
-                self.data.origin_attraction_ts = torch.unsqueeze(
-                    torch.from_numpy(self.data.origin_attraction_ts).float(),
-                    0
-                ).to(device)
-            if hasattr(self.data,'cost_matrix') and getattr(self.data,'cost_matrix') is not None:
-                self.data.cost_matrix = torch.reshape(
-                    torch.from_numpy(self.data.cost_matrix).float(),
-                    (unpack_dims(self.data))
-                ).to(device)
-            if hasattr(self.data,'ground_truth_table') and getattr(self.data,'ground_truth_table') is not None:
-                self.data.ground_truth_table = torch.reshape(
-                    torch.from_numpy(self.data.ground_truth_table).int(),
-                    (unpack_dims(self.data))
-                ).to(device)
+                self.data.log_destination_attraction = torch.squeeze(self.data.log_destination_attraction)
             if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
                 self.data.grand_total = torch.tensor(self.data.grand_total).float().to(device)
             if hasattr(self.data,'margins') and getattr(self.data,'margins') is not None:
@@ -216,7 +210,7 @@ class Inputs:
         self.data_in_device = True
     
     def import_margins(self):
-        if str_in_list('margins', self.config.settings['inputs']['data'].keys()):
+        if 'margins' in list(self.config.settings['inputs']['data'].keys()):
             self.data.margins = {}
             for margin in self.config.settings['inputs']['data'].get('margins',[]):
                 # Make sure that imported filename is not empty
@@ -241,7 +235,7 @@ class Inputs:
                     raise Exception(f"margin for axis {axis} not found in {filepath}.")
                 
     def import_cells(self):
-        if str_in_list('cells', self.config.settings['inputs']['data'].keys()):
+        if 'cells' in list(self.config.settings['inputs']['data'].keys()):
             cell_filename = os.path.join(
                 self.config.settings['inputs']['dataset'],
                 self.config.settings['inputs']['data']['cells']
@@ -255,10 +249,10 @@ class Inputs:
                 # Check that no cells exceed any of the margins
                 for cell, value in cells.items():
                     try:
-                        assert len(cell) == self.ndims() and cell < np.asarray(list(self.data.dims.values()))
+                        assert len(cell) == self.ndims() and cell < np.asarray(list(unpack_dims(self.data.dims.values(),time_dims=False)))
                     except:
                         self.logger.error(f"Cell has length {len(cell)}. The number of table dims are {self.ndims()}")
-                        self.logger.error(f"Cell is equal to {cell}. The cell bounds are {np.asarray(list(self.data.dims.values()))}")
+                        self.logger.error(f"Cell is equal to {cell}. The cell bounds are {np.asarray(list(unpack_dims(self.data.dims.values(),time_dims=False)))}")
                     for ax in cell:
                         if tuplize(ax) in self.margins.keys():
                             try:
@@ -289,9 +283,9 @@ class Inputs:
             if hasattr(self.data,'origin_attraction_ts') and getattr(self.data,'origin_attraction_ts') is not None:
                 self.data.origin_attraction_ts = self.data.origin_attraction_ts.cpu().detach().numpy()
             if hasattr(self.data,'cost_matrix') and getattr(self.data,'cost_matrix') is not None:
-                self.data.cost_matrix = self.data.cost_matrix.cpu().detach().numpy().reshape(unpack_dims(self.data))
+                self.data.cost_matrix = self.data.cost_matrix.cpu().detach().numpy().reshape(unpack_dims(self.data,time_dims=False))
             if hasattr(self.data,'ground_truth_table') and getattr(self.data,'ground_truth_table') is not None:
-                self.data.ground_truth_table = self.data.ground_truth_table.cpu().detach().numpy().reshape(unpack_dims(self.data))
+                self.data.ground_truth_table = self.data.ground_truth_table.cpu().detach().numpy().reshape(unpack_dims(self.data,time_dims=False))
             if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
                 self.data.grand_total = self.data.grand_total.cpu().detach().numpy()
             if hasattr(self.data,'margins') and getattr(self.data,'margins') is not None:
@@ -424,7 +418,7 @@ class Inputs:
         edge_weights[:] = torch.reshape(cost_matrix, (np.prod(dims),))
 
 
-    def generate_synthetic_data(self,method:str='sde_solver',**kwargs) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
+    def generate_synthetic_data(self,**kwargs) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
 
         """Generates synthetic Harris-Wilson using a numerical solver.
 
@@ -439,11 +433,13 @@ class Inputs:
 
         # Get run configuration properties
         self.data.dims = self.config.settings['inputs']['data']['dims']
-        num_steps = self.config.settings['training']["num_steps"]
-
+        synthetis_method = self.config.settings['inputs']['data']['synthesis_method']
+        num_samples = self.config['inputs']['data']['synthesis_n_samples']
+        num_steps = self.config.settings['training']['num_steps']
+        
         # Generate the initial origin sizes
         for key,value in self.config.settings['inputs']['data'].items():
-            if key in list(INPUT_TYPES.keys()) and key != 'cost_matrix':
+            if key in list(INPUT_TYPES.keys()) and not (key in ['cost_matrix']):
                 # Randomly generate data
                 data = np.abs(
                     random_vector(
@@ -466,7 +462,8 @@ class Inputs:
         # Normalise to sum to one
         cost_matrix_max = deepcopy(self.data.cost_matrix.max())
         self.data.cost_matrix = (self.data.cost_matrix/cost_matrix_max)
-        self.data.cost_matrix /= self.data.cost_matrix.sum()
+        cost_matrix_max = 1
+        # self.data.cost_matrix /= self.data.cost_matrix.sum()
 
         # Extract the underlying parameters from the config
         parameter_settings = {
@@ -478,10 +475,11 @@ class Inputs:
         }
         # Update kappa and delta based on data (if not specified)
         self.update_delta_and_kappa()
+        # Update true parameters to multiply
+        self.true_parameters['beta'] *= self.true_parameters['bmax']
 
         # Pass all data to device
         self.pass_to_device()
-
 
         # Initialise spatial interaction model
         sim = instantiate_sim(
@@ -492,10 +490,10 @@ class Inputs:
             **vars(self.data),
             logger=self.logger
         )
-        
+
         # Initialise the Harris Wilson model
         HWM = HarrisWilson(
-            sim = sim,
+            intensity_model = sim,
             config = self.config,
             dt = self.config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.true_parameters,
@@ -503,108 +501,18 @@ class Inputs:
             logger = self.logger
         )
 
-        if method == 'sde_potential':
-        
-            # Create partial function
-            torch_optimize_partial = partial(
-                torch_optimize,
-                function= sim.sde_potential_and_gradient,
-                method='L-BFGS-B',
-                **vars(HWM),
-                **vars(self.data)
-            )
-            # Create initialisations
-            Ndests = self.data.dims['destination']
-            g = np.log(HWM.delta.item())*np.ones((Ndests,Ndests)) - np.log(HWM.delta.item())*np.eye(Ndests) + np.log(1+HWM.delta.item())*np.eye(Ndests)
-            g = g.astype('float32')
-
-            # Get minimum across different initialisations in parallel
-            xs = [torch_optimize_partial(g[i,:]) for i in range(Ndests)]
-            # Compute potential
-            fs = np.asarray([
-                sim.sde_potential(
-                    torch.tensor(xs[i]
-                ).to(dtype=float32,device=sim.device),
-                **vars(HWM)
-                ).detach().cpu().numpy() for i in range(Ndests)
-            ])
-            # Get arg min
-            arg_min = np.argmin(fs)
-            minimum = xs[arg_min]
-            num_samples = 1
-            # Update log destination attraction
-            destination_attraction_ts = torch.exp(torch.tensor(minimum,dtype=float32,device=self.config['inputs']['device']))
-        
-        elif method == 'sde_solver':
-            # Run the ABM for n iterations, generating the entire time series
-            # Run experiments in parallel
-            semaphore = mp.Semaphore(self.config['inputs']['n_threads'])
-            processes = []
-            num_samples = self.config['inputs']['data']['synthesis_n_samples']
-            if self.config['inputs']['n_threads'] > 1:
-                manager = mp.Manager()
-                samples = manager.dict()
-                pbar = tqdm(
-                    total=self.config['inputs']['data']['synthesis_n_samples'], 
-                    desc="Generating time series in parallel",
-                    leave=False,
-                    position=int(self.instance)+1
-                )
-                for instance in range(num_samples):
-                    p = mp.Process(
-                        target=HWM.run,
-                        kwargs = dict(
-                            init_destination_attraction=self.data.destination_attraction_ts,
-                            n_iterations=num_steps,
-                            free_parameters=None,
-                            generate_time_series=True,
-                            requires_grad=False,
-                            seed=instance,
-                            semaphore=semaphore,
-                            samples=samples,
-                            pbar=pbar
-                        )
-                    )
-                    processes.append(p)
-
-                for p in processes:
-                    p.start()
-                
-                for p in processes:
-                    p.join()
-                
-                pbar.close()
-
-                # Take mean over seed
-                destination_attraction_ts = torch.stack(list(samples.values())).mean(dim=0)
-            else:
-                samples = []
-                pbar = tqdm(
-                    total=self.config['inputs']['data']['synthesis_n_samples'], 
-                    desc="Generating time series in sequence",
-                    leave=False
-                )
-                for instance in range(num_samples):
-                    samples.append(HWM.run(
-                        init_destination_attraction=self.data.destination_attraction_ts,
-                        n_iterations=num_steps,
-                        free_parameters=None,
-                        generate_time_series=True,
-                        requires_grad=False,
-                        seed=instance,
-                        pbar=pbar
-                    ))
-
-                # Take mean over seed
-                destination_attraction_ts = torch.stack(samples).mean(dim=0)
+        if synthetis_method == 'sde_potential':
+            destination_attraction_ts = self.sde_potential_in_sequence(HWM)
+        elif synthetis_method == 'sde_solver':
+            destination_attraction_ts = self.sde_solver_in_sequence(HWM)
+            # destination_attraction_ts = self.sde_solver_in_parallel(HWM)
         else:
-            raise Exception(f'Cannot synthetise data using method {method}')
+            raise Exception(f'Cannot synthetise data using method {synthetis_method}')
 
-        # Get training data size
-        data_size = self.config.settings['training'].get("data_size", destination_attraction_ts.shape[0])
-
+        # Get training data size from dimensions
+        data_time_steps = self.config.settings['inputs']['dims'].get('time',destination_attraction_ts.shape[0])
         # Extract the training data from the time series data
-        self.data.destination_attraction_ts = destination_attraction_ts[-data_size:]
+        self.data.destination_attraction_ts = destination_attraction_ts[-data_time_steps:]
         self.data.log_destination_attraction = torch.log(destination_attraction_ts[-1:])
 
         # Receive all data from device
@@ -616,8 +524,8 @@ class Inputs:
         # Set dataset name
         grand_total = self.config.settings['spatial_interaction_model'].get('grand_total',1)
         dataset_name = f"./data/inputs/synthetic/" + \
-        f"synthetic_{'x'.join([str(self.data.dims[name]) for name in INPUT_SCHEMA[key]['dims']])}_" + \
-        f"using_{method}_n_{str(num_samples)}_N_{str(int(grand_total))}_sigma_{str(np.round(self.true_parameters['sigma'],2))}"
+        f"synthetic_{'x'.join([str(self.data.dims[name]) for name in INPUT_SCHEMA[key]['dims']])}_total_{grand_total}_" + \
+        f"using_{synthetis_method}_samples_{str(num_samples)}_steps_{str(num_steps)}_sigma_{str(np.round(self.true_parameters['sigma'],2))}"
 
         # Create inputs folder
         if os.path.isdir(dataset_name) and not self.config.settings['experiments'][0]['overwrite']:
@@ -640,6 +548,122 @@ class Inputs:
                     os.path.join(dataset_name,f'{key}_max_normalised.txt')
                 )
         self.logger.success(f"Created and populated synthetic dataset {dataset_name}")
+
+    def sde_solver_in_sequence(self,HWM):
+        samples = []
+        # Run the ABM for n iterations, generating the entire time series
+        num_samples = self.config['inputs']['data']['synthesis_n_samples']
+        num_steps = self.config.settings['training']['num_steps']
+        for instance in tqdm(
+            range(num_samples),
+            desc=f"Generating time series in sequence: Instance {self.instance}",
+            leave=False,
+            position=self.instance+1
+        ):
+            samples.append(
+                HWM.run(
+                    init_destination_attraction=self.data.destination_attraction_ts,
+                    n_iterations=num_steps,
+                    free_parameters=None,
+                    generate_time_series=True,
+                    requires_grad=False,
+                    seed=instance
+                )
+            )
+
+        # Take mean over seed
+        return torch.stack(samples).mean(dim=0)
+    
+    def sde_solver_in_parallel(self,HWM):
+        # Run experiments in parallel
+        processes = []
+        n_workers = int(self.config['inputs']['n_workers'])
+        n_threads = int(self.config['inputs']['n_threads'])
+        semaphore = mp.Semaphore(n_threads)
+        manager = mp.Manager()
+        samples = manager.dict()
+        pbar = tqdm(
+            total=self.config['inputs']['data']['synthesis_n_samples'], 
+            desc="Generating time series in parallel",
+            leave=False,
+            position=(self.instance%n_workers)%n_threads+1
+        )
+        # Run the ABM for n iterations, generating the entire time series
+        num_samples = self.config['inputs']['data']['synthesis_n_samples']
+        num_steps = self.config.settings['training']['num_steps']
+        for instance in range(num_samples):
+            p = mp.Process(
+                target=HWM.run,
+                kwargs = dict(
+                    init_destination_attraction=self.data.destination_attraction_ts,
+                    n_iterations=num_steps,
+                    free_parameters=None,
+                    generate_time_series=True,
+                    requires_grad=False,
+                    seed=instance,
+                    semaphore=semaphore,
+                    samples=samples,
+                    pbar=pbar
+                )
+            )
+            processes.append(p)
+
+        for p in processes:
+            p.start()
+        
+        for p in processes:
+            p.join()
+        
+        pbar.close()
+
+        # Take mean over seed
+        destination_attraction_ts = torch.stack(list(samples.values())).mean(dim=0)
+        return destination_attraction_ts
+    
+    def sde_potential_in_sequence(self,HWM):
+        # Delete destination attraction
+        safe_delete(self.data.destination_attraction_ts)
+        # Create partial function
+        torch_optimize_partial = partial(
+            torch_optimize,
+            function= HWM.sde_potential_and_gradient,
+            method='L-BFGS-B',
+            **self.true_parameters
+        )
+        # Create initialisations
+        Ndests = self.data.dims['destination']
+        g = np.log(HWM.params.delta.item())*np.ones((Ndests,Ndests)) - \
+            np.log(HWM.params.delta.item())*np.eye(Ndests) + \
+            np.log(1+HWM.params.delta.item())*np.eye(Ndests)
+        g = g.astype('float32')
+        
+        # Get minimum across different initialisations in parallel
+        xs = [torch_optimize_partial(g[i,:]) for i in range(Ndests)]
+        # Compute potential
+        fs = np.asarray([
+            HWM.sde_potential(
+                torch.tensor(xs[i]
+            ).to(
+                dtype=float32,
+                device=HWM.intensity_model.device
+            ),
+            **self.true_parameters
+            ).detach().cpu().numpy() for i in range(Ndests)
+        ])
+        # Get arg min
+        arg_min = np.argmin(fs)
+        minimum = xs[arg_min]
+        # Update log destination attraction
+        destination_attraction_ts = torch.exp(torch.tensor(minimum,dtype=float32,device=self.config['inputs']['device']))
+        
+        # print({k:v.sum() for k,v in vars(self.data).items() if k != 'dims'})
+        # print('\n')
+        # print(self.true_parameters)
+        # print('\n')
+        # print(destination_attraction_ts)
+        # print(destination_attraction_ts.sum())
+        # sys.exit()
+        return destination_attraction_ts
 
     def __str__(self):
         od = self.config.settings['inputs']['data']['origin_demand']

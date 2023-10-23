@@ -5,12 +5,13 @@ import json
 import click
 import torch
 import psutil
+import logging 
 
 from copy import deepcopy
 
 from multiresticodm.config import Config
-from multiresticodm.logger_class import LOG_LEVELS
-from multiresticodm.utils import print_json, setup_logger
+from multiresticodm.utils import setup_logger
+from multiresticodm.logger_class import *
 from multiresticodm.global_variables import TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
 
 
@@ -165,7 +166,7 @@ _common_run_options = [
                default = [], help = 'Decides which experiments to run'),
     click.option('--experiment_title','-et', type=click.STRING,
                default = '', help = 'Title appended to output filename of experiment'),
-    click.option('--sweep_mode', default=False,is_flag=True, show_default=True,
+    click.option('--sweep_mode/--no-sweep_mode', default=None,is_flag=True, show_default=True,
               help=f'Flag for whether parameter sweep mode is activated or not.'),
     click.option('--dataset','-d', type=click.Path(exists=False),
                default=None, help = 'Overwrites dataset name in config'),
@@ -229,7 +230,7 @@ def exec(logger,settings,config_path,**kwargs):
     config = Config(
         path=config_path,
         settings=None,
-        level=settings.get('logging_mode','info').upper(),
+        console_handler_level = settings.get('logging_mode','info'),
         logger=logger
     )
 
@@ -284,7 +285,7 @@ def exec(logger,settings,config_path,**kwargs):
 @common_options
 @create_and_run_options
 @click.option('--dims','-dims', type=(str, int), multiple=True,
-                default=None, help = 'Overwrites input dimensions size')
+                default=[(None,None)], help = 'Overwrites input dimensions size')
 @click.option('--synthesis_method','-smthd', type=click.Choice(['sde_solver','sde_potential']),
                 default='sde_solver', help = 'Determines method for synthesing data')
 @click.option('--synthesis_n_samples','-sn', type=click.IntRange(min=1),
@@ -312,35 +313,41 @@ def create(
     synthesis_method,
     synthesis_n_samples
 ):
-    
     # Unpack dimensions
-    dims = {v[0]:v[1] for v in dims}
+    if list(dims) != [(None,None)]:
+        dims = {v[0]:v[1] for v in dims}
+    else:
+        dims = None
 
     # Gather all arguments in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
     # Remove all nulls
-    settings = {k: v for k, v in settings.items() if v}
+    settings = {k: v for k, v in settings.items() if v is not None}
+    # Capitalise all single-letter arguments
+    settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
+
+    # Convert strings to ints
+    settings['n_threads'] = int(settings.get('n_threads',1))
+    settings['n_workers'] = settings.get('n_workers',1)
+    
+    # Update number of workers
+    set_threads(settings['n_threads'])
 
     # Import all modules
     from multiresticodm.utils import deep_updates
     from multiresticodm.experiments import ExperimentHandler
 
-    # Capitalise all single-letter arguments
-    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
-
     # Setup logger
     logger = setup_logger(
         __name__,
-        settings.get('logging_mode','info').upper(),
-        log_to_file=True,
-        log_to_console=True
+        console_handler_level = settings.get('logging_mode','info'),
     )
 
     # Read config
     config = Config(
         path=config_path,
         settings=None,
-        level=settings.get('logging_mode','info').upper(),
+        console_handler_level = settings.get('logging_mode','info'),
         logger=logger
     )
     # Update settings with overwritten values
@@ -477,36 +484,35 @@ def run(
     # Gather all arguments in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
     # Remove all nulls
-    settings = {k: v for k, v in settings.items() if v}
+    settings = {k: v for k, v in settings.items() if v is not None}
+    # Capitalise all single-letter arguments
+    settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
+
+    # Convert covariance to 2x2 array
+    if 'covariance' in list(settings.keys()):
+        settings['covariance'] = asarray([float(x) for x in settings['covariance'].split(",")]).reshape((2,2)).tolist()
+    
     # Convert strings to ints
     settings['n_threads'] = int(settings.get('n_threads',1))
     settings['n_workers'] = settings.get('n_workers',1)
+    
     # Update number of workers
     set_threads(settings['n_threads'])
 
     # Import all modules
     from numpy import asarray
-    from multiresticodm.utils import str_in_list
-
-    # Convert covariance to 2x2 array
-    if str_in_list('covariance',settings.keys()):
-        settings['covariance'] = asarray([float(x) for x in settings['covariance'].split(",")]).reshape((2,2)).tolist()
-    # Capitalise all single-letter arguments
-    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
 
     # Setup logger
     logger = setup_logger(
         __name__,
-        settings.get('logging_mode','info').upper(),
-        log_to_file=True,
-        log_to_console=True
+        console_handler_level = settings.get('logging_mode','info'),
     )
     exec(logger,settings=settings,config_path=config_path,run_experiments=run_experiments)
 
 
 _output_options = [
     click.option('--out_directory', '-o', required=True, type=click.Path(exists=True), default='./data/outputs/'),
-    click.option('--dataset_name', '-dn', required=True, multiple=True, type=click.STRING),
+    click.option('--dataset_name', '-dn', required=False, multiple=True, type=click.STRING),
     click.option('--directories','-d', multiple=True, required=False, type=click.Path(exists=False)),
     click.option('--experiment_type','-e', multiple=True, type=click.STRING ,cls=NotRequiredIf, not_required_if='directories'),
     click.option('--experiment_title','-et', multiple=True, type=click.STRING, default = [''], cls=NotRequiredIf, not_required_if='directories'),
@@ -630,20 +636,20 @@ def output_options(func):
             type=click.INT, help='Plots marker every n-th poInt in dataset')
 @click.option('--marker_size','-ms', default = 1, show_default = True,
             type=click.INT, help='Sets marker size in plot')
-@click.option('--benchmark/--no-benchmark', '-bm', default=False, is_flag=True, show_default=True,
+@click.option('--benchmark/--no-benchmark', '-bm', default=None, is_flag=True, show_default=True,
               help=f'Flag for plotting data along with benchmark/baseline (if provided).')
-@click.option('--annotate/--no-annotate', default=False, is_flag=True, show_default=True,
+@click.option('--annotate/--no-annotate', default=None, is_flag=True, show_default=True,
               help=f'Flag for annotating plot with text')
-@click.option('--transpose/--no-transpose', default=False, is_flag=True, show_default=True,
+@click.option('--transpose/--no-transpose', default=None, is_flag=True, show_default=True,
               help=f'Flag for taking switching origins with destinations in plots.')
-@click.option('--colorbar/--no-colorbar', default=True, is_flag=True, show_default=True,
+@click.option('--colorbar/--no-colorbar', default=None, is_flag=True, show_default=True,
               help=f'Flag for plotting colorbars or not.')
 @click.pass_context
 def plot(
         ctx,
-        directories,
-        output_directory,
+        out_directory,
         dataset_name,
+        directories,
         experiment_type,
         experiment_title,
         exclude,
@@ -718,12 +724,10 @@ def plot(
 
     # Gather all options in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
-    
+    # Capitalise all single-letter arguments
+    settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
     # Add context arguments
     undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
-
-    # Capitalise all single-letter arguments
-    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
 
     # Convert strings to ints
     settings['n_threads'] = int(settings.get('n_threads',1))
@@ -741,23 +745,16 @@ def plot(
     # Setup logger
     logger = setup_logger(
         __name__,
-        settings.get('logging_mode','info').upper(),
-        log_to_file=True,
-        log_to_console=True
+        console_handler_level = settings.get('logging_mode','trace'),
+        file_handler_level = 'DEBUG'
     )
-
-    # Validate passed plots
-    for c in plots:
-        if c not in list(PLOT_HASHMAP.keys()):
-            raise click.BadOptionUsage("%s is not an available plot." % c)
-
-    logger.info('Starting')
-
+    
     # Run plot
     Plot(
         plot_ids=plots,
         outputs_directories=list(directories),
-        settings=settings
+        settings=settings,
+        logger=logger
     )
 
     logger.info('Done')
@@ -774,13 +771,13 @@ def plot(
 @click.option('--algorithm', '-a', default=['linear'], show_default=True, multiple=True,
               type=click.STRING, help=f'Sets algorihm name for use in.')
 @click.option('--sort_by','-sort', multiple=True, type=click.STRING, required=False)
-@click.option('--ascending','-asc', default=False, is_flag=True, show_default=True, required=False)
+@click.option('--ascending','-asc', default=None, is_flag=True, show_default=True, required=False)
 @click.pass_context
 def summarise(
         ctx,
-        directories,
-        output_directory,
+        out_directory,
         dataset_name,
+        directories,
         experiment_type,
         experiment_title,
         exclude,
@@ -814,12 +811,10 @@ def summarise(
     """
     # Gather all options in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
-
+    # Capitalise all single-letter arguments
+    settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
     # Add context arguments
     undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
-
-    # Capitalise all single-letter arguments
-    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
 
     # Convert strings to ints
     settings['n_threads'] = int(settings.get('n_threads',1))
@@ -837,11 +832,8 @@ def summarise(
     # Setup logger
     logger = setup_logger(
         __name__,
-        settings.get('logging_mode','info').upper(),
-        log_to_file=True,
-        log_to_console=True
+        console_handler_level = settings.get('logging_mode','info'),
     )
-    
     logger.info('Gathering data')
 
 

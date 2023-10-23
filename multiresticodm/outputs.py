@@ -16,7 +16,6 @@ from pathlib import Path
 from copy import deepcopy
 from functools import partial
 from datetime import datetime
-from argparse import Namespace
 from torch import int32, float32
 from typing import Union,List,Tuple
 from itertools import product,chain
@@ -38,12 +37,12 @@ class OutputSummary(object):
 
     def __init__(self, settings, **kwargs):
         # Setup logger
+        level = kwargs['console_level'] if kwargs.get('console_level',None) is not None else None
         self.logger = setup_logger(
             __name__,
-            level=settings.get('logging_mode','info').upper(),
-            log_to_file=True,
-            log_to_console=True
+            console_handler_level = level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
+
         # Get command line settings
         self.settings = settings
         # Store device
@@ -68,12 +67,12 @@ class OutputSummary(object):
      
     @classmethod
     def find_matching_output_folders(cls,__self__):
-        if str_in_list('directories',__self__.settings.keys()) and len(__self__.settings['directories']) > 0:
+        if 'directories' in list(__self__.settings.keys()) and len(__self__.settings['directories']) > 0:
             output_dirs = []
             for _dir in list(__self__.settings['directories']):
                 for dataset_name in __self__.settings['dataset_name']:
                     path_dir = os.path.join(
-                        __self__.settings['output_directory'],
+                        __self__.settings['out_directory'],
                         dataset_name,
                         _dir
                     )
@@ -82,20 +81,22 @@ class OutputSummary(object):
         else:
             # Search metadata based on search parameters
             # Get output directory
-            output_directory = __self__.settings['output_directory']
+            output_directory = __self__.settings['out_directory']
             # Get experiment title
             experiment_titles = __self__.settings['experiment_title']
+            experiment_titles = experiment_titles if len(experiment_titles) > 0 else ['']
             # Get dataset name
             dataset_names = __self__.settings['dataset_name']
+            dataset_names = dataset_names if len(dataset_names) > 0 else ['.*']
             # Get type of experiment
             experiment_types = __self__.settings['experiment_type']
+            experiment_types = experiment_types if len(experiment_types) > 0 else ['']
 
             # Get date
             if len(__self__.settings['dates']) <= 0:
                 dates = ['']
             else:
                 dates = list(__self__.settings.get('dates',['']))
-
             
             # Grab all output directories
             folder_patterns = []
@@ -107,7 +108,7 @@ class OutputSummary(object):
                                 os.path.join(
                                     output_directory,
                                     data_name,
-                                    (f"{(exp_type+'.*') if len(exp_type) > 0 else exp_type}"+
+                                    (f"{(exp_type+'.*') if len(exp_type) > 0 else ''}"+
                                     f"{('_'+exp_title+'.*') if len(exp_title) > 0 else ''}"+
                                     f"{(dt+'*') if len(dt) > 0 else ''}")
                                 )
@@ -191,7 +192,7 @@ class OutputSummary(object):
                         settings=self.settings,
                         output_names=(list(self.settings['sample'])+['ground_truth_table']),
                         coordinate_slice=coordinate_slice,
-                        level=self.settings['logging_mode'].upper(),
+                        console_handling_level = self.settings['logging_mode'],
                         logger = self.logger
                     )
                 # This is the case where there are SOME input slices provided
@@ -202,7 +203,7 @@ class OutputSummary(object):
                         output_names=(list(self.settings['sample'])+['ground_truth_table']),
                         coordinate_slice=coordinate_slice,
                         input_slice=path_value,
-                        level=self.settings['logging_mode'].upper(),
+                        console_handling_level = self.settings['logging_mode'],
                         logger = self.logger
                     )
 
@@ -217,7 +218,7 @@ class OutputSummary(object):
                         metric_data[j][k] = v
                 print('metric_data')
                 # Store useful metadata
-                if not str_in_list(output_folder,self.experiment_metadata.keys()):
+                if not output_folder in list(self.experiment_metadata.keys()):
                     self.experiment_metadata[output_folder] = metric_data
                 else:
                     self.experiment_metadata[output_folder] = np.append(
@@ -246,15 +247,15 @@ class OutputSummary(object):
 
             # Make output directory
             output_directory = os.path.join(
-                self.settings['output_directory'],
+                self.settings['out_directory'],
                 dataset,
                 'summaries'
             )
             makedir(output_directory)
 
             date_strings = '__'.join(self.settings['dates'])
-            if str_in_list('directories',self.settings.keys()) and len(self.settings['directories']) > 0:
-                if str_in_list('filename_ending',self.settings.keys()):
+            if 'directories' in list(self.settings.keys()) and len(self.settings['directories']) > 0:
+                if 'filename_ending' in list(self.settings.keys()):
                     filepath = os.path.join(
                         output_directory,
                         f"{self.settings['filename_ending']}.csv"
@@ -289,7 +290,7 @@ class OutputSummary(object):
         metric_data = []
 
         for sample_name in self.settings['sample']:
-            # Get samples
+             # Get samples
             self.logger.info(f'Getting sample {sample_name}...')
             print(outputs.data.table.dtype)
             print(outputs.data.table.coords)
@@ -484,7 +485,7 @@ class OutputSummary(object):
         metric_arguments = {}
         settings_copy = deepcopy(settings)
         if metric.lower() == 'shannon_entropy':
-            dummy_config = Namespace(**{'settings':outputs.config})
+            dummy_config = Config(settings=outputs.config)
             ct = instantiate_ct(
                 config=dummy_config,
                 log_to_console=False,
@@ -513,7 +514,7 @@ class OutputSummary(object):
 class Outputs(object):
 
     def __init__(self,
-                 config, 
+                 config:Config, 
                  module:str=__name__,
                  settings:dict={}, 
                  output_names:list=['ground_truth_table'], 
@@ -521,15 +522,18 @@ class Outputs(object):
                  input_slice:dict={},
                  **kwargs):
         # Setup logger
-        level = kwargs['logger'].level if 'logger' in kwargs else config.get('level','INFO').upper()
+        console_level = kwargs['console_level'] if kwargs.get('console_level',None) is not None else None
+        file_level = kwargs['file_level'] if kwargs.get('file_level',None) is not None else None
         self.logger = setup_logger(
             module,
-            level=level,
-            log_to_file=kwargs.get('log_to_file',True),
-            log_to_console=kwargs.get('log_to_console',True),
+            console_handler_level = console_level,
+            file_handler_level = file_level
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update config level
-        self.logger.setLevel(level)
+        self.logger.setLevels(
+            console_level = console_level,
+            file_level = file_level
+        )
 
         # Sample names must be a subset of all data names
         try:
@@ -558,7 +562,6 @@ class Outputs(object):
             assert os.path.exists(config)
             self.config = Config(
                 path=os.path.join(config,"config.json"),
-                level='INFO',
                 logger = self.logger
             )
 
@@ -643,6 +646,7 @@ class Outputs(object):
                 self.settings['dims'] = list(np.shape(self.ground_truth_table))
                 self.logger.info(f'Ground truth table loaded')
 
+
             # Load output h5 file to xarrays
             self.load_h5_data(
                 config,
@@ -701,6 +705,7 @@ class Outputs(object):
                         value = sigma_to_noise_regime(sweep_params[v])
                     # Else use passed sweep value
                     else:
+                        print(v,sweep_params.keys())
                         value = sweep_params[v]
                     # Add to key-value pair to unique sweep id
                     sweep_id.append(f"{str(v)}_{str(value)}")
@@ -710,7 +715,6 @@ class Outputs(object):
                     self.sweep_id = os.path.join(*sweep_id)
                 else:
                     self.sweep_id = ''
-
             # Create output directories if necessary
             self.create_output_subdirectories(sweep_id=self.sweep_id)
         
@@ -734,11 +738,11 @@ class Outputs(object):
             noise_level = noise_level[0]
         noise_level = noise_level.capitalize()
         
-        if not str_in_list('experiment_title',self.config['outputs'].keys()):
+        if not 'experiment_title' in list(self.config['outputs'].keys()):
             self.config['outputs']['experiment_title'] = ""
 
         if sweep_experiment_id is None:
-            if str_in_list(self.config['experiment_type'].lower(),['tablesummariesmcmcconvergence','table_mcmc_convergence']):
+            if self.config['experiment_type'].lower() in ['tablesummariesmcmcconvergence','table_mcmc_convergence']:
                 return self.config['experiment_type']+'_K'+\
                         str(self.config['K'])+'_'+\
                         self.config['mcmc']['contingency_table']['proposal']+'_'+\
@@ -847,7 +851,10 @@ class Outputs(object):
 
         # Get total number of samples
         N = self.settings.get('N',samples.shape[0])
-        N = min(N,samples.shape[0])
+        if N is None:
+            N = samples.shape[0]
+        else:
+            N = min(N,samples.shape[0])
         
         # Apply stop
         samples = samples[:N]
@@ -866,7 +873,6 @@ class Outputs(object):
                 # Group coordinates are file-dependent
                 if 'sweep_params' in list(h5data[self.experiment_id].attrs.keys()) and \
                     'sweep_values' in list(h5data[self.experiment_id].attrs.keys()):
-                
                     # Loop through each sweep parameters and add it as a coordinate
                     for (k,v) in zip(h5data[self.experiment_id].attrs['sweep_params'],
                                 h5data[self.experiment_id].attrs['sweep_values']):
@@ -975,7 +981,7 @@ class Outputs(object):
         return local_coords,file_global_coords,data_vars
 
     def load_h5_data(self,output_path,coordinate_slice:dict={},slice_samples:bool=True):
-        self.logger.info('Loading h5 data into xarrays...')
+        self.logger.note('Loading h5 data into xarrays...')
 
         # Get all h5 files
         h5files = list(Path(os.path.join(output_path,'samples')).rglob("*.h5"))
@@ -1122,7 +1128,7 @@ class Outputs(object):
         
         elif sample_name == 'ground_truth_table':
             # Get config and sim
-            dummy_config = Namespace(**{'settings':self.config})
+            dummy_config = Config(settings=self.config)
             ct = instantiate_ct(
                 config=dummy_config,
                 log_to_console=False,
@@ -1138,7 +1144,7 @@ class Outputs(object):
                 )
             )
         
-        elif str_in_list(sample_name, INPUT_TYPES.keys()):
+        elif sample_name in list(INPUT_TYPES.keys()):
             # Get sim model 
             sim_model = globals()[self.config.settings['spatial_interaction_model']['name']+'SIM']
             self.check_data_availability(
@@ -1154,7 +1160,7 @@ class Outputs(object):
 
         else:
             if not hasattr(self.data,sample_name):
-                raise Exception(f"{sample_name} not found in output data [{','.join(vars(self.data).keys())}]")
+                raise Exception(f"{sample_name} not found in output data [{','.join(list(vars(self.data).keys()))}]")
             
             # Get xarray
             samples = getattr(self.data,sample_name)
@@ -1163,10 +1169,13 @@ class Outputs(object):
             iter_coords = [x for x in samples.dims if x in ['iter','seed']]
             
             # Find sweep coordinates that are not iteration-related
-            sweep_coords = [d for d in samples.dims if d not in list(CORE_COORDINATES_DTYPES.keys())+['N']]
+            sweep_coords = [d for d in samples.dims if d not in (list(CORE_COORDINATES_DTYPES.keys()))]
 
-            # Stack all non-core coordinates into new coordinate
-            samples = samples.stack(N=tuplize(iter_coords),sweep=tuplize(sweep_coords))
+            if len(sweep_coords) > 0:
+                # Stack all non-core coordinates into new coordinate
+                samples = samples.stack(id=tuplize(iter_coords),sweep=tuplize(sweep_coords))
+            else:
+                samples = samples.stack(id=tuplize(iter_coords))
 
             # If parameter is beta, scale it by bmax
             if sample_name == 'beta' and self.intensity_model_class == 'spatial_interaction_model':
@@ -1188,23 +1197,23 @@ class Outputs(object):
             filename = f"{','.join(self.settings['sample'])}"
         else:
             filename = f"{sample}"
-        if str_in_list('statistic',self.settings.keys()):
+        if 'statistic' in list(self.settings.keys()):
             filename += f"_{','.join([str(stat) for stat in list(flatten(self.settings['statistic'][0]))])}"
-        if str_in_list('table_dim',self.config.keys()):
+        if 'table_dim' in list(self.config.keys()):
             filename += f"_{self.config['table_dim']}"
-        if str_in_list('table_total',self.config.keys()):
+        if 'table_total' in list(self.config.keys()):
             filename += f"_{self.config['table_total']}"
-        if str_in_list('type',self.config.keys()) and len(self.config['type']) > 0:
+        if 'type' in list(self.config.keys()) and len(self.config['type']) > 0:
             filename += f"_{self.config['type']}"
-        if str_in_list('experiment_title',self.settings.keys()) and len(self.settings['experiment_title']) > 0:
+        if 'experiment_title' in list(self.settings.keys()) and len(self.settings['experiment_title']) > 0:
             filename += f"_{self.settings['experiment_title']}"
-        if str_in_list('viz_type',self.settings.keys()):
+        if 'viz_type' in list(self.settings.keys()):
             filename += f"_{self.settings['viz_type']}"
-        if str_in_list('burnin',self.settings.keys()):
+        if 'burnin' in list(self.settings.keys()):
             filename += f"_burnin{self.settings['burnin']}" 
-        if str_in_list('thinning',self.settings.keys()):
+        if 'thinning' in list(self.settings.keys()):
             filename += f"_thinning{self.settings['thinning']}"
-        if str_in_list('N',self.settings.keys()):
+        if 'N' in list(self.settings.keys()):
             filename += f"_N{self.settings['N']}"
         # filename += f"_N{self.config['mcmc']['N']}"
         return filename
@@ -1214,7 +1223,7 @@ class Outputs(object):
         if statistic is None or statistic.lower() == '' or 'sample' in statistic.lower() or len(kwargs.get('dim',[])) == 0:
             return data
         
-        elif not str_in_list(sample_name,OUTPUT_TYPES.keys()):
+        elif not sample_name in list(OUTPUT_TYPES.keys()):
             return deep_call(
                 data,
                 f".{statistic}(dim)",
@@ -1223,19 +1232,19 @@ class Outputs(object):
             )
         
         elif statistic.lower() == 'signedmean' and \
-            str_in_list(sample_name,OUTPUT_TYPES.keys()): 
-            if str_in_list(sample_name,INTENSITY_TYPES.keys()):
+            sample_name in list(OUTPUT_TYPES.keys()):
+            if sample_name in list(INTENSITY_TYPES.keys()) and hasattr(self.data,'sign'):
                 signs = self.get_sample('sign')
                 print(signs)
                 # Compute moments
                 return ( torch.einsum('nk,n...->k...',signs.float(),data.float()) / torch.sum(torch.ravel(signs.float())))
             else:
-                return self.compute_sample_statistics(data,sample_name,'mean',kwargs['axis'])
+                return self.compute_sample_statistics(data,sample_name,'mean',dim=kwargs['dim'])
        
         elif (statistic.lower() == 'signedvariance' or statistic.lower() == 'signedvar') and \
-            str_in_list(sample_name,OUTPUT_TYPES.keys()):
+            sample_name in list(OUTPUT_TYPES.keys()):
 
-            if str_in_list(sample_name,INTENSITY_TYPES.keys()):
+            if sample_name in list(INTENSITY_TYPES.keys()):
                 # Compute mean
                 samples_mean = self.compute_sample_statistics(data,sample_name,'signedmean',**kwargs)
                 # Compute squared mean
@@ -1253,7 +1262,7 @@ class Outputs(object):
                 # return self.compute_sample_statistics(data,sample_name,'var',**kwargs)
         
         elif statistic.lower() == 'error' and \
-            str_in_list(sample_name,[param for param in OUTPUT_TYPES.keys() if 'error' not in param]):
+            sample_name in [param for param in list(OUTPUT_TYPES.keys()) if 'error' not in param]:
             # Apply error norm
             return apply_norm(
                 tab=data,

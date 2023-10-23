@@ -118,7 +118,9 @@ NUMPY_TO_TORCH_DTYPE = {
     'int16':int16,
     'int32':int32,
     'int64':int64,
-    'bool':tbool
+    'bool':tbool,
+    'str':str,
+    'object':object
 }
 
 TORCH_TO_NUMPY_DTYPE = {v:k for k,v in NUMPY_TO_TORCH_DTYPE.items()}
@@ -127,7 +129,8 @@ INPUT_SCHEMA = {
     "origin_demand":{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":1},
     "destination_demand":{"dims":['destination'],"axes":[1],"dtype":"float32", "ndmin":1},
     "origin_attraction_ts":{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":2},
-    "destination_attraction_ts":{"dims":['destination'],"axes":[1],"dtype":"float32", "ndmin":2},
+    "destination_attraction_ts":{"dims":['time','destination'],"axes":[0,1],"dtype":"float32", "ndmin":2},
+    "log_destination_attraction":{"dims":['destination'],"axes":[0],"dtype":"float32", "ndmin":1},
     "cost_matrix":{"dims":['origin','destination'],"axes":[0,1],"dtype":"float32", "ndmin":2},
     "ground_truth_table":{"dims":['origin','destination'],"axes":[0,1],"dtype":"int32", "ndmin":2},
     "dims":{},
@@ -173,16 +176,22 @@ OUTPUT_TYPES = {
 
 DATA_TYPES = {**INPUT_TYPES,**OUTPUT_TYPES}
 
+AUXILIARY_COORDINATES_DTYPES = {
+    'N':torch.int32,
+    'dataset':str,
+    'covariance':str,
+    'step_size':torch.float32
+}
+
 CORE_COORDINATES_DTYPES = {
  'iter':torch.int32,
  'seed':torch.int32,
  'time':torch.int32,
  'origin':torch.int32,
- 'destination':torch.int32,
- 'N':object
+ 'destination':torch.int32
 }
 
-COORDINATES_DTYPES = {**CORE_COORDINATES_DTYPES,**DATA_TYPES}
+COORDINATES_DTYPES = {**CORE_COORDINATES_DTYPES,**AUXILIARY_COORDINATES_DTYPES,**DATA_TYPES}
 
 
 NUMPY_TYPE_TO_DAT_TYPE = {

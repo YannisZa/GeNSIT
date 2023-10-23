@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from torch import int32
 from typing import Dict,Tuple,List
 
-from multiresticodm.utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string,str_in_list
+from multiresticodm.utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string
 from multiresticodm.contingency_table import ContingencyTable
 
 def instantiate_markov_basis(ct:ContingencyTable,**kwargs): #-> Union[MarkovBasis,None]:
@@ -23,8 +23,7 @@ class MarkovBasis(object):
         # Setup logger
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            level=ct.config.level if ct.config else kwargs.get('level','INFO'),
-            log_to_file=False,
+            console_handler_level = ct.config.level if ct.config else kwargs.get('level','INFO'),
             log_to_console=kwargs.get('log_to_console',True),
         ) if kwargs.get('logger',None) is None else kwargs['logger']
 
@@ -41,8 +40,8 @@ class MarkovBasis(object):
         
         # Get flag for storing markov basis
         self.export = True
-        if str_in_list('outputs',self.ct.config.settings.keys()) and \
-            str_in_list('export_basis',self.ct.config.settings['outputs'].keys()):
+        if 'outputs' in list(self.ct.config.settings.keys()) and \
+            'export_basis' in list(self.ct.config.settings['outputs'].keys()):
             self.export = self.ct.config.settings['outputs']['export_basis']
 
         # Initialise bases
@@ -265,7 +264,7 @@ class MarkovBasis(object):
         # WITH NO CELL CONSTRAINTS AND THEN DISREGARD MOVES INCOMPATIBLE WITH CONSTRAINTS PROVIDED.
 
         # Check if output directory is provided
-        if not str_in_list('outputs',self.ct.config.settings) or not str_in_list('directory',self.ct.config.settings['outputs']) or self.ct.config.settings['outputs']['directory'] == '':
+        if not 'outputs' in list(self.ct.config.settings.keys()) or not 'directory' in list(self.ct.config.settings['outputs'].keys()) or self.ct.config.settings['outputs']['directory'] == '':
             self.logger.warning(f'Output directory not provided. Markov bases cannot be found.')
             # Set export flag to false
             self.export = False
@@ -301,7 +300,7 @@ class MarkovBasis(object):
         # Export markov bases to file
         table_dims = 'x'.join(list(map(str,self.ct.dims)))
 
-        if not str_in_list('outputs',self.ct.config.settings) or not str_in_list('directory',self.ct.config.settings['outputs']) or self.ct.config.settings['outputs']['directory'] is None:
+        if not 'outputs' in list(self.ct.config.settings.keys()) or not 'directory' in list(self.ct.config.settings['outputs'].keys()) or self.ct.config.settings['outputs']['directory'] is None:
             self.logger.warning(f'Output directory not provided. Markov bases cannot be exported.')
             return
 
