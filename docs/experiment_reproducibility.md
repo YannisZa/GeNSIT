@@ -84,50 +84,32 @@ multiresticodm run ./data/inputs/configs/table_convergence.toml \
  -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[1]' -ax '[0]' \
  -n 10000 -re exp10 -k 1000 -nw 1 -p degree_higher -et both_margins
 
-## Create comparison plot for all results
+## Create synthetic data
 
-multiresticodm plot \
- -dn synthetic_2x3_N_100 -dn synthetic_2x3_N_5000 -dn synthetic_33x33_N_100 -dn synthetic_33x33_N_5000 \
- -e direct_sampling_TableSummariesMCMCConvergence -et row_margin \
- -l table_dim -l table_total -l experiment_title \
- -fe curse_of_dimensionality --no-benchmark -x MCMC_Iteration -yl -0.00 0.05 -p 00 \
- -stat 'sum' '0' -b 0 -t 10 -n 10000 -ff pdf
+clear; multiresticodm create ./data/inputs/configs/synthetic_data_generation.toml -smthd sde_solver -sn 100 -nw 4 -nt 4 -log debug
+clear; multiresticodm create ./data/inputs/configs/synthetic_data_generation.toml -smthd sde_solver -sn 1 -nw 8 -nt 1 -log debug
 
-multiresticodm plot \
- -dn synthetic_33x33_N_5000 \
- -e direct_sampling_TableSummariesMCMCConvergence \
- -e degree_one_TableSummariesMCMCConvergence \
- -e degree_higher_TableSummariesMCMCConvergence \
- -et row_margin -et both_margins \
- -l proposal -l experiment_title \
- -fe proposal_comparison --no-benchmark -x MCMC_Iteration -p 00 \
- -stat 'sum' '0' -b 0 -t 90 -n 100000 -ff pdf \
- -exc exp10_K1000_direct_sampling_TableSummariesMCMCConvergence_row_margin_30_05_2023_14_35_30
+## SIM Inference
 
-## SIM inference
+### MCMC
 
-### Low noise
+clear; multiresticodm run ./data/inputs/configs/synthetic_data_learning.toml -nw 4 -nt 1 -mcmcnw 6 -re SIM_MCMC
 
-multiresticodm run ./data/inputs/configs/sim_inference_low_noise_mcmc.toml -d ./data/inputs/london_retail -nw 8 -delta 0.00612245 \
--cov '0.00749674,0.00182529,0.00182529,0.00709968' -ls 50 -lss 0.02 -bm 700000 -n 50000
+### Neural Network
 
-### High noise
-
-multiresticodm run ./data/inputs/configs/sim_inference_high_noise_mcmc.toml -re exp5 -d ./data/inputs/london_retail -cm cost_mat.txt \
--od P.txt -lda log_destination_attraction.txt -delta 0.00612245 -kappa 1.30000005 -bm 700000 \
--cov '1.0,0.0,0.0,1.0' -ss 0.3 -ls 50 -lss 0.02 -als 10 -alss 0.1 -as 10 -nb 50 -n 100000
+clear; multiresticodm run ./data/inputs/configs/synthetic_data_learning.toml -nw 12 -nt 1 -re SIM_NN
 
 ## Joint table and sim inference
 
-### Low noise
+## Summaries and Metrics
 
-multiresticodm run ./data/inputs/configs/joint_table_sim_inference_low_noise_mcmc.toml -d ./data/inputs/london_retail -delta 0.00612245 \
--cov '0.00349674,0.00182529,0.00182529,0.00309968' -ls 100 -lss 0.01 -bm 700000 -tab '' -j 49 -n 50000 -nw 8
+## Plots
 
-### High noise
+### Log destination attraction predictions and residual plots
 
-multiresticodm run ./data/inputs/configs/joint_table_sim_inference_high_noise_mcmc.toml -d ./data/inputs/london_retail -delta 0.00612245 \
--cov '1.0,0.0,0.0,1.0' -ss 0.1 -ls 50 -lss 0.02 -als 10 -alss 0.1 -as 10 -nb 50 -bm 700000 -n 1000 -nw 6 -tab '' -j 49
+clear; multiresticodm plot -o ./data/outputs/synthetic \
+-e SIM_NN -l dims -l noise_regime \
+-p 31 -b 0 -t 1 -fs 5 5 -ms 20 -ff pdf -df dat -tfs 14 -afs 14 -lls 18 -als 18 --benchmark
 
 # Cambridge commuter LSOAs to MSOAs
 
@@ -436,15 +418,7 @@ multiresticodm run ./data/inputs/configs/joint_table_sim_inference_high_noise_mc
  -re exp14 -nw 16 -nt 1 -nt 8 -et both_margins_permuted_cells_20% \
  -n 100000 -sp 0.05
 
-## Create synthetic data
-
-clear; multiresticodm create ./data/inputs/configs/synthetic_data_generation.toml -mthd sde_solver -sn 30 -nw 1 -nt 1 -log debug
-
-## Neural Network (synthetic data)
-
-clear; multiresticodm run ./data/inputs/configs/synthetic_data_learning.toml -nw 1 -nt 1 -log debug
-
-## Neural Network (real data)
+## Neural Network
 
 Set ulimit -n 8000
 
@@ -506,7 +480,7 @@ clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural
  -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt \
  -p degree_higher -re JointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained_20%\_cells -ax '[1]' -ax '[0]' -dev cpu
 
-## Summaries and metrics
+## Summaries and Metrics
 
 ### SRMSE
 
@@ -608,10 +582,9 @@ clear;multiresticodm plot -p 02 -o ./data/outputs/ -dn cambridge_work_commuter_l
 
 ### Log destination attraction predictions and residual plots
 
-multiresticodm plot -dn cambridge_work_commuter_lsoas_to_msoas -o ./data/outputs/ \
--et grand_total -et row_margin -et both_margins -et both_margins_permuted_cells_10% -et both_margins_permuted_cells_20% \
--e JointTableSIM_MCMC -l type -l noise_regime -l experiment_title \
--p 31 -b 10000 -fs 5 5 -ms 20 -ff pdf -df dat -tfs 14 -afs 14 -lls 18 -als 18 --benchmark
+clear; multiresticodm plot -dn cambridge_work_commuter_lsoas_to_msoas -o ./data/outputs/ \
+-e SIM_NN -l type -l noise_regime \
+-p 31 -b 0 -t 1 -fs 5 5 -ms 20 -ff pdf -df dat -tfs 14 -afs 14 -lls 18 -als 18 --benchmark
 
 ### Mixing
 
