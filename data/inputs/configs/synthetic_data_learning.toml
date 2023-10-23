@@ -12,24 +12,23 @@ seed = 8888
 # [inputs.seed.sweep]
 #   default = 1
 #   range = "1:30:1"
-# dataset = "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.01" 
 [inputs.dataset.sweep]
-  default = "synthetic_100x25_using_sde_solver_n _30_N_1_sigma_0.01" 
+  default = "synthetic_100x25_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.01"
   range = [
-    "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.01",
-    "synthetic_100x25_using_sde_solver_n_30_N_1_sigma_0.14",
-    "synthetic_100x50_using_sde_solver_n_30_N_1_sigma_0.01",
-    "synthetic_100x50_using_sde_solver_n_30_N_1_sigma_0.14",
-    "synthetic_100x75_using_sde_solver_n_30_N_1_sigma_0.01",
-    "synthetic_100x75_using_sde_solver_n_30_N_1_sigma_0.14",
-    "synthetic_500x25_using_sde_solver_n_30_N_1_sigma_0.01",
-    "synthetic_500x25_using_sde_solver_n_30_N_1_sigma_0.14",
-    "synthetic_500x50_using_sde_solver_n_30_N_1_sigma_0.01",
-    "synthetic_500x50_using_sde_solver_n_30_N_1_sigma_0.14",
-    "synthetic_500x75_using_sde_solver_n_30_N_1_sigma_0.01",
-    "synthetic_500x75_using_sde_solver_n_30_N_1_sigma_0.14",
-    "synthetic_500x100_using_sde_solver_n_30_N_1_sigma_0.01",
-    "synthetic_500x100_using_sde_solver_n_30_N_1_sigma_0.14"
+    "synthetic_100x25_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.01",
+    "synthetic_100x25_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.14",
+    "synthetic_100x50_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.01",
+    "synthetic_100x50_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.14",
+    "synthetic_100x75_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.01",
+    "synthetic_100x75_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.14",
+    "synthetic_500x25_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.01",
+    "synthetic_500x25_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.14",
+    "synthetic_500x50_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.01",
+    "synthetic_500x50_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.14",
+    "synthetic_500x75_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.01",
+    "synthetic_500x75_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.14",
+    "synthetic_500x100_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.01",
+    "synthetic_500x100_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.14"
   ]
 
 [inputs.data]
@@ -66,16 +65,24 @@ seed = 8888
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356
       range = [
-      0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356,
-      0.0141421356,0.141421356,0.0141421356,0.141421356,0.0141421356,0.141421356
+        0.0141421356,0.141421356,
+        0.0141421356,0.141421356,
+        0.0141421356,0.141421356,
+        0.0141421356,0.141421356,
+        0.0141421356,0.141421356,
+        0.0141421356,0.141421356,
+        0.0141421356,0.141421356
       ]
+      coupled = true
+      target_name = 'dataset'
 
 [training]
   batch_size = +1
   num_steps = +1
   [training.N.sweep]
-    default = +1000
-    range = [10000,10000,10000,10000,10000,10000,50000,50000,50000,50000,50000,50000,50000,50000]
+    default = +10_000
+    range = [10_000,10_000,10_000,10_000,10_000,10_000,
+              50_000,50_000,50_000,50_000,50_000,50_000,50_000,50_000]
     coupled = true
     target_name = 'dataset'
 
@@ -100,7 +107,15 @@ seed = 8888
             target_name = 'dataset'
         [mcmc.parameters.step_size.sweep]
             default = 1.0
-            range = [1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2,1.0,0.2]
+            range = [
+              1.0,0.2,
+              1.0,0.2,
+              1.0,0.2,
+              1.0,0.2,
+              1.0,0.2,
+              1.0,0.2,
+              1.0,0.2
+            ]
             coupled = true
             target_name = 'dataset'
     [mcmc.destination_attraction]
