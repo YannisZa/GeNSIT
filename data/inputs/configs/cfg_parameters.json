@@ -116,6 +116,12 @@
         }
       },
       "dims": {
+        "time": {
+          "sweep": {
+            "default": true,
+            "range": true
+          }
+        },
         "origin": {
           "sweep": {
             "default": true,
@@ -207,12 +213,6 @@
       }
     },
     "num_steps": {
-      "sweep": {
-        "default": true,
-        "range": true
-      }
-    },
-    "data_size": {
       "sweep": {
         "default": true,
         "range": true

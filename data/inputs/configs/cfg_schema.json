@@ -96,10 +96,49 @@
         "valid-range": [1, null]
       },
 
+      "synthesis_method": {
+        "sweepable": false,
+        "optional": true,
+
+        "dtype": "str",
+        "default-value": "sde_solver",
+        "is-any-of": ["sde_solver", "sde_potential"]
+      },
+
+      "synthesis_n_samples": {
+        "sweepable": false,
+        "optional": true,
+
+        "dtype": "int",
+        "default-value": 1,
+        "valid-range": [1, null]
+      },
+
       "dims": {
         "sweepable": false,
         "optional": true,
 
+        "time": {
+          "sweepable": true,
+          "optional": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "int",
+              "default-value": 1,
+              "valid-range": [0, null],
+              "inclusive": false
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "list-length": [1, null],
+              "default-value": [1],
+              "valid-range": [0, null],
+              "inclusive": false
+            }
+          }
+        },
         "origin": {
           "sweepable": true,
           "optional": false,
@@ -875,11 +914,11 @@
   },
   "mcmc": {
     "sweepable": false,
-    "optional": false,
+    "optional": true,
 
     "disable_tqdm": {
       "sweepable": false,
-      "optional": false,
+      "optional": true,
       "dtype": "bool",
       "default-value": true
     },
@@ -894,11 +933,11 @@
     },
     "parameters": {
       "sweepable": false,
-      "optional": false,
+      "optional": true,
 
       "theta_steps": {
         "sweepable": false,
-        "optional": false,
+        "optional": true,
 
         "dtype": "int",
         "default-value": 1,
@@ -907,7 +946,7 @@
       },
       "covariance": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
@@ -939,7 +978,7 @@
       },
       "step_size": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
@@ -960,11 +999,11 @@
     },
     "destination_attraction": {
       "sweepable": false,
-      "optional": false,
+      "optional": true,
 
       "log_destination_attraction_steps": {
         "sweepable": false,
-        "optional": false,
+        "optional": true,
 
         "dtype": "int",
         "default-value": 1,
@@ -973,7 +1012,7 @@
       },
       "leapfrog_steps": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
@@ -994,7 +1033,7 @@
       },
       "ais_leapfrog_steps": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
@@ -1014,7 +1053,7 @@
       },
       "ais_samples": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
@@ -1034,7 +1073,7 @@
       },
       "n_bridging_distributions": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
@@ -1054,7 +1093,7 @@
       },
       "leapfrog_step_size": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
@@ -1074,7 +1113,7 @@
       },
       "ais_leapfrog_step_size": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
@@ -1095,27 +1134,6 @@
     }
   },
   "training": {
-    "data_size": {
-      "sweepable": true,
-      "optional": false,
-
-      "sweep": {
-        "default": {
-          "dtype": "int",
-          "default-value": 1,
-          "valid-range": [0.0, null],
-          "inclusive": false
-        },
-        "range": {
-          "dtype": "list",
-          "list-dtype": "int",
-          "list-length": [1, null],
-          "default-value": [1],
-          "valid-range": [0.0, null],
-          "inclusive": false
-        }
-      }
-    },
     "N": {
       "sweepable": true,
       "optional": false,
@@ -1162,7 +1180,7 @@
   },
   "neural_network": {
     "sweepable": false,
-    "optional": false,
+    "optional": true,
 
     "disable_tqdm": {
       "sweepable": false,
@@ -1197,7 +1215,7 @@
 
       "loss_name": {
         "sweepable": false,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
@@ -1261,7 +1279,7 @@
     },
     "hyperparameters": {
       "sweepable": false,
-      "optional": false,
+      "optional": true,
 
       "num_layers": {
         "sweepable": true,
@@ -1329,7 +1347,7 @@
       },
       "learning_rate": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
 
         "sweep": {
           "default": {
