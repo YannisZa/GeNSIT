@@ -4,9 +4,9 @@ import sys
 from typing import Any
 from copy import deepcopy
 from collections.abc import Iterable,Sequence
-from numpy import arange, isfinite, isnan, shape
+from numpy import arange, isfinite, isnan, shape, array, repeat
 
-from multiresticodm.utils import in_range,string_to_numeric,is_null
+from multiresticodm.utils import in_range,string_to_numeric,is_null,flatten
 
 def instantiate_data_type(
     data,
@@ -239,7 +239,7 @@ class Path(Str):
         return True
 
     def value(self):
-        return '' if isnan(self.data) else os.path.basename(self.data)
+        return '' if len(self.data) <=0 else os.path.basename(self.data)
 
 
 class File(Path):
@@ -460,7 +460,7 @@ class CustomList(NonPrimitiveEntry):
         # Remove 'dtype' key
         self.schema = {} 
         for k,v in schema.items():
-            if k ['dtype','sweepable','target_name','optional']:
+            if k in ['dtype','sweepable','target_name','optional']:
                 continue
             # Remove all non-primitive entry names from preffix
             stored = False
@@ -479,28 +479,56 @@ class CustomList(NonPrimitiveEntry):
     def value(self) -> list:
         return [None if is_null(datum.value()) else datum.value() for datum in self.data]
 
-    def parse(self,data,schema):
-        # Split by ':'
-        d = data.split(":")
-        # Count number of occurences of ':'
-        column_count = data.count(":")
-        # Get whether bounds are inclusive
-        inclusive = schema.get('inclusive',True)
-        if column_count > 0:
-            d = [string_to_numeric(elem) for elem in d]
-        if column_count == 1:
-            if inclusive:
-                return arange(d[0],d[1]+1).tolist(),True
-            else:
-                return arange(d[0],d[1]).tolist(),True
-        elif column_count == 2:
-            if inclusive:
-                return arange(d[0],d[1]+1,d[2]).tolist(),True
-            else:
-                return arange(d[0],d[1],d[2]).tolist(),True
-        else:
-            return [],False
 
+    def parse(self,data,schema):
+        if isinstance(data,str):
+            return self._parse(data,schema)
+        elif isinstance(data,Iterable):
+            results = []
+            successes = []
+            for datum in data:
+                res = array(self._parse(datum,schema))
+                results.append(res[0])
+                successes.append(res[1])
+            results = list(flatten(results))
+            return results, all(successes)
+        else:
+            return data,True
+        
+    def _parse(self,data,schema):
+        if isinstance(data,str):
+            if ":" in data:
+                # Split by ':'
+                d = data.split(":")
+                # Count number of occurences of ':'
+                column_count = data.count(":")
+                # Get whether bounds are inclusive
+                inclusive = schema.get('inclusive',True)
+                if column_count > 0:
+                    d = [string_to_numeric(elem) for elem in d]
+                if column_count == 1:
+                    if inclusive:
+                        return arange(d[0],d[1]+1).tolist(),True
+                    else:
+                        return arange(d[0],d[1]).tolist(),True
+                elif column_count == 2:
+                    if inclusive:
+                        return arange(d[0],d[1]+1,d[2]).tolist(),True
+                    else:
+                        return arange(d[0],d[1],d[2]).tolist(),True
+                else:
+                    return [],False
+            elif "repeat" in data:
+                # Clean string
+                repetition_str = data.split('(')[-1].split(')')[0]
+                # Elicit repetition arguments
+                number,reps = repetition_str.split(',')
+                # Convert to numeric
+                number = string_to_numeric(number)
+                reps = string_to_numeric(reps)
+                return repeat(number,reps).tolist(),True
+        else:
+            return data,True
 
     def check_parsing(self):
         try:

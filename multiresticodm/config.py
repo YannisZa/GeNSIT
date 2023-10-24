@@ -1,4 +1,5 @@
 import json
+import sys
 import toml
 import os.path
 
@@ -265,10 +266,10 @@ class Config:
                             raise Exception(f"""
                                 Key {'>'.join(key_path)} is compulsory but not included
                             """)
+
                     if key_path[-1] == 'sweep' and settings_found:
                         # 2: Check if argument is not sweepable but contains 
                         # a sweep parameter in settings
-
                         # Get schema of parameter configured for a sweep
                         schema_parent_val, _ = self.path_get(self.schema,key_path[:-1])
                         if not schema_parent_val["sweepable"]:
@@ -297,7 +298,8 @@ class Config:
                             except:
                                 raise Exception(f"""
                                     Key {'>'.join(key_path)} does not have a
-                                    'target_name' configuration for a sweep
+                                    'target_name' configuration for a sweep or
+                                    target_name does not exist
                                 """)
                             target_name = settings_val['target_name']
                             if target_name in list(self.coupled_sweep_paths.keys()):
@@ -428,7 +430,6 @@ class Config:
         # Keep track of the target name for each sweeped variable
         self.target_names_by_sweep_var = {}
         for key_path in self.isolated_sweep_paths.values():
-            # print('isolated',key_path)
             # Get sweep configuration
             sweep_input,_ = self.path_get(
                 settings=self.settings,

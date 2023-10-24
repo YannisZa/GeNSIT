@@ -323,6 +323,12 @@ def random_vector(
             scale=parameters.get("std",0.1),
             size=size
         ).astype('float32')
+    
+    elif distribution == "poisson":
+        return np.random.poisson(
+            lam=parameters.get("lam",1.0),
+            size=size
+        ).astype('float32')
 
     else:
         raise ValueError(f"Unrecognised distribution type {distribution}!")

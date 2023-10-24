@@ -680,7 +680,7 @@ class Outputs(object):
             
             # Get intensity model class
             self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
-            
+
             # Update experiment id
             self.experiment_id = self.update_experiment_directory_id(kwargs.get('experiment_id',None))
 
@@ -739,6 +739,8 @@ class Outputs(object):
         noise_level = noise_level.capitalize()
         
         if not 'experiment_title' in list(self.config['outputs'].keys()):
+            self.config['outputs']['experiment_title'] = ""
+        elif isinstance(self.config['outputs']['experiment_title'],Iterable):
             self.config['outputs']['experiment_title'] = ""
 
         if sweep_experiment_id is None:

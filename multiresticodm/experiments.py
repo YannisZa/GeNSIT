@@ -49,7 +49,7 @@ class ExperimentHandler(object):
 
     def __init__(self, config:Config, **kwargs):
         # Import logger
-        level = kwargs['logger'].level if 'logger' in list(kwargs.keys()) else config.get('level','INFO')
+        level = kwargs.get('level',None)
         self.logger = setup_logger(
             __name__,
             console_handler_level = level, 
@@ -57,7 +57,7 @@ class ExperimentHandler(object):
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
         self.logger.setLevels(
-            console_handler_level = level
+            console_level = level
         )
         
         # Get configuration
@@ -108,7 +108,7 @@ class ExperimentHandler(object):
 class Experiment(object):
     def __init__(self, config:Config, **kwargs):
         # Create logger
-        level = kwargs['logger'].level if 'logger' in list(kwargs.keys()) else config.get('level','INFO')
+        level = kwargs.get('console_level',None)
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
             console_handler_level = level, 
@@ -116,7 +116,7 @@ class Experiment(object):
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger lever
         self.logger.setLevels(
-            console_handler_level = level
+            console_level = level
         )
         
         self.logger.debug(f"{self}")
@@ -753,7 +753,7 @@ class SIM_MCMC(Experiment):
         super().__init__(config,**kwargs)
 
         # Fix random seed
-        rng = set_seed(self.seed)
+        set_seed(self.seed)
 
         # Enable garbage collections
         gc.enable()
@@ -2408,9 +2408,9 @@ class ExperimentSweep():
             new_config.settings["sweep_mode"] = False
             # Deactivate logging
             self.logger.setLevels(
-                console_handler_level = level
+                console_level='ERROR',
+                file_level='DEBUG'
             )
-            self.logger.setLevel('ERROR')
             
             # Activate sample exports
             new_config.settings['export_samples'] = True

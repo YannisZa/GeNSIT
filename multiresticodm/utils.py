@@ -814,8 +814,8 @@ def in_range(v,limits:list,allow_nan:bool=False,inclusive:bool=False):
 def is_null(v):
     if isinstance(v,str):
         return v == ''
-    elif isinstance(v,list):
-        return len(v) <= 0
+    elif isinstance(v,Iterable):
+        return any([is_null(val) for val in v])
     else:
         return v is None or np.isnan(v)
 
