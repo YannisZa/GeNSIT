@@ -9,10 +9,10 @@ in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 to_learn = ['alpha', 'beta']
-seed = 1234
-# [inputs.seed.sweep]
-  # default = 1234
-  # range = "1:10:1"
+# seed = 1234
+[inputs.seed.sweep]
+  default = 1234
+  range = "1:10:1"
 
 [inputs.data]
   origin_demand = 'origin_demand_sum_normalised.txt'
@@ -77,7 +77,7 @@ seed = 1234
   #   default = 10
   #   range = []
   # [training.N.sweep]
-  #   default = 100
+  #   default = 10
   #   range = [100,1000,10000]
 
 [neural_network]

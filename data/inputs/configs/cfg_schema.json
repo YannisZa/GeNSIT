@@ -631,10 +631,67 @@
         "sweepable": false,
         "optional": true,
 
-        "dtype": "file",
-        "file-exists": false,
-        "file-extension": "txt",
-        "default-value": "ground_truth_table.txt"
+        "file": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "ground_truth_table.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": ["ground_truth_table.txt"],
+              "unique-vals": true
+            }
+          }
+        },
+        "distribution": {
+          "sweepable": false,
+          "optional": true,
+
+          "dtype": "str",
+          "default-value": ["poisson"],
+          "is-any-of": ["poisson"]
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "list",
+              "list-list-dtype": "int",
+              "default-value": [[]]
+            }
+          }
+        },
+        "parameters": {
+          "sweepable": false,
+          "optional": true,
+
+          "lam": {
+            "sweepable": false,
+            "optional": true,
+
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [0, null]
+          }
+        }
       },
       "margins": {
         "sweepable": false,
@@ -669,6 +726,41 @@
             "dtype": "list",
             "list-dtype": "int",
             "default-value": []
+          }
+        }
+      }
+    }
+  },
+  "contingency_table": {
+    "sweepable": false,
+    "optional": true,
+
+    "sparse_margins": {
+      "sweepable": false,
+      "optional": true,
+
+      "dtype": "bool",
+      "default-value": true
+    },
+    "constraints": {
+      "sweepable": false,
+      "optional": true,
+
+      "axes": {
+        "sweepable": true,
+        "optional": true,
+
+        "sweep": {
+          "default": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": [0, 1]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "list",
+            "list-list-dtype": "int",
+            "default-value": [[0, 1]]
           }
         }
       },
@@ -1131,6 +1223,57 @@
           }
         }
       }
+    },
+    "contingency_table": {
+      "sweepable": false,
+      "optional": true,
+
+      "table_steps": {
+        "sweepable": false,
+        "optional": true,
+
+        "dtype": "int",
+        "default-value": 1,
+        "value-range": [1, null]
+      },
+      "proposal": {
+        "sweepable": true,
+        "optional": true,
+
+        "sweep": {
+          "default": {
+            "dtype": "str",
+            "default-value": "direct_sampling",
+            "is-any-of": ["degree_one", "degree_higher", "direct_sampling"]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "str",
+            "default-value": ["direct_sampling"],
+            "is-any-of": ["degree_one", "degree_higher", "direct_sampling"]
+          }
+        }
+      },
+      "table0": {
+        "sweepable": false,
+        "optional": true,
+
+        "dtype": "str",
+        "default-value": "maximum_entropy_solution",
+        "is-any-of": [
+          "direct_sampling",
+          "random_sample",
+          "maximum_entropy_solution"
+        ]
+      },
+      "margin0": {
+        "sweepable": false,
+        "optional": true,
+
+        "dtype": "str",
+        "default-value": "multinomial",
+        "is-any-of": ["multinomial", "import"]
+      }
     }
   },
   "training": {
@@ -1145,7 +1288,7 @@
           "valid-range": [1, null]
         },
         "range": {
-          "dtype": "list",
+          "dtype": "customList",
           "list-dtype": "int",
           "list-length": [1, null],
           "default-value": [1],
@@ -1587,11 +1730,20 @@
       "default-value": "./data/outputs/"
     },
     "experiment_title": {
+      "sweepable": true,
       "optional": true,
-      "sweepable": false,
 
-      "dtype": "str",
-      "default-value": ""
+      "sweep": {
+        "default": {
+          "dtype": "str",
+          "default-value": ""
+        },
+        "range": {
+          "dtype": "list",
+          "list-dtype": "str",
+          "default-value": [""]
+        }
+      }
     }
   }
 }

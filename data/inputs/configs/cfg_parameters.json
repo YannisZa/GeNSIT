@@ -96,7 +96,18 @@
           "std": false
         }
       },
-      "table": true,
+      "table": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        },
+        "distribution": false,
+        "parameters": {
+          "lam": false
+        }
+      },
       "margins": [
         {
           "axis": true,
@@ -109,12 +120,6 @@
           "value": true
         }
       ],
-      "cells": {
-        "sweep": {
-          "default": true,
-          "range": true
-        }
-      },
       "dims": {
         "time": {
           "sweep": {
@@ -133,6 +138,23 @@
             "default": true,
             "range": true
           }
+        }
+      }
+    }
+  },
+  "contingency_table": {
+    "sparse_margins": true,
+    "constraints": {
+      "axes": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "cells": {
+        "sweep": {
+          "default": true,
+          "range": true
         }
       }
     }
@@ -276,6 +298,19 @@
           "range": true
         }
       }
+    },
+    "contingency_table": {
+      "sweepable": false,
+      "optional": true,
+      "table_steps": true,
+      "proposal": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "table0": true,
+      "margin0": true
     }
   },
   "neural_network": {
@@ -342,6 +377,11 @@
     "write_start": true,
     "write_every": true,
     "out_directory": true,
-    "experiment_title": true
+    "experiment_title": {
+      "sweep": {
+        "default": true,
+        "range": true
+      }
+    }
   }
 }
