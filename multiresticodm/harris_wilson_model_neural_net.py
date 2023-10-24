@@ -227,15 +227,15 @@ class HarrisWilson_NN:
             config: settings regarding model (hyper)parameters and other settings
         '''
         # Setup logger
-        level = kwargs['logger'].level if 'logger' in list(kwargs.keys()) else physics_model.config.get('level','INFO')
+        level = kwargs.get('level',None)
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            console_handler_level = level,
+            console_level = level,
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
         self.logger.setLevels(
-            console_handler_level = level
+            console_level = level
         )
         # Store random number generator
         self._rng = rng

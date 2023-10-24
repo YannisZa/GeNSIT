@@ -37,10 +37,10 @@ class OutputSummary(object):
 
     def __init__(self, settings, **kwargs):
         # Setup logger
-        level = kwargs['console_level'] if kwargs.get('console_level',None) is not None else None
+        level = kwargs.get('level',None)
         self.logger = setup_logger(
             __name__,
-            console_handler_level = level,
+            console_level = level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
 
         # Get command line settings
@@ -522,17 +522,14 @@ class Outputs(object):
                  input_slice:dict={},
                  **kwargs):
         # Setup logger
-        console_level = kwargs['console_level'] if kwargs.get('console_level',None) is not None else None
-        file_level = kwargs['file_level'] if kwargs.get('file_level',None) is not None else None
+        level = kwargs.get('level',None)
         self.logger = setup_logger(
             module,
-            console_handler_level = console_level,
-            file_handler_level = file_level
+            console_level = level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update config level
         self.logger.setLevels(
-            console_level = console_level,
-            file_level = file_level
+            console_level = level
         )
 
         # Sample names must be a subset of all data names
@@ -587,7 +584,11 @@ class Outputs(object):
             self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
             
             # Define config experiment path to directory
-            self.outputs_path = config
+            self.outputs_path = config if kwargs.get('base_dir') is None \
+            else os.path.join(
+                kwargs['base_dir'],
+                self.experiment_id
+            ) 
 
             # Import all input data
             self.inputs = Inputs(
@@ -689,7 +690,10 @@ class Outputs(object):
                     self.config['outputs']['out_directory'],
                     self.config['inputs']['dataset'],
                     self.experiment_id
-            )
+            ) if kwargs.get('base_dir') is None else os.path.join(
+                    kwargs['base_dir'],
+                    self.experiment_id
+            ) 
     
             # Name output sample directory according 
             # to sweep params (if they are provided)
@@ -705,7 +709,6 @@ class Outputs(object):
                         value = sigma_to_noise_regime(sweep_params[v])
                     # Else use passed sweep value
                     else:
-                        print(v,sweep_params.keys())
                         value = sweep_params[v]
                     # Add to key-value pair to unique sweep id
                     sweep_id.append(f"{str(v)}_{str(value)}")

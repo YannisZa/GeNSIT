@@ -28,10 +28,10 @@ class Inputs:
             **kwargs
     ):  
         # Import logger
-        level = kwargs['console_level'] if kwargs.get('console_level',None) is not None else None
+        level = kwargs.get('level',None)
         self.logger = setup_logger(
             __name__,
-            console_handler_level = level, 
+            console_level = level, 
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
         self.logger.setLevels(
@@ -249,10 +249,10 @@ class Inputs:
                 # Check that no cells exceed any of the margins
                 for cell, value in cells.items():
                     try:
-                        assert len(cell) == self.ndims() and cell < np.asarray(list(unpack_dims(self.data.dims.values(),time_dims=False)))
+                        assert len(cell) == self.ndims() and cell < np.asarray(list(unpack_dims(self.data.dims,time_dims=False)))
                     except:
                         self.logger.error(f"Cell has length {len(cell)}. The number of table dims are {self.ndims()}")
-                        self.logger.error(f"Cell is equal to {cell}. The cell bounds are {np.asarray(list(unpack_dims(self.data.dims.values(),time_dims=False)))}")
+                        self.logger.error(f"Cell is equal to {cell}. The cell bounds are {np.asarray(list(unpack_dims(self.data.dims,time_dims=False)))}")
                     for ax in cell:
                         if tuplize(ax) in self.margins.keys():
                             try:

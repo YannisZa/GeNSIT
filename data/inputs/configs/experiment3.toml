@@ -110,7 +110,7 @@ load_experiment = ''
 [[experiments]]
   type = 'NonJointTableSIM_NN'
   comment = 'Non-independent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
-  disable_tqdm = false
+  disable_tqdm = true
   print_statements = true
   export_samples = true
   export_metadata = true
@@ -120,7 +120,7 @@ load_experiment = ''
 [[experiments]]
   type = 'JointTableSIM_NN'
   comment = 'dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
-  disable_tqdm = false
+  disable_tqdm = true
   print_statements = true
   export_samples = true
   export_metadata = true

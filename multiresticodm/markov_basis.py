@@ -21,9 +21,10 @@ def instantiate_markov_basis(ct:ContingencyTable,**kwargs): #-> Union[MarkovBasi
 class MarkovBasis(object):
     def __init__(self, ct:ContingencyTable,**kwargs):
         # Setup logger
+        level = kwargs.get('level',None)
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            console_handler_level = ct.config.level if ct.config else kwargs.get('level','INFO'),
+            console_level = level,
             log_to_console=kwargs.get('log_to_console',True),
         ) if kwargs.get('logger',None) is None else kwargs['logger']
 

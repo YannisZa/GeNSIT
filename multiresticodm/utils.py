@@ -242,8 +242,8 @@ def str_to_tuple(s:str) -> Tuple[int,int]:
     return (int(s.split('(')[1].split(',')[0]),int(s.split(',')[1].split(')')[0]))
 
 
-def ndims(__self__,time_dims):
-    return np.sum([1 for dim in unpack_dims(__self__.data.dims.values(),time_dims=time_dims) if dim > 1],dtype='uint8')
+def ndims(__self__,time_dims:bool=True):
+    return np.sum([1 for dim in unpack_dims(__self__.data.dims,time_dims=time_dims) if dim > 1],dtype='uint8')
 
 
 def deep_get(key, value):
@@ -851,8 +851,8 @@ def string_to_numeric(s):
 
 def setup_logger(
         name,
-        console_handler_level:str=None,
-        file_handler_level:str=None,
+        console_level:str=None,
+        file_console_level:str=None,
     ):
     print('setting up new logger',name)
 
@@ -863,12 +863,12 @@ def setup_logger(
     # Get logger
     logger = DualLogger(
         name = name,
-        level = console_handler_level
+        level = console_level
     )
 
     logger.setLevels(
-        console_level = console_handler_level,
-        file_level = file_handler_level
+        console_level = console_level,
+        file_level = file_console_level
     )
 
     return logger

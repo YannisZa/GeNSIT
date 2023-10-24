@@ -230,7 +230,7 @@ def exec(logger,settings,config_path,**kwargs):
     config = Config(
         path=config_path,
         settings=None,
-        console_handler_level = settings.get('logging_mode','info'),
+        console_level = settings.get('logging_mode','info'),
         logger=logger
     )
 
@@ -340,14 +340,14 @@ def create(
     # Setup logger
     logger = setup_logger(
         __name__,
-        console_handler_level = settings.get('logging_mode','info'),
+        console_level = settings.get('logging_mode','info'),
     )
 
     # Read config
     config = Config(
         path=config_path,
         settings=None,
-        console_handler_level = settings.get('logging_mode','info'),
+        console_level = settings.get('logging_mode','info'),
         logger=logger
     )
     # Update settings with overwritten values
@@ -505,7 +505,7 @@ def run(
     # Setup logger
     logger = setup_logger(
         __name__,
-        console_handler_level = settings.get('logging_mode','info'),
+        console_level = settings.get('logging_mode','info'),
     )
     exec(logger,settings=settings,config_path=config_path,run_experiments=run_experiments)
 
@@ -745,8 +745,8 @@ def plot(
     # Setup logger
     logger = setup_logger(
         __name__,
-        console_handler_level = settings.get('logging_mode','trace'),
-        file_handler_level = 'DEBUG'
+        console_level = settings.get('logging_mode','trace'),
+        file_console_level = 'DEBUG'
     )
     
     # Run plot
@@ -832,7 +832,7 @@ def summarise(
     # Setup logger
     logger = setup_logger(
         __name__,
-        console_handler_level = settings.get('logging_mode','info'),
+        console_level = settings.get('logging_mode','info'),
     )
     logger.info('Gathering data')
 

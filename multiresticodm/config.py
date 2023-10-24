@@ -23,7 +23,7 @@ class Config:
         self.level = kwargs.get('level','INFO')
         self.logger = setup_logger(
             __name__,
-            console_handler_level = self.level,
+            console_level = self.level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         
         # Sweep mode activated is set to false
@@ -414,7 +414,7 @@ class Config:
                 param_sizes += [f"{k}: "+','.join([f"{v['vars']}" ])+f" ({v['length']})"]
                 total_sizes += [v['length']]
         
-        param_sizes_str = " x ".join(param_sizes)
+        param_sizes_str = "\n --- ".join(['']+param_sizes)
         total_size_str = reduce(mul,total_sizes)
 
         return sweep_configurations, param_sizes_str, total_size_str

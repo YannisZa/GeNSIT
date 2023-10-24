@@ -47,10 +47,10 @@ class Plot(object):
 
     def __init__(self,plot_ids:List[str],settings:dict,**kwargs):
         # Setup logger
-        level = kwargs['console_level'] if kwargs.get('console_level',None) is not None else None
+        level = kwargs.get('level',None)
         self.logger = setup_logger(
             __name__,
-            console_handler_level = level,
+            console_level = level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
 
         # Enable garbage collector
