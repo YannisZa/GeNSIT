@@ -52,7 +52,7 @@ class ExperimentHandler(object):
         level = kwargs.get('level',None)
         self.logger = setup_logger(
             __name__,
-            console_handler_level = level, 
+            console_level = level, 
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
@@ -108,10 +108,10 @@ class ExperimentHandler(object):
 class Experiment(object):
     def __init__(self, config:Config, **kwargs):
         # Create logger
-        level = kwargs.get('console_level',None)
+        level = kwargs.get('level',None)
         self.logger = setup_logger(
             __name__+kwargs.get('instance',''),
-            console_handler_level = level, 
+            console_level = level, 
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger lever
@@ -121,31 +121,11 @@ class Experiment(object):
         
         self.logger.debug(f"{self}")
         # Make sure you are reading a config
-        if isinstance(config,dict):
-            config = Config(
-                settings=config,
-                logger = self.logger
-            )
-        elif not isinstance(config,Config):
+        if not isinstance(config,Config):
             raise Exception(f'config provided has invalid type {type(config)}')
 
         # Store config
         self.config = config
-        if len(self.config['inputs'].get('load_experiment',[])) > 0:
-            # Get path
-            filepath = self.config['inputs'].get('load_experiment','')
-            # Load metadata
-            settings = read_json(path.join(filepath,path.basename(filepath)+'_metadata.json'))
-            # Deep update config settings based on metadata
-            settings_flattened = deep_flatten(settings,parent_key='',sep='')
-            # Remove load experiment 
-            del settings_flattened['load_experiment']
-            deep_updates(self.config.settings,settings_flattened,overwrite=True)
-            # Merge settings to config
-            self.config = Config(
-                settings={**self.config, **settings_flattened},
-                logger = self.logger
-            )
         
         # Update config with current timestamp ( but do not overwrite)
         datetime_results = list(deep_get(key='datetime',value=self.config.settings))
@@ -157,6 +137,7 @@ class Experiment(object):
         # Inherit experiment id from parameter sweep (if it exists)
         # This will be used to create a unique output directory for every sweep
         self.sweep_experiment_id = kwargs.get('experiment_id',None)
+        self.outputs_base_dir = kwargs.get('base_dir','')
 
         # Update current config
         # self.config = self.sim.config.update_recursively(self.config,updated_config,overwrite=True)
@@ -181,7 +162,7 @@ class Experiment(object):
         # print('current_device',torch.cuda.current_device())
 
         # Disable tqdm if needed
-        self.tqdm_disabled = kwargs.get('tqdm_disabled',False)
+        self.tqdm_disabled = self.config['experiments'][0].get('disable_tqdm',True)
 
         # Count the number of gradient descent steps
         self._time = 0
@@ -377,8 +358,8 @@ class Experiment(object):
             if 'table' in self.output_names:
                 self.tables = self.outputs.h5group.create_dataset(
                     "table",
-                    (0,*dims),
-                    maxshape=(None,*dims),
+                    (0,*unpack_dims(dims,time_dims=False)),
+                    maxshape=(None,*unpack_dims(dims,time_dims=False)),
                     chunks=True,
                     compression=3,
                 )
@@ -533,18 +514,18 @@ class Experiment(object):
     def update_metadata(self):
         if hasattr(self,'theta_acc'):
             self.config['theta_acceptance'] = int(100*self.theta_acc[:].mean(axis=0))
-            self.logger.progress('Theta acceptance:',self.config['theta_acceptance'])
+            self.logger.progress(f"Theta acceptance: {self.config['theta_acceptance']}")
         if hasattr(self,'signs'):
             self.config['positives_percentage'] = int(100*self.signs[:].sum(axis=0))
-            self.logger.progress('Positives %:',self.config['positives_percentage'])
+            self.logger.progress(f"Positives %: {self.config['positives_percentage']}")
         if hasattr(self,'log_destination_attraction_acc'):
             self.config['log_destination_attraction_acceptance'] = int(100*self.log_destination_attraction_acc[:].mean(axis=0))
-            self.logger.progress('Log destination attraction acceptance:',self.config['log_destination_attraction_acceptance'])
+            self.logger.progress(f"Log destination attraction acceptance: {self.config['log_destination_attraction_acceptance']}")
         if hasattr(self,'table_acc'):
             self.config['table_acceptance'] = int(100*self.table_acc[:].mean(axis=0))
-            self.logger.progress('Table acceptance:',self.config['table_acceptance'])
+            self.logger.progress(f"Table acceptance: {self.config['table_acceptance']}")
         if hasattr(self,'losses'):
-            self.logger.progress('Average loss:',self.losses[:].mean(axis=0))
+            self.logger.progress(f'Average loss: {self.losses[:].mean(axis=0)}')
 
 class DataGeneration(Experiment):
 
@@ -813,6 +794,7 @@ class SIM_MCMC(Experiment):
             self.config,
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
+            base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
@@ -964,10 +946,10 @@ class SIM_MCMC(Experiment):
                 filename=f"metadata"
             )
         if self.config.settings.get('export_samples',True):
-            # Close h5 data file
-            self.outputs.h5file.close()
             # Write log file
-            self.outputs.write_log(self.logger)
+            self.outputs.write_log(self.logger.file)
+        # Close h5 data file
+        self.outputs.h5file.close()
         
         self.logger.note("Simulation run finished.")
 
@@ -1054,6 +1036,7 @@ class JointTableSIM_MCMC(Experiment):
             self.config,
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
+            base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
@@ -1253,10 +1236,10 @@ class JointTableSIM_MCMC(Experiment):
                 filename=f"metadata"
             )
         if self.config.settings.get('export_samples',True):
-            # Close h5 data file
-            self.outputs.h5file.close()
             # Write log file
-            self.outputs.write_log(self.logger)
+            self.outputs.write_log(self.logger.file)
+        # Close h5 data file
+        self.outputs.h5file.close()
         
         self.logger.note("Simulation run finished.")
 
@@ -1348,6 +1331,7 @@ class Table_MCMC(Experiment):
             self.config,
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
+            base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
@@ -1391,7 +1375,7 @@ class Table_MCMC(Experiment):
             disable=self.tqdm_disabled,
             leave=False,
             position=(self.device_id+1),
-            desc = f"NonJointTableSIM_NN device id: {self.device_id}"
+            desc = f"Table MCMC device id: {self.device_id}"
         ):
 
             # Track the epoch training time
@@ -1436,10 +1420,10 @@ class Table_MCMC(Experiment):
                 filename=f"metadata"
             )
         if self.config.settings.get('export_samples',True):
-            # Close h5 data file
-            self.outputs.h5file.close()
             # Write log file
-            self.outputs.write_log(self.logger)
+            self.outputs.write_log(self.logger.file)
+        # Close h5 data file
+        self.outputs.h5file.close()
         
         self.logger.note("Simulation run finished.")
 
@@ -1732,6 +1716,7 @@ class SIM_NN(Experiment):
             self.config,
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
+            base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
@@ -1832,10 +1817,10 @@ class SIM_NN(Experiment):
                 filename=f"metadata"
             )
         if self.config.settings.get('export_samples',True):
-            # Close h5 data file
-            self.outputs.h5file.close()
             # Write log file
-            self.outputs.write_log(self.logger)
+            self.outputs.write_log(self.logger.file)
+        # Close h5 data file
+        self.outputs.h5file.close()
         
         self.logger.note("Simulation run finished.")
 
@@ -1935,6 +1920,7 @@ class NonJointTableSIM_NN(Experiment):
             self.config,
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
+            base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
@@ -1981,7 +1967,7 @@ class NonJointTableSIM_NN(Experiment):
             disable=self.tqdm_disabled,
             leave=False,
             position=(self.device_id+1),
-            desc = f"Table MCMC device id: {self.device_id}"
+            desc = f"NonJointTableSIM_NN device id: {self.device_id}"
         ):
 
             # Track the epoch training time
@@ -2015,7 +2001,7 @@ class NonJointTableSIM_NN(Experiment):
                 log_intensity = self.harris_wilson_nn.physics_model.intensity_model.log_intensity(
                     log_destination_attraction = log_destination_attraction_sample_expanded,
                     grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))],
-                    **dict(zip(self.harris_wilson_nn.parameters_to_learn,theta_sample_expanded.split(1,dim=1)))
+                    **dict(zip(self.harris_wilson_nn.physics_model.params_to_learn,theta_sample_expanded.split(1,dim=1)))
                 ).squeeze()
 
                 # Sample table
@@ -2058,10 +2044,10 @@ class NonJointTableSIM_NN(Experiment):
                 filename=f"metadata"
             )
         if self.config.settings.get('export_samples',True):
-            # Close h5 data file
-            self.outputs.h5file.close()
             # Write log file
-            self.outputs.write_log(self.logger)
+            self.outputs.write_log(self.logger.file)
+        # Close h5 data file
+        self.outputs.h5file.close()
         
         self.logger.note("Simulation run finished.")
 
@@ -2161,6 +2147,7 @@ class JointTableSIM_NN(Experiment):
             self.config,
             module=__name__+kwargs.get('instance',''),
             sweep_params=kwargs.get('sweep_params',{}),
+            base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
@@ -2241,7 +2228,7 @@ class JointTableSIM_NN(Experiment):
                 log_intensity = self.harris_wilson_nn.physics_model.intensity_model.log_intensity(
                     log_destination_attraction = log_destination_attraction_sample_expanded,
                     grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))],
-                    **dict(zip(self.harris_wilson_nn.parameters_to_learn,theta_sample_expanded.split(1,dim=1)))
+                    **dict(zip(self.harris_wilson_nn.physics_model.params_to_learn,theta_sample_expanded.split(1,dim=1)))
                 ).squeeze()
                 
                 # Sample table
@@ -2289,10 +2276,10 @@ class JointTableSIM_NN(Experiment):
                 filename=f"metadata"
             )
         if self.config.settings.get('export_samples',True):
-            # Close h5 data file
-            self.outputs.h5file.close()
             # Write log file
-            self.outputs.write_log(self.logger)
+            self.outputs.write_log(self.logger.file)
+        # Close h5 data file
+        self.outputs.h5file.close()
         
         self.logger.note("Simulation run finished.")
 
@@ -2307,7 +2294,7 @@ class ExperimentSweep():
         # Setup logger
         self.logger = setup_logger(
             __name__,
-            console_handler_level = config.level,
+            console_level = config.level,
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
 
@@ -2341,23 +2328,29 @@ class ExperimentSweep():
         if isinstance(self.config['inputs']['dataset'],dict):
             dir_range = deepcopy(self.config['inputs']['dataset']['sweep']['range'])
             self.config['inputs']['dataset'] = dir_range[0]
-
+        
         self.outputs = Outputs(
             self.config,
             sweep_params=kwargs.get('sweep_params',{}),
             logger = self.logger
         )
-        # Prepare writing to file
-        self.outputs.open_output_file(kwargs.get('sweep_params',{}))
-        # Enable it again
+
+        # Make output home directory
+        self.outputs_base_dir = self.outputs.outputs_path
+        self.outputs_experiment_id = self.outputs.experiment_id
+        
+        # # Prepare writing to file
+        # self.outputs.open_output_file(kwargs.get('sweep_params',{}))
+
+        # # Enable it again
         deep_updates(self.config.settings,{'export_samples':export_samples})
 
-        # Write metadata
-        if self.config.settings['experiments'][0].get('export_metadata',True):
-            self.outputs.write_metadata(
-                dir_path='',
-                filename=f"config"
-            )
+        # # Write metadata
+        # if self.config.settings['experiments'][0].get('export_metadata',True):
+        #     self.outputs.write_metadata(
+        #         dir_path='',
+        #         filename=f"config"
+        #     )
 
         if len(dir_range) > 0:
             self.config['inputs']['dataset'] = dir_range
@@ -2380,79 +2373,76 @@ class ExperimentSweep():
         total_size_str = self.config.prepare_sweep_configurations(self.sweep_params)
 
         self.logger.info(f"{self.outputs.experiment_id}")
-        self.logger.info(f"Parameter space size: {param_sizes_str}. Total = {total_size_str}.")
+        self.logger.info(f"Parameter space size: {param_sizes_str}")
+        self.logger.info(f"Total = {total_size_str}.")
         self.logger.info(f"Preparing configs...")
         
         # For each configuration update experiment config 
         # and instantiate new experiment
-        self.prepare_experiments_sequential(sweep_configurations)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             # Decide whether to run sweeps in parallel or not
             if self.n_workers > 1:
-                self.run_parallel()
-                # self.run_concurrent()
+                self.run_parallel(sweep_configurations)
+                # self.run_concurrent(sweep_configurations)
             else:
-                self.run_sequential()
+                self.run_sequential(sweep_configurations)
         
-    def prepare_experiments_sequential(self,sweep_configurations):
-        for sval in tqdm(
-            sweep_configurations,
-            total=len(sweep_configurations),
-            leave=False,
-            desc='Preparing experiments'
-        ):
-            # Create new config
-            new_config = deepcopy(self.config)
-            # Deactivate sweep             
-            new_config.settings["sweep_mode"] = False
-            # Deactivate logging
-            self.logger.setLevels(
-                console_level='ERROR',
-                file_level='DEBUG'
+    def prepare_experiment(self,sweep_configuration):
+        # Create new config
+        new_config = deepcopy(self.config)
+        # Deactivate sweep             
+        new_config.settings["sweep_mode"] = False
+        # Deactivate logging
+        self.logger.setLevels(
+            console_level='ERROR',
+            file_level='DEBUG'
+        )
+        
+        # Activate sample exports
+        new_config.settings['export_samples'] = True
+        # Create sweep dictionary
+        sweep = {}
+        # Update config
+        i = 0
+        for value in self.sweep_params['isolated'].values():
+            new_config.path_set(
+                new_config,
+                sweep_configuration[i],
+                value['path']
             )
-            
-            # Activate sample exports
-            new_config.settings['export_samples'] = True
-            # Create sweep dictionary
-            sweep = {}
-            # Update config
-            i = 0
-            for value in self.sweep_params['isolated'].values():
+            # Update current sweep
+            sweep[value['var']] = sweep_configuration[i]
+            i += 1
+        for sweep_group in self.sweep_params['coupled'].values():
+            for value in sweep_group.values():
                 new_config.path_set(
                     new_config,
-                    sval[i],
+                    sweep_configuration[i],
                     value['path']
                 )
                 # Update current sweep
-                sweep[value['var']] = sval[i]
+                sweep[value['var']] = sweep_configuration[i]
                 i += 1
-            for sweep_group in self.sweep_params['coupled'].values():
-                for value in sweep_group.values():
-                    new_config.path_set(
-                        new_config,
-                        sval[i],
-                        value['path']
-                    )
-                    # Update current sweep
-                    sweep[value['var']] = sval[i]
-                    i += 1
-            # Append to experiments
-            self.experiment_configs.append({"config":new_config,"sweep":sweep})
+        # Return config and sweep params
+        return new_config,sweep
     
-    def instantiate_and_run(self,instance_num:int,config_and_sweep:dict,semaphore=None,counter=None):
-    
+    def prepare_instantiate_and_run(self,instance_num:int,sweep_configuration:dict,semaphore=None,counter=None):
+        # Prepare experiment
+        config,sweep = self.prepare_experiment(sweep_configuration)
+        
         self.logger.info(f'Instance = {str(instance_num)} START')
+
         if semaphore is not None:
             semaphore.acquire()
         # Create new experiment
         new_experiment = instantiate_experiment(
-            experiment_type=config_and_sweep['config'].settings['experiment_type'],
-            config=config_and_sweep['config'],
-            sweep_params=config_and_sweep['sweep'],
+            experiment_type=config.settings['experiment_type'],
+            config=config,
+            sweep_params=sweep,
             instance=str(instance_num),
-            experiment_id=self.outputs.experiment_id,
-            tqdm_disabled=False,
+            base_dir=self.outputs_base_dir,
+            experiment_id=self.outputs_experiment_id,
             device_id=(instance_num%self.n_workers),
             logger=self.logger,
         )
@@ -2465,38 +2455,38 @@ class ExperimentSweep():
                 counter.value += 1
         self.logger.info(f'Instance = {str(instance_num)} DONE')
 
-    def run_sequential(self):
-        for instance,conf_and_sweep in tqdm(
-            enumerate(self.experiment_configs),
-            total=len(self.experiment_configs),
+    def run_sequential(self,sweep_configurations):
+        for instance,sweep_config in tqdm(
+            enumerate(sweep_configurations),
+            total=len(sweep_configurations),
             desc='Running sweeps in sequence',
             leave=False,
             position=0
         ):
-            self.instantiate_and_run(
+            self.prepare_instantiate_and_run(
                 instance_num=instance,
-                config_and_sweep=conf_and_sweep,
+                sweep_configuration=sweep_config,
                 semaphore=None,
                 counter=None
             )
     
-    def run_parallel(self):
+    def run_parallel(self,sweep_configurations):
         # Run experiments in parallel
         semaphore = mp.Semaphore(self.n_workers)
         counter = mp.Value('i', 0, lock=True)
         processes = []
         with tqdm(
-            total=len(self.experiment_configs), 
+            total=len(sweep_configurations), 
             desc='Running sweeps in parallel',
             leave=False,
             position=0
         ) as pbar:
-            for instance,conf_and_sweep in enumerate(self.experiment_configs):
+            for instance,sweep_config in enumerate(sweep_configurations):
                 p = mp.Process(
-                    target=self.instantiate_and_run, 
+                    target=self.prepare_instantiate_and_run, 
                     args=(
                         instance, 
-                        conf_and_sweep, 
+                        sweep_config, 
                         semaphore,
                         counter
                     )
@@ -2510,11 +2500,7 @@ class ExperimentSweep():
                 pbar.update(counter.value - pbar.n)
 
             for p in processes:
-                p.join()
-
-            for p in processes:
                 p.close()
             
-    def run_process(self,process):
-        process.run()
-        return True
+            for p in processes:
+                p.join()
