@@ -18,6 +18,12 @@
         "range": true
       }
     },
+    "to_learn": {
+      "sweep": {
+        "default": true,
+        "range": true
+      }
+    },
     "load_experiment": true,
     "data": {
       "data_generation_seed": true,
@@ -315,14 +321,14 @@
   },
   "neural_network": {
     "disable_tqdm": true,
-    "to_learn": {
-      "sweep": {
-        "default": true,
-        "range": true
-      }
-    },
-    "loss_function": {
+    "loss": {
       "loss_name": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "loss_function": {
         "sweep": {
           "default": true,
           "range": true

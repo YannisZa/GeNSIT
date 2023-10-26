@@ -37,14 +37,14 @@
       "optional": true,
       "dtype": "int",
       "default-value": 1,
-      "valid-range": [1, 16]
+      "valid-range": [1, 32]
     },
     "n_threads": {
       "sweepable": false,
       "optional": true,
       "dtype": "int",
       "default-value": 8,
-      "valid-range": [1, 16]
+      "valid-range": [1, 32]
     },
     "device": {
       "sweepable": false,
@@ -74,6 +74,27 @@
           "list-length": [1, null],
           "list-dtype": "str",
           "default-value": ["synthetic_2x3_N_100/"]
+        }
+      }
+    },
+    "to_learn": {
+      "sweepable": true,
+      "optional": false,
+
+      "sweep": {
+        "default": {
+          "dtype": "list",
+          "list-dtype": "str",
+          "default-value": ["alpha", "beta", "sigma"],
+          "is-any-of": ["alpha", "beta", "kappa", "delta", "sigma"]
+        },
+        "range": {
+          "dtype": "list",
+          "list-dtype": "list",
+          "list-list-dtype": "str",
+          "default-value": [["alpha", "beta", "sigma"]],
+          "is-any-of": ["alpha", "beta", "kappa", "delta", "sigma"],
+          "unique-vals": true
         }
       }
     },
@@ -120,7 +141,7 @@
 
         "time": {
           "sweepable": true,
-          "optional": false,
+          "optional": true,
 
           "sweep": {
             "default": {
@@ -141,7 +162,7 @@
         },
         "origin": {
           "sweepable": true,
-          "optional": false,
+          "optional": true,
 
           "sweep": {
             "default": {
@@ -160,7 +181,7 @@
 
         "destination": {
           "sweepable": true,
-          "optional": false,
+          "optional": true,
 
           "sweep": {
             "default": {
@@ -693,12 +714,38 @@
           }
         }
       },
+      "total_cost_by_origin": {
+        "sweepable": false,
+        "optional": true,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "total_distance_to_work.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": ["total_distance_to_work.txt"],
+              "unique-vals": true
+            }
+          }
+        }
+      },
       "margins": {
         "sweepable": false,
         "optional": true,
 
-        "dtype": "list",
-        "list-dtype": "customDict",
+        "dtype": "customDict",
         "dict-key-dtype": "str",
         "dict-value-schema": {
           "file": {
@@ -1331,38 +1378,52 @@
       "dtype": "bool",
       "default-value": true
     },
-    "to_learn": {
-      "sweepable": true,
-      "optional": false,
-
-      "sweep": {
-        "default": {
-          "dtype": "list",
-          "list-dtype": "str",
-          "default-value": ["alpha", "beta", "sigma"],
-          "is-any-of": ["alpha", "beta", "kappa", "delta", "sigma"]
-        },
-        "range": {
-          "dtype": "list",
-          "list-dtype": "list",
-          "list-list-dtype": "str",
-          "default-value": [["alpha", "beta", "sigma"]],
-          "is-any-of": ["alpha", "beta", "kappa", "delta", "sigma"],
-          "unique-vals": true
-        }
-      }
-    },
-    "loss_function": {
+    "loss": {
       "sweepable": false,
       "optional": true,
 
       "loss_name": {
-        "sweepable": false,
+        "sweepable": true,
         "optional": true,
 
         "sweep": {
           "default": {
-            "dtype": "str",
+            "dtype": "list",
+            "list-dtype": "str",
+            "list-length": [1, null],
+            "default-value": ["destination_attraction_ts_loss"],
+            "is-any-of": [
+              "destination_attraction_ts_loss",
+              "table_likelihood_loss",
+              "total_distance_travelled_loss"
+            ],
+            "unique-vals": true
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "list",
+            "list-length": [1, null],
+            "list-list-dtype": "int",
+            "list-list-length": [1, null],
+            "default-value": [["destination_attraction_ts_loss"]],
+            "is-any-of": [
+              "destination_attraction_ts_loss",
+              "table_likelihood_loss",
+              "total_distance_travelled_loss"
+            ],
+            "unique-vals": true
+          }
+        }
+      },
+      "loss_function": {
+        "sweepable": true,
+        "optional": true,
+
+        "sweep": {
+          "default": {
+            "dtype": "list",
+            "list-dtype": "str",
+            "list-length": [1, null],
             "default-value": "mseloss",
             "is-any-of": [
               "l1loss",
@@ -1385,13 +1446,18 @@
               "cosineembeddingloss",
               "multimarginloss",
               "tripletmarginloss",
-              "tripletmarginwithdistanceloss"
-            ]
+              "tripletmarginwithdistanceloss",
+              "custom"
+            ],
+            "unique-vals": false
           },
           "range": {
             "dtype": "list",
-            "list-dtype": "str",
-            "default-value": ["mseloss"],
+            "list-dtype": "list",
+            "list-length": [1, null],
+            "list-list-dtype": "int",
+            "list-list-length": [1, null],
+            "default-value": [["mseloss"]],
             "is-any-of": [
               "l1loss",
               "mseloss",
@@ -1413,7 +1479,8 @@
               "cosineembeddingloss",
               "multimarginloss",
               "tripletmarginloss",
-              "tripletmarginwithdistanceloss"
+              "tripletmarginwithdistanceloss",
+              "custom"
             ],
             "unique-vals": true
           }
@@ -1644,8 +1711,7 @@
     "sweepable": false,
     "optional": false,
 
-    "dtype": "list",
-    "list-dtype": "customDict",
+    "dtype": "customDict",
     "dict-key-dtype": "str",
     "dict-value-schema": {
       "type": {
@@ -1704,6 +1770,15 @@
   "outputs": {
     "sweepable": false,
     "optional": false,
+
+    "chunk_size": {
+      "sweepable": false,
+      "optional": true,
+
+      "dtype": "int",
+      "default-value": 1,
+      "valid-range": [1, null]
+    },
 
     "write_start": {
       "sweepable": false,

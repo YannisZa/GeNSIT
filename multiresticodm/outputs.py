@@ -2,8 +2,8 @@ import os
 import re
 import gc
 import sys
-import logging
 import time
+import logging
 import traceback
 import h5py as h5
 import numpy as np
@@ -12,11 +12,11 @@ import pandas as pd
 import geopandas as gpd
 
 from tqdm import tqdm
+from torch import int32
 from pathlib import Path
 from copy import deepcopy
 from functools import partial
 from datetime import datetime
-from torch import int32, float32
 from typing import Union,List,Tuple
 from itertools import product,chain
 from multiprocessing.pool import Pool
@@ -584,11 +584,7 @@ class Outputs(object):
             self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
             
             # Define config experiment path to directory
-            self.outputs_path = config if kwargs.get('base_dir') is None \
-            else os.path.join(
-                kwargs['base_dir'],
-                self.experiment_id
-            ) 
+            self.outputs_path = config if kwargs.get('base_dir') is None else kwargs['base_dir']
 
             # Import all input data
             self.inputs = Inputs(
@@ -690,10 +686,7 @@ class Outputs(object):
                     self.config['outputs']['out_directory'],
                     self.config['inputs']['dataset'],
                     self.experiment_id
-            ) if kwargs.get('base_dir') is None else os.path.join(
-                    kwargs['base_dir'],
-                    self.experiment_id
-            ) 
+            ) if kwargs.get('base_dir') is None else kwargs['base_dir']
     
             # Name output sample directory according 
             # to sweep params (if they are provided)
@@ -782,23 +775,30 @@ class Outputs(object):
             makedir(os.path.join(self.outputs_path,'figures'))
             makedir(os.path.join(self.outputs_path,'sample_derivatives'))
 
-    def write_log(self,logger):
-        if isinstance(logger,logging.Logger):
-            for i,hand in enumerate(logger.handlers):
+    def write_log(self):
+        if isinstance(self.logger,DualLogger):
+            for i,hand in enumerate(self.logger.file.handlers):
                 if isinstance(hand,logging.FileHandler):
                     # Do not write to temporary filename
                     if not hand.filename.startswith("logs/temp_"):
                         # Close handler
-                        logger.handlers[i].flush()
-                        logger.handlers[i].close()
+                        self.logger.file.handlers[i].flush()
+                        self.logger.file.handlers[i].close()
+        elif isinstance(self.logger,logging.Logger):
+            for i,hand in enumerate(self.logger.handlers):
+                if isinstance(hand,logging.FileHandler):
+                    # Do not write to temporary filename
+                    if not hand.filename.startswith("logs/temp_"):
+                        # Close handler
+                        self.logger.handlers[i].flush()
+                        self.logger.handlers[i].close()
         else:
-            raise Exception(f'Cannot write outputs of invalid type logger {type(logger)}')
+            raise Exception(f'Cannot write outputs of invalid type logger {type(self.logger)}')
         
 
     def write_metadata(self,dir_path:str,filename:str) -> None:
         # Define filepath
         filepath = os.path.join(self.outputs_path,dir_path,f"{filename.split('.')[0]}.json")
-        # print('writing metadata',filepath)
         if (os.path.exists(filepath) and self.config['experiments'][0]['overwrite']) or (not os.path.exists(filepath)):
             if isinstance(self.config,Config):
                 write_json(self.config.settings,filepath,indent=2)
@@ -819,13 +819,32 @@ class Outputs(object):
             # Write to file
             if export_samples:
                 self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
-                self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5"), mode="w")
+                try:
+                    self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5"), mode="w")
+                except:
+                    print(self.sweep_id)
+                    print(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5"))
+                    print(os.path.exists(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5")))
+                    raise Exception('FAILED')
+                    # sys.exit()
                 self.h5group = self.h5file.create_group(self.experiment_id)
                 # Store sweep configurations as attributes 
                 self.h5group.attrs.create("sweep_params",list(sweep_params.keys()))
                 self.h5group.attrs.create("sweep_values",['' if val is None else str(val) for val in sweep_params.values()])
                 # Update log filename
-                if isinstance(self.logger,logging.Logger):
+                if isinstance(self.logger,DualLogger):
+                    for i,hand in enumerate(self.logger.file.handlers):
+                        if isinstance(hand,logging.FileHandler):
+                            # Make directory
+                            makedir(os.path.join(self.outputs_path,'samples',self.sweep_id))
+                            # Define filename
+                            self.logger.file.handlers[i].filename = os.path.join(
+                                self.outputs_path,
+                                'samples',
+                                self.sweep_id,
+                                f"outputs.log"
+                            )
+                elif isinstance(self.logger,logging.Logger):
                     for i,hand in enumerate(self.logger.handlers):
                         if isinstance(hand,logging.FileHandler):
                             # Make directory
@@ -837,7 +856,6 @@ class Outputs(object):
                                 self.sweep_id,
                                 f"outputs.log"
                             )
-
 
     def slice_sample_iterations(self,samples):
         # Get burnin parameter

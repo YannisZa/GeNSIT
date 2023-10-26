@@ -1,0 +1,131 @@
+{
+  "log_level": "info",
+  "sweep_mode": false,
+  "inputs": {
+    "n_workers": 24,
+    "n_threads": 1,
+    "device": "cpu",
+    "to_learn": [
+      "alpha",
+      "beta"
+    ],
+    "in_directory": "./data/inputs/",
+    "dataset": "cambridge_work_commuter_lsoas_to_msoas",
+    "load_experiment": "",
+    "seed": 1,
+    "data": {
+      "origin_demand": {
+        "file": "origin_demand_sum_normalised.txt"
+      },
+      "destination_attraction_ts": {
+        "file": "destination_attraction_time_series_sum_normalised.txt"
+      },
+      "cost_matrix": {
+        "file": "cost_matrices/clustered_facilities_sample_20x20_20_01_2023_sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_prob_origin_destination_adjusted_normalised_boundary_only_edge_corrected_cost_matrix_max_normalised.txt"
+      },
+      "ground_truth_table": {
+        "file": "table_lsoas_to_msoas.txt"
+      },
+      "total_cost_by_origin": {
+        "file": "lsoas_total_distance_to_work.txt"
+      }
+    },
+    "dims": {
+      "origin": 69,
+      "destination": 13,
+      "time": 1
+    }
+  },
+  "contingency_table": {
+    "sparse_margins": true,
+    "constraints": {
+      "axes": [],
+      "cells": ""
+    }
+  },
+  "spatial_interaction_model": {
+    "name": "TotallyConstrained",
+    "grand_total": 33704,
+    "parameters": {
+      "bmax": 1.0,
+      "alpha": 1.0,
+      "beta": 1.0
+    }
+  },
+  "harris_wilson_model": {
+    "dt": 0.001,
+    "parameters": {
+      "epsilon": 1.0,
+      "sigma": 0.01414213515818119,
+      "delta": 0.014880955219268799,
+      "kappa": 1.1934525966644287,
+      "bmax": 1.0,
+      "noise_percentage": 3.0,
+      "noise_var": 0.005921068601310253
+    }
+  },
+  "training": {
+    "num_steps": 1,
+    "batch_size": 1,
+    "N": 10
+  },
+  "mcmc": {
+    "disable_tqdm": true,
+    "mcmc_workers": 1,
+    "contingency_table": {
+      "table_steps": 1,
+      "proposal": "direct_sampling",
+      "table0": "maximum_entropy_solution",
+      "margin0": "multinomial"
+    }
+  },
+  "neural_network": {
+    "disable_tqdm": true,
+    "hyperparameters": {
+      "num_layers": 1,
+      "optimizer": "Adam",
+      "learning_rate": 0.002,
+      "biases": {
+        "default": [
+          0.0,
+          4.0
+        ],
+        "layer_specific": {}
+      },
+      "nodes_per_layer": {
+        "default": 20,
+        "layer_specific": {}
+      },
+      "activation_funcs": {
+        "default": "linear",
+        "layer_specific": {
+          "1": "abs"
+        }
+      }
+    }
+  },
+  "experiments": [
+    {
+      "type": "JointTableSIM_NN",
+      "comment": "Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks",
+      "disable_tqdm": true,
+      "print_statements": true,
+      "export_samples": true,
+      "export_metadata": true,
+      "overwrite": true
+    }
+  ],
+  "outputs": {
+    "chunk_size": 20000,
+    "write_start": 1,
+    "write_every": 1,
+    "out_directory": "./data/outputs/",
+    "experiment_title": ""
+  },
+  "run_experiments": {
+    "JointTableSIM_NN": 1
+  },
+  "experiment_type": "JointTableSIM_NN",
+  "datetime": "26_10_2023_21_30_20",
+  "noise_regime": "low"
+}

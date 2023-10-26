@@ -10,15 +10,9 @@ in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
-  default = "1:10000:1"
-  range = [
-    "1:10000:1","1:10000:1","1:10000:1",
-    "1:1000:1","1:1000:1","1:1000:1",
-    "1:100:1","1:100:1","1:100:1",
-    "1:10:1","1:10:1","1:10:1",
-    "1:1:1","1:1:1","1:1:1"
-  ]
-
+  default = 1#"1:10000:1"
+  range = ["1:10000:1","1:1000:1","1:100:1","1:10:1","1:1:1"]
+  
 [inputs.data]
     [inputs.data.origin_demand]
       file = 'origin_demand_sum_normalised.txt'
@@ -29,8 +23,10 @@ load_experiment = ''
       sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_\
       prob_origin_destination_adjusted_normalised_boundary_only_\
       edge_corrected_cost_matrix_max_normalised.txt"""
-    [inputs.data.table]
+    [inputs.data.ground_truth_table]
       file = 'table_lsoas_to_msoas.txt'
+    [inputs.data.total_cost_by_origin]
+      file = 'lsoas_total_distance_to_work.txt'
 
 [contingency_table]
   sparse_margins = false
@@ -59,6 +55,7 @@ load_experiment = ''
   dt = +0.001
   [harris_wilson_model.parameters]
     epsilon = 1.0
+    # sigma = 0.0141421356
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356
       range = [0.0141421356, 0.1414213562, nan]
@@ -67,14 +64,8 @@ load_experiment = ''
   num_steps = +1
   batch_size = +1
   [training.N.sweep]
-    default = "repeat(1,1)"
-    range = [
-      "repeat(10,10000)","repeat(10,10000)","repeat(10,10000)",
-      "repeat(10,1000)","repeat(10,1000)","repeat(10,1000)",
-      "repeat(10,100)","repeat(10,100)","repeat(10,100)",
-      "repeat(10,10)","repeat(10,10)","repeat(10,10)",
-      "repeat(1,1)","repeat(1,1)","repeat(1,1)"
-    ]
+    default = 10#"repeat(10,10000)"
+    range = ["repeat(10,10000)","repeat(100,1000)","repeat(1000,100)","repeat(10000,10)","repeat(100000,1)",]
     coupled = true
     target_name = 'seed'
 
@@ -90,8 +81,20 @@ load_experiment = ''
 
 [neural_network]
   disable_tqdm = true
-  [neural_network.loss_function] 
-    loss_name = 'mseloss'
+  [neural_network.loss.loss_name.sweep]
+    default = ['destination_attraction_ts_loss','total_distance_travelled_loss','table_likelihood_loss']
+    range = [
+          ['destination_attraction_ts_loss','total_distance_travelled_loss','table_likelihood_loss'],
+          ['destination_attraction_ts_loss','total_distance_travelled_loss'],
+          ['total_distance_travelled_loss']
+    ]
+  [neural_network.loss.loss_function.sweep]
+    default = ['mseloss','mseloss','custom']
+    range = [
+      ['mseloss','mseloss','custom'],
+      ['mseloss','mseloss'],
+      ['mseloss']
+    ]
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
@@ -109,7 +112,7 @@ load_experiment = ''
 
 [[experiments]]
   type = 'NonJointTableSIM_NN'
-  comment = 'Non-independent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  comment = 'Independent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
   disable_tqdm = true
   print_statements = true
   export_samples = true
@@ -119,7 +122,7 @@ load_experiment = ''
 
 [[experiments]]
   type = 'JointTableSIM_NN'
-  comment = 'dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
   disable_tqdm = true
   print_statements = true
   export_samples = true
@@ -128,6 +131,7 @@ load_experiment = ''
 
 
 [outputs]
+    chunk_size = +20_000
     write_start = +1
     write_every = +1
     out_directory = './data/outputs/'

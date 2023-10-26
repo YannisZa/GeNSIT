@@ -5,9 +5,6 @@ import json
 import click
 import torch
 import psutil
-import logging 
-
-from copy import deepcopy
 
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger
@@ -26,7 +23,7 @@ def set_threads(n_threads):
 
 
 # Get total number of threads
-AVAILABLE_CORES = psutil.cpu_count(logical=False)
+AVAILABLE_CORES = psutil.cpu_count(logical=True)
 AVAILABLE_THREADS = psutil.cpu_count(logical=True)
 
 class PythonLiteralOption(click.Option):
@@ -122,9 +119,9 @@ def cli():
 _common_options = [
     click.option('--norm', '-no', default='relative_l_1', show_default=True,
             type=click.Choice(NORMS), help=f'Sets norm to use in relevant plots.'),
-    click.option('--n_workers','-nw', type=click.IntRange(min=1,max=AVAILABLE_THREADS),
+    click.option('--n_workers','-nw', type=click.IntRange(min=1,max=AVAILABLE_CORES),
             default = '1', help = 'Overwrites number of independent workers used in multiprocessing'),
-    click.option('--n_threads','-nt', type=click.IntRange(min=1,max=AVAILABLE_CORES), 
+    click.option('--n_threads','-nt', type=click.IntRange(min=1,max=AVAILABLE_THREADS), 
                  default = '1',help = '''Overwrites number of threads (per worker) used in multithreading.
             If many are provided first is set as the numpy threads and the second as the numba threads'''),
     click.option('--logging_mode','-log', type=click.Choice(['debug', 'info', 'warning', 'critical']+LOG_LEVELS), default='info', 
@@ -367,7 +364,7 @@ def create(
     logger.info(f"Validating config provided...")
     
     # Validate config
-    config.validate_config()
+    config.validate_config(experiment_type=','.join(list(run_experiments.keys())))
 
 
     # Intialise experiment handler

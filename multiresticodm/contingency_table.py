@@ -74,6 +74,8 @@ class ContingencyTable(object):
         self.markov_basis_class = None
         # Flag for whether to allow sparse margins or not
         self.sparse_margins = False
+        # Initialise residual margins
+        self.residual_margins = {}
 
     def build(self, config, **kwargs):
         # Build contingency table
@@ -315,8 +317,6 @@ class ContingencyTable(object):
         if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:
             # Update table properties
             self.update_table_properties_from_table()
-            # Copy residal margins
-            self.residual_margins = deepcopy(self.data.margins)
         else:
             self.logger.warning('Valid contingency table was not provided. One will be randomly generated.')
             if not hasattr(self.data,'dims') or len(self.data.dims) <= 0:
@@ -674,8 +674,6 @@ class ContingencyTable(object):
             self.data.ground_truth_table = tab.int().to(dtype=int32,device=self.device)
         # Update table properties
         self.update_table_properties_from_table()
-        # Copy residal margins
-        self.residual_margins = deepcopy(self.data.margins)
 
     def update_table_properties_from_table(self) -> None:
         # Update dimensions
@@ -1171,10 +1169,11 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 # Update min residual
                 min_residual = self.maxent_given_constraints(min_residual,residual_margins)
                 if min_residual[smallest_value_cell] < 0 or any([v.sum() < 0 for v in residual_margins.values()]):
+                    self.logger.error('Failed to update min residual in maximum entropy solution')
                     print(min_residual)
                     print(table0.sum())
                     pprint(residual_margins)
-                    sys.exit()
+                    raise Exception('Failed to update min residual in maximum entropy solution')
 
             # Increment counter
             counter += 1

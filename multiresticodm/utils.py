@@ -163,6 +163,7 @@ def write_txt(data:Union[np.array,np.ndarray],filepath:str,**kwargs:Dict) -> Non
 
 
 def write_json(data:Dict,filepath:str,**kwargs:Dict) -> None:
+    # print(filepath.split("/samples/")[-1])
     with open(filepath, 'w') as f:
         json.dump(data,f,**kwargs)
 
@@ -390,6 +391,14 @@ def deep_flatten(d, parent_key='', sep='_'):
         else:
             items.append((new_key, v))
     return dict(items)
+
+def update_deep_dict(original, new_data, **kwargs):
+    for key, value in new_data.items():
+        if key in original and isinstance(original[key], dict) and isinstance(value, dict):
+            update_deep_dict(original[key], value)
+        else:
+            if kwargs.get('overwrite',True):
+                original[key] = value
 
 
 def deep_update(d,key,val,**kwargs):
@@ -967,3 +976,9 @@ def tuple_dim(x,dims=()):
         return tuple_dim(x[0],dims=dims)
     else:
         return dims
+    
+def divide_chunks(l, n): 
+      
+    # looping till length l 
+    for i in range(0, len(l), n):  
+        yield l[i:i + n] 

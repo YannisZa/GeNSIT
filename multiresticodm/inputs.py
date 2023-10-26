@@ -186,8 +186,7 @@ class Inputs:
         if not self.data_in_device:
             for input,schema in INPUT_SCHEMA.items():
                 if input not in ['dims','grand_total','margins','true_parameters'] and \
-                    hasattr(self.data,input) and \
-                    getattr(self.data,input) is not None:
+                    hasattr(self.data,input) and getattr(self.data,input) is not None:
                         setattr(
                             self.data,
                             input, 
@@ -196,7 +195,6 @@ class Inputs:
                                 tuple([self.data.dims[name] for name in schema['dims']])
                             ).to(device)
                         )
-
             if hasattr(self.data,'log_destination_attraction') and getattr(self.data,'log_destination_attraction') is not None:
                 self.data.log_destination_attraction = torch.squeeze(self.data.log_destination_attraction)
             if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
@@ -274,6 +272,7 @@ class Inputs:
     def receive_from_device(self):
         
         if self.data_in_device:
+            # Input data
             if hasattr(self.data,'origin_demand') and getattr(self.data,'origin_demand') is not None:
                 self.data.origin_demand = self.data.origin_demand.cpu().detach().numpy()
             if hasattr(self.data,'destination_attraction_ts') and getattr(self.data,'destination_attraction_ts') is not None:
@@ -284,12 +283,14 @@ class Inputs:
                 self.data.origin_attraction_ts = self.data.origin_attraction_ts.cpu().detach().numpy()
             if hasattr(self.data,'cost_matrix') and getattr(self.data,'cost_matrix') is not None:
                 self.data.cost_matrix = self.data.cost_matrix.cpu().detach().numpy().reshape(unpack_dims(self.data,time_dims=False))
-            if hasattr(self.data,'ground_truth_table') and getattr(self.data,'ground_truth_table') is not None:
-                self.data.ground_truth_table = self.data.ground_truth_table.cpu().detach().numpy().reshape(unpack_dims(self.data,time_dims=False))
             if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
                 self.data.grand_total = self.data.grand_total.cpu().detach().numpy()
             if hasattr(self.data,'margins') and getattr(self.data,'margins') is not None:
                 self.data.margins = {axis: margin.cpu().detach().numpy() for axis,margin in self.data.margins.items()}
+            if hasattr(self.data,'total_cost_by_origin') and getattr(self.data,'total_cost_by_origin') is not None:
+                self.data.total_cost_by_origin = self.data.total_cost_by_origin.cpu().detach().numpy()
+            if hasattr(self.data,'ground_truth_table') and getattr(self.data,'ground_truth_table') is not None:
+                self.data.ground_truth_table = self.data.ground_truth_table.cpu().detach().numpy().reshape(unpack_dims(self.data,time_dims=False))
             if hasattr(self,'true_parameters') and len(getattr(self,'true_parameters')) > 0:
                 for param in self.true_parameters.keys():
                     self.true_parameters[param] = self.true_parameters[param].cpu().detach().item()
@@ -458,12 +459,14 @@ class Inputs:
                 size=(self.data.dims['origin'], self.data.dims['destination']),
             )
         ).astype('float32')
+        self.data.total_cost_by_origin = self.data.cost_matrix.sum(dim=0)
 
         # Normalise to sum to one
         cost_matrix_max = deepcopy(self.data.cost_matrix.max())
         self.data.cost_matrix = (self.data.cost_matrix/cost_matrix_max)
         cost_matrix_max = 1
         # self.data.cost_matrix /= self.data.cost_matrix.sum()
+        self.data.total_cost_by_origin /= self.data.total_cost_by_origin.sum()
 
         # Extract the underlying parameters from the config
         parameter_settings = {
@@ -662,7 +665,6 @@ class Inputs:
         # print('\n')
         # print(destination_attraction_ts)
         # print(destination_attraction_ts.sum())
-        # sys.exit()
         return destination_attraction_ts
 
     def __str__(self):
@@ -676,12 +678,18 @@ class Inputs:
         dats = Path(dats['file'] if isinstance(dats,dict) else dats)
         cost = self.config.settings['inputs']['data']['cost_matrix']
         cost = Path(cost['file'] if isinstance(cost,dict) else cost)
+        table = self.config.settings['inputs']['data']['table']
+        table = Path(table['file'] if isinstance(table,dict) else table)
+        total_cost_by_origin = self.config.settings['inputs']['data']['total_cost_by_origin']
+        total_cost_by_origin = Path(total_cost_by_origin['file'] if isinstance(total_cost_by_origin,dict) else total_cost_by_origin)
 
         return f"""
             Dataset: {Path(self.config.settings['inputs']['dataset']).stem}
             Cost matrix: {cost.stem if len(cost) > 0 else ''}
+            Total cost by origin: {total_cost_by_origin.stem if len(total_cost_by_origin) > 0 else ''}
             Origin demand: {od.stem if len(od) > 0 else ''}
             Destination demand: {dd.stem if len(dd) > 0 else ''}
             Origin attraction time series: {oats.stem if len(oats) > 0 else ''}
             Destination attraction time series: {dats.stem if len(dats) > 0 else ''}
+            Ground truth table: {table.stem if len(table) > 0 else ''}
         """

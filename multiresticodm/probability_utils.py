@@ -68,44 +68,44 @@ def log_table_likelihood_total_derivative_wrt_x(likelihood_grad,intensity_grad_x
     # the derivative of the intensity wrt to x times the derivative of the table likelihood wrt x 
     return (likelihood_grad @ intensity_grad_x)
 
-def log_poisson_pmf_unnormalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_poisson_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Compute log intensity total
     log_total = torch.logsumexp(log_intensity.ravel(),dim=0)
     # Compute log pmf
     return -torch.exp(log_total) + (table.to(dtype=float32)*log_intensity).sum() - log_factorial_sum(table.ravel())
 
 
-def log_poisson_pmf_normalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_poisson_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Return log pmf
     return log_poisson_pmf_unnormalised(log_intensity,table)
 
 
-def poisson_pmf_ground_truth(log_intensity:torch.tensor,table:torch.tensor,axis:int=None) -> float:
+def poisson_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int=None) -> float:
     return torch.exp(log_intensity)
 
 
-def log_poisson_pmf_jacobian_wrt_intensity(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_poisson_pmf_jacobian_wrt_intensity(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Compute intensity
     intensity = torch.exp(log_intensity)
     # Compute likelihood derivative wrt to intensity
     return -1 + table/intensity
 
-def log_multinomial_pmf_unnormalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_multinomial_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Normalise log intensites by log rowsums to create multinomial probabilities
     log_probabilities = (log_intensity - torch.logsumexp(log_intensity.ravel(),dim=0))
     # Compute log pmf
     return (table.to(dtype=float32).ravel()*log_probabilities.ravel()).sum() - log_factorial_sum(table.ravel())
 
-def log_multinomial_pmf_normalised(log_intensity:torch.tensor,table:torch.tensor,) -> float:
+def log_multinomial_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor,) -> float:
     # Return log pmf
     return ((log_multinomial_pmf_unnormalised(log_intensity,table)) + log_factorial_sum(table.sum())).to(dtype=float32)
 
 
-def multinomial_pmf_ground_truth(log_intensity:torch.tensor,table:torch.tensor,axis:int=None) -> float:
+def multinomial_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int=None) -> float:
     return torch.sum(table)/torch.sum(torch.exp(log_intensity)) * torch.exp(log_intensity)
 
 
-def log_multinomial_pmf_jacobian_wrt_intensity(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_multinomial_pmf_jacobian_wrt_intensity(table:torch.tensor,log_intensity:torch.tensor) -> float:
     table = table.to(dtype=float32)
     # Compute intensity
     intensity = torch.exp(log_intensity).to(dtype=float32)
@@ -113,7 +113,7 @@ def log_multinomial_pmf_jacobian_wrt_intensity(log_intensity:torch.tensor,table:
     return table/intensity - torch.sum(table)/torch.sum(intensity)
 
 
-def log_product_multinomial_pmf_unnormalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_product_multinomial_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Compute log margins of intensity matrix
     log_rowsums = torch.logsumexp(log_intensity,dim=1).unsqueeze(1)
     # Normalise log intensites by log rowsums to create multinomial probabilities
@@ -122,20 +122,20 @@ def log_product_multinomial_pmf_unnormalised(log_intensity:torch.tensor,table:to
     return (table.to(dtype=float32).ravel()*log_probabilities.ravel()).sum() - log_factorial_sum(table.ravel())
 
 
-def log_product_multinomial_pmf_normalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_product_multinomial_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Return log pmf
     log_target = log_product_multinomial_pmf_unnormalised(log_intensity,table) + \
         log_factorial_sum(table.sum(dim=1).to(dtype=int32))
     return log_target
 
 
-def product_multinomial_pmf_ground_truth(log_intensity:torch.tensor,table:torch.tensor,axis:int=None) -> float:
+def product_multinomial_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int=None) -> float:
     if axis is None:
         axis = 1
     return torch.sum(table,dim=axis)/torch.sum(torch.exp(log_intensity),dim=axis) * torch.exp(log_intensity)
 
 
-def log_product_multinomial_pmf_jacobian_wrt_intensity(log_intensity:torch.tensor,table:torch.tensor):
+def log_product_multinomial_pmf_jacobian_wrt_intensity(table:torch.tensor,log_intensity:torch.tensor):
     # Get dimensions
     nrows,ncols = np.shape(table)
     intensity = torch.exp(log_intensity)
@@ -145,7 +145,7 @@ def log_product_multinomial_pmf_jacobian_wrt_intensity(log_intensity:torch.tenso
     # Normalise log intensites by log colsums to create multinomial probabilities
     return table/intensity - (table_rowsums/intensity_rowsums).reshape((nrows,1))
 
-def log_fishers_hypergeometric_pmf_unnormalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_fishers_hypergeometric_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Compute log odds ratio
     log_or = log_odds_ratio_wrt_intensity(log_intensity)
     # Compute log_probabilities
@@ -154,13 +154,13 @@ def log_fishers_hypergeometric_pmf_unnormalised(log_intensity:torch.tensor,table
     # Compute log pmf
     return (table.to(dtype=float32).ravel() * log_or_probabilities.ravel()).sum() - log_factorial_sum(table.ravel()).sum()
 
-def log_fishers_hypergeometric_pmf_normalised(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_fishers_hypergeometric_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Return log pmf
     return  log_fishers_hypergeometric_pmf_unnormalised(log_intensity,table) + \
         log_factorial_sum(table.sum(dim=0).to(dtype=int32))
 
 
-def fishers_hypergeometric_pmf_ground_truth(log_intensity:torch.tensor,table:torch.tensor,axis:int=None) -> float:
+def fishers_hypergeometric_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int=None) -> float:
     if axis is None:
         axis = 0
     # Compute odds ratio
@@ -168,7 +168,7 @@ def fishers_hypergeometric_pmf_ground_truth(log_intensity:torch.tensor,table:tor
     return torch.sum(table,dim=axis) * (odds_ratio / torch.sum(odds_ratio,dim=axis))
 
 
-def log_fishers_hypergeometric_pmf_jacobian_wrt_intensity(log_intensity:torch.tensor,table:torch.tensor) -> float:
+def log_fishers_hypergeometric_pmf_jacobian_wrt_intensity(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Dimensions
     nrows,ncols = np.shape(table)
     # Intensity

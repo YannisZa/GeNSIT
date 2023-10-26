@@ -14,7 +14,6 @@ PARAMETER_DEFAULTS = {
     'noise_percentage': 3,
     'sigma': 3,
 }
-MCMC_PARAMETERS = ['alpha','beta','delta','gamma','kappa','epsilon']
 
 XARRAY_SCHEMA = {
     'alpha': {
@@ -132,6 +131,7 @@ INPUT_SCHEMA = {
     "destination_attraction_ts":{"dims":['time','destination'],"axes":[0,1],"dtype":"float32", "ndmin":2},
     "log_destination_attraction":{"dims":['destination'],"axes":[0],"dtype":"float32", "ndmin":1},
     "cost_matrix":{"dims":['origin','destination'],"axes":[0,1],"dtype":"float32", "ndmin":2},
+    "total_cost_by_origin":{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":1},
     "ground_truth_table":{"dims":['origin','destination'],"axes":[0,1],"dtype":"int32", "ndmin":2},
     "dims":{},
     "grand_total":{}
@@ -141,6 +141,7 @@ TABLE_INFERENCE_EXPERIMENTS = ['nonjointtablesim_nn','jointtablesim_nn','jointta
 
 INPUT_TYPES = {
     'cost_matrix':torch.float32,
+    'total_cost_by_origin':torch.float32,
     'origin_demand':torch.float32,
     'destination_demand':torch.float32,
     'origin_attraction_ts':torch.float32,
@@ -267,16 +268,19 @@ SWEEPABLE_PARAMS = {
         "is_coord":True        
     },
     "origin_demand": {
-        "is_coord":False
+        "is_coord":True
     },
     "destination_attraction_ts": {
-        "is_coord":False
+        "is_coord":True
     },
     "cost_matrix": {
-        "is_coord":False
+        "is_coord":True
+    },
+    "total_cost_by_origin": {
+        "is_coord": False
     },
     "name": {
-        "is_coord":False
+        "is_coord":True
     },
     "alpha": {
         "is_coord":True
@@ -303,7 +307,7 @@ SWEEPABLE_PARAMS = {
         "is_coord":True
     },
     "N": {
-        "is_coord":False
+        "is_coord":True
     },
     "to_learn": {
         "is_coord":False
@@ -323,17 +327,26 @@ INTENSITY_MODELS = ['spatial_interaction_model']
 
 DATE_FORMATS = ['start,stop,step-%m-%Y','start,stop,step_%m_%Y','start,stop,step_%m', 'start,stop,step-%m']
 
-# Caching numba functions
-UTILS_CACHED =  True
-MATH_UTILS_CACHED =  True
-PROBABILITY_UTILS_CACHED = True
-
-# Parallelise numba functions
-NUMBA_PARALLELISE = False#True
 
 def sigmoid(beta=torch.tensor(1.0)):
     '''Extends the torch.nn.sigmoid activation function by allowing for a slope parameter.'''
     return lambda x: torch.sigmoid(beta * x)
+
+
+LOSS_DATA_REQUIREMENTS = {
+    'destination_attraction_ts_loss': {
+        "prediction_data": ['destination_attraction_ts'],
+        "validation_data": ['destination_attraction_ts'],
+    },
+    'table_likelihood_loss': {
+        "prediction_data": ['table'],
+        "validation_data": ['log_intensity']
+    },
+    'total_distance_travelled_loss': {
+        "prediction_data": ['table'],
+        "validation_data": ['cost_matrix','total_cost_by_origin']
+    }
+}
 
 # Pytorch loss functions
 LOSS_FUNCTIONS = {
@@ -358,6 +371,7 @@ LOSS_FUNCTIONS = {
     'multimarginloss': torch.nn.MultiMarginLoss,
     'tripletmarginloss': torch.nn.TripletMarginLoss,
     'tripletmarginwithdistanceloss': torch.nn.TripletMarginWithDistanceLoss,
+    'custom':None
 }
 
 # Pytorch activation functions.

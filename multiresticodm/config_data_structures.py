@@ -11,7 +11,7 @@ from multiresticodm.utils import in_range,string_to_numeric,is_null,flatten
 def instantiate_data_type(
     data,
     schema:dict,
-    key_path:list
+    key_path:list,
 ):  
     try:
         data_type = schema["dtype"]
@@ -88,6 +88,7 @@ class PrimitiveEntry(Entry):
         return True
     
     def check_scope(self):
+        valid_scope = self.schema.get("is-any-of",[])
         valid_scope = self.schema.get("is-any-of",[])
         if isinstance(valid_scope,list) and len(valid_scope) > 0:
             try: 

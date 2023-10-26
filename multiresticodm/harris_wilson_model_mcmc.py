@@ -979,7 +979,6 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             # print('\n')
             # print("Proposing " + str(log_destination_attraction_new))
             # print("Momentum " + str(momentum_new))
-            # sys.exit()
 
         # Compute proposal log Hamiltonian energy
         H_new = 0.5*torch.dot(momentum_new, momentum_new) + W_new
@@ -1175,7 +1174,6 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
             # print("Proposing " + str(log_destination_attraction_new))
             # print("Momentum " + str(momentum_new))
-            # sys.exit()
 
         # Compute proposal log Hamiltonian energy
         H_new = 0.5*torch.dot(momentum_new, momentum_new) + W_new

@@ -1,0 +1,34 @@
+{
+  "SIM_MCMC": {
+    "inputs>to_learn>sweep>is-any-of>default>default-value": ["alpha", "beta"],
+    "inputs>to_learn>sweep>is-any-of>default>is-any-of": ["alpha", "beta"],
+    "inputs>to_learn>sweep>is-any-of>range>default-value": [["alpha", "beta"]],
+    "inputs>to_learn>sweep>is-any-of>range>is-any-of": ["alpha", "beta"],
+    "harris_wilson_model>parameters>sigma>sweep>default>allow-nan": false,
+    "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false
+  },
+  "JointTableSIM_MCMC": {
+    "inputs>to_learn>sweep>is-any-of>default>default-value": ["alpha", "beta"],
+    "inputs>to_learn>sweep>is-any-of>default>is-any-of": ["alpha", "beta"],
+    "inputs>to_learn>sweep>is-any-of>range>default-value": [["alpha", "beta"]],
+    "inputs>to_learn>sweep>is-any-of>range>is-any-of": ["alpha", "beta"],
+    "harris_wilson_model>parameters>sigma>sweep>default>allow-nan": false,
+    "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false
+  },
+  "NonJointTableSIM_NN": {
+    "neural_network>loss>loss_name>sweep>default>is-any-of": [
+      "destination_attraction_ts_loss"
+    ],
+    "neural_network>loss>loss_name>sweep>range>is-any-of": [
+      "destination_attraction_ts_loss"
+    ]
+  },
+  "SIM_NN": {
+    "neural_network>loss>loss_name>sweep>default>is-any-of": [
+      "destination_attraction_ts_loss"
+    ],
+    "neural_network>loss>loss_name>sweep>range>is-any-of": [
+      "destination_attraction_ts_loss"
+    ]
+  }
+}

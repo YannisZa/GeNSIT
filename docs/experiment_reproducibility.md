@@ -115,14 +115,14 @@ clear; multiresticodm plot -o ./data/outputs/synthetic \
 
 ## Experiment 3
 
+Set ulimit -n 50000
+
 ### Independent (non-joint) Table and SIM
 
 clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
- -re NonJointTableSIM_NN -nw 8 -nt 3 -sm -dev cpu
+ -re NonJointTableSIM_NN -nw 24 -nt 1 -sm -dev cpu
 
 ## Neural Network
-
-Set ulimit -n 8000
 
 ### SIM only
 
