@@ -70,9 +70,10 @@ def log_table_likelihood_total_derivative_wrt_x(likelihood_grad,intensity_grad_x
 
 def log_poisson_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor) -> float:
     # Compute log intensity total
-    log_total = torch.logsumexp(log_intensity.ravel(),dim=0)
+    # log_total = torch.logsumexp(log_intensity.ravel(),dim=0)
     # Compute log pmf
-    return -torch.exp(log_total) + (table.to(dtype=float32)*log_intensity).sum() - log_factorial_sum(table.ravel())
+    return torch.sum(log_intensity)
+    # -torch.exp(log_total) + (table.to(dtype=float32)*log_intensity).sum() - log_factorial_sum(table.ravel())
 
 
 def log_poisson_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor) -> float:

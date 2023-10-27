@@ -843,5 +843,5 @@ def summarise(
     logger.info('Done')
 
 if __name__ == '__main__':
-    # run()
-    summarise()
+    run()
+    # summarise()

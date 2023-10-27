@@ -12,7 +12,8 @@ from torch import nn, float32
 from typing import Any, List, Union
 
 from multiresticodm.config import Config
-from multiresticodm.utils import safe_delete, setup_logger
+from multiresticodm.utils import setup_logger
+import multiresticodm.probability_utils as ProbabilityUtils
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS
 
@@ -258,6 +259,8 @@ class HarrisWilson_NN:
             # Get loss function
             loss_func = LOSS_FUNCTIONS.get(function.lower(),None)
             loss_func = loss.get(name,loss_func) if loss_func is None else loss_func()
+            if name == 'table_likelihood_loss':
+                loss_func = ProbabilityUtils.log_poisson_pmf_unnormalised
             if loss_func is None:
                 raise Exception(f"Loss {name} is missing loss function {function}.")
             else:
@@ -268,38 +271,47 @@ class HarrisWilson_NN:
             [torch.tensor(0.0, requires_grad=False)] * len(self.physics_model.params_to_learn)
         )
 
-    def evaluate_loss(self,predictions:dict,data:dict,aux_inputs:dict={}):
-        result = torch.tensor(0.0,dtype=float32,device=self.physics_model.device)
-        
+    def evaluate_loss(self,prediction_data:dict,validation_data:dict,aux_inputs:dict={}):
+        self.logger.debug('Loss function update')
+        result = torch.tensor(0.0, requires_grad=True) 
         for name in self.loss_functions.keys():
             # Make sure you have the necessary data
             for pred_dataset in LOSS_DATA_REQUIREMENTS[name]['prediction_data']:
                 try:
-                    assert predictions.get(pred_dataset,None) is not None
+                    assert prediction_data.get(pred_dataset,None) is not None
                 except:
                     raise Exception(f"Loss {name} is missing prediction data {pred_dataset}.")
             for validation_dataset in LOSS_DATA_REQUIREMENTS[name]['validation_data']:
                 try:
-                    data[validation_dataset] = data.get(validation_dataset) \
-                        if data.get(validation_dataset,None) is not None \
+                    validation_data[validation_dataset] = validation_data.get(validation_dataset) \
+                        if validation_data.get(validation_dataset,None) is not None \
                         else aux_inputs.get(validation_dataset,None)
-                    assert data[validation_dataset] is not None
+                    assert validation_data[validation_dataset] is not None
                 except:
                     raise Exception(f"Loss {name} is missing validation data {validation_dataset}.")
 
             if name == 'total_distance_travelled_loss':
                 # Calculate total cost incurred by travelling from every origin
-                total_cost_predicted = torch.tensordot(predictions['table'].to(dtype=float32),data['cost_matrix']).sum(dim=0)
+                total_cost_predicted = torch.tensordot(
+                    prediction_data['table'].to(dtype=float32),
+                    validation_data['cost_matrix']
+                ).sum(dim=0)
                 # Normalise to 1
-                total_cost_predicted /= total_cost_predicted.sum(dim=0)
+                normalised_total_cost_predicted = total_cost_predicted / total_cost_predicted.sum(dim=0)
                 # Add to total loss
-                result += self.loss_functions[name](total_cost_predicted,data['total_cost_by_origin'])
+                res = self.loss_functions[name](
+                    normalised_total_cost_predicted,
+                    validation_data['total_cost_by_origin']
+                )
             else:
                 # Add to total loss
                 pred_dataset = LOSS_DATA_REQUIREMENTS[name]['prediction_data'][0]
                 validation_dataset = LOSS_DATA_REQUIREMENTS[name]['validation_data'][0]
-                result += self.loss_functions[name](predictions[pred_dataset].to(dtype=float32),data[validation_dataset].to(dtype=float32))
-        
+                res = self.loss_functions[name](
+                    prediction_data[pred_dataset].to(dtype=float32),
+                    validation_data[validation_dataset].to(dtype=float32)
+                )
+        result = result + res
         return result
 
     def epoch(
@@ -360,7 +372,7 @@ class HarrisWilson_NN:
 
             # Update the model parameters after every batch and clear the loss
             if t % batch_size == 0 or t == len(validation_data) - 1:
-                loss.backward()
+                loss.backward(retain_graph=True)
                 self._neural_net.optimizer.step()
                 self._neural_net.optimizer.zero_grad()
                 self._time += 1
@@ -379,12 +391,8 @@ class HarrisWilson_NN:
     def epoch_time_step(
         self,
         *,
-        loss,
         experiment,
         validation_data: dict,
-        prediction_data: dict = {},
-        loss_functions: dict = {},
-        aux_inputs:dict = {},
         dt: float,
         **__,
     ):
@@ -406,21 +414,10 @@ class HarrisWilson_NN:
             dt=dt,
             requires_grad=True,
         )
-        self.logger.debug('Loss function update')
-        
-        # Add prediction of destination attraction to predicted data
-        # for evaluating the loss function
-        prediction_data['destination_attraction_ts'] = torch.flatten(predicted_dest_attraction)
-        # Update loss
-        loss = loss + self.evaluate_loss(
-            data = validation_data,
-            predictions = prediction_data,
-            aux_inputs = aux_inputs
-        )
-        
+                
         # Update number of processed steps
         experiment.n_processed_steps += 1
-        return loss, predicted_theta, torch.log(predicted_dest_attraction)
+        return predicted_theta, predicted_dest_attraction
 
 
     def __repr__(self):
