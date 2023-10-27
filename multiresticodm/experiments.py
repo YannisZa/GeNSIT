@@ -34,6 +34,7 @@ def instantiate_experiment(experiment_type:str,config:Config,**kwargs):
     has_coupled_sweep_paths = len(config.coupled_sweep_paths.values()) > 0
     has_isolated_sweep_paths = len(config.isolated_sweep_paths.values()) > 0
     if hasattr(sys.modules[__name__], experiment_type):
+        print(config.settings.get("sweep_mode",False))
         if config.settings.get("sweep_mode",False) and \
             (has_isolated_sweep_paths or has_coupled_sweep_paths):
             return ExperimentSweep(
@@ -137,7 +138,7 @@ class Experiment(object):
         # Inherit experiment id from parameter sweep (if it exists)
         # This will be used to create a unique output directory for every sweep
         self.sweep_experiment_id = kwargs.get('experiment_id',None)
-        self.outputs_base_dir = kwargs.get('base_dir','')
+        self.outputs_base_dir = kwargs.get('base_dir',None)
 
         # Update current config
         # self.config = self.sim.config.update_recursively(self.config,updated_config,overwrite=True)
