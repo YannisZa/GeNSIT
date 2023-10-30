@@ -398,6 +398,7 @@ class Config:
                     if settings_found:
                         # Get child key settings
                         settings_child_val, settings_child_found = self.path_get(settings,(key_path+['default']))
+
                         # Update settings with sweep default
                         try:
                             assert self.path_set(settings,settings_child_val,key_path[:-1])
@@ -410,6 +411,7 @@ class Config:
                     # without specifying a sweep configuration
                     else:
                         settings_child_val, settings_child_found = self.path_get(settings,key_path[:-1])
+
                         # If still no values have been provided
                         # Check if this setting is even compulsory
                         parent_schema_val, _ = self.path_get(base_schema,key_path[:-1])
@@ -417,8 +419,7 @@ class Config:
                             raise Exception(f"""
                                 Key {'>'.join(key_path[:-1])} is compulsory but not included
                             """)
-                        
-                        
+                    
                     # If this is the case we have modified the config
                     # Parse settings value into approapriate data structure
                     if settings_child_found:
@@ -559,6 +560,7 @@ class Config:
                 "path": key_path,
                 "values": sweep_vals
             }
+
             # Isolated sweeps have themselves as the target name
             self.target_names_by_sweep_var[key_path[-1]] = key_path[-1]
         coupled_val_lens = {}
@@ -579,6 +581,7 @@ class Config:
                     "path": key_path,
                     "values": sweep_vals
                 }
+
                 # Add key path length to dict
                 coupled_val_lens[target_name][key_path[-1]] = len(sweep_vals)
                 # Coupled sweeps have a common target name
