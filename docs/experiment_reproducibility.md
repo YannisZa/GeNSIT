@@ -117,6 +117,11 @@ clear; multiresticodm plot -o ./data/outputs/synthetic \
 
 Set ulimit -n 50000
 
+### NN SIM
+
+clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
+ -re SIM_NN -nw 24 -nt 1 -sm -dev cpu
+
 ### Independent (non-joint) Table and SIM
 
 clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
