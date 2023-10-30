@@ -73,7 +73,7 @@
           "dtype": "list",
           "list-length": [1, null],
           "list-dtype": "str",
-          "default-value": ["synthetic_2x3_N_100/"]
+          "default-value": "synthetic_2x3_N_100/"
         }
       }
     },
@@ -92,7 +92,7 @@
           "dtype": "list",
           "list-dtype": "list",
           "list-list-dtype": "str",
-          "default-value": [["alpha", "beta", "sigma"]],
+          "default-value": ["alpha", "beta", "sigma"],
           "is-any-of": ["alpha", "beta", "kappa", "delta", "sigma"],
           "unique-vals": true
         }
@@ -154,7 +154,7 @@
               "dtype": "list",
               "list-dtype": "int",
               "list-length": [1, null],
-              "default-value": [1],
+              "default-value": 1,
               "valid-range": [0, null],
               "inclusive": false
             }
@@ -174,7 +174,7 @@
               "dtype": "list",
               "list-length": [1, null],
               "list-dtype": "int",
-              "default-value": [1]
+              "default-value": 1
             }
           }
         },
@@ -193,7 +193,7 @@
               "dtype": "list",
               "list-dtype": "int",
               "list-length": [1, null],
-              "default-value": [1]
+              "default-value": 1
             }
           }
         }
@@ -219,7 +219,7 @@
               "list-dtype": "file",
               "file-exists": false,
               "file-extension": "txt",
-              "default-value": ["origin_demand.txt"],
+              "default-value": "origin_demand.txt",
               "unique-vals": true
             }
           }
@@ -238,7 +238,7 @@
               "dtype": "list",
               "list-dtype": "list",
               "list-list-dtype": "int",
-              "default-value": [[]]
+              "default-value": []
             }
           }
         },
@@ -247,7 +247,7 @@
           "optional": true,
 
           "dtype": "str",
-          "default-value": ["uniform"],
+          "default-value": "uniform",
           "is-any-of": ["uniform", "normal"]
         },
         "parameters": {
@@ -309,7 +309,7 @@
               "list-dtype": "file",
               "file-exists": false,
               "file-extension": "txt",
-              "default-value": ["destination_demand.txt"],
+              "default-value": "destination_demand.txt",
               "unique-vals": true
             }
           }
@@ -328,7 +328,7 @@
               "dtype": "list",
               "list-dtype": "list",
               "list-list-dtype": "int",
-              "default-value": [[]]
+              "default-value": []
             }
           }
         },
@@ -337,7 +337,7 @@
           "optional": true,
 
           "dtype": "str",
-          "default-value": ["uniform"],
+          "default-value": "uniform",
           "is-any-of": ["uniform", "normal"]
         },
         "parameters": {
@@ -399,7 +399,7 @@
               "list-dtype": "file",
               "file-exists": false,
               "file-extension": "txt",
-              "default-value": ["origin_attraction_ts.txt"],
+              "default-value": "origin_attraction_ts.txt",
               "unique-vals": true
             }
           }
@@ -418,7 +418,7 @@
               "dtype": "list",
               "list-dtype": "list",
               "list-list-dtype": "int",
-              "default-value": [[]]
+              "default-value": []
             }
           }
         },
@@ -427,7 +427,7 @@
           "optional": true,
 
           "dtype": "str",
-          "default-value": ["uniform"],
+          "default-value": "uniform",
           "is-any-of": ["uniform", "normal"]
         },
         "parameters": {
@@ -489,7 +489,7 @@
               "list-dtype": "file",
               "file-exists": false,
               "file-extension": "txt",
-              "default-value": ["destination_attraction_ts.txt"],
+              "default-value": "destination_attraction_ts.txt",
               "unique-vals": true
             }
           }
@@ -508,7 +508,7 @@
               "dtype": "list",
               "list-dtype": "list",
               "list-list-dtype": "int",
-              "default-value": [[]]
+              "default-value": []
             }
           }
         },
@@ -517,7 +517,7 @@
           "optional": true,
 
           "dtype": "str",
-          "default-value": ["uniform"],
+          "default-value": "uniform",
           "is-any-of": ["uniform", "normal"]
         },
         "parameters": {
@@ -579,7 +579,7 @@
               "list-dtype": "file",
               "file-exists": false,
               "file-extension": "txt",
-              "default-value": ["cost_matrix.txt"],
+              "default-value": "cost_matrix.txt",
               "unique-vals": true
             }
           }
@@ -589,7 +589,7 @@
           "optional": true,
 
           "dtype": "str",
-          "default-value": ["uniform"],
+          "default-value": "uniform",
           "is-any-of": ["uniform", "normal"]
         },
         "value": {
@@ -606,7 +606,7 @@
               "dtype": "list",
               "list-dtype": "list",
               "list-list-dtype": "int",
-              "default-value": [[]]
+              "default-value": []
             }
           }
         },
@@ -669,7 +669,7 @@
               "list-dtype": "file",
               "file-exists": false,
               "file-extension": "txt",
-              "default-value": ["ground_truth_table.txt"],
+              "default-value": "ground_truth_table.txt",
               "unique-vals": true
             }
           }
@@ -679,7 +679,7 @@
           "optional": true,
 
           "dtype": "str",
-          "default-value": ["poisson"],
+          "default-value": "poisson",
           "is-any-of": ["poisson"]
         },
         "value": {
@@ -696,7 +696,7 @@
               "dtype": "list",
               "list-dtype": "list",
               "list-list-dtype": "int",
-              "default-value": [[]]
+              "default-value": []
             }
           }
         },
@@ -735,7 +735,7 @@
               "list-dtype": "file",
               "file-exists": false,
               "file-extension": "txt",
-              "default-value": ["total_distance_to_work.txt"],
+              "default-value": "total_distance_to_work.txt",
               "unique-vals": true
             }
           }
@@ -762,7 +762,7 @@
                 "dtype": "list",
                 "list-dtype": "file",
                 "file-extension": "txt",
-                "default-value": ["margins.txt"]
+                "default-value": "margins.txt"
               }
             }
           },
@@ -800,13 +800,15 @@
         "sweep": {
           "default": {
             "dtype": "list",
-            "list-dtype": "int",
-            "default-value": [0, 1]
+            "list-dtype": "list",
+            "list-list-dtype": "int",
+            "default-value": [[0, 1]]
           },
           "range": {
             "dtype": "list",
             "list-dtype": "list",
-            "list-list-dtype": "int",
+            "list-list-dtype": "list",
+            "list-list-list-dtype": "int",
             "default-value": [[0, 1]]
           }
         }
@@ -827,7 +829,7 @@
             "list-dtype": "file",
             "file-exists": false,
             "file-extension": "txt",
-            "default-value": [""]
+            "default-value": ""
           }
         }
       }
@@ -851,7 +853,7 @@
           "dtype": "list",
           "list-length": [1, 2],
           "list-dtype": "str",
-          "default-value": ["TotallyConstrained"],
+          "default-value": "TotallyConstrained",
           "is-any-of": ["TotallyConstrained", "ProductionConstrained"],
           "unique-vals": true
         }
@@ -871,7 +873,7 @@
           "dtype": "list",
           "list-length": [1, null],
           "list-dtype": "int",
-          "default-value": [1]
+          "default-value": 1
         }
       }
     },
@@ -892,7 +894,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "float",
-            "default-value": [1.0],
+            "default-value": 1.0,
             "valid-range": [0.0, null],
             "unique-vals": true
           }
@@ -911,7 +913,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "float",
-            "default-value": [0.0],
+            "default-value": 0.0,
             "valid-range": [0.0, null],
             "unique-vals": true
           }
@@ -931,7 +933,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "float",
-            "default-value": [0.0],
+            "default-value": 0.0,
             "valid-range": [0.0, null],
             "inclusive": false,
             "unique-vals": true
@@ -958,7 +960,7 @@
           "dtype": "list",
           "list-dtype": "float",
           "valid-range": [0, 1],
-          "default-value": [0.001],
+          "default-value": 0.001,
           "unique-vals": true
         }
       }
@@ -980,7 +982,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "float",
-            "default-value": [0.0],
+            "default-value": 0.0,
             "valid-range": [0.0, null],
             "unique-vals": true
           }
@@ -1000,7 +1002,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "float",
-            "default-value": [0.0],
+            "default-value": 0.0,
             "valid-range": [0.0, null],
             "inclusive": false,
             "unique-vals": true
@@ -1015,13 +1017,13 @@
           "default": {
             "dtype": "float",
             "allow-nan": true,
-            "default-value": 0.0,
+            "default-value": null,
             "valid-range": [0.0, null]
           },
           "range": {
             "dtype": "list",
             "list-dtype": "float",
-            "default-value": [0.0],
+            "default-value": null,
             "valid-range": [0.0, null],
             "allow-nan": true,
             "unique-vals": true
@@ -1042,7 +1044,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "float",
-            "default-value": [0.0],
+            "default-value": 0.0,
             "valid-range": [0.0, null],
             "inclusive": false,
             "unique-vals": true
@@ -1128,7 +1130,7 @@
           },
           "range": {
             "dtype": "list",
-            "default-value": [1.0],
+            "default-value": 1.0,
             "list-dtype": "float",
             "value-range": [0.0, null],
             "inclusive": false
@@ -1162,7 +1164,7 @@
           },
           "range": {
             "dtype": "list",
-            "default-value": [1],
+            "default-value": 1,
 
             "list-dtype": "int",
             "value-range": [0, null],
@@ -1183,7 +1185,7 @@
           },
           "range": {
             "dtype": "list",
-            "default-value": [1],
+            "default-value": 1,
             "list-dtype": "int",
             "value-range": [0, null],
             "inclusive": false
@@ -1203,7 +1205,7 @@
           },
           "range": {
             "dtype": "list",
-            "default-value": [1],
+            "default-value": 1,
             "list-dtype": "int",
             "value-range": [0, null],
             "inclusive": false
@@ -1223,7 +1225,7 @@
           },
           "range": {
             "dtype": "list",
-            "default-value": [1],
+            "default-value": 1,
             "list-dtype": "int",
             "value-range": [0, null],
             "inclusive": false
@@ -1243,7 +1245,7 @@
           },
           "range": {
             "dtype": "list",
-            "default-value": [0.01],
+            "default-value": 0.01,
             "list-dtype": "float",
             "value-range": [0.0, null],
             "inclusive": false
@@ -1263,7 +1265,7 @@
           },
           "range": {
             "dtype": "list",
-            "default-value": [0.2],
+            "default-value": 0.2,
             "list-dtype": "float",
             "value-range": [0.0, null],
             "inclusive": false
@@ -1296,7 +1298,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "str",
-            "default-value": ["direct_sampling"],
+            "default-value": "direct_sampling",
             "is-any-of": ["degree_one", "degree_higher", "direct_sampling"]
           }
         }
@@ -1338,7 +1340,7 @@
           "dtype": "customList",
           "list-dtype": "int",
           "list-length": [1, null],
-          "default-value": [1],
+          "default-value": 1,
           "valid-range": [1, null]
         }
       }
@@ -1391,7 +1393,7 @@
             "dtype": "list",
             "list-dtype": "str",
             "list-length": [1, null],
-            "default-value": ["destination_attraction_ts_loss"],
+            "default-value": "destination_attraction_ts_loss",
             "is-any-of": [
               "destination_attraction_ts_loss",
               "table_likelihood_loss",
@@ -1405,7 +1407,7 @@
             "list-length": [1, null],
             "list-list-dtype": "int",
             "list-list-length": [1, null],
-            "default-value": [["destination_attraction_ts_loss"]],
+            "default-value": "destination_attraction_ts_loss",
             "is-any-of": [
               "destination_attraction_ts_loss",
               "table_likelihood_loss",
@@ -1457,7 +1459,7 @@
             "list-length": [1, null],
             "list-list-dtype": "int",
             "list-list-length": [1, null],
-            "default-value": [["mseloss"]],
+            "default-value": "mseloss",
             "is-any-of": [
               "l1loss",
               "mseloss",
@@ -1504,7 +1506,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "int",
-            "default-value": [1],
+            "default-value": 1,
             "valid-range": [1, null],
             "unique-vals": true
           }
@@ -1536,7 +1538,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "str",
-            "default-value": ["Adam"],
+            "default-value": "Adam",
             "is-any-of": [
               "Adagrad",
               "Adam",
@@ -1568,7 +1570,7 @@
           "range": {
             "dtype": "list",
             "list-dtype": "float",
-            "default-value": [0.002],
+            "default-value": 0.002,
             "valid-range": [0, 1],
             "unique-vals": true
           }
@@ -1816,7 +1818,7 @@
         "range": {
           "dtype": "list",
           "list-dtype": "str",
-          "default-value": [""]
+          "default-value": ""
         }
       }
     }

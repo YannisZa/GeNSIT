@@ -19,7 +19,13 @@
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
       "destination_attraction_ts_loss"
     ],
+    "neural_network>loss>loss_name>sweep>default>default-value": [
+      "destination_attraction_ts_loss"
+    ],
     "neural_network>loss>loss_name>sweep>range>is-any-of": [
+      "destination_attraction_ts_loss"
+    ],
+    "neural_network>loss>loss_name>sweep>range>default-value": [
       "destination_attraction_ts_loss"
     ]
   },
@@ -27,7 +33,13 @@
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
       "destination_attraction_ts_loss"
     ],
+    "neural_network>loss>loss_name>sweep>default>default-value": [
+      "destination_attraction_ts_loss"
+    ],
     "neural_network>loss>loss_name>sweep>range>is-any-of": [
+      "destination_attraction_ts_loss"
+    ],
+    "neural_network>loss>loss_name>sweep>range>default-value": [
       "destination_attraction_ts_loss"
     ]
   }

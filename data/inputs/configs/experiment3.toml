@@ -10,7 +10,7 @@ in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
-  default = 1#"1:10000:1"
+  default = 1
   range = ["1:10000:1","1:1000:1","1:100:1","1:10:1","1:1:1"]
   
 [inputs.data]
@@ -31,11 +31,11 @@ load_experiment = ''
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
-    default = []
-    range = [[], [[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
+    default = [[+0,+1]]
+    range = [[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
   [contingency_table.constraints.cells.sweep]
     default = ''
-    range = ['','','','',
+    range = ['','','',
       'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
       'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
     ]
@@ -64,7 +64,7 @@ load_experiment = ''
   num_steps = +1
   batch_size = +1
   [training.N.sweep]
-    default = 10#"repeat(10,10000)"
+    default = 10
     range = ["repeat(10,10000)","repeat(100,1000)","repeat(1000,100)","repeat(10000,10)","repeat(100000,1)",]
     coupled = true
     target_name = 'seed'
@@ -81,20 +81,23 @@ load_experiment = ''
 
 [neural_network]
   disable_tqdm = true
-  [neural_network.loss.loss_name.sweep]
-    default = ['destination_attraction_ts_loss','total_distance_travelled_loss','table_likelihood_loss']
-    range = [
-          ['destination_attraction_ts_loss','total_distance_travelled_loss','table_likelihood_loss'],
-          ['destination_attraction_ts_loss','total_distance_travelled_loss'],
-          ['total_distance_travelled_loss']
-    ]
-  [neural_network.loss.loss_function.sweep]
-    default = ['mseloss','mseloss','custom']
-    range = [
-      ['mseloss','mseloss','custom'],
-      ['mseloss','mseloss'],
-      ['mseloss']
-    ]
+  [neural_network.loss]
+    loss_name = ['destination_attraction_ts_loss']
+    loss_function = ['mseloss']
+  # [neural_network.loss.loss_name.sweep]
+  #   default = ['destination_attraction_ts_loss','total_distance_travelled_loss','table_likelihood_loss']
+  #   range = [
+  #         ['destination_attraction_ts_loss','total_distance_travelled_loss','table_likelihood_loss'],
+  #         ['destination_attraction_ts_loss','total_distance_travelled_loss'],
+  #         ['total_distance_travelled_loss']
+  #   ]
+  # [neural_network.loss.loss_function.sweep]
+  #   default = ['mseloss','mseloss','custom']
+  #   range = [
+  #     ['mseloss','mseloss','custom'],
+  #     ['mseloss','mseloss'],
+  #     ['mseloss']
+  #   ]
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
@@ -109,6 +112,15 @@ load_experiment = ''
       default = 'linear'
       [neural_network.hyperparameters.activation_funcs.layer_specific]
         1 = 'abs'
+
+[[experiments]]
+  type = 'SIM_NN'
+  comment = 'Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = true
+  print_statements = true
+  export_samples = true
+  export_metadata = true
+  overwrite = true
 
 [[experiments]]
   type = 'NonJointTableSIM_NN'
@@ -137,6 +149,7 @@ load_experiment = ''
     out_directory = './data/outputs/'
     [outputs.experiment_title.sweep]
       default = '_uncostrained'
-      range = ['_uncostrained','_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      # range = ['_uncostrained',
+      range = ['_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
       coupled = true
       target_name = 'axes'
