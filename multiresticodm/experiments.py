@@ -4,10 +4,8 @@ import time
 import warnings
 import torch.multiprocessing as mp
 
-from os import path
 from tqdm import tqdm
 from copy import deepcopy
-from torch import autograd
 from datetime import datetime
 from torch import float32, uint8
 from scipy.optimize import minimize
@@ -34,7 +32,6 @@ def instantiate_experiment(experiment_type:str,config:Config,**kwargs):
     has_coupled_sweep_paths = len(config.coupled_sweep_paths.values()) > 0
     has_isolated_sweep_paths = len(config.isolated_sweep_paths.values()) > 0
     if hasattr(sys.modules[__name__], experiment_type):
-        print(config.settings.get("sweep_mode",False))
         if config.settings.get("sweep_mode",False) and \
             (has_isolated_sweep_paths or has_coupled_sweep_paths):
             return ExperimentSweep(
@@ -237,7 +234,6 @@ class Experiment(object):
             else:
                 dir_path = ""
                 filename = 'config'
-            
 
             self.outputs.write_metadata(
                 dir_path=dir_path,
@@ -450,7 +446,7 @@ class Experiment(object):
             # Update gradients
             loss = kwargs.get('loss',None)
             if loss is not None:
-                loss.backward(retain_graph=True)
+                loss.backward()
                 self.harris_wilson_nn._neural_net.optimizer.step()
                 self.harris_wilson_nn._neural_net.optimizer.zero_grad()
 
@@ -1645,7 +1641,7 @@ class SIM_NN(Experiment):
         
         # Initalise superclass
         super().__init__(config,**kwargs)
-
+        
         # Perform experiment-specific validation check
         config.experiment_validate_config()
 
@@ -2290,7 +2286,7 @@ class ExperimentSweep():
         self.config.settings['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
 
         # Load schema
-        self.config.load_schema()
+        self.config.load_schemas()
 
         # Store number of workers
         self.n_workers = self.config.settings['inputs'].get("n_workers",1)

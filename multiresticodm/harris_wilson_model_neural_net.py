@@ -372,7 +372,7 @@ class HarrisWilson_NN:
 
             # Update the model parameters after every batch and clear the loss
             if t % batch_size == 0 or t == len(validation_data) - 1:
-                loss.backward(retain_graph=True)
+                loss.backward()
                 self._neural_net.optimizer.step()
                 self._neural_net.optimizer.zero_grad()
                 self._time += 1
