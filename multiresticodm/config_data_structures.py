@@ -53,9 +53,15 @@ class Entry():
             try: 
                 assert isinstance(self.data,self.dtype)
             except:
-                raise InvalidTypeException(f"Expected type {self.dtype}. Got {type(self.data)}",key_path=self.key_path)
+                raise InvalidTypeException(
+                    message=f"Expected type {self.dtype}. Got {type(self.data)}",
+                    key_path=self.key_path,
+                    data=self.data
+                )
         else:
-            raise TypeNotFoundException(key_path=self.key_path)
+            raise TypeNotFoundException(
+                key_path=self.key_path
+            )
         return True
 #--------------------------------------------------------------------
 #--------------------------------------------------------------------
@@ -84,7 +90,11 @@ class PrimitiveEntry(Entry):
             try: 
                 assert in_range(self.data,valid_range,allow_nan=allow_nan,inclusive=inclusive)
             except:
-                raise InvalidRangeException(f"Data {self.data} is out of range {valid_range}",key_path=self.key_path)
+                raise InvalidRangeException(
+                    f"Data {self.data} is out of range {valid_range}",
+                    key_path=self.key_path,
+                    data=self.data
+                )
         return True
     
     def check_scope(self):
@@ -94,7 +104,11 @@ class PrimitiveEntry(Entry):
             try: 
                 assert self.data in valid_scope
             except:
-                raise InvalidScopeException(f"Data {self.data} is not in scope {valid_scope}",key_path=self.key_path)
+                raise InvalidScopeException(
+                    f"Data {self.data} is not in scope {valid_scope}",
+                    key_path=self.key_path,
+                    data=self.data
+                )
         return True
 
 class Bool(PrimitiveEntry):
@@ -110,17 +124,25 @@ class Bool(PrimitiveEntry):
         try:
             assert str(self.data) in ['True','False']
         except:
-            raise InvalidBooleanException(f"Boolean {str(self.data)} is not equal to 'True' or 'False'",key_path=self.key_path)
+            raise InvalidBooleanException(
+                f"Boolean {str(self.data)} is not equal to 'True' or 'False'",
+                key_path=self.key_path,
+                data=self.data
+            )
 
 class Numeric(PrimitiveEntry):
     def __init__(self,data,schema,key_path):
         super().__init__(data,schema,key_path)
-
+        
     def check_numeric(self):
         try:
             assert self.data.isnumeric()
         except:
-            raise StringNotNumericException(f"String {self.data} is not numeric",key_path=self.key_path)
+            raise StringNotNumericException(
+                f"String {self.data} is not numeric",
+                key_path=self.key_path,
+                data=self.data
+            )
         return True
 
     def check_finiteness(self):
@@ -130,7 +152,11 @@ class Numeric(PrimitiveEntry):
             try:
                 assert isfinite(self.data)
             except:
-                raise InfiniteNumericException(f"Infinite data {self.data} provided",key_path=self.key_path)
+                raise InfiniteNumericException(
+                    f"Infinite data {self.data} provided",
+                    key_path=self.key_path,
+                    data=self.data
+                )
 
     def check(self):
         # Check that correct type is used
@@ -157,7 +183,7 @@ class Float(Numeric):
     def __init__(self,data,schema,key_path):
         super().__init__(data,schema,key_path)
         self.dtype = float
-    
+
     def __str__(self) -> str:
         return "Float()"
     
@@ -197,7 +223,7 @@ class Path(Str):
     def __init__(self,data,schema,key_path):
         super().__init__(data,schema,key_path)
         self.dtype = str
-
+    
     def __str__(self) -> str:
         return "Path(String)"
 
@@ -209,7 +235,11 @@ class Path(Str):
             try:
                 assert os.path.exists(self.data)
             except:
-                raise PathNotExistException(f"Path to file {self.data} does not exist",key_path=self.key_path)
+                raise PathNotExistException(
+                    f"Path to file {self.data} does not exist",
+                    key_path=self.key_path,
+                    data=self.data
+                )
         return True
 
     def check_directory_exists(self):
@@ -217,7 +247,11 @@ class Path(Str):
         try:
             os.path.isdir(self.data)
         except:
-            raise DirectoryNotFoundException(f"Path to file {self.data} is not a directory",key_path=self.key_path)
+            raise DirectoryNotFoundException(
+                f"Path to file {self.data} is not a directory",
+                key_path=self.key_path,
+                data=self.data
+            )
         return True
 
     def check_file_exists(self):
@@ -225,7 +259,11 @@ class Path(Str):
         try:
             os.path.isfile(self.data)
         except:
-            raise FileNotFoundException(f"Path to file {self.data} is not a file",key_path=self.key_path)
+            raise FileNotFoundException(
+                f"Path to file {self.data} is not a file",
+                key_path=self.key_path,
+                data=self.data
+            )
         return True
 
     def check_extension(self):
@@ -236,11 +274,15 @@ class Path(Str):
             try:
                 assert self.data.endswith(("."+extension))
             except:
-                raise InvalidExtensionException(f"File {self.data} does not have extension {extension}.",key_path=self.key_path)
+                raise InvalidExtensionException(
+                    f"File {self.data} does not have extension {extension}.",
+                    key_path=self.key_path,
+                    data=self.data
+                )
         return True
 
     def value(self):
-        return '' if len(self.data) <=0 else os.path.basename(self.data)
+        return self.schema['default-value'] if len(self.data) <=0 else os.path.basename(self.data)
 
 
 class File(Path):
@@ -296,12 +338,20 @@ class NonPrimitiveEntry(Entry):
                 try: 
                     assert in_range(len(self.data),length,allow_nan=False,inclusive=True)
                 except:
-                    raise InvalidLengthException(f"Length {len(self.data)} is not in range {length}.",key_path=self.key_path)
+                    raise InvalidLengthException(
+                        f"Length {len(self.data)} is not in range {length}.",
+                        key_path=self.key_path,
+                        data=self.data
+                    )
             else:
                 try: 
                     assert len(self.data) == length
                 except:
-                    raise InvalidLengthException(f"Length {len(self.data)} is not equal to {length}.",key_path=self.key_path)
+                    raise InvalidLengthException(
+                        f"Length {len(self.data)} is not equal to {length}.",
+                        key_path=self.key_path,
+                        data=self.data
+                    )
         return True
 
     def check_uniqueness(self,vals:Iterable):
@@ -313,7 +363,11 @@ class NonPrimitiveEntry(Entry):
             try: 
                 assert len(data) == len(set(data))
             except:
-                raise DataUniquenessException(f"Data {data} is not unique",key_path=self.key_path)
+                raise DataUniquenessException(
+                    f"Data {data} is not unique",
+                    key_path=self.key_path,
+                    data=self.data
+                )
         return True
 
     def check_elements(self,vals:Iterable):
@@ -359,7 +413,7 @@ class List(NonPrimitiveEntry):
         self.data = [instantiate_data_type(val,self.schema,key_path) for val in data]
 
     def value(self) -> list:
-        return [None if is_null(datum.value()) else datum.value() for datum in self.data]
+        return [self.schema['default-value'] if is_null(datum.value()) else datum.value() for datum in self.data]
             
         
     def check(self):
@@ -405,7 +459,7 @@ class List2D(NonPrimitiveEntry):
         self.data = [ [instantiate_data_type(val,self.schema,key_path) for val in row] for row in data]
 
     def value(self) -> list:
-        return [[None if is_null(datum.value()) else datum.value() for datum in row] for row in self.data]
+        return [[self.schema['default-value'] if is_null(datum.value()) else datum.value() for datum in row] for row in self.data]
             
     def check_dims(self):
         # Check that list has specified length
@@ -416,17 +470,29 @@ class List2D(NonPrimitiveEntry):
                     try: 
                         assert in_range(shape(self.data)[0],nrows,allow_nan=False,inclusive=True)
                     except:
-                        raise InvalidLengthException(f"#rows {shape(self.data)[0]} is not in range {nrows}.",key_path=self.key_path)
+                        raise InvalidLengthException(
+                            f"#rows {shape(self.data)[0]} is not in range {nrows}.",
+                            key_path=self.key_path,
+                            data=self.data
+                        )
                 if isinstance(ncols,Iterable):
                     try: 
                         assert in_range(shape(self.data)[1],ncols,allow_nan=False,inclusive=True)
                     except:
-                        raise InvalidLengthException(f"#cols {shape(self.data)[1]} is not in range {ncols}.",key_path=self.key_path)
+                        raise InvalidLengthException(
+                            f"#cols {shape(self.data)[1]} is not in range {ncols}.",
+                            key_path=self.key_path,
+                            data=self.data
+                        )
             else:
                 try: 
                     assert shape(self.data) == (nrows,ncols)
                 except:
-                    raise InvalidLengthException(f"Shape {shape(self.data)} is not equal to {(nrows,ncols)}.",key_path=self.key_path)
+                    raise InvalidLengthException(
+                        f"Shape {shape(self.data)} is not equal to {(nrows,ncols)}.",
+                        key_path=self.key_path,
+                        data=self.data
+                    )
         return True
 
     def check_elements(self,vals:Iterable):
@@ -478,7 +544,7 @@ class CustomList(NonPrimitiveEntry):
         self.data = [instantiate_data_type(val,self.schema,key_path) for val in self.data]
     
     def value(self) -> list:
-        return [None if is_null(datum.value()) else datum.value() for datum in self.data]
+        return [self.schema['default-value'] if is_null(datum.value()) else datum.value() for datum in self.data]
 
 
     def parse(self,data,schema):
@@ -535,7 +601,11 @@ class CustomList(NonPrimitiveEntry):
         try:
             assert self.parsing_success
         except:
-            raise CustomListParsingException(f"Data {self.data} contain > 2 or < 0 ':' strings.",key_path=self.key_path)
+            raise CustomListParsingException(
+                f"Data {self.data} contain > 2 or < 0 ':' strings.",
+                key_path=self.key_path,
+                data=self.data
+            )
         return True
 
     def check(self):
@@ -584,7 +654,7 @@ class Dict(NonPrimitiveEntry):
         self.data = {instantiate_data_type(key,key_schema,key_path):instantiate_data_type(val,value_schema,key_path) for key,val in data.items()}
     
     def value(self) -> dict:
-        return {key.value():(None if is_null(value) else value.value()) for key,value in self.data.items()}
+        return {key.value():(self.schema['default-value'] if is_null(datum) else datum.value()) for key,datum in self.data.items()}
 
     def check(self):
         # Check that correct length is provided
@@ -634,7 +704,7 @@ class CustomDict(NonPrimitiveEntry):
         self.data = {instantiate_data_type(key,key_schema,key_path):instantiate_data_type(val,value_schema[key],key_path) for key,val in data.items()}
             
     def value(self) -> dict:
-        return {key.value():(None if is_null(value) else value.value()) for key,value in self.data.items()}
+        return {key.value():(self.schema['default-value'] if is_null(datum) else datum.value()) for key,datum in self.data.items()}
     
 
     def check(self):
@@ -652,84 +722,86 @@ class CustomDict(NonPrimitiveEntry):
 #--------------------------------------------------------------------
 
 class EntryException(Exception):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message)
         self.message = message
-        self.key_path = key_path
+        self.key_path = kwargs.get('key_path',[])
+        self.data = kwargs.get('data','[data-not-found]')
 
     def __str__(self):
         return f"""
             Error in {'>'.join(self.key_path)}
             {self.message}
+            Data: {self.data}
         """
 
 class InvalidLengthException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InvalidRangeException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class DataUniquenessException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InfiniteNumericException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InvalidTypeException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InvalidElementTypeException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InvalidScopeException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class StringNotNumericException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class PathNotExistException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InvalidExtensionException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InvalidBooleanException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class CustomListParsingException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class FileNotFoundException(PathNotExistException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class DirectoryNotFoundException(PathNotExistException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InvalidElementException(EntryException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InvalidKeyException(InvalidElementException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 class InvalidValueException(InvalidElementException):
-    def __init__(self,message,key_path=[],**kwargs):
-        super().__init__(message,key_path=key_path,**kwargs)
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
 
 #--------------------------------------------------------------------
 #--------------------------------------------------------------------
@@ -738,9 +810,10 @@ class InvalidValueException(InvalidElementException):
 #--------------------------------------------------------------------
 
 class SchemaException(Exception):
-    def __init__(self,key_path=[],**kwargs):
+    def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.key_path = key_path
+        self.key_path = kwargs.get('key_path',[])
+        self.data = kwargs.get('data','[data-not-found]')
 
     def __str__(self):
         return f"""
@@ -748,21 +821,21 @@ class SchemaException(Exception):
         """
 
 class RangeNotFoundException(SchemaException):
-    def __init__(self,key_path=[],**kwargs):
-        super().__init__(key_path=key_path,**kwargs)
-
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+    
 class TypeNotFoundException(SchemaException):
-    def __init__(self,key_path=[],**kwargs):
-        super().__init__(key_path=key_path,**kwargs)
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
 
 class PathNotFoundException(SchemaException):
-    def __init__(self,key_path=[],**kwargs):
-        super().__init__(key_path=key_path,**kwargs)
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
 
 class ExtensionNotFoundException(SchemaException):
-    def __init__(self,key_path=[],**kwargs):
-        super().__init__(key_path=key_path,**kwargs)
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
 
 class EmptyOrInvalidScopeException(SchemaException):
-    def __init__(self,key_path=[],**kwargs):
-        super().__init__(key_path=key_path,**kwargs)
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
