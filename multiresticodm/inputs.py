@@ -128,7 +128,7 @@ class Inputs:
         if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:
             # Compute grand total
             self.data.grand_total = np.sum(self.data.ground_truth_table,dtype='float32')
-            self.config.settings['spatial_interaction_model']['grand_total'] = self.data.grand_total
+            self.config.settings['spatial_interaction_model']['grand_total'] = float(self.data.grand_total)
         if hasattr(self.data,'dims') and self.data.dims is not None and len(self.data.dims) > 0:
             self.config.settings['inputs']['dims'] = self.data.dims
 
