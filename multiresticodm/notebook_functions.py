@@ -741,7 +741,6 @@ def export_competitive_method_outputs(
     makedir(output_path)
     makedir(os.path.join(output_path,'samples'))
     makedir(os.path.join(output_path,'figures'))
-    makedir(os.path.join(output_path,'sample_derivatives'))
 
     write_npy(signs,os.path.join(output_path,'samples','signs_samples.npy'))
     write_npy(thetas,os.path.join(output_path,'samples','theta_samples.npy'))
