@@ -259,12 +259,10 @@ class HarrisWilson_NN:
             # Get loss function
             loss_func = LOSS_FUNCTIONS.get(function.lower(),None)
             loss_func = loss.get(name,loss_func) if loss_func is None else loss_func()
-            if name == 'table_likelihood_loss':
-                loss_func = ProbabilityUtils.log_poisson_pmf_unnormalised
-            if loss_func is None:
-                raise Exception(f"Loss {name} is missing loss function {function}.")
-            else:
+            if loss_func is not None:
                 self.loss_functions[name] = loss_func
+            else:
+                raise Exception(f"Loss {name} is missing loss function {function}.")
 
         self._loss_sample = torch.tensor(0.0, requires_grad=False)
         self._theta_sample = torch.stack(
