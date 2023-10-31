@@ -334,15 +334,15 @@ def sigmoid(beta=torch.tensor(1.0)):
 
 
 LOSS_DATA_REQUIREMENTS = {
-    'destination_attraction_ts_loss': {
+    'dest_attraction_ts': {
         "prediction_data": ['destination_attraction_ts'],
         "validation_data": ['destination_attraction_ts'],
     },
-    'table_likelihood_loss': {
+    'table_likelihood': {
         "prediction_data": ['table'],
         "validation_data": ['log_intensity']
     },
-    'total_distance_travelled_loss': {
+    'total_distance': {
         "prediction_data": ['table'],
         "validation_data": ['cost_matrix','total_cost_by_origin']
     }
