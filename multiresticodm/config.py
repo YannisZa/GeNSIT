@@ -9,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, setup_logger, read_json, expand_tuple
+from multiresticodm.utils import deep_apply, safe_delete, setup_logger, read_json, expand_tuple, unique
 
 class Config:
 
@@ -32,7 +32,8 @@ class Config:
         self.isolated_sweep_paths = {}
         # Gather all coupled sweeps
         self.coupled_sweep_paths = {}
-
+        # Gather all excluded settings
+        self.excluded_key_paths = []
         # Load config
         if path:
 
@@ -155,6 +156,24 @@ class Config:
         
         return found
 
+    def path_find(self, key, value, path:list=[], found:bool=False):        
+        for k, v in (value.items() if isinstance(value, dict) else
+            enumerate(value) if isinstance(value, list) else []):
+            
+            path.append(str(k))
+            
+            if k == key:
+                found = True
+            elif isinstance(v, (list,dict)):
+                path,found = self.path_find(key,v,path,found)
+            
+            if found:
+                return path,True
+            
+            path.remove(str(k))
+
+        return path,found
+
 
     def path_get(self,settings=None,path=[]):
         if len(path) <= 0:
@@ -179,6 +198,18 @@ class Config:
                     return settings_copy,(settings_copy!='not-found')
         
         return settings_copy,(settings_copy!='not-found')
+
+    def path_delete(self,settings,path:list,deleted:bool=False):
+        if len(path) <= 0:
+            return False
+        deleted = False
+        if len(path) == 1:
+            safe_delete(settings[path[0]])
+            deleted = True
+        else:
+            deleted = self.path_delete(settings[path[0]],path[1:],deleted)
+        
+        return deleted
 
     def path_set(self,settings,value,path=[],overwrite:bool=False):
         if len(path) <= 0:
@@ -250,7 +281,11 @@ class Config:
                 key_path=[],
                 experiment_type=experiment_type
             )
-    
+        # Delete excluded key paths
+        for key_path in self.excluded_key_paths:
+            print(key_path)
+            self.path_delete(self.settings,key_path)
+
     def validate_config(self,parameters=None,settings=None,base_schema=None,key_path=[],**kwargs):
         # Pass defaults if no meaningful arguments are provided
         if parameters is None:
@@ -302,13 +337,15 @@ class Config:
             # If settings are any other (primitive of non-promitive) value,
             # validate settings for given key path
             # Special treament is required depending on:
+            # - whether parameter needs to be excluded or not (See 0:)
             # - whether parameter is optional or not (See 1:)
             # - whether sweep parameters are passed or not (See 2:)
-            # - whether sweep parameters contain default and range configurations (See 3:)
-            # - whether coupled sweep parameters are passed or not (See 4:)
-            # - whether sweep mode is activated (See 5:)
-            # - whether sweep is deactivated and only sweep configuration is provided (See 6:)
-            # - all data type-specific checks (See 7:)
+            # - whether sweep parameters contain default configurations (See 3:)
+            # - whether sweep parameters contain range configurations (See 4:)
+            # - whether coupled sweep parameters are passed or not (See 5:)
+            # - whether sweep mode is activated (See 6:)
+            # - whether sweep is deactivated and only sweep configuration is provided (See 7:)
+            # - all data type-specific checks (See 8:)
             else:
                 # if v:
                 # Append key to path
@@ -325,6 +362,11 @@ class Config:
                 except:
                     raise Exception(f"Key {'>'.join(key_path)} not found in schema.")
                 
+                # 0: Check if argument needs to be excluded
+                # and add it to excluded key paths if that is the case
+                if isinstance(schema_val,dict) and schema_val.get('exclude',False):
+                    self.excluded_key_paths.append(key_path)
+
                 # 1: Check if argument is optional in case it is not included in settings
                 # and it is not part of a sweep
                 if not 'sweep' in key_path and not settings_found:
@@ -347,15 +389,34 @@ class Config:
                     # a default and a range configuration
                     try:
                         assert isinstance(settings_val,dict) \
-                            and "default" in list(settings_val.keys()) \
-                            and "range" in list(settings_val.keys())
+                            and "default" in list(settings_val.keys())
                     except:
                         raise Exception(f"""
                             Key {'>'.join(key_path)} is not a dictionary 
-                            or does not have 'default' and 'range' configurations 
+                            or does not have 'default' configuration 
                             for a sweep
                         """)
-                    # 4: Check that argument that is coupled sweepable containts 
+                    # 4: Check whether a range configuration is provided
+                    # otherwise replace sweep key-value pair with sweep default
+                    if "range" not in list(settings_val.keys()):
+                        # Get child key settings
+                        settings_child_val, settings_child_found = self.path_get(settings,(key_path+['default']))
+
+                        # Update settings with sweep default
+                        try:
+                            assert self.path_set(settings,settings_child_val,key_path[:-1])
+                        except:
+                            raise Exception(f"""
+                                Key {'>'.join(key_path)} could not be updated \
+                                with sweep default
+                            """)
+                        # Flag for whether this parameter should be treated as 
+                        # a sweep parameter is set to False due to lack of range configuration
+                        is_sweep = False
+                    else:
+                        is_sweep = True
+
+                    # 5: Check that argument that is coupled sweepable containts 
                     # a target name and that target name exists as a key
                     if settings_val.get('coupled',False):
                         try:
@@ -373,20 +434,34 @@ class Config:
                             self.coupled_sweep_paths[target_name][key_path[-2]] = deepcopy(key_path[:-1])
                         else:
                             # Create a sublist of paths based on target name
-                            self.coupled_sweep_paths[target_name] = {
-                                target_name : deepcopy(self.isolated_sweep_paths[target_name]),
-                                key_path[-2] : deepcopy(key_path[:-1])
-                            }
+                            # Try to read sweep data from isolated sweeps
+                            if target_name in self.isolated_sweep_paths:
+                                self.coupled_sweep_paths[target_name] = {    
+                                    target_name : deepcopy(self.isolated_sweep_paths[target_name]),
+                                    key_path[-2] : deepcopy(key_path[:-1])
+                                }
+                            # Otherwise find the target name in settings
+                            else:
+                                target_name_path,found = self.path_find(target_name,self.settings,path=[],found=False)
+                                if found and len(target_name_path) > 0:
+                                    self.coupled_sweep_paths[target_name] = {    
+                                        target_name : target_name_path,
+                                        key_path[-2] : deepcopy(key_path[:-1])
+                                    }
+                                else:
+                                    raise Exception(f"""Target name {target_name} not found in settings.""")
                     else:
                         # Add to isolated sweep paths
-                        self.isolated_sweep_paths[key_path[-2]] = deepcopy(key_path[:-1])
+                        # iff this parameter should be treated a sweep parameter
+                        if is_sweep:
+                            self.isolated_sweep_paths[key_path[-2]] = deepcopy(key_path[:-1])
 
 
-                # 5: Check that if parameter sweep is activated
+                # 6: Check that if parameter sweep is activated
                 if key_path[-1] == 'sweep_mode':
                     self.sweep_active = settings_val
                 
-                # 6: If sweep is deactivated and
+                # 7: If sweep is deactivated and
                 # A: a sweep configuration is provided or the values are provided
                 # then read the default sweep configuration
                 # B: a sweep configuration is NOT provided but the values are provided
@@ -433,10 +508,10 @@ class Config:
                             entry.check()
                         except:
                             traceback.print_exc()
-                            self.logger.error(f"Config for experiment(s) {kwargs.get('experiment_type','experiment_type')} failed.")
+                            self.logger.error(f"Config for experiment(s) {kwargs.get('experiment_type','UNKNOWN')} failed.")
                             sys.exit()
                 
-                # 7: Check all data type-specific checks
+                # 8: Check all data type-specific checks
                 # according to the schema
                 if settings_found:
                     # If parameter is sweepable but settings 
@@ -477,7 +552,6 @@ class Config:
                 
                 # Remove it from path
                 key_path.remove(k)
-
 
     def prepare_sweep_configurations(self,sweep_params):
 
@@ -581,7 +655,17 @@ class Config:
                     "path": key_path,
                     "values": sweep_vals
                 }
-
+                # Target variables should be unique 
+                # as they are used for name output folders
+                if key_path[-1] == target_name:
+                    try:
+                        assert len(sweep_vals) == len(unique(sweep_vals))
+                    except:
+                        print(sweep_vals)
+                        raise Exception(f"""
+                            Coupled sweep values for target name {target_name} are not unique.
+                            {len(sweep_vals)} values are provided of which {len(unique(sweep_vals))} are unique.
+                        """)
                 # Add key path length to dict
                 coupled_val_lens[target_name][key_path[-1]] = len(sweep_vals)
                 # Coupled sweeps have a common target name
