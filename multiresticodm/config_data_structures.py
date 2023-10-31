@@ -49,9 +49,10 @@ class Entry():
     
     def check_type(self,data_type=None):
         data_type = self.schema.get("dtype",data_type)
+        allow_nan = self.schema.get("allow-nan",False)
         if data_type is not None:
             try: 
-                assert isinstance(self.data,self.dtype)
+                assert isinstance(self.data,self.dtype) or allow_nan
             except:
                 raise InvalidTypeException(
                     message=f"Expected type {self.dtype}. Got {type(self.data)}",
