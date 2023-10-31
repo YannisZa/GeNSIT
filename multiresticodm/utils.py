@@ -551,7 +551,15 @@ def parse_slice_by(slice_by:list):
     slices = {k:list(v) for k,v in slices.items()}
     return slices
 
-
+def stringify(data):
+    if isinstance(data,Iterable) and not isinstance(data,str) and len(data) > 0:
+        return f"({','.join([stringify(v) for v in data])})"
+    elif data == '' or data is None:
+        return "none"
+    elif hasattr(data,'__len__') and len(data) == 0:
+        return "[]"
+    else:
+        return f"{str(data).replace(' ','')}"
 
 def stringify_statistic(statistic):
     # Unpack statistic pair
@@ -809,11 +817,8 @@ def create_dynamic_data_label(__self__,data,**kwargs):
 
 def in_range(v,limits:list,allow_nan:bool=False,inclusive:bool=False):
     within_range = True
-    if np.isnan(v):
-        if not allow_nan:
-            return False
-        else:
-            return True
+    if v is None or not np.isfinite(v):
+        return allow_nan
     if limits[0] is not None:
         within_range = within_range and (v >= limits[0] if inclusive else v > limits[0])
     if limits[1] is not None:
@@ -982,3 +987,12 @@ def divide_chunks(l, n):
     # looping till length l 
     for i in range(0, len(l), n):  
         yield l[i:i + n] 
+
+def unique(data):
+    if hasattr(data,'__len__') and not isinstance(data,str):
+        # Convert nested lists to string
+        hashable_data = ['_'.join(str(datum)) for datum in data]
+        # Return unique values
+        return list(set(hashable_data))
+    else:
+        return data
