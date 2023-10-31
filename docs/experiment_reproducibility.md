@@ -1,117 +1,13 @@
-# Synthetic data
-
-Repeat the following by changing the -d argument based on the synthetic dataset and -k argument based on the ensemble size
-
-## Direct sampling
-
-### Unconstrained
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_2x3_N_100/ -ax '[]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et unconstrained
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_2x3_N_5000/ -ax '[]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et unconstrained
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_100/ -ax '[]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -sm -et unconstrained
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et unconstrained
-
-### Grand total margin constrained
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_2x3_N_100/ -ax '[0, 1]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et grand_total
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_2x3_N_5000/ -ax '[0, 1]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et grand_total
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_100/ -ax '[0, 1]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -sm -et grand_total
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[0, 1]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et grand_total
-
-### Row margin constrained
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_2x3_N_100/ -ax '[1]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et row_margin
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_2x3_N_5000/ -ax '[1]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et row_margin
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_100/ -ax '[1]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -sm -et row_margin
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[1]' \
--n 1000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et row_margin
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[1]' \
--n 10000 -re exp10 -k 1000 -nw 1 -p direct_sampling -et row_margin
-
-## Markov Basis MCMC
-
-### Row margin constrained
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[1]' \
- -n 10000 -re exp10 -k 1000 -nw 1 -p degree_one -et row_margin
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[1]' \
- -n 10000 -re exp10 -k 1000 -nw 1 -p degree_higher -et row_margin
-
-### Both margins constrained
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[1]' -ax '[0]' \
- -n 10000 -re exp10 -k 1000 -nw 1 -p degree_one -et both_margins
-
-multiresticodm run ./data/inputs/configs/table_convergence.toml \
- -d ./data/inputs/synthetic_33x33_N_5000/ -ax '[1]' -ax '[0]' \
- -n 10000 -re exp10 -k 1000 -nw 1 -p degree_higher -et both_margins
-
-## Create synthetic data
-
-clear; multiresticodm create ./data/inputs/configs/synthetic_data_generation.toml -smthd sde_solver -sn 100 -nw 4 -nt 4 -log debug
-clear; multiresticodm create ./data/inputs/configs/synthetic_data_generation.toml -smthd sde_solver -sn 1 -nw 8 -nt 1 -log debug
-
-## SIM Inference
-
-### MCMC
-
-clear; multiresticodm run ./data/inputs/configs/synthetic_data_learning.toml -nw 4 -nt 1 -mcmcnw 6 -re SIM_MCMC
-
-### Neural Network
-
-clear; multiresticodm run ./data/inputs/configs/synthetic_data_learning.toml -nw 12 -nt 1 -re SIM_NN
-
-## Joint table and sim inference
-
-## Summaries and Metrics
-
-## Plots
-
-### Log destination attraction predictions and residual plots
-
-clear; multiresticodm plot -o ./data/outputs/synthetic \
--e SIM_NN -l dims -l noise_regime \
--p 31 -b 0 -t 1 -fs 5 5 -ms 20 -ff pdf -df dat -tfs 14 -afs 14 -lls 18 -als 18 --benchmark
-
 # Cambridge commuter LSOAs to MSOAs
+
+## Experiment 2
+
+Set ulimit -n 50000
+
+### Dependent (joint) Table and SIM
+
+clear; multiresticodm run ./data/inputs/configs/experiment2.toml \
+ -re JointTableSIM_NN -nw 10 -nt 1 -sm
 
 ## Experiment 3
 
@@ -120,72 +16,19 @@ Set ulimit -n 50000
 ### NN SIM
 
 clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
- -re SIM_NN -nw 24 -nt 1 -sm -dev cpu
+ -re SIM_NN -nw 10 -nt 1 -sm -ln dest_attraction_ts -lf mseloss
 
 ### Independent (non-joint) Table and SIM
 
 clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
- -re NonJointTableSIM_NN -nw 24 -nt 1 -sm -dev cpu
-
-## Neural Network
-
-### SIM only
-
-clear; multiresticodm run ./data/inputs/configs/sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re SIM_NN -nw 16 -nt 8 -et total_constrained
-
-### Independent (non-joint) Table and SIM
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re NonJointTableSIM_NN -nw 8 -nt 8 -n 1000 -et unconstrained -ax '[]' -sm -dev cpu
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re NonJointTableSIM_NN -nw 8 -nt 8 -n 1000 -et total_constrained -ax '[0,1]' -dev cpu
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re NonJointTableSIM_NN -nw 8 -nt 8 -n 1000 -et row_constrained -ax '[1]' -dev cpu
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -p degree_higher -re NonJointTableSIM_NN -nw 5 -nt 2 -n 1000 -et both_margin_constrained -ax '[1]' -ax '[0]' -dev cpu
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt \
--p degree_higher -re NonJointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained_10%\_cells -ax '[1]' -ax '[0]' -dev cpu
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt \
- -p degree_higher -re NonJointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained_20%\_cells -ax '[1]' -ax '[0]' -dev cpu
+ -re NonJointTableSIM_NN -nw 10 -nt 1 -sm -ln dest_attraction_ts -lf mseloss
 
 ### Dependent (joint) Table and SIM
 
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -p degree_higher -re JointTableSIM_NN -nw 8 -nt 8 -n 1000 -et unconstrained -ax '[]' -sm -dev cpu
-
-clear;multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -p degree_higher -re JointTableSIM_NN -nw 8 -nt 8 -n 1000 -et total_constrained -ax '[0,1]' -dev cpu
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -re JointTableSIM_NN -nw 8 -nt 8 -n 1000 -et row_constrained -ax '[1]' -dev cpu
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ \
- -p degree_higher -re JointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained -ax '[1]' -ax '[0]' -dev cpu
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt \
- -p degree_higher -re JointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained_10%\_cells -ax '[1]' -ax '[0]' -dev cpu
-
-clear; multiresticodm run ./data/inputs/configs/joint_table_sim_inference_neural_net.toml \
- -d ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/ -c cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt \
- -p degree_higher -re JointTableSIM_NN -nw 5 -nt 8 -n 1000 -et both_margin_constrained_20%\_cells -ax '[1]' -ax '[0]' -dev cpu
+clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
+ -re JointTableSIM_NN -nw 10 -nt 1 -sm \
+ -ln dest_attraction_ts -ln table_likelihood \
+ -lf mseloss -lf custom
 
 ## Summaries and Metrics
 
@@ -237,7 +80,7 @@ clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_ls
 clear; multiresticodm plot -p 10 -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas \
 -e JointTableSIM_MCMC \
 -s table -nn 30 -dis euclidean_distance \
--et unconstrained -et row_margin -et both_margins -et both_margins_permuted_cells_10% -et both_margins_permuted_cells_20% \
+-en unconstrained -en row_margin -en both_margins -en both_margins_permuted_cells_10% -en both_margins_permuted_cells_20% \
 -b 10000 -t 1000 -n 100 -nw 12 -l experiment_title -l noise_regime -fe table_space -ff pdf
 
 clear; multiresticodm plot -p 10 -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas \
@@ -345,5 +188,3 @@ multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp
 multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIM_MCMCHighNoise_07_02_2023_16_15_43 -g ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson -p 41 -fs 20 10 -ff png -ac cgreen -ac cred -mc cool --annotate -s table -stat mean_variance '' '' -csl 0.0 1.0 -b 10000 -afs 26 -cfs 20 -mcl 2.7744176387786865 357.8244323730469 -acl 277.0 848.0 -acl 276.0 16340.0 -fe high_noise --no-colorbar -lw 10 -op 0.2
 
 multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIM_MCMCHighNoise_07_02_2023_16_15_43 -g ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson -p 41 -fs 20 10 -ff pdf -ac cgreen -ac cred -mc cblue --annotate -t posterior_table_mean_error -csl 0.5 1.0 -b 10000 -afs 26 -cfs 20 -mcl 7.592240947332791e-07 0.009970745312129123 -acl 0.0 0.0 -acl 0.000530141493261603 0.07746821280692036 -fe high_noise --no-colorbar -no relative_l1
-
-# Competitive methods
