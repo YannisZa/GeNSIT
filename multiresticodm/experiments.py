@@ -1,8 +1,7 @@
-import gc
 import sys
 import time
 import warnings
-import torch.multiprocessing as mp
+import concurrent.futures as concurrency
 
 from tqdm import tqdm
 from copy import deepcopy
@@ -117,6 +116,9 @@ class Experiment(object):
             console_level = level
         )
         
+        # Enable garbage collections
+        # gc.enable()
+
         self.logger.debug(f"{self}")
         # Make sure you are reading a config
         if not isinstance(config,Config):
@@ -193,9 +195,6 @@ class Experiment(object):
                 settings={},
                 logger = self.logger
             )
-
-        # Run garbage collector
-        gc.collect()
 
         # Reinitialise objects
         self.results = []
@@ -793,9 +792,6 @@ class SIM_MCMC(Experiment):
         # Fix random seed
         set_seed(self.seed)
 
-        # Enable garbage collections
-        gc.enable()
-
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
@@ -998,9 +994,6 @@ class JointTableSIM_MCMC(Experiment):
 
         # Fix random seed
         rng = set_seed(self.seed)
-
-        # Enable garbage collections
-        gc.enable()
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -1272,9 +1265,6 @@ class Table_MCMC(Experiment):
         # Fix random seed
         rng = set_seed(self.seed)
 
-        # Enable garbage collections
-        gc.enable()
-
         # Prepare inputs
         self.inputs = Inputs(
             config=config,
@@ -1514,8 +1504,6 @@ class TableSummaries_MCMCConvergence(Experiment):
         # Delete duplicate of contingency table and spatial interaction model
         safe_delete(self.ct)
         safe_delete(self.sim)
-        # Run garbage collector to release memory
-        gc.collect()
 
     def initialise_parameters(self):
             
@@ -1649,9 +1637,6 @@ class SIM_NN(Experiment):
 
         # Fix random seed
         rng = set_seed(self.seed)
-
-        # Enable garbage collections
-        gc.enable()
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -1827,9 +1812,6 @@ class NonJointTableSIM_NN(Experiment):
 
         # Fix random seed
         rng = set_seed(self.seed)
-
-        # Enable garbage collections
-        gc.enable()
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -2036,6 +2018,7 @@ class NonJointTableSIM_NN(Experiment):
         self.logger.note("Simulation run finished.")
 
 class JointTableSIM_NN(Experiment):
+    
     def __init__(self, config:Config, **kwargs):
 
         # Initalise superclass
@@ -2048,9 +2031,6 @@ class JointTableSIM_NN(Experiment):
 
         # Fix random seed
         rng = set_seed(self.seed)
-
-        # Enable garbage collections
-        gc.enable()
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -2125,7 +2105,7 @@ class JointTableSIM_NN(Experiment):
             neural_net = neural_network,
             loss = dict(
                 **config['neural_network'].pop('loss'),
-                table_likelihood_loss = self.ct_mcmc.table_loss_function
+                table_likelihood = self.ct_mcmc.table_loss_function
             ),
             physics_model = harris_wilson_model,
             instance = kwargs.get('instance',''),
@@ -2154,7 +2134,7 @@ class JointTableSIM_NN(Experiment):
         self.logger.info(f"{self.ct_mcmc}")
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        
+
     def run(self,**kwargs) -> None:
 
         self.logger.note(f"Running Joint Table Inference and Neural Network training of Harris Wilson model.")
@@ -2314,17 +2294,17 @@ class ExperimentSweep():
         self.outputs_experiment_id = self.outputs.experiment_id
         
         # # Prepare writing to file
-        # self.outputs.open_output_file(kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep_params={})
 
         # # Enable it again
         deep_updates(self.config.settings,{'export_samples':export_samples})
 
         # # Write metadata
-        # if self.config.settings['experiments'][0].get('export_metadata',True):
-        #     self.outputs.write_metadata(
-        #         dir_path='',
-        #         filename=f"config"
-        #     )
+        if self.config.settings['experiments'][0].get('export_metadata',True):
+            self.outputs.write_metadata(
+                dir_path='',
+                filename=f"config"
+            )
 
         if len(dir_range) > 0:
             self.config['inputs']['dataset'] = dir_range
@@ -2357,8 +2337,7 @@ class ExperimentSweep():
             warnings.simplefilter("ignore")
             # Decide whether to run sweeps in parallel or not
             if self.n_workers > 1:
-                self.run_parallel(sweep_configurations)
-                # self.run_concurrent(sweep_configurations)
+                self.run_concurrent(sweep_configurations)
             else:
                 self.run_sequential(sweep_configurations)
         
@@ -2402,38 +2381,41 @@ class ExperimentSweep():
         return new_config,sweep
     
     def prepare_instantiate_and_run(self,instance_num:int,sweep_configuration:dict,semaphore=None,counter=None,pbar=None):
-        if semaphore is not None:
-            semaphore.acquire()
-        
-        # Prepare experiment
-        config,sweep = self.prepare_experiment(sweep_configuration)
-        
-        self.logger.info(f'Instance = {str(instance_num)} START')
-
-        # Create new experiment
-        new_experiment = instantiate_experiment(
-            experiment_type=config.settings['experiment_type'],
-            config=config,
-            sweep_params=sweep,
-            instance=str(instance_num),
-            base_dir=self.outputs_base_dir,
-            experiment_id=self.outputs_experiment_id,
-            device_id=(instance_num%self.n_workers),
-            logger=self.logger,
-        )
-        self.logger.debug('New experiment set up')
-        # Running experiment
-        new_experiment.run()
-        
-        if counter is not None and pbar is not None:
-            with counter.get_lock():
-                counter.value += 1
-                pbar.n = counter.value
-                pbar.refresh()
+        try:
+            if semaphore is not None:
+                semaphore.acquire()
             
-        if semaphore is not None:
-            semaphore.release()
-        self.logger.info(f'Instance = {str(instance_num)} DONE')
+            # Prepare experiment
+            config,sweep = self.prepare_experiment(sweep_configuration)
+            
+            self.logger.info(f'Instance = {str(instance_num)} START')
+
+            # Create new experiment
+            new_experiment = instantiate_experiment(
+                experiment_type=config.settings['experiment_type'],
+                config=config,
+                sweep_params=sweep,
+                instance=str(instance_num),
+                base_dir=self.outputs_base_dir,
+                experiment_id=self.outputs_experiment_id,
+                device_id=(instance_num%self.n_workers),
+                logger=self.logger,
+            )
+            self.logger.debug('New experiment set up')
+            # Running experiment
+            new_experiment.run()
+            if counter is not None and pbar is not None:
+                with counter.get_lock():
+                    counter.value += 1
+                    pbar.n = counter.value
+                    pbar.refresh()
+                
+            if semaphore is not None:
+                semaphore.release()
+            # gc.collect()
+            self.logger.info(f'Instance = {str(instance_num)} DONE')
+        except Exception as e:
+            raise Exception(f'failed running instance {instance_num}')
 
     def run_sequential(self,sweep_configurations):
         for instance,sweep_config in tqdm(
@@ -2447,10 +2429,11 @@ class ExperimentSweep():
                 instance_num=instance,
                 sweep_configuration=sweep_config,
                 semaphore=None,
-                counter=None
+                counter=None,
+                pbar=None
             )
     
-    def run_parallel(self,sweep_configurations):
+    def run_concurrent(self,sweep_configurations):
 
         # Split the sweep configurations into chunks
         sweep_config_chunks = list(divide_chunks(
@@ -2459,35 +2442,28 @@ class ExperimentSweep():
         ))
         
         for chunk_id, sweep_config_chunk in enumerate(sweep_config_chunks):
-            # Run experiments in parallel
-            semaphore = mp.Semaphore(self.n_workers)
-            counter = mp.Value('i', 0, lock=True)
-            
-            processes = []
-
-            with tqdm(
+            # Initialise progress bar
+            pbar = tqdm(
                 total=len(sweep_config_chunk), 
-                desc=f'Running sweeps in parallel: Batch {chunk_id}/{len(sweep_config_chunks)}',
+                desc=f'Running sweeps concurrently: Batch {chunk_id+1}/{len(sweep_config_chunks)}',
                 leave=False,
                 position=0
-            ) as pbar:
-                for instance,sweep_config in enumerate(sweep_config_chunk):
-                    p = mp.Process(
-                        target=self.prepare_instantiate_and_run, 
-                        args=(
-                            instance, 
-                            sweep_config, 
-                            semaphore,
-                            counter,
-                            pbar
-                        )
-                    )
-                    processes.append(p)
-                    p.start()
+            )
+            with concurrency.ProcessPoolExecutor(self.n_workers*2) as executor:
+                # Start the processes and ignore the results
+                futures = [executor.submit(
+                    fn = self.prepare_instantiate_and_run,
+                    instance_num = instance,
+                    sweep_configuration = sweep_config
+                ) for instance,sweep_config in enumerate(sweep_config_chunk)]
 
-
-                for p in processes:
-                    p.join()
-                    p.close()
-                
-            
+                # Wait for all processes to finish
+                for index,fut in enumerate(concurrency.as_completed(futures)):
+                    try:
+                        fut.result()
+                    except:
+                        self.logger.error(f""" Sweep config 
+                            {sweep_config_chunk[index]}
+                        """)
+                        raise Exception(f"Future {index} failed")
+                    pbar.update(1)
