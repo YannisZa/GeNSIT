@@ -9,7 +9,7 @@ from torch import float32
 from multiresticodm.config import Config
 from multiresticodm.global_variables import PARAMETER_DEFAULTS,Dataset
 from multiresticodm.spatial_interaction_model import SpatialInteraction2D
-from multiresticodm.utils import set_seed, setup_logger, sigma_to_noise_regime, to_json_format
+from multiresticodm.utils import set_seed, setup_logger, to_json_format
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
 
@@ -67,13 +67,13 @@ class HarrisWilson:
         except:
             self.logger.error(f"Some parameters in {','.join(self.config.settings['inputs']['to_learn'])} cannot be learned.")
             self.logger.error(f"Acceptable parameters are {','.join(self.param_names)}.")
-            raise Exception('Cannot instantiate Harris Wilson Model.')
+            raise Exception('Cannot instantiate Harris Wilson Model.') 
         
         # Set parameters to learn based on
         # kwargs or parameter defaults
         self.params_to_learn = {}
-        for param in self.config.settings['inputs']['to_learn']:
-            self.params_to_learn[param] = kwargs.get(param,PARAMETER_DEFAULTS[param])
+        for i,param in enumerate(self.config.settings['inputs']['to_learn']):
+            self.params_to_learn[param] = i
 
         # Fixed hyperparameters
         self.params = Dataset()
@@ -256,32 +256,32 @@ class HarrisWilson:
         # Parameters to learn
         alpha = (
             self.params.alpha
-            if 'alpha' not in self.params_to_learn.keys()
+            if 'alpha' not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["alpha"]]
         )
         beta = (
             self.params.beta
-            if "beta" not in self.params_to_learn.keys()
+            if "beta" not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["beta"]]
         )
         kappa = (
             self.params.kappa
-            if "kappa" not in self.params_to_learn.keys()
+            if "kappa" not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["kappa"]]
         )
         delta = (
             self.params.delta
-            if "delta" not in self.params_to_learn.keys()
+            if "delta" not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["delta"]]
         )
         epsilon = (
             self.params.epsilon
-            if "epsilon" not in self.params_to_learn.keys()
+            if "epsilon" not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["epsilon"]]
         )
         sigma = (
             self.params.sigma
-            if "sigma" not in self.params_to_learn.keys()
+            if "sigma" not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["sigma"]]
         )
 

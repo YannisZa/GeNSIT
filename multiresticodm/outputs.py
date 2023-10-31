@@ -704,7 +704,7 @@ class Outputs(object):
                     else:
                         value = sweep_params[v]
                     # Add to key-value pair to unique sweep id
-                    sweep_id.append(f"{str(v)}_{str(value)}")
+                    sweep_id.append(f"{str(v)}_{stringify(value)}")
                 # Join all grouped sweep vars into one sweep id 
                 # which will be used to create an output folder
                 if len(sweep_id) > 0:
@@ -773,7 +773,6 @@ class Outputs(object):
             if len(sweep_id) > 0 and isinstance(sweep_id,str):
                 makedir(os.path.join(self.outputs_path,'samples',sweep_id))
             makedir(os.path.join(self.outputs_path,'figures'))
-            makedir(os.path.join(self.outputs_path,'sample_derivatives'))
 
     def write_log(self):
         if isinstance(self.logger,DualLogger):
@@ -822,7 +821,6 @@ class Outputs(object):
                 try:
                     self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5"), mode="w")
                 except:
-                    print(self.sweep_id)
                     print(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5"))
                     print(os.path.exists(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5")))
                     raise Exception('FAILED')

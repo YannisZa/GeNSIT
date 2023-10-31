@@ -9,7 +9,7 @@ import psutil
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger
 from multiresticodm.logger_class import *
-from multiresticodm.global_variables import TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
+from multiresticodm.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
 
 
 def set_threads(n_threads):
@@ -23,8 +23,11 @@ def set_threads(n_threads):
 
 
 # Get total number of threads
-AVAILABLE_CORES = psutil.cpu_count(logical=True)
+AVAILABLE_CORES = psutil.cpu_count(logical=False)
 AVAILABLE_THREADS = psutil.cpu_count(logical=True)
+
+def to_list(ctx, param, value):
+    return list(value)
 
 class PythonLiteralOption(click.Option):
 
@@ -159,9 +162,9 @@ _create_and_run_options = [
 _common_run_options = [
     click.option('--load_experiment','-le', multiple=False, type=click.Path(exists=True), default=None, 
                    help='Defines path to existing experiment output in order to load it and resume experimentation.'),
-    click.option('--run_experiments','-re', type=click.STRING, multiple=True,
-               default = [], help = 'Decides which experiments to run'),
-    click.option('--experiment_title','-et', type=click.STRING,
+    click.option('--run_experiments','-re', type=click.STRING, multiple=True, callback=to_list,
+               default = None, help = 'Decides which experiments to run'),
+    click.option('--title','-en', type=click.STRING,
                default = None, help = 'Title appended to output filename of experiment'),
     click.option('--sweep_mode/--no-sweep_mode', default=None,is_flag=True, show_default=True,
               help=f'Flag for whether parameter sweep mode is activated or not.'),
@@ -380,23 +383,25 @@ def create(
 # @click.command(context_settings=dict(help_option_names=['-h', '--help']))
 @click.option('--proposal','-p', type=click.Choice(['direct_sampling','degree_higher','degree_one']),
             default = None, help = 'Overwrites contingency table MCMC proposal')
+@click.option('--loss_name','-ln', type=click.Choice(list(LOSS_DATA_REQUIREMENTS.keys())), callback=to_list,
+            default = None, multiple = True, help = 'Overwrites neural net loss name(s)')
+@click.option('--loss_function','-lf', type=click.Choice(list(LOSS_FUNCTIONS.keys())), callback=to_list,
+            default = None, multiple = True, help = 'Overwrites neural net loss function(s)')
 @click.option('--grid_size','-gs', type=click.IntRange(min=1),
             default = None, help = 'Overwrites size of square grid for R^2 and Log Target analyses.')
 @click.option('--theta_steps','-pn', type=click.IntRange(min=1),
-            default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joInt scheme.')
+            default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.')
 @click.option('--log_destination_attraction_steps','-dan', type=click.IntRange(min=1),
-            default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joInt scheme.')
-@click.option('--k','-k', type=click.IntRange(min=1), default = None,
-            help = 'Overwrites size of ensemble of datasets for MCMC convergence diagnostic')
+            default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.')
 @click.option('--table_steps','-tn', type=click.IntRange(min=1),
-            default = None, help = 'Overwrites number of Spatial Interaction Model MCMC steps in joInt scheme.')
+            default = None, help = 'Overwrites number of Spatial Interaction Model MCMC steps in joint scheme.')
 @click.option('--alpha0','-alpha0', type=click.FloatRange(min=0), default = None,
             help = 'Overwrites initialisation of alpha parameter in MCMC.')
 @click.option('--beta0','-beta0', type=click.FloatRange(min=0), default = None,
             help = 'Overwrites initialisation of beta parameter in MCMC.')
 @click.option('--beta_max','-bm', type=click.FloatRange(min=0), default = None,
             help = 'Overwrites maximum beta in SIM parameters.')
-@click.option('--covariance','-cov', type=click.STRING, default = None, 
+@click.option('--covariance','-cov', type=click.STRING, default = None,
             help = 'Overwrites covariance matrix of parameter Gaussian Randow walk proposal')
 @click.option('--step_size','-ss', type=click.FloatRange(min=0), default = None,
             help = 'Overwrites step size in parameter Gaussian Randow walk proposal')
@@ -419,6 +424,8 @@ def run(
         log_destination_attraction,
         destination_attraction_ts,
         proposal,
+        loss_name,
+        loss_function,
         grid_size,
         theta_steps,
         log_destination_attraction_steps,
@@ -443,7 +450,7 @@ def run(
         origin_demand,
         cost_matrix,
         run_experiments,
-        experiment_title,
+        title,
         sweep_mode,
         table,
         device,
@@ -454,7 +461,6 @@ def run(
         store_progress,
         cells,
         sparse_margins,
-        k,
         seed,
         config_path,
         data_generation_seed,
@@ -477,11 +483,12 @@ def run(
     Run Data Augementation Spatial Interaction Model Markov Chain Monte Carlo.
     :param config_path: Configuration file path    
     """
-
     # Gather all arguments in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
     # Remove all nulls
     settings = {k: v for k, v in settings.items() if v is not None}
+    # Remove empty lists
+    settings = {k: v for k, v in settings.items() if not hasattr(v,'__len__') or (hasattr(v,'__len__') and len(v) > 0)}
     # Capitalise all single-letter arguments
     settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
 
@@ -504,15 +511,21 @@ def run(
         __name__,
         console_level = settings.get('logging_mode','info'),
     )
-    exec(logger,settings=settings,config_path=config_path,run_experiments=run_experiments)
+
+    exec(
+        logger,
+        settings=settings,
+        config_path=config_path,
+        run_experiments=run_experiments
+    )
 
 
 _output_options = [
     click.option('--out_directory', '-o', required=True, type=click.Path(exists=True), default='./data/outputs/'),
     click.option('--dataset_name', '-dn', required=False, multiple=True, type=click.STRING),
     click.option('--directories','-d', multiple=True, required=False, type=click.Path(exists=False)),
-    click.option('--experiment_type','-e', multiple=True, type=click.STRING ,cls=NotRequiredIf, not_required_if='directories'),
-    click.option('--experiment_title','-et', multiple=True, type=click.STRING, default = None, cls=NotRequiredIf, not_required_if='directories'),
+    click.option('--experiment_type','-et', multiple=True, type=click.STRING ,cls=NotRequiredIf, not_required_if='directories'),
+    click.option('--title','-en', multiple=True, type=click.STRING, default = None, cls=NotRequiredIf, not_required_if='directories'),
     click.option('--exclude','-exc', type=click.STRING, default = None,cls=NotRequiredIf, not_required_if='directories'),
     click.option('--filename_ending', '-fe', default = None, type=click.STRING),
     click.option('--burnin', '-b', default=0, show_default=True,
@@ -648,7 +661,7 @@ def plot(
         dataset_name,
         directories,
         experiment_type,
-        experiment_title,
+        title,
         exclude,
         filename_ending,
         burnin,
@@ -776,7 +789,7 @@ def summarise(
         dataset_name,
         directories,
         experiment_type,
-        experiment_title,
+        title,
         exclude,
         filename_ending,
         burnin,

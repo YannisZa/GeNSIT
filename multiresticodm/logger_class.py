@@ -169,7 +169,7 @@ class DualLogger():
             
     def debug(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(logging.DEBUG):
             self.console.debug(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(logging.DEBUG):
@@ -177,7 +177,7 @@ class DualLogger():
 
     def info(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(logging.INFO):
             self.console.info(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(logging.INFO):
@@ -185,7 +185,7 @@ class DualLogger():
 
     def warning(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(logging.INFO):
             self.console.warning(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(logging.WARNING):
@@ -193,7 +193,7 @@ class DualLogger():
 
     def error(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(logging.ERROR):
             self.console.error(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(logging.ERROR):
@@ -201,7 +201,7 @@ class DualLogger():
 
     def critical(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(logging.CRITICAL):
             self.console.critical(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(logging.CRITICAL):
@@ -209,7 +209,7 @@ class DualLogger():
 
     def trace(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(TRACE):
             self.console.trace(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(TRACE):
@@ -217,7 +217,7 @@ class DualLogger():
     
     def remark(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(REMARK):
             self.console.remark(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(REMARK):
@@ -225,7 +225,7 @@ class DualLogger():
 
     def note(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(NOTE):
             self.console.note(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(NOTE):
@@ -233,7 +233,7 @@ class DualLogger():
     
     def progress(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(PROGRESS):
             self.console.progress(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(PROGRESS):
@@ -241,7 +241,7 @@ class DualLogger():
     
     def caution(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(CAUTION):
             self.console.caution(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(CAUTION):
@@ -249,7 +249,7 @@ class DualLogger():
     
     def hilight(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(HILIGHT):
             self.console.hilight(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(HILIGHT):
@@ -257,7 +257,7 @@ class DualLogger():
     
     def success(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(SUCCESS):
             self.console.success(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(SUCCESS):
@@ -265,7 +265,7 @@ class DualLogger():
     
     def empty(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
+        module = inspect.getmodule(frame)
         if self.console.isEnabledFor(EMPTY):
             self.console.empty(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
         if self.file.isEnabledFor(EMPTY):
