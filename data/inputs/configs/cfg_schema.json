@@ -2,12 +2,14 @@
   "sweep_mode": {
     "sweepable": false,
     "optional": false,
+    "exclude": false,
     "dtype": "bool",
     "default-value": false
   },
   "log_level": {
     "sweepable": false,
     "optional": false,
+    "exclude": false,
     "dtype": "str",
     "default-value": "info",
     "is-any-of": ["info", "warn", "error", "critical", "debug"]
@@ -16,6 +18,7 @@
     "seed": {
       "sweepable": true,
       "optional": true,
+      "exclude": false,
 
       "sweep": {
         "default": {
@@ -35,6 +38,7 @@
     "n_workers": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
       "dtype": "int",
       "default-value": 1,
       "valid-range": [1, 32]
@@ -42,6 +46,7 @@
     "n_threads": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
       "dtype": "int",
       "default-value": 8,
       "valid-range": [1, 32]
@@ -49,6 +54,7 @@
     "device": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
       "dtype": "str",
       "default-value": "cpu",
       "is-any-of": ["cpu", "mps", "cuda"]
@@ -56,6 +62,7 @@
     "in_directory": {
       "sweepable": false,
       "optional": false,
+      "exclude": false,
       "dtype": "directory",
       "directory-exists": true,
       "default-value": "./data/inputs/"
@@ -63,6 +70,7 @@
     "dataset": {
       "sweepable": true,
       "optional": false,
+      "exclude": false,
 
       "sweep": {
         "default": {
@@ -80,6 +88,7 @@
     "to_learn": {
       "sweepable": true,
       "optional": false,
+      "exclude": false,
 
       "sweep": {
         "default": {
@@ -101,16 +110,19 @@
     "load_experiment": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
       "dtype": "str",
       "default-value": ""
     },
     "data": {
       "sweepable": false,
       "optional": false,
+      "exclude": false,
 
       "data_generation_seed": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "dtype": "int",
         "default-value": 1234,
@@ -120,6 +132,7 @@
       "synthesis_method": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "dtype": "str",
         "default-value": "sde_solver",
@@ -129,6 +142,7 @@
       "synthesis_n_samples": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "dtype": "int",
         "default-value": 1,
@@ -138,10 +152,12 @@
       "dims": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "time": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -163,6 +179,7 @@
         "origin": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -182,6 +199,7 @@
         "destination": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -201,10 +219,12 @@
       "origin_demand": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "file": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -227,6 +247,7 @@
         "value": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -245,6 +266,7 @@
         "distribution": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "str",
           "default-value": "uniform",
@@ -253,10 +275,12 @@
         "parameters": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "upper": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -265,6 +289,7 @@
           "lower": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -273,6 +298,7 @@
           "mean": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -281,6 +307,7 @@
           "std": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -291,10 +318,12 @@
       "destination_demand": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "file": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -317,6 +346,7 @@
         "value": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -335,6 +365,7 @@
         "distribution": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "str",
           "default-value": "uniform",
@@ -343,10 +374,12 @@
         "parameters": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "upper": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -355,6 +388,7 @@
           "lower": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -363,6 +397,7 @@
           "mean": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -371,6 +406,7 @@
           "std": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -381,10 +417,12 @@
       "origin_attraction_ts": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "file": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -407,6 +445,7 @@
         "value": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -425,6 +464,7 @@
         "distribution": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "str",
           "default-value": "uniform",
@@ -433,10 +473,12 @@
         "parameters": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "upper": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -445,6 +487,7 @@
           "lower": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -453,6 +496,7 @@
           "mean": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -461,6 +505,7 @@
           "std": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -471,10 +516,12 @@
       "destination_attraction_ts": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "file": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -497,6 +544,7 @@
         "value": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -515,6 +563,7 @@
         "distribution": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "str",
           "default-value": "uniform",
@@ -523,10 +572,12 @@
         "parameters": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "upper": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -535,6 +586,7 @@
           "lower": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -543,6 +595,7 @@
           "mean": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -551,6 +604,7 @@
           "std": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -561,10 +615,12 @@
       "cost_matrix": {
         "sweepable": false,
         "optional": false,
+        "exclude": false,
 
         "file": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -587,6 +643,7 @@
         "distribution": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "str",
           "default-value": "uniform",
@@ -595,6 +652,7 @@
         "value": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -613,10 +671,12 @@
         "parameters": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "upper": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -625,6 +685,7 @@
           "lower": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -633,6 +694,7 @@
           "mean": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -641,6 +703,7 @@
           "std": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -651,10 +714,12 @@
       "table": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "file": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -677,6 +742,7 @@
         "distribution": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "str",
           "default-value": "poisson",
@@ -685,6 +751,7 @@
         "value": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -703,10 +770,12 @@
         "parameters": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "lam": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "float",
             "default-value": 1.0,
@@ -717,10 +786,12 @@
       "total_cost_by_origin": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "file": {
           "sweepable": true,
           "optional": true,
+          "exclude": false,
 
           "sweep": {
             "default": {
@@ -744,6 +815,7 @@
       "margins": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "dtype": "customDict",
         "dict-key-dtype": "str",
@@ -751,6 +823,7 @@
           "file": {
             "sweepable": true,
             "optional": true,
+            "exclude": false,
 
             "sweep": {
               "default": {
@@ -769,6 +842,7 @@
           "value": {
             "sweepable": false,
             "optional": true,
+            "exclude": false,
 
             "dtype": "list",
             "list-dtype": "int",
@@ -781,10 +855,12 @@
   "contingency_table": {
     "sweepable": false,
     "optional": true,
+    "exclude": false,
 
     "sparse_margins": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "dtype": "bool",
       "default-value": true
@@ -792,10 +868,12 @@
     "constraints": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "axes": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -816,6 +894,7 @@
       "cells": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -838,10 +917,12 @@
   "spatial_interaction_model": {
     "sweepable": false,
     "optional": true,
+    "exclude": false,
 
     "name": {
       "sweepable": true,
       "optional": false,
+      "exclude": false,
 
       "sweep": {
         "default": {
@@ -862,6 +943,7 @@
     "grand_total": {
       "sweepable": true,
       "optional": true,
+      "exclude": false,
 
       "sweep": {
         "default": {
@@ -880,10 +962,12 @@
     "parameters": {
       "sweepable": false,
       "optional": false,
+      "exclude": false,
 
       "alpha": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -903,6 +987,7 @@
       "beta": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -922,6 +1007,7 @@
       "bmax": {
         "sweepable": true,
         "optional": false,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -945,10 +1031,12 @@
   "harris_wilson_model": {
     "sweepable": false,
     "optional": false,
+    "exclude": false,
 
     "dt": {
       "sweepable": true,
       "optional": false,
+      "exclude": false,
 
       "sweep": {
         "default": {
@@ -968,10 +1056,12 @@
     "parameters": {
       "sweepable": false,
       "optional": false,
+      "exclude": false,
 
       "delta": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -991,6 +1081,7 @@
       "kappa": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1012,6 +1103,7 @@
       "sigma": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1033,6 +1125,7 @@
       "epsilon": {
         "sweepable": true,
         "optional": false,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1056,16 +1149,19 @@
   "mcmc": {
     "sweepable": false,
     "optional": true,
+    "exclude": false,
 
     "disable_tqdm": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
       "dtype": "bool",
       "default-value": true
     },
     "mcmc_workers": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "dtype": "int",
       "default-value": 1,
@@ -1075,10 +1171,12 @@
     "parameters": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "theta_steps": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "dtype": "int",
         "default-value": 1,
@@ -1088,6 +1186,7 @@
       "covariance": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1120,6 +1219,7 @@
       "step_size": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1141,10 +1241,12 @@
     "destination_attraction": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "log_destination_attraction_steps": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "dtype": "int",
         "default-value": 1,
@@ -1154,6 +1256,7 @@
       "leapfrog_steps": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1175,6 +1278,7 @@
       "ais_leapfrog_steps": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1195,6 +1299,7 @@
       "ais_samples": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1215,6 +1320,7 @@
       "n_bridging_distributions": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1235,6 +1341,7 @@
       "leapfrog_step_size": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1255,6 +1362,7 @@
       "ais_leapfrog_step_size": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1276,10 +1384,12 @@
     "contingency_table": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "table_steps": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "dtype": "int",
         "default-value": 1,
@@ -1288,6 +1398,7 @@
       "proposal": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1306,6 +1417,7 @@
       "table0": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "dtype": "str",
         "default-value": "maximum_entropy_solution",
@@ -1318,6 +1430,7 @@
       "margin0": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "dtype": "str",
         "default-value": "multinomial",
@@ -1329,6 +1442,7 @@
     "N": {
       "sweepable": true,
       "optional": false,
+      "exclude": false,
 
       "sweep": {
         "default": {
@@ -1348,6 +1462,7 @@
     "num_steps": {
       "sweepable": true,
       "optional": true,
+      "exclude": false,
 
       "sweep": {
         "default": {
@@ -1365,6 +1480,7 @@
     "batch_size": {
       "sweepable": false,
       "optional": false,
+      "exclude": false,
       "dtype": "int",
       "default-value": 1,
       "valid-range": [1, null]
@@ -1373,31 +1489,35 @@
   "neural_network": {
     "sweepable": false,
     "optional": true,
+    "exclude": false,
 
     "disable_tqdm": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
       "dtype": "bool",
       "default-value": true
     },
     "loss": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "loss_name": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
             "dtype": "list",
             "list-dtype": "str",
             "list-length": [1, null],
-            "default-value": "destination_attraction_ts_loss",
+            "default-value": "dest_attraction_ts",
             "is-any-of": [
-              "destination_attraction_ts_loss",
-              "table_likelihood_loss",
-              "total_distance_travelled_loss"
+              "dest_attraction_ts",
+              "table_likelihood",
+              "total_distance"
             ],
             "unique-vals": true
           },
@@ -1420,6 +1540,7 @@
       "loss_function": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1492,10 +1613,12 @@
     "hyperparameters": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "num_layers": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1515,6 +1638,7 @@
       "optimizer": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1560,6 +1684,7 @@
       "learning_rate": {
         "sweepable": true,
         "optional": true,
+        "exclude": false,
 
         "sweep": {
           "default": {
@@ -1579,10 +1704,12 @@
       "biases": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "default": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "list",
           "list-dtype": "float",
@@ -1592,6 +1719,7 @@
         "layer_specific": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "dict",
           "dict-key-dtype": "str",
@@ -1604,10 +1732,12 @@
       "nodes_per_layer": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "default": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "int",
           "default-value": 20,
@@ -1616,6 +1746,7 @@
         "layer_specific": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "dict",
           "dict-key-dtype": "str",
@@ -1628,10 +1759,12 @@
       "activation_funcs": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
 
         "default": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "str",
           "default-value": "linear",
@@ -1669,6 +1802,7 @@
         "layer_specific": {
           "sweepable": false,
           "optional": true,
+          "exclude": false,
 
           "dtype": "dict",
           "dict-key-dtype": "strInt",
@@ -1712,6 +1846,7 @@
   "experiments": {
     "sweepable": false,
     "optional": false,
+    "exclude": false,
 
     "dtype": "customDict",
     "dict-key-dtype": "str",
@@ -1719,6 +1854,7 @@
       "type": {
         "sweepable": false,
         "optional": false,
+        "exclude": false,
         "dtype": "str",
         "default-value": "SIM_NN",
         "is-any-of": [
@@ -1734,36 +1870,42 @@
       "comment": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
         "dtype": "str",
         "default-value": ""
       },
       "disable_tqdm": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
         "dtype": "bool",
         "default-value": true
       },
       "print_statements": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
         "dtype": "bool",
         "default-value": false
       },
       "export_samples": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
         "dtype": "bool",
         "default-value": true
       },
       "export_metadata": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
         "dtype": "bool",
         "default-value": true
       },
       "overwrite": {
         "sweepable": false,
         "optional": true,
+        "exclude": false,
         "dtype": "bool",
         "default-value": true
       }
@@ -1772,10 +1914,12 @@
   "outputs": {
     "sweepable": false,
     "optional": false,
+    "exclude": false,
 
     "chunk_size": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "dtype": "int",
       "default-value": 1,
@@ -1785,6 +1929,7 @@
     "write_start": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "dtype": "int",
       "default-value": 1,
@@ -1793,6 +1938,7 @@
     "write_every": {
       "sweepable": false,
       "optional": true,
+      "exclude": false,
 
       "dtype": "int",
       "default-value": 1,
@@ -1801,14 +1947,16 @@
     "out_directory": {
       "sweepable": false,
       "optional": false,
+      "exclude": false,
 
       "dtype": "directory",
       "directory-exists": true,
       "default-value": "./data/outputs/"
     },
-    "experiment_title": {
+    "title": {
       "sweepable": true,
       "optional": true,
+      "exclude": false,
 
       "sweep": {
         "default": {

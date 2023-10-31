@@ -306,8 +306,6 @@
       }
     },
     "contingency_table": {
-      "sweepable": false,
-      "optional": true,
       "table_steps": true,
       "proposal": {
         "sweep": {
@@ -383,7 +381,7 @@
     "write_start": true,
     "write_every": true,
     "out_directory": true,
-    "experiment_title": {
+    "title": {
       "sweep": {
         "default": true,
         "range": true

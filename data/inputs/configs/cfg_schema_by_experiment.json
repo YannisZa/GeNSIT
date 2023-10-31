@@ -17,30 +17,33 @@
   },
   "NonJointTableSIM_NN": {
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
-      "destination_attraction_ts_loss"
+      "dest_attraction_ts"
     ],
     "neural_network>loss>loss_name>sweep>default>default-value": [
-      "destination_attraction_ts_loss"
+      "dest_attraction_ts"
     ],
     "neural_network>loss>loss_name>sweep>range>is-any-of": [
-      "destination_attraction_ts_loss"
+      "dest_attraction_ts"
     ],
     "neural_network>loss>loss_name>sweep>range>default-value": [
-      "destination_attraction_ts_loss"
+      "dest_attraction_ts"
     ]
   },
   "SIM_NN": {
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
-      "destination_attraction_ts_loss"
+      "dest_attraction_ts"
     ],
     "neural_network>loss>loss_name>sweep>default>default-value": [
-      "destination_attraction_ts_loss"
+      "dest_attraction_ts"
     ],
     "neural_network>loss>loss_name>sweep>range>is-any-of": [
-      "destination_attraction_ts_loss"
+      "dest_attraction_ts"
     ],
     "neural_network>loss>loss_name>sweep>range>default-value": [
-      "destination_attraction_ts_loss"
-    ]
+      "dest_attraction_ts"
+    ],
+    "contingency_table>axes>exclude": true,
+    "contingency_table>constraints>cells>exclude": true,
+    "outputs>title>exclude": true
   }
 }
