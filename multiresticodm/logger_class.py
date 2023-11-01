@@ -169,104 +169,104 @@ class DualLogger():
             
     def debug(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.DEBUG):
-            self.console.debug(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.debug(msg,extra = dict(modulename=module))
         if self.file.isEnabledFor(logging.DEBUG):
-            self.file.debug(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.debug(msg,extra = dict(modulename=module))
 
     def info(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.INFO):
-            self.console.info(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.info(msg,extra = dict(modulename=module))
         if self.file.isEnabledFor(logging.INFO):
-            self.file.info(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.info(msg,extra = dict(modulename=module))
 
     def warning(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.INFO):
-            self.console.warning(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.warning(msg,extra = dict(modulename=module))
         if self.file.isEnabledFor(logging.WARNING):
-            self.file.warning(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.warning(msg,extra = dict(modulename=module))
 
     def error(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.ERROR):
-            self.console.error(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.error(msg,extra = dict(modulename=module))
         if self.file.isEnabledFor(logging.ERROR):
-            self.file.error(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.error(msg,extra = dict(modulename=module))
 
     def critical(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.CRITICAL):
-            self.console.critical(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.critical(msg,extra = dict(modulename=module))
         if self.file.isEnabledFor(logging.CRITICAL):
-            self.file.critical(msg,extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.critical(msg,extra = dict(modulename=module))
 
     def trace(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(TRACE):
-            self.console.trace(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.trace(msg, extra = dict(modulename=module))
         if self.file.isEnabledFor(TRACE):
-            self.file.trace(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.trace(msg, extra = dict(modulename=module))
     
     def remark(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(REMARK):
-            self.console.remark(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.remark(msg, extra = dict(modulename=module))
         if self.file.isEnabledFor(REMARK):
-            self.file.remark(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.remark(msg, extra = dict(modulename=module))
 
     def note(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(NOTE):
-            self.console.note(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.note(msg, extra = dict(modulename=module))
         if self.file.isEnabledFor(NOTE):
-            self.file.note(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.note(msg, extra = dict(modulename=module))
     
     def progress(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(PROGRESS):
-            self.console.progress(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.progress(msg, extra = dict(modulename=module))
         if self.file.isEnabledFor(PROGRESS):
-            self.file.progress(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.progress(msg, extra = dict(modulename=module))
     
     def caution(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(CAUTION):
-            self.console.caution(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.caution(msg, extra = dict(modulename=module))
         if self.file.isEnabledFor(CAUTION):
-            self.file.caution(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.caution(msg, extra = dict(modulename=module))
     
     def hilight(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(HILIGHT):
-            self.console.hilight(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.hilight(msg, extra = dict(modulename=module))
         if self.file.isEnabledFor(HILIGHT):
-            self.file.hilight(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.hilight(msg, extra = dict(modulename=module))
     
     def success(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(SUCCESS):
-            self.console.success(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.success(msg, extra = dict(modulename=module))
         if self.file.isEnabledFor(SUCCESS):
-            self.file.success(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.success(msg, extra = dict(modulename=module))
     
     def empty(self, msg):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame)
+        module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(EMPTY):
-            self.console.empty(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.console.empty(msg, extra = dict(modulename=module))
         if self.file.isEnabledFor(EMPTY):
-            self.file.empty(msg, extra = dict(modulename=module.__name__.split('.')[-1]))
+            self.file.empty(msg, extra = dict(modulename=module))
