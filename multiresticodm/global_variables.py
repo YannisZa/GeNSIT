@@ -119,7 +119,8 @@ NUMPY_TO_TORCH_DTYPE = {
     'int64':int64,
     'bool':tbool,
     'str':str,
-    'object':object
+    'object':object,
+    'list':list
 }
 
 TORCH_TO_NUMPY_DTYPE = {v:k for k,v in NUMPY_TO_TORCH_DTYPE.items()}
@@ -134,7 +135,9 @@ INPUT_SCHEMA = {
     "total_cost_by_origin":{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":1},
     "ground_truth_table":{"dims":['origin','destination'],"axes":[0,1],"dtype":"int32", "ndmin":2},
     "dims":{},
-    "grand_total":{}
+    "grand_total":{},
+    "to_learn":{},
+    "true_parameters":{}
 }
 
 TABLE_INFERENCE_EXPERIMENTS = ['nonjointtablesim_nn','jointtablesim_nn','jointtablesim_mcmc','table_mcmc','table_mcmc','tablesummaries_mcmcconvergence']
@@ -181,7 +184,14 @@ AUXILIARY_COORDINATES_DTYPES = {
     'N':torch.int32,
     'dataset':str,
     'covariance':str,
-    'step_size':torch.float32
+    'step_size':torch.float32,
+    'to_learn':object,
+    'sigma':object,
+    'title':str,
+    'axes':object,
+    'cells':str,
+    'loss_name':object,
+    'loss_function':object
 }
 
 CORE_COORDINATES_DTYPES = {
@@ -189,7 +199,7 @@ CORE_COORDINATES_DTYPES = {
  'seed':torch.int32,
  'time':torch.int32,
  'origin':torch.int32,
- 'destination':torch.int32
+ 'destination':torch.int32,
 }
 
 COORDINATES_DTYPES = {**CORE_COORDINATES_DTYPES,**AUXILIARY_COORDINATES_DTYPES,**DATA_TYPES}
@@ -244,7 +254,7 @@ LINESTYLES = {'monte_carlo_sample_degree_one':'dashed',
 
 # Type of plots
 PLOT_HASHMAP = {
-        '00':'table_posterior_mean_convergence_fixed_intensity',
+        'dss':'data_plot_2d_scatter',
         '01':'colsum_posterior_mean_convergence_fixed_intensity',
         '02':'table_posterior_mean_convergence',
         '10':'table_distribution_low_dimensional_embedding',
@@ -265,61 +275,61 @@ PLOT_HASHMAP = {
 
 SWEEPABLE_PARAMS = {
     "seed": {
-        "is_coord":True        
+        "is_coord": True        
     },
     "origin_demand": {
-        "is_coord":True
+        "is_coord": True
     },
     "destination_attraction_ts": {
-        "is_coord":True
+        "is_coord": True
     },
     "cost_matrix": {
-        "is_coord":True
+        "is_coord": True
     },
     "total_cost_by_origin": {
         "is_coord": False
     },
     "name": {
-        "is_coord":True
+        "is_coord": True
     },
     "alpha": {
-        "is_coord":True
+        "is_coord": True
     },
     "beta": {
-        "is_coord":True
+        "is_coord": True
     },
     "bmax": {
-        "is_coord":False
+        "is_coord": False
     },
     "dt": {
-        "is_coord":True
+        "is_coord": True
     },
     "delta": {
-        "is_coord":True
+        "is_coord": True
     },
     "kappa": {
-        "is_coord":True
+        "is_coord": True
     },
     "sigma": {
-        "is_coord":True
+        "is_coord": True
     },
     "epsilon": {
-        "is_coord":True
+        "is_coord": True
     },
     "N": {
-        "is_coord":True
+        "is_coord": True
     },
     "to_learn": {
-        "is_coord":False
+        "is_coord": False
     },
     "num_layers": {
-        "is_coord":True
+        "is_coord": True
     },
     "optimizer": {
-        "is_coord":True
+        "is_coord": True
     },
     "learning_rate": {
-        "is_coord":True
+        "is_coord": True
     }
 }
 
