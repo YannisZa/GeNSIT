@@ -54,6 +54,7 @@ class Inputs:
         # this is relevant in the case of the DataGeneration experiment
         self.instance = kwargs.get('instance',1)
 
+
         self.seed = None
         if 'data_generation_seed' in list(self.config.settings['inputs']['data'].keys()):
             self.seed = int(self.config.settings['inputs']['data']['data_generation_seed'])
@@ -145,7 +146,7 @@ class Inputs:
         self.true_parameters = {
             k: parameter_settings.get(k,v) \
                 for k,v in PARAMETER_DEFAULTS.items() \
-                if not k in params_to_learn
+                if k not in params_to_learn
         }
         # Update kappa and delta based on data (if not specified)
         self.update_delta_and_kappa()
