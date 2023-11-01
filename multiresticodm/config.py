@@ -9,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, safe_delete, setup_logger, read_json, expand_tuple, unique
+from multiresticodm.utils import deep_apply, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk
 
 class Config:
 
@@ -286,6 +286,38 @@ class Config:
             print(key_path)
             self.path_delete(self.settings,key_path)
 
+    def find_sweep_key_paths(self):
+        for key_val_path in deep_walk(self.settings):
+            
+            if 'sweep' in key_val_path and key_val_path[-2] == 'range':
+                # Index location of sweep in key value path
+                indx = key_val_path.index('sweep')
+                # Get sweep settings
+                sweep_settings,_ = self.path_get(self.settings,key_val_path[:(indx+1)])
+                # If the sweep setting is coupled add to coupled sweep paths
+                if sweep_settings.get('coupled',False) and len(sweep_settings.get('target_name','')) > 0:
+                    target_name = sweep_settings.get('target_name','')
+                    if target_name in list(self.coupled_sweep_paths.keys()):
+                        # Add path to coupled sweeps
+                        self.coupled_sweep_paths[target_name][key_val_path[indx-1]] = deepcopy(key_val_path[:indx])
+                    else:
+                        # Find target name
+                        target_name_path,found = self.path_find(target_name,self.settings,path=[],found=False)
+                        if found and len(target_name_path) > 0:
+                            self.coupled_sweep_paths[target_name] = {    
+                                target_name : target_name_path,
+                                key_val_path[indx-1] : deepcopy(key_val_path[:indx])
+                            }
+                # Else add to isolated sweep paths
+                else:
+                    self.isolated_sweep_paths[key_val_path[indx-1]] = deepcopy(key_val_path[:indx])
+        
+        # Find common keys between isolated and coupled paths
+        common_keys = set(list(self.isolated_sweep_paths.keys())).intersection(set(list(self.coupled_sweep_paths.keys())))
+        # Remove them from isolated sweeps
+        for k in list(common_keys):
+            del self.isolated_sweep_paths[k]
+        
     def validate_config(self,parameters=None,settings=None,base_schema=None,key_path=[],**kwargs):
         # Pass defaults if no meaningful arguments are provided
         if parameters is None:
@@ -681,3 +713,36 @@ class Config:
 
         return sweep_params
     
+
+    def prepare_experiment_config(self,sweep_params,sweep_configuration):
+        # Create new config
+        new_config = deepcopy(self)
+        # Deactivate sweep             
+        new_config.settings["sweep_mode"] = False
+        # Activate sample exports
+        new_config.settings['export_samples'] = True
+        # Create sweep dictionary
+        sweep = {}
+        # Update config
+        i = 0
+        for value in sweep_params['isolated'].values():
+            new_config.path_set(
+                new_config,
+                sweep_configuration[i],
+                value['path']
+            )
+            # Update current sweep
+            sweep[value['var']] = sweep_configuration[i]
+            i += 1
+        for sweep_group in sweep_params['coupled'].values():
+            for value in sweep_group.values():
+                new_config.path_set(
+                    new_config,
+                    sweep_configuration[i],
+                    value['path']
+                )
+                # Update current sweep
+                sweep[value['var']] = sweep_configuration[i]
+                i += 1
+        # Return config and sweep params
+        return new_config,sweep
