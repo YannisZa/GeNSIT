@@ -227,13 +227,15 @@ class Experiment(object):
     def write_metadata(self):
         if self.config.settings.get('export_metadata',True):
             self.logger.debug("Writing metadata ...")
-            if self.config.settings["sweep_mode"] or len(self.outputs.sweep_id) > 0:
-                dir_path = os.path.join("samples",self.outputs.sweep_id)
-                filename = 'metadata'
+            dir_path = ""
+            if self.config.settings["sweep_mode"] or len(self.outputs.sweep_id) == 0:
+                filename='config'
             else:
-                dir_path = ""
-                filename = 'config'
-
+                filename='metadata'
+            
+            if len(self.outputs.sweep_id) > 0:
+                dir_path = os.path.join("samples",self.outputs.sweep_id)
+            
             self.outputs.write_metadata(
                 dir_path=dir_path,
                 filename=filename
@@ -2342,43 +2344,14 @@ class ExperimentSweep():
                 self.run_sequential(sweep_configurations)
         
     def prepare_experiment(self,sweep_configuration):
-        # Create new config
-        new_config = deepcopy(self.config)
-        # Deactivate sweep             
-        new_config.settings["sweep_mode"] = False
         # Deactivate logging
         self.logger.setLevels(
             console_level='ERROR',
             file_level='DEBUG'
         )
         
-        # Activate sample exports
-        new_config.settings['export_samples'] = True
-        # Create sweep dictionary
-        sweep = {}
-        # Update config
-        i = 0
-        for value in self.sweep_params['isolated'].values():
-            new_config.path_set(
-                new_config,
-                sweep_configuration[i],
-                value['path']
-            )
-            # Update current sweep
-            sweep[value['var']] = sweep_configuration[i]
-            i += 1
-        for sweep_group in self.sweep_params['coupled'].values():
-            for value in sweep_group.values():
-                new_config.path_set(
-                    new_config,
-                    sweep_configuration[i],
-                    value['path']
-                )
-                # Update current sweep
-                sweep[value['var']] = sweep_configuration[i]
-                i += 1
-        # Return config and sweep params
-        return new_config,sweep
+        return self.config.prepare_experiment_config(self.sweep_params,sweep_configuration)
+        
     
     def prepare_instantiate_and_run(self,instance_num:int,sweep_configuration:dict,semaphore=None,counter=None,pbar=None):
         try:
