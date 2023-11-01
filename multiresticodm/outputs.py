@@ -52,18 +52,18 @@ class OutputSummary(object):
         # Enable garbage collector
         gc.enable()
         # Update settings to parse statistics argument
-        deep_updates(
-            self.settings,
-            unpack_statistics(self.settings)
-        )
+        unpacked_stats = unpack_statistics(self.settings)
+        if unpacked_stats is not None:
+            deep_updates(
+                self.settings,
+                unpacked_stats
+            )
         # Update settings to parse slice by argument
         self.settings['slice_by'] = parse_slice_by(
             self.settings.get('slice_by',[])
         )
         # Setup experiments
         self.collect_experiment_metadata()
-        # Compile metadata
-        self.write_metadata_summaries()
      
     @classmethod
     def find_matching_output_folders(cls,__self__):
@@ -83,17 +83,14 @@ class OutputSummary(object):
             # Get output directory
             output_directory = __self__.settings['out_directory']
             # Get experiment title
-            experiment_titles = __self__.settings['experiment_title']
-            experiment_titles = experiment_titles if len(experiment_titles) > 0 else ['']
+            experiment_titles = __self__.settings.get('experiment_title',[''])
             # Get dataset name
-            dataset_names = __self__.settings['dataset_name']
-            dataset_names = dataset_names if len(dataset_names) > 0 else ['.*']
+            dataset_names = __self__.settings.get('dataset_name',['.*'])
             # Get type of experiment
-            experiment_types = __self__.settings['experiment_type']
-            experiment_types = experiment_types if len(experiment_types) > 0 else ['']
+            experiment_types = __self__.settings.get('experiment_type',[''])
 
             # Get date
-            if len(__self__.settings['dates']) <= 0:
+            if len(__self__.settings.get('dates',[])) <= 0:
                 dates = ['']
             else:
                 dates = list(__self__.settings.get('dates',['']))
@@ -106,7 +103,6 @@ class OutputSummary(object):
                         for dt in dates:
                             folder_patterns.append(
                                 os.path.join(
-                                    output_directory,
                                     data_name,
                                     (f"{(exp_type+'.*') if len(exp_type) > 0 else ''}"+
                                     f"{('_'+exp_title+'.*') if len(exp_title) > 0 else ''}"+
@@ -115,17 +111,28 @@ class OutputSummary(object):
                             )
             # Combine them all into one pattern
             folder_patterns_re = "(" + ")|(".join(folder_patterns) + ")"
-            # Get all output directories matching dataset name
-            output_dirs = sorted(get_directories_and_immediate_subdirectories(output_directory))
+            # Get all output directories matching dataset name(s)
+            output_dirs = flatten([get_all_subdirectories(output_directory+dataset) for dataset in dataset_names])
+            # Sort them by string
+            output_dirs = sorted(list(output_dirs))
             # Get all output dirs that match the pattern
-            output_dirs = [output_folder for output_folder in output_dirs if re.match(folder_patterns_re,output_folder)]
+            output_dirs = [output_folder for output_folder in output_dirs if re.search(folder_patterns_re,output_folder)]
             # Exclude those that are specified
-            if len(__self__.settings['exclude']) > 0:
+            if len(__self__.settings.get('exclude',[])) > 0:
                 output_dirs = [
                     output_folder for output_folder in output_dirs if __self__.settings['exclude'] not in output_folder
                 ]
             # Sort by datetime
-            output_dirs = sorted(output_dirs,key=(lambda dt: datetime.strptime(dt[-19:], "%d_%m_%Y_%H_%M_%S")))
+            date_pattern = re.compile(r"\d{1,2}\_\d{1,2}\_\d{2,4}\_\d{1,2}\_\d{1,2}\_\d{1,2}")
+            output_dirs = sorted(
+                output_dirs,
+                key=(
+                    lambda dt: datetime.strptime(
+                        date_pattern.search(dt).group(0), 
+                        "%d_%m_%Y_%H_%M_%S"
+                    )
+                )
+            )
             # If no directories found terminate
             if len(output_dirs) == 0 :
                 __self__.logger.error(f'No directories found in {os.path.join(output_directory,"*")}')
@@ -135,77 +142,87 @@ class OutputSummary(object):
     def collect_experiment_metadata(self):
         # Find matching directories
         output_dirs = self.find_matching_output_folders(self)
-        for i,output_folder in tqdm(enumerate(output_dirs),total=len(output_dirs),desc='Collecting metadata'):
-            
-            self.logger.info(f'{output_folder}')
+        for i,output_folder in enumerate(output_dirs):
             
             # Get name of folder
             folder_name = Path(output_folder).stem
             
             # Read metadata config
-            experiment_metadata = read_json(os.path.join(output_folder,"config.json"))
+            experiment_config = Config(
+                path = os.path.join(output_folder,"config.json")
+            )
+            experiment_config.find_sweep_key_paths()
 
-            # Extract useful data
-            useful_metadata = {}
-            for key in self.settings['metadata_keys']:
-                try:
-                    # Get first instance of key
-                    useful_metadata[key] = list(deep_get(key=key,value=experiment_metadata))[0]
-                except:
-                    self.logger.error(f"{key} not found in experiment metadata.")
-
-            if 'sweeped_params_paths' in list(experiment_metadata.keys()) and len(experiment_metadata['sweeped_params_paths']) > 0:
-                coordinate_slice = {}
-                input_slice = []
-                # Loop through key-value pairs used
-                # to subset the output samples
-                for name,values in self.settings['slice_by'].items():
-                    # Loop through experiment's sweeped parameters
-                    for key_path in experiment_metadata['sweeped_params_paths']:
-                        # If there is a match between the two
-                        if name == key_path[-1]:
-                            # If is a coordinate add to the coordinate slice
-                            # This slices the xarray created from the outputs samples
-                            if SWEEPABLE_PARAMS[name]['is_coord']:
-                                if name in list(coordinate_slice.keys()):
-                                    coordinate_slice[name]['values'] = np.append(coordinate_slice[name]['values'],values)
-                                else:
-                                    coordinate_slice[name] = {"path": key_path, "values": values}
-                            # If is NOT a coordinate add to the input slice
-                            # This slices the input data and requires reinstantiating outputs
-                            else:
-                                input_slice.append({"values":values,"key_path":key_path})
-                if len(input_slice) == 0:
-                    input_slice = [None]
-            else:
-                coordinate_slice = {}
-                input_slice = [None]
+            # Parse sweep configurations
+            sweep_params = experiment_config.parse_sweep_params()
             
+            # Slice sweep params
+            input_slice,coordinate_slice = self.create_sweep_slice(experiment_config)
 
-            for path_value in input_slice:
-                
+            # Get all sweep configurations
+            sweep_configurations, \
+            param_sizes_str, \
+            total_size_str = experiment_config.prepare_sweep_configurations(sweep_params)
+
+            # Get output folder
+            base_dir = output_folder.split(
+                'samples/'
+            )[0]
+            output_folder_succinct = base_dir.split(
+                experiment_config['inputs']['dataset']
+            )[-1]
+            self.logger.info(f"Scanning folder {i+1}/{len(output_dirs)}")
+            self.logger.info("----------------------------------------------------------------------------------")
+            self.logger.info(f'{output_folder_succinct}')
+            self.logger.info(f"Parameter space size: {param_sizes_str}")
+            self.logger.info(f"Total = {total_size_str}.")
+            self.logger.info("----------------------------------------------------------------------------------")
+
+            # Get sweep parameter names
+            sweep_param_names = list(experiment_config.isolated_sweep_paths.keys())
+            sweep_param_names += [
+                item
+                for nested_dict in experiment_config.coupled_sweep_paths.values() 
+                for item in nested_dict.keys()
+            ]
+            sweep_param_names = list(flatten(sweep_param_names))
+            # Get sweep slice parameter names
+            sweep_slice_param_names = list(input_slice.keys())+list(coordinate_slice.keys())
+
+            for sweep_configuration in tqdm(sweep_configurations,desc='Collecting metadata',leave=False):
+                # If there is no overlap between slice and available sweep params continue
+                # as long as some slice params have been provided
+                if set(sweep_slice_param_names) and not set(sweep_slice_param_names).intersection(set(sweep_param_names)):
+                    continue
+                    
+                # Get specific sweep config 
+                new_config,sweep = experiment_config.prepare_experiment_config(
+                    sweep_params = sweep_params,
+                    sweep_configuration = sweep_configuration
+                )
+
+                # Extract useful data
+                useful_metadata = {}
+                for key in self.settings['metadata_keys']:
+                    try:
+                        # Get first instance of key
+                        useful_metadata[key] = list(deep_get(key=key,value=new_config))[0]
+                    except:
+                        self.logger.error(f"{key} not found in experiment metadata.")
+                    
                 # Get outputs and unpack its statistics
-                # This is the case where there are NO input slices provided
-                if path_value is None:
-                    outputs = Outputs(
-                        config=output_folder,
-                        settings=self.settings,
-                        output_names=(list(self.settings['sample'])+['ground_truth_table']),
-                        coordinate_slice=coordinate_slice,
-                        console_handling_level = self.settings['logging_mode'],
-                        logger = self.logger
-                    )
                 # This is the case where there are SOME input slices provided
-                else:
-                    outputs = Outputs(
-                        config=output_folder,
-                        settings=self.settings,
-                        output_names=(list(self.settings['sample'])+['ground_truth_table']),
-                        coordinate_slice=coordinate_slice,
-                        input_slice=path_value,
-                        console_handling_level = self.settings['logging_mode'],
-                        logger = self.logger
-                    )
+                outputs = Outputs(
+                    config = new_config,
+                    settings = self.settings,
+                    output_names = (list(self.settings['sample'])+['ground_truth_table']),
+                    coordinate_slice = coordinate_slice,
+                    sweep_params = sweep,
+                    base_dir= base_dir,
+                    console_handling_level = self.settings['logging_mode'],
+                    logger = self.logger
+                )
+                outputs.load()
 
                 # Apply these metrics to the data 
                 metric_data = self.apply_metrics(
@@ -230,7 +247,7 @@ class OutputSummary(object):
                 safe_delete(outputs)
                 gc.collect()
                 print('sleep')
-                time.sleep(15)
+                time.sleep(5)
 
     def write_metadata_summaries(self):
         if len(self.experiment_metadata.keys()) > 0:
@@ -288,13 +305,9 @@ class OutputSummary(object):
         self.logger.info('Applying metrics...')
         
         metric_data = []
-
         for sample_name in self.settings['sample']:
              # Get samples
             self.logger.info(f'Getting sample {sample_name}...')
-            print(outputs.data.table.dtype)
-            print(outputs.data.table.coords)
-            print(outputs.data.table.shape)
             try:
                 samples = outputs.get_sample(sample_name)
             except Exception as e:
@@ -510,34 +523,98 @@ class OutputSummary(object):
         metric_arguments.update(settings_copy)
 
         return metric_arguments
+    
+    def create_sweep_slice(self,config):
+        if len(config.isolated_sweep_paths) > 0 or len(config.coupled_sweep_paths) > 0:
+
+            coordinate_slice = {}
+            input_slice = {}
+            # Loop through key-value pairs used
+            # to subset the output samples
+            for name,sliced_values in self.settings['slice_by'].items():
+                # Loop through experiment's isolated sweeped parameters
+                for target_name,target_path in config.isolated_sweep_paths.items():
+                    # If there is a match between the two
+                    if name == target_name:
+                        # If is a coordinate add to the coordinate slice
+                        # This slices the xarray created from the outputs samples
+                        if SWEEPABLE_PARAMS[name]['is_coord']:
+                            if name in list(coordinate_slice.keys()):
+                                coordinate_slice[name]['values'] = np.append(
+                                    coordinate_slice[name]['values'],
+                                    sliced_values
+                                )
+                            else:
+                                coordinate_slice[name] = {
+                                    "paths": target_path,
+                                    "values": sliced_values
+                                }
+                        # If is NOT a coordinate add to the input slice
+                        # This slices the input data and requires reinstantiating outputs
+                        else:
+                            input_slice[name] = {
+                                "values":sliced_values,
+                                "key_path":target_path
+                            }
+                # Loop through experiment's coupled sweeped parameters
+                for target_name,target_paths in config.coupled_sweep_paths.items():
+                    # If any of the coupled sweeps contain the target name
+                    if name in list(target_paths.keys()):
+                        for coupled_name,target_path in target_paths.items():
+                            # If is a coordinate add to the coordinate slice
+                            # This slices the xarray created from the outputs samples
+                            if SWEEPABLE_PARAMS[coupled_name]['is_coord']:
+                                if name in list(coordinate_slice.keys()):
+                                    coordinate_slice[coupled_name]['values'] = np.append(
+                                        coordinate_slice[coupled_name]['values'],
+                                        sliced_values
+                                    )
+                                else:
+                                    coordinate_slice[coupled_name] = {
+                                        "paths": target_path,
+                                        "values": sliced_values
+                                    }
+                            # If is NOT a coordinate add to the input slice
+                            # This slices the input data and requires reinstantiating outputs
+                            else:
+                                input_slice[name] = {
+                                    "values":sliced_values,
+                                    "key_path":target_path
+                                }
+            if len(input_slice) == 0:
+                input_slice = {}
+        else:
+            coordinate_slice = {}
+            input_slice = {}
+        return input_slice,coordinate_slice
 
 class Outputs(object):
 
     def __init__(self,
                  config:Config, 
-                 module:str=__name__,
                  settings:dict={}, 
-                 output_names:list=['ground_truth_table'], 
-                 coordinate_slice:dict={},
-                 input_slice:dict={},
+                 output_names:list=['ground_truth_table'],
+                 sweep_params:dict={},
                  **kwargs):
         # Setup logger
         level = kwargs.get('level',None)
         self.logger = setup_logger(
-            module,
+            __name__,
             console_level = level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update config level
         self.logger.setLevels(
             console_level = level
         )
+        # Store output names
+        self.output_names = output_names
 
         # Sample names must be a subset of all data names
         try:
-            assert set(output_names).issubset(set(DATA_TYPES.keys()))
+            assert set(self.output_names).issubset(set(DATA_TYPES.keys()))
         except Exception as e:
             self.logger.error('Some sample names provided are not recognized')
-            self.logger.error(','.join(output_names))
+            self.logger.error(','.join(self.output_names))
             self.logger.debug(traceback.format_exc())
             raise Exception('Cannot load outputs.')
 
@@ -546,134 +623,15 @@ class Outputs(object):
         # Store device
         self.device = self.settings.get('device','cpu')
         # Store coordinate slice
-        self.coordinate_slice = coordinate_slice
+        self.coordinate_slice = kwargs.get('coordinate_slice',[])
         # Create semi-private xarray data 
         self.data = Dataset()
         # Enable garbage collector
         gc.enable()
-        if isinstance(config,str):
-            # Store experiment id
-            self.experiment_id = os.path.basename(os.path.normpath(config))
-            
-            # Load metadata
-            assert os.path.exists(config)
-            self.config = Config(
-                path=os.path.join(config,"config.json"),
-                logger = self.logger
-            )
-
-            # Update config based on slice of coordinate-like sweeped params
-            # affecting only the outputs of the model
-            if self.coordinate_slice:
-                for param in self.coordinate_slice.keys():
-                    self.config.path_set(
-                        settings = self.config.settings,
-                        value = self.coordinate_slice[param]['values'], 
-                        path = self.coordinate_slice[param]['path']
-                    )
-            # Update config based on slice of NON-coordinate-like sweeped params
-            # affecting only the inputs of the model
-            if input_slice:
-                self.config.path_set(
-                    settings = self.config.settings,
-                    value = input_slice['value'], 
-                    path = input_slice['path']
-                )
-            
-            # Get intensity model class
-            self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
-            
-            # Define config experiment path to directory
-            self.outputs_path = config if kwargs.get('base_dir') is None else kwargs['base_dir']
-
-            # Import all input data
-            self.inputs = Inputs(
-                config = self.config,
-                synthetic_data = False,
-                logger = self.logger
-            )
-            # Convert all inputs to tensors
-            self.inputs.pass_to_device()
-
-            # Try to load ground truth table
-            self.ground_truth_table = None
-            self.settings['table_total'] = self.settings.get('table_total',1)
-            if 'ground_truth_table' in output_names:
-                # Try reading it from settings path
-                try:
-                    self.ground_truth_table = np.loadtxt(
-                        os.path.join(
-                            self.config['inputs']['dataset'],
-                            self.settings['table']
-                        )
-                    )
-                    # Convert to xarray dataarray
-                    dims = np.shape(self.ground_truth_table)
-                    self.ground_truth_table = xr.DataArray(
-                        data=torch.tensor(self.ground_truth_table).to(dtype=int32,device=self.device),
-                        name='ground_truth_table',
-                        dims=['origin','destination'],
-                        coords=dict(
-                            origin=np.arange(1,dims[0]+1,1,dtype='int32'),
-                            destination=np.arange(1,dims[1]+1,1,dtype='int32')
-                        )
-                    )
-                
-                except:
-                    # Try reading it from inputs
-                    try:
-                        self.ground_truth_table = xr.DataArray(
-                            data=self.inputs.table.to(dtype=int32,device=self.device),
-                            name='ground_truth_table',
-                            dims=['origin','destination'],
-                            coords=dict(
-                                origin=np.arange(1,dims[0]+1,1,dtype='int32'),
-                                destination=np.arange(1,dims[1]+1,1,dtype='int32')
-                            )
-                        )
-                    except:
-                        pass
-            
-            # Try to get table total (number of agents)
-            if self.ground_truth_table is not None:
-                # Remove it from sample names
-                output_names.remove('ground_truth_table')
-                # Extract metadata
-                self.settings['table_total'] = self.ground_truth_table.values.ravel().sum()
-                self.settings['dims'] = list(np.shape(self.ground_truth_table))
-                self.logger.info(f'Ground truth table loaded')
-
-
-            # Load output h5 file to xarrays
-            self.load_h5_data(
-                config,
-                coordinate_slice=self.coordinate_slice,
-                slice_samples=kwargs.get('slice_samples',True)
-            )
-            
-            # Try to update metadata on table samples
-            try:
-                if 'table' in output_names and self.settings['table_total'] == 1:
-                    table = self.get_sample('table')
-                    self.settings['table_total'] = table.sum(dim=['origin','destination']).values[0]
-            except:
-                self.logger.debug(traceback.format_exc())
-                self.logger.warning(f'Sample table could not be loaded')
-                sys.exit()
-
-            if self.settings['table_total'] == 0:
-                print(self.ground_truth_table)
-                self.logger.warning('Ground truth missing')
-            
-        elif isinstance(config,Config):
+        
+        if isinstance(config,Config):
             # Store config
             self.config = config
-            
-            # Remove unnecessary data
-            # for attr in ['inputs','harris_wilson_nn','sim_mcmc','sim','ct']:
-            #     if hasattr(self.experiment,attr):
-            #         safe_delete(getattr(self.experiment,attr))
-            # gc.collect()
             
             # Get intensity model class
             self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
@@ -687,35 +645,147 @@ class Outputs(object):
                     self.config['inputs']['dataset'],
                     self.experiment_id
             ) if kwargs.get('base_dir') is None else kwargs['base_dir']
-    
-            # Name output sample directory according 
-            # to sweep params (if they are provided)
-            sweep_params = kwargs.get('sweep_params',{})
-            self.sweep_id = ''
-            if len(sweep_params) > 0 and isinstance(sweep_params,dict):
-                # Create sweep id by grouping coupled sweep vars together
-                # and isolated sweep vars separately
-                sweep_id = []
-                for v in set(list(self.config.target_names_by_sweep_var.values())).difference(set(['dataset'])):
-                    # Map sigma to noise regime
-                    if str(v) == 'sigma':
-                        value = sigma_to_noise_regime(sweep_params[v])
-                    # Else use passed sweep value
-                    else:
-                        value = sweep_params[v]
-                    # Add to key-value pair to unique sweep id
-                    sweep_id.append(f"{str(v)}_{stringify(value)}")
-                # Join all grouped sweep vars into one sweep id 
-                # which will be used to create an output folder
-                if len(sweep_id) > 0:
-                    self.sweep_id = os.path.join(*sweep_id)
-                else:
-                    self.sweep_id = ''
-            # Create output directories if necessary
-            self.create_output_subdirectories(sweep_id=self.sweep_id)
-        
+
+        elif isinstance(config,str):
+            # Store experiment id
+            self.experiment_id = os.path.basename(os.path.normpath(config.split('samples/')[0]))
+            
+            # Load metadata
+            assert os.path.exists(config)
+            self.config = Config(
+                path=os.path.join(config,"config.json"),
+                logger = self.logger
+            )
+
+            # Get intensity model class
+            self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
+            
+            # Define config experiment path to directory
+            self.outputs_path = config if kwargs.get('base_dir') is None else kwargs['base_dir']
         else:
             raise Exception(f'Config {config} of type {type(config)} not recognised.')
+
+        # Name output sample directory according 
+        # to sweep params (if they are provided)
+        self.sweep_id = ''
+        if len(sweep_params) > 0 and isinstance(sweep_params,dict):
+            # Create sweep id by grouping coupled sweep vars together
+            # and isolated sweep vars separately
+            sweep_id = []
+            for v in set(list(self.config.target_names_by_sweep_var.values())).difference(set(['dataset'])):
+                # Map sigma to noise regime
+                if str(v) == 'sigma':
+                    value = sigma_to_noise_regime(sweep_params[v])
+                # Else use passed sweep value
+                else:
+                    value = sweep_params[v]
+                # Add to key-value pair to unique sweep id
+                sweep_id.append(f"{str(v)}_{stringify(value)}")
+            # Join all grouped sweep vars into one sweep id 
+            # which will be used to create an output folder
+            if len(sweep_id) > 0:
+                self.sweep_id = os.path.join(*sorted(sweep_id,key=lambda x: x.split('_')[0]))
+            else:
+                self.sweep_id = ''
+
+    def load(self,input_slice:dict={},slice_samples:bool=True):
+
+        # Update config based on slice of coordinate-like sweeped params
+        # affecting only the outputs of the model
+        # if self.coordinate_slice:
+        #     for param in self.coordinate_slice.keys():
+        #         self.config.path_set(
+        #             settings = self.config.settings,
+        #             value = self.coordinate_slice[param]['values'], 
+        #             path = self.coordinate_slice[param]['path']
+        #         )
+        # Update config based on slice of NON-coordinate-like sweeped params
+        # affecting only the inputs of the model
+        if input_slice:
+            self.config.path_set(
+                settings = self.config.settings,
+                value = input_slice['value'], 
+                path = input_slice['path']
+            )
+        
+        # Import all input data
+        self.inputs = Inputs(
+            config = self.config,
+            synthetic_data = False,
+            logger = self.logger,
+        )
+        # Convert all inputs to tensors
+        self.inputs.pass_to_device()
+
+        # Try to load ground truth table
+        self.ground_truth_table = None
+        self.settings['table_total'] = self.settings.get('table_total',1)
+        
+        if 'ground_truth_table' in self.output_names:
+            # Try reading it from settings path
+            try:
+                self.ground_truth_table = np.loadtxt(
+                    os.path.join(
+                        self.config['inputs']['dataset'],
+                        self.settings['table']
+                    )
+                )
+                # Convert to xarray dataarray
+                dims = np.shape(self.ground_truth_table)
+                self.ground_truth_table = xr.DataArray(
+                    data=torch.tensor(self.ground_truth_table).to(dtype=int32,device=self.device),
+                    name='ground_truth_table',
+                    dims=['origin','destination'],
+                    coords=dict(
+                        origin=np.arange(1,dims[0]+1,1,dtype='int32'),
+                        destination=np.arange(1,dims[1]+1,1,dtype='int32')
+                    )
+                )
+            
+            except:
+                # Try reading it from inputs
+                try:
+                    self.ground_truth_table = xr.DataArray(
+                        data=self.inputs.table.to(dtype=int32,device=self.device),
+                        name='ground_truth_table',
+                        dims=['origin','destination'],
+                        coords=dict(
+                            origin=np.arange(1,dims[0]+1,1,dtype='int32'),
+                            destination=np.arange(1,dims[1]+1,1,dtype='int32')
+                        )
+                    )
+                except:
+                    pass
+        
+        # Try to get table total (number of agents)
+        if self.ground_truth_table is not None:
+            # Remove it from sample names
+            self.output_names.remove('ground_truth_table')
+            # Extract metadata
+            self.settings['table_total'] = self.ground_truth_table.values.ravel().sum()
+            self.settings['dims'] = list(np.shape(self.ground_truth_table))
+            self.logger.info(f'Ground truth table loaded')
+
+
+        # Load output h5 file to xarrays
+        self.load_h5_data(
+            slice_samples=slice_samples
+        )
+        print(vars(self.data).keys())
+        
+        # Try to update metadata on table samples
+        try:
+            if 'table' in self.output_names and self.settings['table_total'] == 1:
+                table = self.get_sample('table')
+                self.settings['table_total'] = table.sum(dim=['origin','destination']).values[0]
+        except:
+            self.logger.debug(traceback.format_exc())
+            self.logger.warning(f'Sample table could not be loaded')
+            sys.exit()
+
+        if self.settings['table_total'] == 0:
+            print(self.ground_truth_table)
+            self.logger.warning('Ground truth missing')
 
     def update_experiment_directory_id(self,sweep_experiment_id:str=None):
 
@@ -810,6 +880,8 @@ class Outputs(object):
         print_json(self.config,indent=2)
 
     def open_output_file(self,sweep_params:dict={}):
+        # Create output directories if necessary
+        self.create_output_subdirectories(sweep_id=self.sweep_id)
         if hasattr(self,'config') and hasattr(self.config,'settings'):
             export_samples = list(deep_get(key='export_samples',value=self.config.settings))
             export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
@@ -892,15 +964,16 @@ class Outputs(object):
                 self.logger.debug('Collect group-level attributes as coordinates')
                 # Collect group-level attributes as coordinates
                 # Group coordinates are file-dependent
-                if 'sweep_params' in list(h5data[self.experiment_id].attrs.keys()) and \
-                    'sweep_values' in list(h5data[self.experiment_id].attrs.keys()):
+                group_id = next(iter(h5data))
+                if 'sweep_params' in list(h5data[group_id].attrs.keys()) and \
+                    'sweep_values' in list(h5data[group_id].attrs.keys()):
                     # Loop through each sweep parameters and add it as a coordinate
-                    for (k,v) in zip(h5data[self.experiment_id].attrs['sweep_params'],
-                                h5data[self.experiment_id].attrs['sweep_values']):
+                    for (k,v) in zip(h5data[group_id].attrs['sweep_params'],
+                                h5data[group_id].attrs['sweep_values']):
                         local_coords[k] = {parse(v,np.float32(-1.0))}
                 self.logger.debug('Store dataset')
                 # Store dataset
-                for sample_name,sample_data in h5data[self.experiment_id].items():
+                for sample_name,sample_data in h5data[group_id].items():
                     # Apply burning, thinning and trimming
                     self.logger.debug(f'Data {sample_name} {np.shape(sample_data)}')
                     if kwargs.get('slice_samples',True):
@@ -925,7 +998,7 @@ class Outputs(object):
 
     def read_h5_data(self,h5files:list,**kwargs):
         # Get each file and add it to the new dataset
-        h5data, local_coords, data_vars = {},{},{}
+        h5data, local_coords, file_global_coords, data_vars = {},{},{},{}
         if self.settings['n_workers'] > 1:
             # Do it concurrently
             # Use the Pool to parallelize loading
@@ -1001,11 +1074,13 @@ class Outputs(object):
                         data_vars[sample_name] = deepcopy(sample_data)
         return local_coords,file_global_coords,data_vars
 
-    def load_h5_data(self,output_path,coordinate_slice:dict={},slice_samples:bool=True):
+    def load_h5_data(self,coordinate_slice:dict={},slice_samples:bool=True):
         self.logger.note('Loading h5 data into xarrays...')
 
         # Get all h5 files
-        h5files = list(Path(os.path.join(output_path,'samples')).rglob("*.h5"))
+        h5files = list(Path(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}")).rglob("*.h5"))
+        print(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}"))
+        print(len(h5files))
         # Sort them by seed
         h5files = sorted(h5files, key = lambda x: int(str(x).split('seed_')[1].split('/',1)[0]) if 'seed' in str(x) else str(x))
         # Read h5 data
@@ -1022,7 +1097,7 @@ class Outputs(object):
         
         # Create an xarray dataset for each sample
         for sample_name,sample_data in tqdm(data_vars.items(),disable=True,desc='Creating xarray dataset(s)',leave=False):
-
+            
             coordinates = {}
             # Ignore first two dimensions
             # First dimension is the sweep dimension
@@ -1110,6 +1185,7 @@ class Outputs(object):
 
             # Compute intensities for all samples
             table_total = self.settings.get('table_total') if self.settings.get('table_total',-1.0) > 0 else 1.0
+            print(table_total)
 
             # Instantiate ct
             sim = instantiate_sim(
@@ -1117,6 +1193,7 @@ class Outputs(object):
                 **data,
                 logger=self.logger
             )
+            print(sim)
             
             data = []
             # Prepare output arguments
@@ -1349,3 +1426,4 @@ class Outputs(object):
                 # print(sample_statistic.shape)
 
         return sample_statistic
+
