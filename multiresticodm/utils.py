@@ -1,3 +1,4 @@
+from glob import glob
 import os
 import re
 import gc
@@ -14,6 +15,7 @@ import operator
 import tikzplotlib
 import numpy as np
 import pandas as pd
+from pathlib import Path
 import matplotlib.pyplot as plt
 
 
@@ -163,7 +165,6 @@ def write_txt(data:Union[np.array,np.ndarray],filepath:str,**kwargs:Dict) -> Non
 
 
 def write_json(data:Dict,filepath:str,**kwargs:Dict) -> None:
-    # print(filepath.split("/samples/")[-1])
     with open(filepath, 'w') as f:
         json.dump(data,f,**kwargs)
 
@@ -333,16 +334,15 @@ def find_common_substring(names):
 
     return substring_counts
 
-def get_directories_and_immediate_subdirectories(path):
+def get_all_subdirectories(out_path,stop_at:str='config.json'):
     directories = []
-    with os.scandir(path) as entries:
-        for entry in entries:
-            if entry.is_dir():
-                directories.append(entry.name)
-                with os.scandir(entry) as child_entries:
-                    for child_entry in child_entries:
-                        if child_entry.is_dir():
-                            directories.append(child_entry.path)
+    for entry in os.walk(out_path):
+        # If this is a dir that matches the stopping condition
+        # or has a file that matches the stopping condition
+        if any([stop_at in subentry for subentry in entry[2]]):
+            entry_path = Path(entry[0])
+            directories.append(str(entry_path.absolute()))
+
     return directories
 
 def find_dataset_directory(dataset_name):
@@ -866,7 +866,7 @@ def string_to_numeric(s):
 def setup_logger(
         name,
         console_level:str=None,
-        file_console_level:str=None,
+        file_level:str=None,
     ):
     print('setting up new logger',name)
 
@@ -882,7 +882,7 @@ def setup_logger(
 
     logger.setLevels(
         console_level = console_level,
-        file_level = file_console_level
+        file_level = file_level
     )
 
     return logger
@@ -929,6 +929,22 @@ def h5_deep_get(name,group,prefix=''):
             elif isinstance(val, h5py.Dataset):
                 if name == key:
                     yield path
+
+def deep_walk(indict, pre=None):
+    pre = pre[:] if pre else []
+    if isinstance(indict, dict):
+        for key, value in indict.items():
+            if isinstance(value, dict):
+                for d in deep_walk(value, pre + [key]):
+                    yield d
+            elif isinstance(value, list) or isinstance(value, tuple):
+                for v in value:
+                    for d in deep_walk(v, pre + [key]):
+                        yield d
+            else:
+                yield pre + [key, value]
+    else:
+        yield pre + [indict]
 
 def broadcast(arr,shape):
     # Squeeze array
