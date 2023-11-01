@@ -526,7 +526,7 @@ _output_options = [
     click.option('--directories','-d', multiple=True, required=False, type=click.Path(exists=False)),
     click.option('--experiment_type','-et', multiple=True, type=click.STRING ,cls=NotRequiredIf, not_required_if='directories'),
     click.option('--title','-en', multiple=True, type=click.STRING, default = None, cls=NotRequiredIf, not_required_if='directories'),
-    click.option('--exclude','-exc', type=click.STRING, default = None,cls=NotRequiredIf, not_required_if='directories'),
+    click.option('--exclude','-exc', type=click.STRING, default = [], multiple = True, cls=NotRequiredIf, not_required_if='directories'),
     click.option('--filename_ending', '-fe', default = None, type=click.STRING),
     click.option('--burnin', '-b', default=0, show_default=True,
                 type=click.IntRange(min=0), help=f'Sets number of initial samples to discard.'),
@@ -545,7 +545,10 @@ _output_options = [
     click.option('--dates','-date', type=click.STRING, default=None, multiple=True, required=False),
                 #  type=click.DateTime(formats=DATE_FORMATS), multiple=True, required=False),
     click.option('--epsilon_threshold', '-eps', default=0.001, show_default=True,
-        type=click.FLOAT, help=f'Sets error norm threshold below which convergence is achieved. Used only in convergence plots.')
+        type=click.FLOAT, help=f'Sets error norm threshold below which convergence is achieved. Used only in convergence plots.'),
+    click.option('--metadata_keys','-k', multiple=True, type=click.STRING, required=False),
+    click.option('--region_mass', '-r', default=[0.95], show_default=True, multiple=True,
+              type=click.FloatRange(0,1), help=f'Sets high posterior density region mass.')
 ]
 
 def output_options(func):
@@ -559,7 +562,9 @@ def output_options(func):
 ))
 @output_options
 @common_options
-@click.option('--plots', '-p', type=click.Choice(list(PLOT_HASHMAP.keys())), multiple=True, required=True,
+@click.argument('x', type=click.STRING, required=True)
+@click.argument('y', type=click.STRING, required=True)
+@click.option('--plots', '-p', type=click.Choice(list(PLOT_HASHMAP.keys())), multiple=True, default = [], required=True,
               help=f'''Sets plotting functions
                     \b
                     {json.dumps(PLOT_HASHMAP,indent=4,separators=(',', ':')).replace('{','').replace('}','')}
@@ -599,13 +604,13 @@ def output_options(func):
               type=click.STRING, help=f'Sets auxiliary colormap (e.g. colormap corresponding to margins).')
 @click.option('--label_by', '-l', default=None, show_default=False, multiple=True,
               type=click.STRING, help=f'Sets metadata key(s) to label figure by.')
-@click.option('--x_label', '-x', default=None, show_default=False,
+@click.option('--x_label', '-xlab', default=None, show_default=False,
               type=click.STRING, help=f'Sets x axis label.')
-@click.option('--y_label', '-y', default=None, show_default=False,
+@click.option('--y_label', '-ylab', default=None, show_default=False,
               type=click.STRING, help=f'Sets y axis label.')
-@click.option('--x_limit', '-xl', default=(None,None), show_default=False,
+@click.option('--x_limit', '-xlim', default=(None,None), show_default=False,
               type=(float, float), help=f'Sets x limits.')
-@click.option('--y_limit', '-yl', default=(None,None), show_default=False,
+@click.option('--y_limit', '-ylim', default=(None,None), show_default=False,
               type=(float, float), help=f'Sets y limits.')
 @click.option('--color_segmentation_limits', '-csl', default=(0,1), show_default=False,
               type=(click.FloatRange(0,1), click.FloatRange(0,1)), 
@@ -680,6 +685,10 @@ def plot(
         n,
         table,
         device,
+        metadata_keys,
+        region_mass,
+        x,
+        y,
         plots,
         geometry,
         origin_geometry_type,
@@ -755,8 +764,8 @@ def plot(
     # Setup logger
     logger = setup_logger(
         __name__,
-        console_level = settings.get('logging_mode','trace'),
-        file_console_level = 'DEBUG'
+        console_level = settings.get('logging_mode','info'),
+        file_level = 'DEBUG',
     )
     
     # Run plot
@@ -775,11 +784,8 @@ def plot(
 ))
 @output_options
 @common_options
-@click.option('--metadata_keys','-k', multiple=True, type=click.STRING, required=False)
-@click.option('--region_mass', '-r', default=[0.95], show_default=True, multiple=True,
-              type=click.FloatRange(0,1), help=f'Sets high posterior density region mass.')
 @click.option('--algorithm', '-a', default=['linear'], show_default=True, multiple=True,
-              type=click.STRING, help=f'Sets algorihm name for use in.')
+              type=click.STRING, help=f'Sets algorithm name for use in.')
 @click.option('--sort_by','-sort', multiple=True, type=click.STRING, required=False)
 @click.option('--ascending','-asc', default=None, is_flag=True, show_default=True, required=False)
 @click.pass_context
@@ -846,15 +852,18 @@ def summarise(
     )
     logger.info('Gathering data')
 
-
     # Run output handler
-    OutputSummary(
+    outsum = OutputSummary(
         settings=settings,
         logger=logger
     )
+    # Write experiment metadata to file
+    outsum.collect_experiment_metadata()
+
 
     logger.info('Done')
 
 if __name__ == '__main__':
     run()
+    # plot()
     # summarise()
