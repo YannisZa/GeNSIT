@@ -10,6 +10,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import geopandas as gpd
+import concurrent.futures as concurrency
 
 from tqdm import tqdm
 from torch import int32
@@ -148,28 +149,29 @@ class OutputSummary(object):
             folder_name = Path(output_folder).stem
             
             # Read metadata config
-            experiment_config = Config(
-                path = os.path.join(output_folder,"config.json")
+            self.config = Config(
+                path = os.path.join(output_folder,"config.json"),
+                logger = self.logger
             )
-            experiment_config.find_sweep_key_paths()
+            self.config.find_sweep_key_paths()
 
             # Parse sweep configurations
-            sweep_params = experiment_config.parse_sweep_params()
+            self.sweep_params = self.config.parse_sweep_params()
             
             # Slice sweep params
-            input_slice,coordinate_slice = self.create_sweep_slice(experiment_config)
+            input_slice,coordinate_slice = self.create_sweep_slice()
 
             # Get all sweep configurations
             sweep_configurations, \
             param_sizes_str, \
-            total_size_str = experiment_config.prepare_sweep_configurations(sweep_params)
+            total_size_str = self.config.prepare_sweep_configurations(self.sweep_params)
 
             # Get output folder
-            base_dir = output_folder.split(
+            self.base_dir = output_folder.split(
                 'samples/'
             )[0]
-            output_folder_succinct = base_dir.split(
-                experiment_config['inputs']['dataset']
+            output_folder_succinct = self.base_dir.split(
+                self.config['inputs']['dataset']
             )[-1]
             self.logger.info(f"Scanning folder {i+1}/{len(output_dirs)}")
             self.logger.info("----------------------------------------------------------------------------------")
@@ -179,75 +181,135 @@ class OutputSummary(object):
             self.logger.info("----------------------------------------------------------------------------------")
 
             # Get sweep parameter names
-            sweep_param_names = list(experiment_config.isolated_sweep_paths.keys())
+            sweep_param_names = list(self.config.isolated_sweep_paths.keys())
             sweep_param_names += [
                 item
-                for nested_dict in experiment_config.coupled_sweep_paths.values() 
+                for nested_dict in self.config.coupled_sweep_paths.values() 
                 for item in nested_dict.keys()
             ]
             sweep_param_names = list(flatten(sweep_param_names))
             # Get sweep slice parameter names
             sweep_slice_param_names = list(input_slice.keys())+list(coordinate_slice.keys())
 
-            for sweep_configuration in tqdm(sweep_configurations,desc='Collecting metadata',leave=False):
-                # If there is no overlap between slice and available sweep params continue
-                # as long as some slice params have been provided
-                if set(sweep_slice_param_names) and not set(sweep_slice_param_names).intersection(set(sweep_param_names)):
-                    continue
-                    
-                # Get specific sweep config 
-                new_config,sweep = experiment_config.prepare_experiment_config(
-                    sweep_params = sweep_params,
-                    sweep_configuration = sweep_configuration
-                )
+            # If there is no overlap between slice and available sweep params continue
+            # as long as some slice params have been provided
+            if set(sweep_slice_param_names) and not set(sweep_slice_param_names).intersection(set(sweep_param_names)):
+                continue
+            
+            # Do it concurrently
+            if self.settings.get('n_workers',1) > 1:
 
-                # Extract useful data
-                useful_metadata = {}
-                for key in self.settings['metadata_keys']:
-                    try:
-                        # Get first instance of key
-                        useful_metadata[key] = list(deep_get(key=key,value=new_config))[0]
-                    except:
-                        self.logger.error(f"{key} not found in experiment metadata.")
-                    
-                # Get outputs and unpack its statistics
-                # This is the case where there are SOME input slices provided
-                outputs = Outputs(
-                    config = new_config,
-                    settings = self.settings,
-                    output_names = (list(self.settings['sample'])+['ground_truth_table']),
-                    coordinate_slice = coordinate_slice,
-                    sweep_params = sweep,
-                    base_dir= base_dir,
-                    console_handling_level = self.settings['logging_mode'],
-                    logger = self.logger
+                # Initialise progress bar
+                pbar = tqdm(
+                    sweep_configurations,
+                    desc='Collecting metadata',
+                    leave=False,
+                    position=0
                 )
-                outputs.load()
+                with concurrency.ProcessPoolExecutor(self.settings.get('n_workers',1)*2) as executor:
+                    # Start the processes and ignore the results
+                    futures = [executor.submit(
+                        fn = self.get_sweep_metric_data,
+                        output_folder = output_folder,
+                        sweep_configuration = sweep_configuration,
+                        coordinate_slice = coordinate_slice
+                    ) for sweep_configuration in sweep_configurations]
 
-                # Apply these metrics to the data 
-                metric_data = self.apply_metrics(
-                    experiment_id=output_folder,
-                    outputs=outputs
-                )
-                for j in range(len(metric_data)):
-                    metric_data[j]['folder'] = folder_name
-                    for k,v in useful_metadata.items():
-                        metric_data[j][k] = v
-                print('metric_data')
-                # Store useful metadata
-                if not output_folder in list(self.experiment_metadata.keys()):
-                    self.experiment_metadata[output_folder] = metric_data
-                else:
-                    self.experiment_metadata[output_folder] = np.append(
-                        self.experiment_metadata[output_folder],
-                        metric_data,
-                        axis=0
+                    # Wait for all processes to finish
+                    for index,fut in enumerate(concurrency.as_completed(futures)):
+                        try:
+                            metric_data = fut.result()
+                        except:
+                            self.logger.error(traceback.format_exc())
+                            raise Exception(f"Future {index} failed")
+                        pbar.update(1)
+
+                        # Store useful metadata
+                        if not output_folder in list(self.experiment_metadata.keys()):
+                            self.experiment_metadata[output_folder] = metric_data
+                        else:
+                            self.experiment_metadata[output_folder] = np.append(
+                                self.experiment_metadata[output_folder],
+                                metric_data,
+                                axis=0
+                            )
+
+            else:
+                for sweep_configuration in tqdm(
+                    sweep_configurations,
+                    desc='Collecting metadata',
+                    leave=False,
+                    position=0
+                ):
+                    # Get metric data for sweep dataset
+                    metric_data = self.get_sweep_metric_data(
+                        output_folder,
+                        sweep_configuration,
+                        coordinate_slice = coordinate_slice
                     )
-                
-                safe_delete(outputs)
-                gc.collect()
-                print('sleep')
-                time.sleep(5)
+                    # Store useful metadata
+                    if not output_folder in list(self.experiment_metadata.keys()):
+                        self.experiment_metadata[output_folder] = metric_data
+                    else:
+                        self.experiment_metadata[output_folder] = np.append(
+                            self.experiment_metadata[output_folder],
+                            metric_data,
+                            axis=0
+                        )
+                    
+    def get_sweep_metric_data(
+        self,
+        output_folder,
+        sweep_configuration,
+        coordinate_slice:dict={}
+    ):
+            
+        # Get specific sweep config 
+        new_config,sweep = self.config.prepare_experiment_config(
+            sweep_params = self.sweep_params,
+            sweep_configuration = sweep_configuration
+        )
+
+        # Extract useful data
+        useful_metadata = {}
+        for key in self.settings['metadata_keys']:
+            try:
+                # Get first instance of key
+                useful_metadata[key] = list(deep_get(key=key,value=new_config))[0]
+            except:
+                self.logger.error(f"{key} not found in experiment metadata.")
+            
+        # Get outputs and unpack its statistics
+        # This is the case where there are SOME input slices provided
+        outputs = Outputs(
+            config = new_config,
+            settings = self.settings,
+            output_names = (list(self.settings['sample'])+['ground_truth_table']),
+            coordinate_slice = coordinate_slice,
+            sweep_params = sweep,
+            base_dir = self.base_dir,
+            console_handling_level = self.settings['logging_mode'],
+            logger = self.logger
+        )
+        outputs.load()
+
+        # Apply these metrics to the data 
+        metric_data = self.apply_metrics(
+            experiment_id=output_folder,
+            outputs=outputs
+        )
+        for j in range(len(metric_data)):
+            metric_data[j]['folder'] = folder_name
+            for k,v in useful_metadata.items():
+                metric_data[j][k] = v
+        
+        safe_delete(outputs)
+        gc.collect()
+        # self.logger.progress('Sleeping for 3 seconds...')
+        # time.sleep(3)
+
+        return metric_data
+
 
     def write_metadata_summaries(self):
         if len(self.experiment_metadata.keys()) > 0:
@@ -302,12 +364,12 @@ class OutputSummary(object):
     
     def apply_metrics(self,experiment_id,outputs):
         # Get outputs and unpack its statistics
-        self.logger.info('Applying metrics...')
+        self.logger.progress('Applying metrics...')
         
         metric_data = []
         for sample_name in self.settings['sample']:
              # Get samples
-            self.logger.info(f'Getting sample {sample_name}...')
+            self.logger.progress(f'Getting sample {sample_name}...')
             try:
                 samples = outputs.get_sample(sample_name)
             except Exception as e:
@@ -524,8 +586,8 @@ class OutputSummary(object):
 
         return metric_arguments
     
-    def create_sweep_slice(self,config):
-        if len(config.isolated_sweep_paths) > 0 or len(config.coupled_sweep_paths) > 0:
+    def create_sweep_slice(self):
+        if len(self.config.isolated_sweep_paths) > 0 or len(self.config.coupled_sweep_paths) > 0:
 
             coordinate_slice = {}
             input_slice = {}
@@ -533,7 +595,7 @@ class OutputSummary(object):
             # to subset the output samples
             for name,sliced_values in self.settings['slice_by'].items():
                 # Loop through experiment's isolated sweeped parameters
-                for target_name,target_path in config.isolated_sweep_paths.items():
+                for target_name,target_path in self.config.isolated_sweep_paths.items():
                     # If there is a match between the two
                     if name == target_name:
                         # If is a coordinate add to the coordinate slice
@@ -557,7 +619,7 @@ class OutputSummary(object):
                                 "key_path":target_path
                             }
                 # Loop through experiment's coupled sweeped parameters
-                for target_name,target_paths in config.coupled_sweep_paths.items():
+                for target_name,target_paths in self.config.coupled_sweep_paths.items():
                     # If any of the coupled sweeps contain the target name
                     if name in list(target_paths.keys()):
                         for coupled_name,target_path in target_paths.items():
@@ -764,14 +826,13 @@ class Outputs(object):
             # Extract metadata
             self.settings['table_total'] = self.ground_truth_table.values.ravel().sum()
             self.settings['dims'] = list(np.shape(self.ground_truth_table))
-            self.logger.info(f'Ground truth table loaded')
+            self.logger.progress(f'Ground truth table loaded')
 
 
         # Load output h5 file to xarrays
         self.load_h5_data(
             slice_samples=slice_samples
         )
-        print(vars(self.data).keys())
         
         # Try to update metadata on table samples
         try:
@@ -999,79 +1060,33 @@ class Outputs(object):
     def read_h5_data(self,h5files:list,**kwargs):
         # Get each file and add it to the new dataset
         h5data, local_coords, file_global_coords, data_vars = {},{},{},{}
-        if self.settings['n_workers'] > 1:
-            # Do it concurrently
-            # Use the Pool to parallelize loading
-            with Pool(processes=self.settings['n_workers']) as p:
-                with tqdm(total=len(h5files),leave=False) as pbar:
-                    # Use imap_unordered to process items and update progress
-                    for result in p.imap_unordered(
-                        partial(
-                            self.read_h5_file,
-                            **kwargs
-                        ),
-                        h5files,
-                        chunksize=5
-                    ):
-                        h5data.update(result)
-                        # Update the progress bar for each completed task
-                        pbar.update(1)
-            # Gather all data
-            for filename in tqdm(h5files,desc='Gathering data',leave=False):
-                file_global_coords = h5data[str(filename)]['global_coords']
-                file_local_coords = h5data[str(filename)]['local_coords']
-                file_data_vars = h5data[str(filename)]['data_vars']
-                # print('global',{k:np.shape(v) for k,v in file_global_coords.items()})
-                # print('local',{k:np.shape(v) for k,v in file_local_coords.items()})
-                # print({k:np.shape(v) for k,v in file_data_vars.items()})
 
-                # Read coords
-                # self.logger.debug(f"Reading coordinates")
-                if len(local_coords) > 0:
-                    for k,v in file_local_coords.items():
-                        self.logger.debug(f"{k}")
-                        local_coords[k].update(v)
-                else:
-                    local_coords = deepcopy(file_local_coords)
-                # Read data
-                # self.logger.debug(f"Reading data")
-                for sample_name,sample_data in file_data_vars.items():
-                    # self.logger.debug(f"{sample_name} {np.shape(sample_data)}")
-                    if sample_name in list(data_vars.keys()) and len(data_vars[sample_name]) > 0:
-                        data_vars[sample_name].append(sample_data)
-                    else:
-                        data_vars[sample_name] = [sample_data]
+        # Do it sequentially
+        for filename in h5files:
+
+            # Read h5 file
+            h5data = self.read_h5_file(filename,**kwargs)
+            file_global_coords = h5data[str(filename)]['global_coords']
+            file_local_coords = h5data[str(filename)]['local_coords']
+            file_data_vars = h5data[str(filename)]['data_vars']
             
-            # Convert data to numpy
-            for sample_name in data_vars.keys():
-                data_vars[sample_name] = np.concatenate(data_vars[sample_name])
-        else:
-            # Do it sequentially
-            for filename in tqdm(h5files,desc='Reading h5 file(s) in sequence',leave=False):
-
-                # Read h5 file
-                h5data = self.read_h5_file(filename,**kwargs)
-                file_global_coords = h5data[str(filename)]['global_coords']
-                file_local_coords = h5data[str(filename)]['local_coords']
-                file_data_vars = h5data[str(filename)]['data_vars']
-                
-                # Read coords
-                if len(local_coords) > 0:
-                    for k,v in file_local_coords.items():
-                        local_coords[k].update(v)
+            # Read coords
+            if len(local_coords) > 0:
+                for k,v in file_local_coords.items():
+                    local_coords[k].update(v)
+            else:
+                local_coords = deepcopy(file_local_coords)
+            
+            # Read data
+            for sample_name,sample_data in file_data_vars.items():
+                if sample_name in list(data_vars.keys()) and len(data_vars) > 0:
+                    data_vars[sample_name] = np.append(
+                        data_vars[sample_name],
+                        sample_data,
+                        axis=0
+                    )
                 else:
-                    local_coords = deepcopy(file_local_coords)
-                
-                # Read data
-                for sample_name,sample_data in file_data_vars.items():
-                    if sample_name in list(data_vars.keys()) and len(data_vars) > 0:
-                        data_vars[sample_name] = np.append(
-                            data_vars[sample_name],
-                            sample_data,
-                            axis=0
-                        )
-                    else:
-                        data_vars[sample_name] = deepcopy(sample_data)
+                    data_vars[sample_name] = deepcopy(sample_data)
         return local_coords,file_global_coords,data_vars
 
     def load_h5_data(self,coordinate_slice:dict={},slice_samples:bool=True):
@@ -1079,8 +1094,6 @@ class Outputs(object):
 
         # Get all h5 files
         h5files = list(Path(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}")).rglob("*.h5"))
-        print(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}"))
-        print(len(h5files))
         # Sort them by seed
         h5files = sorted(h5files, key = lambda x: int(str(x).split('seed_')[1].split('/',1)[0]) if 'seed' in str(x) else str(x))
         # Read h5 data
@@ -1095,8 +1108,10 @@ class Outputs(object):
                             dtype=TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
                         ) for k,v in global_coords.items()}
         
+        self.logger.progress('Creating xarray dataset(s)')
+        
         # Create an xarray dataset for each sample
-        for sample_name,sample_data in tqdm(data_vars.items(),disable=True,desc='Creating xarray dataset(s)',leave=False):
+        for sample_name,sample_data in data_vars.items():
             
             coordinates = {}
             # Ignore first two dimensions
@@ -1144,7 +1159,6 @@ class Outputs(object):
             # Slice according to coordinate slice
             if len(coordinate_slice) > 0:
                 xr_data = xr_data.sel(**{k:(v['values'] if len(v['values']) > 1 else v['values'][0]) for k,v in coordinate_slice.items()})
-
             # Store dataset
             setattr(self.data,sample_name,xr_data)
             
@@ -1185,15 +1199,13 @@ class Outputs(object):
 
             # Compute intensities for all samples
             table_total = self.settings.get('table_total') if self.settings.get('table_total',-1.0) > 0 else 1.0
-            print(table_total)
 
             # Instantiate ct
             sim = instantiate_sim(
-                sim_type = next(deep_get(key='name',value=self.config.settings), None),
-                **data,
-                logger=self.logger
+                config = self.config,
+                logger=self.logger,
+                **data
             )
-            print(sim)
             
             data = []
             # Prepare output arguments

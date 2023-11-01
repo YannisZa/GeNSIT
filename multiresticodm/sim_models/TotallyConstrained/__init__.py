@@ -107,14 +107,14 @@ def log_flow_matrix(**kwargs):
     # If input is xarray use the following code
     else:
         # Extract dimensions
-        N = log_destination_attraction['N'].shape[0]
+        N = log_destination_attraction['iter'].shape[0]
         time = log_destination_attraction['time'].shape[0]
         # Use the .sel() method to select the dimensions you want to convert
         log_destination_attraction = log_destination_attraction.sel(
-            **{dim: slice(None) for dim in ['N','time','destination']}
+            **{dim: slice(None) for dim in ['iter','time','destination']}
         )
-        alpha = alpha.sel(N=slice(None))
-        beta = beta.sel(N=slice(None))
+        alpha = alpha.sel(iter=slice(None))
+        beta = beta.sel(iter=slice(None))
         # Convert the selected_data to torch tensor
         log_destination_attraction = torch.tensor(
             log_destination_attraction.values
@@ -148,7 +148,7 @@ def log_flow_matrix(**kwargs):
         return log_flow
     else:
         group = {}
-        group['N'] = kwargs['log_destination_attraction'].coords['N']
+        group['id'] = kwargs['log_destination_attraction'].coords['id']
         group['origin'] = arange(1,origin+1,1,dtype='int32')
         group['destination'] = arange(1,destination+1,1,dtype='int32')
         # Create outputs xr data array

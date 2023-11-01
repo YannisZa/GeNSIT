@@ -20,79 +20,79 @@ XARRAY_SCHEMA = {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     }, 
     'beta': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     }, 
     'kappa': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     }, 
     'delta': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     }, 
     'sigma': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     }, 
     'log_destination_attraction': {
         "coords":["time","destination"],
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "new_shape":["N","T","J"]
+        "new_shape":["iter","T","J"]
     },
     'table': {
         "coords":["origin","destination"],
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "new_shape":["N","I","J"]
+        "new_shape":["iter","I","J"]
     },
     'loss': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     },
     'log_target': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     },
     'theta_acc': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     },
     'log_destination_attraction_acc': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     },
     'table_acc': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     },
     'computation_time': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["N","1"]
+        "new_shape":["iter","1"]
     },
 }
 
