@@ -1,10 +1,7 @@
 import os
 
-from multiresticodm.config import Config
 os.environ['USE_PYGEOS'] = '0'
-import gc
 import sys
-import logging
 import traceback
 import seaborn as sns
 import geopandas as gpd
@@ -14,12 +11,9 @@ import matplotlib as mpl
 import matplotlib.cm as cm
 from itertools import product
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 
-from glob import glob
 from pathlib import Path
 from tqdm.auto import tqdm
-from copy import deepcopy
 from scipy import interpolate
 from argparse import Namespace
 from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
@@ -27,6 +21,7 @@ from statsmodels.graphics.tsaplots import plot_acf
 
 from multiresticodm.utils import *
 from multiresticodm.colormaps import *
+from multiresticodm.config import Config
 from multiresticodm.global_variables import *
 from multiresticodm.outputs import Outputs,OutputSummary
 from multiresticodm.contingency_table import instantiate_ct
@@ -53,8 +48,6 @@ class Plot(object):
             console_level = level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
 
-        # Enable garbage collector
-        gc.enable()
         # Store settings
         self.settings = settings
         # Find matching output directories
@@ -170,8 +163,341 @@ class Plot(object):
         else:
             raise Exception(f"No ground truth matching distribution {distribution_name} found")
 
+    '''
+    ╔═╗┌─┐┌┐┌┌─┐┬─┐┬┌─┐  ┌─┐┬  ┌─┐┌┬┐  ┌─┐┬ ┬┌┐┌┌─┐┌┬┐┬┌─┐┌┐┌┌─┐
+    ║ ╦├┤ │││├┤ ├┬┘││    ├─┘│  │ │ │   ├┤ │ │││││   │ ││ ││││└─┐
+    ╚═╝└─┘┘└┘└─┘┴└─┴└─┘  ┴  ┴─┘└─┘ ┴   └  └─┘┘└┘└─┘ ┴ ┴└─┘┘└┘└─┘
+    '''
+
+    def plot_2d_scatter(self,data,**kwargs):
+        # Axes limits from settings (read only x limit)
+        axes_lims = [self.settings.get('x_limit',[None,None])[0],self.settings.get('x_limit',[None,None])[1]]
+        # Otherwise read from data
+        if None in axes_lims:
+            min_val,max_val = np.infty,-np.infty
+            for data in data.values():
+                min_val = min([np.min(data['x']),np.min(data['y']),min_val])
+                max_val = max([np.max(data['x']),np.max(data['y']),max_val])
+            axes_lims = [min_val-0.02,max_val+0.02]
         
-    def plot_error_norms(self,errors,statistic_name,statistic_symbol,sample_name,K:int=None):
+        # Figure size 
+        fig = plt.figure(figsize=self.settings['figure_size'])
+        
+        # Plot benchmark (perfect predictions)
+        if self.settings['benchmark']:
+            plt.plot(
+                np.linspace(*axes_lims),
+                np.linspace(*axes_lims),
+                linewidth=0.2,
+                color='black'
+            )
+        if self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
+            plt.xlabel(
+                self.settings['x_label'].replace("_"," "),
+                fontsize=self.settings['axis_font_size'],
+                labelpad=self.settings['axis_labelpad']
+            )
+        if self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
+            plt.ylabel(
+                self.settings['y_label'].replace("_"," "),
+                fontsize=self.settings['axis_font_size'],
+                labelpad=self.settings['axis_labelpad']
+            )
+        
+        # Axis limits 
+        plt.xlim(left=axes_lims[0], right=axes_lims[1])
+        plt.ylim(bottom=axes_lims[0], top=axes_lims[1])
+        
+        for v in data.values():
+            # Plot x versus y
+            plt.scatter(
+                x=v['x'],
+                y=v['y'],
+                marker=v.get('marker','o'),
+                s=int(self.settings['marker_size']),
+                label=v.get('label','')
+            )
+            
+        # Aspect ratio equal
+        # ax.set_aspect('equal', 'box')
+        plt.gca().set_aspect('equal')
+    
+        # Legend
+        try:
+            leg = plt.legend()
+            leg._ncol = 1
+        except:
+            pass
+        
+        # Tight layout
+        plt.tight_layout()
+
+        # Get experiment id and its data
+        experiment_id = list(data.keys())[0]
+        # Decide on figure output dir
+        if len(self.outputs_directories) > 1:
+            # Get filename
+            filename = kwargs.get('name','NO_NAME')+'_'+\
+                    f"burnin_{self.settings['burnin']}_" + \
+                    f"thinning_{self.settings['thinning']}"
+            # Define filepath
+            parent_directory = Path(data[experiment_id]['outputs'].outputs_path)
+            if 'synthetic' in str(parent_directory):
+                parent_directory = data[experiment_id]['outputs'].config.out_directory
+            else:
+                parent_directory.parent.absolute()
+            dirpath = os.path.join(parent_directory,'paper_figures')
+            filepath = os.path.join(dirpath,filename)
+        else:
+
+            # Get filename
+            dims = unpack_dims(
+                data[experiment_id]['outputs'].inputs.data.dims,
+                time_dims=False
+            )
+            filename = f"table_{'x'.join(list(map(str,list(dims))))}_" + \
+                    f"{experiment_id[:-21]}_{kwargs.get('name','NO_NAME')}_"+ \
+                    f"burnin_{self.settings.get('burnin',0)}_" + \
+                    f"thinning_{self.settings.get('thinning',1)}_" + \
+                    f"N_{data[experiment_id]['outputs'].config['training']['N']}"
+
+            # Define filepath
+            dirpath = os.path.join(
+                data[experiment_id]['outputs'].outputs_path,
+                'figures'
+            )
+            filepath = os.path.join(dirpath,filename)
+
+        # Make outputs directories (if necessary)
+        makedir(dirpath)
+        # Write figure
+        write_figure(
+            fig,
+            filepath,
+            **self.settings
+        )
+        write_figure_data(
+            data,
+            Path(filepath).parent,
+            groupby=[],
+            key_type={'x':'float','y':'float'},
+            **self.settings
+        )
+        
+        self.logger.info(f"Figure exported to {dirpath}")
+        self.logger.info(f"Filename: {filename}")
+
+    def plot_2d_histogram(self):
+
+        self.logger.info('Running parameter_histogram')
+
+        for output_directory in tqdm(self.outputs_directories): 
+            self.logger.debug(f"Experiment id {output_directory}")
+            # Load contingency table
+            outputs = Outputs(
+                output_directory,
+                self.settings,
+                log_to_console=False,
+                logger = self.logger
+            )
+            dummy_config = Namespace(**{'settings':outputs.experiment.config})
+            sim = instantiate_sim(dummy_config)
+
+            # Get only first n_samples as specified by settings
+            parameter_samples = outputs.load_samples('theta')
+            sign_samples = outputs.load_samples('sign')
+
+            # Get filename
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_histogram_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}"
+
+            # Define filepath
+            filepath = os.path.join(outputs.outputs_path,'figures',filename)
+            # Plot empirical mean
+            parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
+
+            # Plot parameter mixing
+            # Figure size 
+            fig,axs = plt.subplots(1,2,figsize=self.settings['figure_size'])
+            # Alpha plot
+            alpha_density = stats.gaussian_kde(parameter_samples[:, 0])
+            _,alpha_his = np.histogram(parameter_samples[:, 0],bins=self.settings['n_bins'], density=True)
+            smoothed_alpha_his = alpha_density(alpha_his)
+            axs[0].plot(alpha_his,alpha_density(alpha_his),label='samples')
+            axs[0].set_xlabel(r'$\alpha$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
+            # Prior plot
+            axs[0].axhline(y=0.5,color='blue',label='prior')
+            if self.settings['y_label'] is None:
+                axs[0].set_ylabel('Density',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
+                axs[0].set_ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            if hasattr(sim,'alpha_true') and sim.noise_regime == 'low':
+                axs[0].axvline(x=sim.alpha_true, color='black', linestyle='-',label='MAP')
+                axs[0].axvline(x=alpha_his[np.argmax(smoothed_alpha_his)],color='m',label='$\hat{MAP}$')
+            axs[0].axvline(x=parameter_mean[0],color='red',label=r'$\hat{\mu(\alpha)}$')
+            # X,Y limits
+            x_min,x_max = self.settings['x_limit']
+            if x_min is not None and x_max is not None:
+                axs[0].set_xlim(max(0.0,x_min),min(x_max,2.0))
+            axs[0].set_ylim(0.0,None)
+            # Legend
+            leg0 = axs[0].legend()
+            leg0._ncol = 1
+
+            # Beta plot
+            beta_density = stats.gaussian_kde(parameter_samples[:, 1])
+            _,beta_his = np.histogram(parameter_samples[:, 1],bins=self.settings['n_bins'], density=True)
+            smoothed_beta_his = beta_density(beta_his)
+            axs[1].plot(beta_his,smoothed_beta_his,label='samples')
+            axs[1].set_xlabel(r'$\beta$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
+            # Prior plot
+            axs[1].axhline(y=0.5,color='blue',label='prior')
+            if self.settings['y_label'] is None:
+                axs[1].set_ylabel('Density',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
+                axs[1].set_ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            if hasattr(sim,'beta_true') and sim.noise_regime == 'low':
+                axs[1].axvline(x=sim.beta_true, color='black', linestyle='-',label='MAP')
+                axs[1].axvline(x=beta_his[np.argmax(smoothed_beta_his)],color='m',label='$\hat{MAP}$')
+            axs[1].axvline(x=parameter_mean[1],color='red',label=r'$\hat{\mu(\beta)}$')
+            # X,Y limits
+            x_min,x_max = self.settings['x_limit']
+            if x_min is not None and x_max is not None:
+                axs[1].set_xlim(max(0.0,x_min),min(x_max,2.0))
+            axs[1].set_ylim(0.0,None)
+            # Legend
+            leg1 = axs[1].legend()
+            leg1._ncol = 1
+            
+            # Figure title
+            if self.settings['figure_title'] is not None:
+                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
+            # Tight layout
+            plt.tight_layout()
+            # Save figure
+            write_figure(fig,filepath,**self.settings)
+            
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
+
+    def plot_2d_grid(self,index,experiment_id,sample_name,sample_symbol):
+            
+        # Options
+        params = {
+            'text.usetex' : True,
+            'font.size' : 20,
+            'legend.fontsize': 20,
+            'legend.handlelength': 2,
+            'font.family' : 'sans-serif',
+            'font.sans-serif':['Helvetica']
+        }
+
+        # plt.rcParams.update(params)
+        grid_size = outputs.experiment.config['grid_size']
+        amin,amax = outputs.experiment.config['a_range']
+        bmin,bmax = outputs.experiment.config['b_range']
+        # Get config and sim
+        outputs = Outputs(
+            output_directory,
+            self.settings,
+            log_to_console=False,
+            logger = self.logger
+        )
+        dummy_config = Namespace(**{'settings':outputs.experiment.config})
+        sim = instantiate_sim(dummy_config)
+        
+        # Update max values
+        bmin *= sim.bmax
+        bmax *= sim.bmax
+        # Create grid
+        alpha_values = np.linspace(amin, amax, grid_size,endpoint=True)
+        beta_values = np.linspace(bmin, bmax, grid_size,endpoint=True)
+        XX, YY = np.meshgrid(alpha_values, beta_values)
+        # Get values
+        values = outputs.load_samples(sample_name)
+
+        # Store values for upper and lower bounds of colorbar
+        colorbar_min = None
+        colorbar_max = None
+        if "colorbar_limit" in list(self.settings.keys()):
+            colorbar_min = self.settings['colorbar_limit'][0]
+            colorbar_max = self.settings['colorbar_limit'][1]
+        
+        # Update colorbar range if necessary
+        if colorbar_min is not None:
+            values[values<colorbar_min] = np.nan
+        if colorbar_max is not None:
+            values[values>colorbar_max] = np.nan
+
+        # Construct interpolator
+        interpolated_data = interpolate.griddata((XX[np.isfinite(values)].ravel(), 
+                                                YY[np.isfinite(values)].ravel()), 
+                                                values[np.isfinite(values)].ravel(), 
+                                                (XX[~np.isfinite(values)].ravel(), 
+                                                YY[~np.isfinite(values)].ravel()), 
+                                                method='nearest')
+        # Interpolate zero values
+        # values[~np.isfinite(values)] = interpolated_data
+
+        # Get output directory
+        output_directory = Path(self.outputs_directories[index])
+        
+        # Save R2 figure to file
+        filepath = os.path.join(
+                output_directory,
+                "figures",
+                f"table_{'x'.join([str(s) for s in sim.shape()])}_" + \
+                f"total_{sim.total_flow}_" + \
+                f"{outputs.experiment.config['type']}" + \
+                f"{self.settings['experiment_title']}" + \
+                f"{sim.noise_regime.title()}Noise"
+        )
+
+        # plt.hist(values.ravel())
+        # # Save figure to file
+        # write_figure(fig,filepath,**self.settings)
+        # Close figure
+        # plt.close()
+        # return 
+
+        # Initialise plot
+        fig = plt.figure(figsize=self.settings['figure_size'])
+        # Plot values
+        plt.contourf(XX, YY*(1/sim.bmax), values, cmap = self.settings['main_colormap'], vmin = colorbar_min, vmax = colorbar_max,levels=self.settings['n_bins'])
+        # plt.contourf(XX, YY*(1/sim.bmax), values, cmap = self.settings['main_colormap'])
+        # Plot x,y limits
+        plt.xlim([np.min(XX), np.max(XX)])
+        plt.ylim([np.min(YY)*(1/sim.bmax), np.max(YY)*(1/sim.bmax)])
+        # Plot colorbar
+        cbar = plt.colorbar()
+        cbar.set_label(sample_symbol,rotation=self.settings['colorbar_label_rotation'],labelpad=self.settings['colorbar_labelpad'])
+        # Plot ground truth and fitted value
+        plt.scatter(outputs.experiment.config['fitted_alpha'],outputs.experiment.config['fitted_scaled_beta'],color='blue',s=self.settings['marker_size']*(2/3),label='fitted')
+        # *(1/sim.bmax)
+        if hasattr(sim,'alpha_true') and hasattr(sim,'beta_true'):
+            plt.scatter(sim.alpha_true,sim.beta_true,color='red',s=self.settings['marker_size'],label='true',marker='x')
+        # Axis labels
+        plt.ylabel(r'$\beta$',rotation=self.settings['axis_label_rotation'],labelpad=self.settings['axis_labelpad'])
+        plt.xlabel(r'$\alpha$')
+        # X axis tick fontsize
+        plt.xticks(fontsize=self.settings['tick_font_size'])
+        plt.yticks(fontsize=self.settings['tick_font_size'])
+        # Legend
+        if self.settings['legend_label_size'] is not None:
+            leg = plt.legend(frameon=False,prop={'size': self.settings['legend_label_size']})
+        else:
+            leg = plt.legend(frameon=False)
+        leg._ncol = 1
+        for text in leg.get_texts():
+            text.set_color("white")
+        # Tight layout
+        plt.tight_layout()
+
+        # Write figure
+        write_figure(fig,filepath,**self.settings)
+
+    def plot_2d_error_norms(self,errors,statistic_name,statistic_symbol,sample_name,K:int=None):
         self.logger.info(f"Plotting {self.settings['norm']} error norms")
         # Define output filename
         if len(errors.keys()) > 1:
@@ -308,7 +634,7 @@ class Plot(object):
         write_figure(fig,filepath,**self.settings)
         
     
-    def plot_lower_dimensional_embedding(self,filepath,embedded_data):
+    def plot_2d_lower_dimensional_embedding(self,filepath,embedded_data):
         
         self.logger.info(f"Plotting lower dimensional embedding of table data")
 
@@ -390,1664 +716,7 @@ class Plot(object):
         else:
             raise Exception(f"Cannot handled embedded data of dimension {embedded_data.shape[1]}")
 
-    def check_table_posterior_mean_convergence_fixed_intensity_input_validity(self):
-        # if the experiment is not of the right type remove it
-        outputs_directories = deepcopy(self.outputs_directories)
-        for i,output_directory in enumerate(self.outputs_directories):
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            if not valid_experiment_type(outputs.experiment_id,['tablesummariesmcmcconvergence','table_mcmc_convergence']):
-                self.logger.info(f'Experiment {outputs.experiment_id} is not of type Table(Summaries)MCMCConvergence')
-                # Remove experiment from output directories
-                self.outputs_directories.remove(outputs_directories[i])
-                # Remove relevant metadata
-                del outputs.experiment.config
-                continue
-
-            if i == 0:
-                K = outputs.experiment.config['K']
-            else:
-                # All experiment must be using the same ensemble size
-                try: 
-                    assert outputs.experiment.config['K'] == K
-                except:
-                    # Remove experiment from output directories
-                    self.outputs_directories.remove(outputs_directories[i])
-                    # Remove relevant metadata
-                    del outputs.experiment.config
-                    continue    
-
-    def table_posterior_mean_convergence_fixed_intensity(self):
-        
-        self.logger.info('Producing plot for table_posterior_mean_convergence_fixed_intensity')
-
-        # Check for validity of inputs
-        self.check_table_posterior_mean_convergence_fixed_intensity_input_validity()
-        if len(self.outputs_directories) > 0:
-            # Read all table norms
-            table_norms = {}
-            # Find out when norm drops below epsilon
-            for output_directory in self.outputs_directories:
-                # Read outputs
-                outputs = Outputs(
-                    output_directory,
-                    self.settings,
-                    output_names=['tableerror'],
-                    log_to_console=False,
-                    logger = self.logger
-                )
-                # Apply statistic to error norm
-                table_error_statistic = outputs.compute_sample_statistics(
-                    outputs.experiment.results['tableerror'],
-                    'tableerror',
-                    list(flatten(self.settings['statistic']))[0],
-                    axis = (1,2)
-                )
-                table_norms[outputs.experiment_id] = {
-                        'y':table_error_statistic,
-                        'config':outputs.experiment.config,
-                        'outputs_path':outputs.outputs_path
-                }
-                # Find supremum of norm below epsilon
-                convergence_index = np.argmax(table_error_statistic < (self.settings['epsilon_threshold']))
-                # Get metadata
-                N = list(deep_get(key='N',value=outputs.experiment.config.settings))[0]
-                try:
-                    thinning = list(deep_get(key='thinning',value=outputs.experiment.config.settings))[0]
-                except:
-                    thinning = 1
-                # Extraction iteration number
-                sample_sizes = range(0,N,thinning)
-                convergence_iteration = sample_sizes[convergence_index]
-                if table_error_statistic[convergence_index] < self.settings['epsilon_threshold']:
-                    print(f"{self.settings['norm']} below {self.settings['epsilon_threshold']} achieved at iteration {convergence_iteration} for {outputs.experiment_id}")
-                else:
-                    print(f"{self.settings['norm']} below {self.settings['epsilon_threshold']} not achieved in {sample_sizes[-1]} iterations for {outputs.experiment_id}...")
-                    print(f"Smallest {self.settings['norm']} was {np.min(table_error_statistic)}")
-
-            # Decide on statistic symbol based on size of ensemble of datasets
-            statistic_symbol = ''
-            if outputs.experiment.config['K'] == 1:
-                statistic_symbol = "\mathbb{{E}}[\mathbf{T}|\mathcal{C}_{T},\Lambda]"
-            else:
-                statistic_symbol = "\mathbb{{E}}[\mathbb{{E}}[\mathbf{T}|\mathcal{C}_{T},\Lambda]]"
-            # print(table_error_statistic)
-            # Plot errors
-            self.plot_error_norms(
-                        table_norms,
-                        'mean',
-                        statistic_symbol,
-                        'table',
-                        outputs.experiment.config['K']
-            )
-        else:
-            self.logger.error('No valid experiments found')
-
-    def check_table_posterior_mean_convergence_input_validity(self):
-        # if the experiment is not of the right type remove it
-        for output_directory in self.outputs_directories: 
-            # Load outputs
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            if not valid_experiment_type(outputs.experiment_id,['jointtablesim_mcmc']):
-                self.logger.info(f'Experiment {outputs.experiment_id} is not of type JointTableSIM_MCMC')
-                # Remove experiment from output directories
-                self.outputs_directories.remove(output_directory)
-
-            # Load contingency table
-            dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            ct = instantiate_ct(
-                config=dummy_config,
-                log_to_console=False
-            )
-            # If no table is provided
-            if ct.table is None:
-                # Remove experiment from output directories
-                self.outputs_directories.remove(output_directory)
-                # Remove relevant metadata
-                del outputs.experiment.config
-                continue
-
-    def table_posterior_mean_convergence(self):
-        
-        self.logger.info('Producing plot for table_posterior_mean_convergence')
-
-        # Check for validity of inputs
-        self.check_table_posterior_mean_convergence_input_validity()
-        if len(self.outputs_directories) > 0:
-            error_norms = {}
-            for output_directory in tqdm(self.outputs_directories):
-                self.logger.debug(f"Experiment id {output_directory}")
-                # Get experiment id
-                outputs = Outputs(
-                    output_directory,
-                    self.settings,
-                    output_names=['intensity','table','sign'],
-                    slice_samples=False,
-                    log_to_console=False,
-                    logger = self.logger
-                )
-                
-                # Instantiate contingency table
-                dummy_config = Namespace(**{'settings':outputs.experiment.config})
-                ct = instantiate_ct(
-                    config=dummy_config,
-                    log_to_console=False
-                )
-                
-                # Load samples and apply moving averages
-                table_rolling_mean = running_average(outputs.experiment.results['table'])
-                
-                # Make sure that no infs are introduced
-                if (not np.isfinite(table_rolling_mean).all()):
-                    self.logger.error(output_directory)
-                    raise Exception(f'Table rolling mean produced Infs/NaNs for distribution {ct.distribution_name}')
-                
-                # Elicit ground truth intensity
-                intensity = self.infer_ground_truth_intensity(ct,np.log(outputs.experiment.results['intensity']))
-
-                # Compute its mean
-                intensity_rolling_mean = running_average(intensity,signs=outputs.experiment.results['sign'])
-
-                # Slice samples for plotting
-                table_rolling_mean = outputs.slice_samples(table_rolling_mean)
-                intensity_rolling_mean = outputs.slice_samples(intensity_rolling_mean)
-                
-                # Make sure that no infs are introduced
-                if (not np.isfinite(intensity_rolling_mean).all()):
-                    self.logger.error(output_directory)
-                    raise Exception(f'Intensity signed rolling mean produced Infs/NaNs for distribution {ct.distribution_name}')
-                
-                # Update error norm normalisation constant only in the unconstrained case
-                # if ct.distribution_name.lower() == 'poisson':
-                self.settings['normalisation_constant'] = ct.margins[tuplize(range(ct.ndims()))]
-
-                # Compute error norm between the two averages
-                # Table is used as a ground truth because
-                # its grand totals are conserved in all but the constrained case
-                # Therefore normalisation in relative norms is the same for all samples
-                error_norm = apply_norm(
-                    tab=intensity_rolling_mean,
-                    tab0=table_rolling_mean,
-                    name=self.settings['norm'],
-                    **self.settings
-                )
-
-                # Compute statistic over error
-                mean_error_norm = outputs.compute_sample_statistics(
-                    error_norm,
-                    'table',
-                    'mean',
-                    axis = (1,2)
-                )
-                
-                # Add error norms to dict
-                error_norms[outputs.experiment_id] = {
-                        'y':mean_error_norm,
-                        'config':outputs.experiment.config,
-                        'outputs_path':outputs.outputs_path
-                }
-                
-
-            # Plot table mean error norm
-            self.plot_error_norms(
-                error_norms,
-                'mean',
-                "\mathbb{{E}}[\mathbf{T}|\mathcal{C}_{T},\mathbf{Y}] - \mathbb{{E}}[\Lambda|\mathcal{C}_{T},\mathbf{Y}]",
-                'table',
-            )
-            
-        else:
-            self.logger.error('No valid experiments found')
-
-    def check_colsum_posterior_mean_convergence_fixed_intensity_input_validity(self):
-        # if the experiment is not of the right type remove it
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            # If experiment is not of the right type
-            if 'tablesummariesmcmcconvergence' not in outputs.experiment_id.lower():
-                self.logger.info(f'Experiment {outputs.experiment_id} is not of type TableSummariesMCMCConvergence')
-                # Remove experiment from output directories
-                self.outputs_directories.remove(output_directory)
-                # Remove relevant metadata
-                del outputs.experiment.config
-                continue
-            # If experiment does not use ensemble size of 1
-            elif outputs.experiment.config['K'] != 1:
-                # Remove experiment from output directories
-                self.outputs_directories.remove(output_directory)
-                # Remove relevant metadata
-                del outputs.experiment.config
-                continue   
-
-    def colsum_posterior_mean_convergence_fixed_intensity(self):        
-        self.logger.info('Producing plot for column sum posterior mean convergence')
-       # Check for validity of inputs
-        self.check_colsum_posterior_mean_convergence_fixed_intensity_input_validity()
-
-        if len(self.outputs_directories) > 0:
-            # Read all norms
-            column_sum_norms = {}
-            for output_directory in self.outputs_directories:
-                self.logger.debug(f"Experiment id {output_directory}")
-                # Get experiment id
-                experiment_id = os.path.basename(os.path.normpath(output_directory))
-                # Grab all files in output directory
-                filenames = glob(os.path.join(output_directory,f'samples/table*_error*.npy'))
-                for fname in filenames:
-                    if f"{self.settings['norm']}_norm" in fname:
-                        column_sum_norms[experiment_id] = read_npy(fname)
-            # Decide on statistic symbol based on size of ensemble of datasets
-            statistic_symbol = "\mathbb{{E}}[\mathbf{{n}}_{{\cdot,+}}|\mathbf{\lambda}]"
-        
-            # Plot errors
-            self.plot_error_norms(
-                        column_sum_norms,
-                        'mean',
-                        statistic_symbol,
-                        'table',
-            )
-        else:
-            self.logger.error('No valid experiments found')
-
-    def table_distribution_low_dimensional_embedding(self):
-        
-        self.logger.info('Running table_distribution_low_dimensional_embedding')
-        valid_experiment_types = ['table_mcmc','jointtablesim_mcmc','sim_mcmc','sim_nn','jointtablesim_nn']
-        
-        # Add ground truth table to embedding
-        outputs = Outputs(
-            self.outputs_directories[0],
-            self.settings,
-            ['ground_truth_table'],
-            slice_samples=False,
-            log_to_console=False,
-            logger = self.logger
-        )
-        # Store sample name, the actual sample (y), and its size (x)
-        dims = np.shape(np.squeeze(outputs.ground_truth_table))
-        # ground_truth_table
-        embedded_data_ids = np.array(['ground_truth'],dtype=str)
-        embedded_data_vals = np.array([outputs.ground_truth_table.ravel()],dtype='int32')
-        
-        # Decide on figure output dir
-        if len(self.outputs_directories) > 1:
-            output_dir = 'paper_figures'
-        else:
-            output_dir = os.path.join('figures',outputs.experiment_id)
-
-        for output_directory in tqdm(sorted(self.outputs_directories)): 
-            self.logger.info(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                list(self.settings.get('sample')),
-                slice_samples=True,
-                log_to_console=True,
-                logger = self.logger
-            )
-            # Make sure the right experiments are provided
-            try:
-                assert np.any([exp_type in outputs.experiment.config['type'].lower() for exp_type in valid_experiment_types])
-            except:
-                self.logger.warning(f"Skipping invalid experiment {outputs.experiment.config['type'].lower()}")
-                continue
-            
-            # Read label(s) from settings
-            try:
-                label = ''
-                for k in list(self.settings['label_by']):
-                    value = list(deep_get(key=k,value=outputs.experiment.config.settings))[0]
-                    # If label not included in metadata ignore it
-                    if value is not None:
-                        label += '_'+str(value)
-                        if k == 'noise_regime':
-                            label += '_noise'
-            except:
-                label = outputs.experiment_id
-            # Get only first n_samples as specified by settings
-            if 'table' in list(outputs.experiment.results.keys()):
-                table_samples = outputs.experiment.results['table']
-                table_samples = table_samples.reshape((table_samples.shape[0], np.prod(table_samples.shape[1:])))
-                # Add to data
-                embedded_data_ids = np.append(embedded_data_ids,np.repeat(("table"+label),table_samples.shape[0]))
-                embedded_data_vals = np.append(embedded_data_vals,table_samples,axis=0)
-                
-            if 'intensity' in list(outputs.experiment.results.keys()):
-                intensity_samples = outputs.experiment.results['intensity']
-                intensity_samples = intensity_samples.reshape((intensity_samples.shape[0], np.prod(intensity_samples.shape[1:])))
-                # Get only the first n_samples after burnin
-                embedded_data_ids = np.append(embedded_data_ids,np.repeat(("intensity"+label),intensity_samples.shape[0]))
-                embedded_data_vals = np.append(embedded_data_vals,intensity_samples,axis=0)
-
-        self.logger.info(f"Getting lower dimensional embedding of {embedded_data_vals.shape[0]} table samples using {self.settings['embedding_method']}, nearest neighbours = {self.settings['nearest_neighbours']} and distance metric = {self.settings['distance_metric']}")
-        
-        # Get data embedding
-        if self.settings['embedding_method'] == 'isomap':
-            # Instantiate isomap
-            isomap = sklearn.manifold.Isomap(
-                    n_components=2,
-                    n_neighbors=self.settings['nearest_neighbours'],
-                    max_iter=int(1e4),
-                    path_method='auto',#'D',
-                    eigen_solver='auto',
-                    neighbors_algorithm='auto',#'ball_tree',
-                    n_jobs=int(self.settings['n_workers']),
-                    metric=map_distance_name_to_function(self.settings['distance_metric']),
-                    metric_params={"dims":dims,"ord":self.settings.get('ord',None)}
-            )
-            # Get lower dimensional embedding
-            embedded_data_vals = isomap.fit_transform(embedded_data_vals)
-            print(f"Reconstruction error = {isomap.reconstruction_error()}")
-        
-        elif self.settings['embedding_method'] == 'tsne':
-            # Instantiate tsne
-            tsne = sklearn.manifold.TSNE(
-                n_components=2,
-                perplexity=float(self.settings['nearest_neighbours']),
-                learning_rate='auto',
-                n_iter=self.settings.get('K',int(1e4)),
-                n_iter_without_progress=300,
-                n_jobs=int(self.settings['n_workers']),
-                metric=map_distance_name_to_function(self.settings['distance_metric']),
-                metric_params={"dims":dims,"ord":self.settings.get('ord',None)}
-            )
-            # Get lower dimensional embedding
-            embedded_data_vals = tsne.fit_transform(embedded_data_vals)
-            print(f"KL Divergence = {tsne.kl_divergence_}")
-        
-        # Store projection data
-        embedded_data_df = pd.DataFrame(
-            data = np.array([
-                embedded_data_ids,
-                embedded_data_vals[:,0],
-                embedded_data_vals[:,1]
-            ]).T,
-            columns = ['sample_name','x','y']
-        )
-        # Change types
-        embedded_data_df = embedded_data_df.astype({'x': 'float32','y': 'float32'})
-        
-        # Get filename for comparison plot
-        filename = f"2d_{self.settings['embedding_method']}_embedding_" + \
-                    f"label_by_{'_'.join(list(self.settings['label_by']))}_" + \
-                    f"burnin{self.settings['burnin']}_" + \
-                    f"thinning{self.settings['thinning']}_" + \
-                    f"{self.settings['distance_metric']}_" + \
-                    f"nearest_neighbours{self.settings['nearest_neighbours']}"
-
-        # Get filepath
-        figure_filepath = os.path.join(
-            outputs.experiment.config['outputs']['directory'],
-            outputs.experiment.config['inputs']['dataset'],
-            output_dir,
-            filename
-        )
-
-        # Plot lower dimensional embedding
-        self.plot_lower_dimensional_embedding(
-            figure_filepath,
-            embedded_data_df
-        )
-            
-    
-    def r2_parameter_grid_plot(self):
-            
-        self.logger.info('Running r2_parameter_grid_plot')
-
-        for i,output_directory in tqdm(enumerate(self.outputs_directories),total=len(self.outputs_directories)): 
-            
-            if not valid_experiment_type(output_directory,["rsquaredanalysis"]):
-                continue
-
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-
-            self.parameter_grid_plot(i,outputs.experiment_id,'r2',r'$R^2$')
-
-    def log_target_parameter_grid_plot(self):
-            
-        self.logger.info('Running log_target_parameter_grid_plot')
-
-        for i,output_directory in tqdm(enumerate(self.outputs_directories),total=len(self.outputs_directories)): 
-            
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-
-            if not valid_experiment_type(outputs.experiment_id,["logtargetanalysis"]):
-                continue
-
-            self.parameter_grid_plot(i,outputs.experiment_id,'log_target',r"$\log(\pi(\mathbf{{x}}\|\mathbf{{\theta}}))$")
-
-    def absolute_error_parameter_grid_plot(self):
-        self.logger.info('Running absolute_error_parameter_grid_plot')
-
-        for i,output_directory in tqdm(enumerate(self.outputs_directories),total=len(self.outputs_directories)): 
-            
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-
-            if not valid_experiment_type(outputs.experiment_id,["absoluteerroranalysis"]):
-                continue
-
-            self.parameter_grid_plot(i,outputs.experiment_id,'absolute_error',r"$\log(\pi(\mathbf{{x}}\|\mathbf{{\theta}}))$")
-
-    def parameter_grid_plot(self,index,experiment_id,sample_name,sample_symbol):
-            
-        # Options
-        params = {
-            'text.usetex' : True,
-            'font.size' : 20,
-            'legend.fontsize': 20,
-            'legend.handlelength': 2,
-            'font.family' : 'sans-serif',
-            'font.sans-serif':['Helvetica']
-        }
-
-        # plt.rcParams.update(params)
-        grid_size = outputs.experiment.config['grid_size']
-        amin,amax = outputs.experiment.config['a_range']
-        bmin,bmax = outputs.experiment.config['b_range']
-        # Get config and sim
-        outputs = Outputs(
-            output_directory,
-            self.settings,
-            log_to_console=False,
-            logger = self.logger
-        )
-        dummy_config = Namespace(**{'settings':outputs.experiment.config})
-        sim = instantiate_sim(dummy_config)
-        
-        # Update max values
-        bmin *= sim.bmax
-        bmax *= sim.bmax
-        # Create grid
-        alpha_values = np.linspace(amin, amax, grid_size,endpoint=True)
-        beta_values = np.linspace(bmin, bmax, grid_size,endpoint=True)
-        XX, YY = np.meshgrid(alpha_values, beta_values)
-        # Get values
-        values = outputs.load_samples(sample_name)
-
-        # Store values for upper and lower bounds of colorbar
-        colorbar_min = None
-        colorbar_max = None
-        if "colorbar_limit" in list(self.settings.keys()):
-            colorbar_min = self.settings['colorbar_limit'][0]
-            colorbar_max = self.settings['colorbar_limit'][1]
-        
-        # Update colorbar range if necessary
-        if colorbar_min is not None:
-            values[values<colorbar_min] = np.nan
-        if colorbar_max is not None:
-            values[values>colorbar_max] = np.nan
-
-        # Construct interpolator
-        interpolated_data = interpolate.griddata((XX[np.isfinite(values)].ravel(), 
-                                                YY[np.isfinite(values)].ravel()), 
-                                                values[np.isfinite(values)].ravel(), 
-                                                (XX[~np.isfinite(values)].ravel(), 
-                                                YY[~np.isfinite(values)].ravel()), 
-                                                method='nearest')
-        # Interpolate zero values
-        # values[~np.isfinite(values)] = interpolated_data
-
-        # Get output directory
-        output_directory = Path(self.outputs_directories[index])
-        
-        # Save R2 figure to file
-        filepath = os.path.join(
-                output_directory,
-                "figures",
-                f"table_{'x'.join([str(s) for s in sim.shape()])}_" + \
-                f"total_{sim.total_flow}_" + \
-                f"{outputs.experiment.config['type']}" + \
-                f"{self.settings['experiment_title']}" + \
-                f"{sim.noise_regime.title()}Noise"
-        )
-
-        # plt.hist(values.ravel())
-        # # Save figure to file
-        # write_figure(fig,filepath,**self.settings)
-        # Close figure
-        # plt.close()
-        # return 
-
-        # Initialise plot
-        fig = plt.figure(figsize=self.settings['figure_size'])
-        # Plot values
-        plt.contourf(XX, YY*(1/sim.bmax), values, cmap = self.settings['main_colormap'], vmin = colorbar_min, vmax = colorbar_max,levels=self.settings['n_bins'])
-        # plt.contourf(XX, YY*(1/sim.bmax), values, cmap = self.settings['main_colormap'])
-        # Plot x,y limits
-        plt.xlim([np.min(XX), np.max(XX)])
-        plt.ylim([np.min(YY)*(1/sim.bmax), np.max(YY)*(1/sim.bmax)])
-        # Plot colorbar
-        cbar = plt.colorbar()
-        cbar.set_label(sample_symbol,rotation=self.settings['colorbar_label_rotation'],labelpad=self.settings['colorbar_labelpad'])
-        # Plot ground truth and fitted value
-        plt.scatter(outputs.experiment.config['fitted_alpha'],outputs.experiment.config['fitted_scaled_beta'],color='blue',s=self.settings['marker_size']*(2/3),label='fitted')
-        # *(1/sim.bmax)
-        if hasattr(sim,'alpha_true') and hasattr(sim,'beta_true'):
-            plt.scatter(sim.alpha_true,sim.beta_true,color='red',s=self.settings['marker_size'],label='true',marker='x')
-        # Axis labels
-        plt.ylabel(r'$\beta$',rotation=self.settings['axis_label_rotation'],labelpad=self.settings['axis_labelpad'])
-        plt.xlabel(r'$\alpha$')
-        # X axis tick fontsize
-        plt.xticks(fontsize=self.settings['tick_font_size'])
-        plt.yticks(fontsize=self.settings['tick_font_size'])
-        # Legend
-        if self.settings['legend_label_size'] is not None:
-            leg = plt.legend(frameon=False,prop={'size': self.settings['legend_label_size']})
-        else:
-            leg = plt.legend(frameon=False)
-        leg._ncol = 1
-        for text in leg.get_texts():
-            text.set_color("white")
-        # Tight layout
-        plt.tight_layout()
-
-        # Write figure
-        write_figure(fig,filepath,**self.settings)
-
-    def parameter_mixing(self):
-
-        self.logger.info('Running parameter_mixing')
-
-        for i,output_directory in tqdm(enumerate(self.outputs_directories),total=len(self.outputs_directories)): 
-            # Load samples and SIM model
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            # Convert to path object
-            output_directory = Path(output_directory)
-
-            # Get only first n_samples as specified by settings
-            parameter_samples = outputs.load_samples('theta')
-            sign_samples = outputs.load_samples('sign')
-            # Plot empirical mean
-            parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
-
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_mixing_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}" 
-
-            # Define filepath
-            filepath = os.path.join(output_directory.parent.absolute(),outputs.experiment_id,'figures',filename)
-    
-            # Plot parameter mixing
-            # Figure size 
-            fig,axs = plt.subplots(1,2,figsize=self.settings['figure_size'])
-            # Alpha plot
-            axs[0].plot(parameter_samples[:, 0],label='samples')
-            axs[0].set_ylabel(r'$\alpha$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            if self.settings['x_label'] is None:
-                axs[0].set_xlabel('MCMC iteration',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                axs[0].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            # if hasattr(sim,'alpha_true'):
-                # axs[0].axhline(y=sim.alpha_true, color='black', linestyle='-',label='true')
-            axs[0].axhline(y=parameter_mean[0],color='red',label=r'$\hat{\mu(\alpha)}$')
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                axs[0].set_xlim(x_min,min(x_max,parameter_samples.shape[0]))
-            y_min,y_max = self.settings['y_limit']
-            if y_min is not None and y_max is not None:
-                axs[0].set_ylim(max(0.0,y_min),min(y_max,2.0))
-            # X,Y label ticks
-            axs[0].locator_params(axis='x', nbins=self.settings['x_tick_frequency'])
-            # Legend
-            leg0 = axs[0].legend()
-            leg0._ncol = 1
-
-            # Beta plot
-            axs[1].plot(parameter_samples[:, 1],label='samples')
-            axs[1].set_ylabel(r'$\beta$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            if self.settings['x_label'] is None:
-                axs[1].set_xlabel('MCMC iteration',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                axs[1].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            # if hasattr(sim,'beta_true'):
-                # axs[1].axhline(y=sim.beta_true, color='black', linestyle='-',label='true')
-            axs[1].axhline(y=parameter_mean[1],color='red',label=r'$\hat{\mu(\beta)}$')
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                axs[1].set_xlim(x_min,min(x_max,parameter_samples.shape[0]))
-            y_min,y_max = self.settings['y_limit']
-            if y_min is not None and y_max is not None:
-                axs[1].set_ylim(max(0.0,y_min),min(y_max,2.0))
-            # X,Y label ticks
-            axs[1].locator_params(axis='x', nbins=self.settings['x_tick_frequency'])
-            # Legend
-            leg1 = axs[1].legend()
-            leg1._ncol = 1
-            
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Save figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-    
-    def parameter_acf(self):
-
-        self.logger.info('Running parameter_acf')
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-
-            # Get only first n_samples as specified by settings
-            parameter_samples = outputs.load_samples('theta')
-
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_" + \
-                    f"parameter_acf_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}"
-
-            
-            # Define filepath
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
-
-            # Plot parameter autocorrelation function
-            # Figure size 
-            fig,axs = plt.subplots(1,2,figsize=self.settings['figure_size'])
-            # Alpha plot
-            plot_acf(parameter_samples[:, 0],lags=self.settings['n_bins'],ax=axs[0],title='')
-            axs[0].set_ylabel(r'$\alpha$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            if self.settings['x_label'] is None:
-                axs[0].set_xlabel('Lags',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                axs[0].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            axs[0].set_ylim(0,None)
-            # Plot 0.2 acf hline
-            if self.settings['benchmark']:
-                axs[0].axhline(y=0.2,color='red')
-            # Beta plot
-            plot_acf(parameter_samples[:, 1],lags=self.settings['n_bins'],ax=axs[1],title='')
-            axs[1].set_ylabel(r'$\beta$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            if self.settings['x_label'] is None:
-                axs[1].set_xlabel('Lags',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                axs[1].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            axs[1].set_ylim(0,None)
-            if self.settings['benchmark']:
-                axs[1].axhline(y=0.2,color='red')
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Save figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-
-    def parameter_2d_contours(self):
-
-        self.logger.info('Running parameter_2d_contours')
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            # dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            # sim = instantiate_sim(dummy_config)
-            # Convert to path object
-            output_directory = Path(output_directory)
-
-            # Take burnin and apply thinning
-            parameter_samples = outputs.load_samples('theta')
-            sign_samples = outputs.load_samples('sign')
-            
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_contours_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}"
-
-            # Define filepath
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
-
-             # Store values for upper and lower bounds of colorbar
-            colorbar_min = None
-            colorbar_max = None
-            if "colorbar_limit" in list(self.settings.keys()):
-                colorbar_min = self.settings['colorbar_limit'][0]
-                colorbar_max = self.settings['colorbar_limit'][1]
-                # Get colormap
-                colorbar_kwargs = { 
-                                    "levels":np.linspace(0,1.0,self.settings['n_bins']+1)
-                                }
-            else:
-                colorbar_kwargs = {
-                                    "thresh":0,
-                                }
-
-            # Plot parameter distribution
-            # Figure size 
-            fig,ax = plt.subplots(1,1,figsize=self.settings['figure_size'])
-            # Contour plot
-            kdeplot = sns.kdeplot(
-                    ax=ax,
-                    x=parameter_samples[:, 0],
-                    y=parameter_samples[:, 1],
-                    shade=True,
-                    cbar=True,
-                    cmap=self.settings["main_colormap"],
-                    **colorbar_kwargs
-            )
-            
-            # Axis labels
-            ax.set_xlabel(
-                r'$\alpha$',
-                fontsize=self.settings['axis_font_size'],
-                labelpad=self.settings['axis_labelpad'],
-                rotation=self.settings['axis_label_rotation']
-            )
-            ax.set_ylabel(
-                r'$\beta$',
-                fontsize=self.settings['axis_font_size'],
-                labelpad=self.settings['axis_labelpad'],
-                rotation=self.settings['axis_label_rotation']
-            )
-            # Plot empirical mean
-            parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
-            ax.plot(
-                parameter_mean[0],
-                parameter_mean[1],
-                color='black',
-                label=r'$\hat{\mu}$',
-                marker='x', 
-                markersize=int(self.settings['marker_size'])
-            )
-            
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                ax.set_xlim(x_min,min(x_max,parameter_samples.shape[0]))
-            y_min,y_max = self.settings['y_limit']
-            if y_min is not None and y_max is not None:
-                ax.set_ylim(max(0.0,y_min),min(y_max,2.0))
-            # Legend
-            leg = plt.legend()
-            leg._ncol = 1
-            
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Save figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-
-    def parameter_histogram(self):
-
-        self.logger.info('Running parameter_histogram')
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            sim = instantiate_sim(dummy_config)
-
-            # Get only first n_samples as specified by settings
-            parameter_samples = outputs.load_samples('theta')
-            sign_samples = outputs.load_samples('sign')
-
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_histogram_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}"
-
-            # Define filepath
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
-            # Plot empirical mean
-            parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
-
-            # Plot parameter mixing
-            # Figure size 
-            fig,axs = plt.subplots(1,2,figsize=self.settings['figure_size'])
-            # Alpha plot
-            alpha_density = stats.gaussian_kde(parameter_samples[:, 0])
-            _,alpha_his = np.histogram(parameter_samples[:, 0],bins=self.settings['n_bins'], density=True)
-            smoothed_alpha_his = alpha_density(alpha_his)
-            axs[0].plot(alpha_his,alpha_density(alpha_his),label='samples')
-            axs[0].set_xlabel(r'$\alpha$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            # Prior plot
-            axs[0].axhline(y=0.5,color='blue',label='prior')
-            if self.settings['y_label'] is None:
-                axs[0].set_ylabel('Density',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
-                axs[0].set_ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            if hasattr(sim,'alpha_true') and sim.noise_regime == 'low':
-                axs[0].axvline(x=sim.alpha_true, color='black', linestyle='-',label='MAP')
-                axs[0].axvline(x=alpha_his[np.argmax(smoothed_alpha_his)],color='m',label='$\hat{MAP}$')
-            axs[0].axvline(x=parameter_mean[0],color='red',label=r'$\hat{\mu(\alpha)}$')
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                axs[0].set_xlim(max(0.0,x_min),min(x_max,2.0))
-            axs[0].set_ylim(0.0,None)
-            # Legend
-            leg0 = axs[0].legend()
-            leg0._ncol = 1
-
-            # Beta plot
-            beta_density = stats.gaussian_kde(parameter_samples[:, 1])
-            _,beta_his = np.histogram(parameter_samples[:, 1],bins=self.settings['n_bins'], density=True)
-            smoothed_beta_his = beta_density(beta_his)
-            axs[1].plot(beta_his,smoothed_beta_his,label='samples')
-            axs[1].set_xlabel(r'$\beta$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            # Prior plot
-            axs[1].axhline(y=0.5,color='blue',label='prior')
-            if self.settings['y_label'] is None:
-                axs[1].set_ylabel('Density',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
-                axs[1].set_ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            if hasattr(sim,'beta_true') and sim.noise_regime == 'low':
-                axs[1].axvline(x=sim.beta_true, color='black', linestyle='-',label='MAP')
-                axs[1].axvline(x=beta_his[np.argmax(smoothed_beta_his)],color='m',label='$\hat{MAP}$')
-            axs[1].axvline(x=parameter_mean[1],color='red',label=r'$\hat{\mu(\beta)}$')
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                axs[1].set_xlim(max(0.0,x_min),min(x_max,2.0))
-            axs[1].set_ylim(0.0,None)
-            # Legend
-            leg1 = axs[1].legend()
-            leg1._ncol = 1
-            
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Save figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-    
-    def destination_attraction_mixing(self):
-
-        self.logger.note('Running destination_attraction_mixing')
-
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                config=output_directory,
-                settings=self.settings,
-                output_names=['log_destination_attraction'],
-                logger = self.logger
-            )
-            dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            sim = instantiate_sim(dummy_config)
-
-            # Get only first n_samples as specified by settings
-            log_destination_attraction_samples = outputs.load_samples('log_destination_attraction')
-            sign_samples = outputs.load_samples('sign')
-
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_log_destination_attraction_mixing_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}"
-
-            # Define filepath
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
-            
-            # Plot parameter mixing
-            # Figure size 
-            fig,axs = plt.subplots(1,sim.dims[1],figsize=self.settings['figure_size'])
-            # Get axis limits
-            x_min,x_max = self.settings['x_limit']
-            # Get relative noise
-            relative_noise = np.sqrt(sim.noise_var)/np.log(sim.dims[1])
-            relative_noise_percentage = round(100*relative_noise)
-            upper_bound = sim.log_destination_attraction + np.log((1.0+2*relative_noise_percentage/100))
-            lower_bound = sim.log_destination_attraction - np.log((1.0+2*relative_noise_percentage/100))
-            # Get mean
-            mu_x = np.dot(log_destination_attraction_samples.T,sign_samples)/np.sum(sign_samples)
-            for j in range(sim.dims[1]):
-                axs[j].plot(log_destination_attraction_samples[:, j])
-                axs[j].set_ylabel(fr'$x_{j}$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-                if self.settings['x_label'] is None:
-                    axs[1].set_xlabel('MCMC iteration',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-                elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                    axs[1].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-                axs[j].axhline(y=mu_x[j], color='red', linestyle='-',label='$\hat{\mu(x_j)}$')
-                axs[j].axhline(y=sim.log_destination_attraction[j], color='m', linestyle='-',label='$\mathbf{y}$')
-                if hasattr(sim,'log_true_destination_attraction') and np.abs(sim.log_destination_attraction[j]-sim.log_true_destination_attraction[j]) > 1e-5:
-                    axs[j].axhline(y=sim.log_true_destination_attraction[j], color='black', linestyle='-',label='true')
-                    
-                axs[j].axhline(y=upper_bound[j], color='m', linestyle='--',label=r'$\mathbf{Y} + 2\sigma_0$')
-                axs[j].axhline(y=lower_bound[j], color='m', linestyle='--',label=r'$\mathbf{Y} - 2\sigma_0$')
-                # X,Y limits
-                if x_min is not None and x_max is not None:
-                    axs[j].set_xlim(x_min,min(x_max,log_destination_attraction_samples.shape[0]))
-                leg = axs[j].legend()
-                leg._ncol = 1
-            
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Save figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-
-    def plot_predictions(self,prediction_data):
-        # Axes limits from settings (read only x limit)
-        axes_lims = [self.settings.get('x_limit',[None,None])[0],self.settings.get('x_limit',[None,None])[1]]
-        # Otherwise read from data
-        if None in axes_lims:
-            min_val,max_val = np.infty,-np.infty
-            for data in prediction_data.values():
-                min_val = min([np.min(data['x']),np.min(data['y']),min_val])
-                max_val = max([np.max(data['x']),np.max(data['y']),max_val])
-            axes_lims = [min_val-0.02,max_val+0.02]
-        
-        # Figure size 
-        fig = plt.figure(figsize=self.settings['figure_size'])
-        # ax = fig.add_subplot(111)
-        # Get relative noise
-        # relative_noise = np.sqrt(sim.noise_var)/np.log(sim.dims[1])
-        # relative_noise_percentage = round(100*relative_noise)
-        # upper_bound = sim.log_destination_attraction + np.log((1.0+2*relative_noise_percentage/100))
-        # lower_bound = sim.log_destination_attraction - np.log((1.0+2*relative_noise_percentage/100))
-        
-        # Plot benchmark (perfect predictions)
-        if self.settings['benchmark']:
-            plt.plot(np.linspace(*axes_lims),np.linspace(*axes_lims),linewidth=0.2,color='black')
-        if self.settings['x_label'] is None:
-            plt.xlabel(r'$\mathbb{{E}}[\mathbf{X}|\mathbf{Y}]$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-        elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-            plt.xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-        if self.settings['y_label'] is None:
-            plt.ylabel(r'$\log{\mathbf{Y}}$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-        elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
-            plt.ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-        
-        # Axis limits 
-        plt.xlim(left=axes_lims[0], right=axes_lims[1])
-        plt.ylim(bottom=axes_lims[0], top=axes_lims[1])
-        
-        for v in prediction_data.values():
-            # Create composite label
-            composite_label = v['label'] + (fr"$R^2 = {np.round(v.get('title',0.0),2)}$)" if v.get('title',0.0) > 0 else '')
-            # Plot predictions against data
-            plt.scatter(x=v['x'],y=v['y'],marker='o',s=int(self.settings['marker_size']),label=composite_label)
-            
-        # Aspect ratio equal
-        # ax.set_aspect('equal', 'box')
-        plt.gca().set_aspect('equal')
-    
-        # Legend
-        try:
-            leg = plt.legend()
-            leg._ncol = 1
-        except:
-            pass
-        
-        # Tight layout
-        plt.tight_layout()
-
-        # Get experiment id and its data
-        experiment_id = list(prediction_data.keys())[0]
-        # Decide on figure output dir
-        if len(self.outputs_directories) > 1:
-            # Get filename
-            filename = f"log_destination_attraction_predictions_"+\
-                    f"burnin_{self.settings['burnin']}_" + \
-                    f"thinning_{self.settings['thinning']}"
-            # Define filepath
-            parent_directory = Path(prediction_data[experiment_id]['outputs'].outputs_path)
-            if 'synthetic' in str(parent_directory):
-                parent_directory = prediction_data[experiment_id]['outputs'].config.out_directory
-            else:
-                parent_directory.parent.absolute()
-            dirpath = os.path.join(parent_directory,'paper_figures')
-            filepath = os.path.join(dirpath,filename)
-        else:
-
-            # Get filename
-            dims = unpack_dims(
-                prediction_data[experiment_id]['outputs'].inputs.data.dims,
-                time_dims=False
-            )
-            filename = f"table_{'x'.join(list(map(str,list(dims))))}_" + \
-                    f"{experiment_id[:-21]}_log_destination_attraction_predictions_"+ \
-                    f"burnin_{self.settings.get('burnin',0)}_" + \
-                    f"thinning_{self.settings.get('thinning',1)}_" + \
-                    f"N_{prediction_data[experiment_id]['outputs'].config['training']['N']}"
-
-            # Define filepath
-            dirpath = os.path.join(
-                prediction_data[experiment_id]['outputs'].outputs_path,
-                'figures'
-            )
-            filepath = os.path.join(dirpath,filename)
-
-        # Make outputs directories (if necessary)
-        makedir(dirpath)
-        # Write figure
-        write_figure(
-            fig,
-            filepath,
-            **self.settings
-        )
-        write_figure_data(
-            prediction_data,
-            Path(filepath).parent,
-            groupby=[],
-            key_type={'x':'float','y':'float'},
-            **self.settings
-        )
-        
-        self.logger.info(f"Figure exported to {dirpath}")
-        self.logger.info(f"Filename: {filename}")
-        
-    def destination_attraction_predictions(self):
-
-        self.logger.info('Running destination_attraction_predictions')
-        predictions = {}
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                output_names=['log_destination_attraction','sign'],
-                settings=self.settings,
-                slice_samples=True,
-                output_dir=self.settings.get('out_directory',''),
-                logger = self.logger,
-            )
-            # Receive outputs
-            outputs.inputs.receive_from_device()
-
-            # Create label
-            label,\
-            _, \
-            _ = create_dynamic_data_label(
-                __self__=self,
-                data=outputs.config.settings
-            )
-            
-            # Get sample values
-            log_destination_attraction = outputs.get_sample('log_destination_attraction')
-            # Get mean 
-            mu_x = outputs.compute_sample_statistics(
-                log_destination_attraction,
-                'log_destination_attraction',
-                'signedmean',
-                dim=['id']
-            )
-            # Compute R squared
-            # Total sum squares
-            w_data = np.exp(outputs.inputs.data.log_destination_attraction).squeeze()
-            w_pred = np.exp(mu_x).squeeze()
-            w_data_centred = w_data - np.mean(w_data)
-            ss_tot = np.dot(w_data_centred, w_data_centred)
-            # Residual sum squares
-            res = w_pred - w_data
-            ss_res = np.dot(res.squeeze(), res.squeeze())
-            # Regression sum squares
-            r2 = 1. - ss_res/ss_tot
-
-            # Add data
-            predictions[outputs.experiment_id] =  {
-                'label':label,
-                'x':mu_x.squeeze(),
-                'y':outputs.inputs.data.log_destination_attraction.squeeze(),
-                'title':r2,
-                'outputs':outputs
-            }
-
-        self.plot_predictions(
-            prediction_data=predictions
-        )
-
-    def destination_attraction_residuals(self):
-
-        self.logger.info('Running destination_attraction_residuals')
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            sim = instantiate_sim(dummy_config)
-
-            # Get only first n_samples as specified by settings
-            log_destination_attraction_samples = outputs.load_samples('log_destination_attraction')
-            sign_samples = outputs.load_samples('sign')
-
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"gamma_{outputs.experiment.config['spatial_interaction_model']['gamma']}" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_log_destination_attraction_residuals_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}"
-
-            # Define filepath
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
-
-            # Plot parameter mixing
-            # Figure size 
-            fig = plt.figure(figsize=self.settings['figure_size'])
-            # Get relative noise
-            # relative_noise = np.sqrt(sim.noise_var)/np.log(sim.dims[1])
-            # relative_noise_percentage = round(100*relative_noise)
-            # upper_bound = sim.log_destination_attraction + np.log((1.0+2*relative_noise_percentage/100))
-            # lower_bound = sim.log_destination_attraction - np.log((1.0+2*relative_noise_percentage/100))
-            # Get mean
-            mu_x = np.dot(log_destination_attraction_samples.T,sign_samples)/np.sum(sign_samples)
-            mu_x = mu_x.flatten()
-            # Get residuals
-            residuals = sim.log_destination_attraction-mu_x
-            # Compute R squared
-            # Total sum squares
-            w_data = np.exp(sim.log_destination_attraction)
-            w_pred = np.exp(mu_x)
-            w_data_centred = w_data - np.mean(w_data)
-            ss_tot = np.dot(w_data_centred, w_data_centred)
-            # Residiual sum squares
-            res = w_pred - w_data
-            ss_res = np.dot(res, res)
-            # Regression sum squares
-            r2 = 1. - ss_res/ss_tot
-
-            # Plot predictions against data
-            plt.scatter(x=residuals,y=mu_x,marker='o',s=int(self.settings['marker_size']))
-            # Plot true mean of errors
-            if self.settings['annotate']:
-                plt.axhline(y=0,color='black')
-            if self.settings['x_label'] is None:
-                plt.xlabel(r'$\log{\mathbf{Y}} - \mathbb{{E}}[\mathbf{X}|\mathbf{Y}]$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                plt.xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            if self.settings['y_label'] is None:
-                plt.ylabel(r'$\mathbb{{E}}[\mathbf{x}|\mathbf{Y}]$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
-                plt.ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            # Legend                
-            leg = plt.legend()
-            leg._ncol = 1
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                plt.title(fr"{self.settings['figure_title'].replace('_',' ').capitalize()} ($R^2 = {np.round(r2,2)}$)",fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            
-            # Write figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-    
-    # def origin_destination_table_spatial(self):
-        
-    #     self.logger.info('Running origin_destination_table_spatial')
-    #     # Define arrow kwargs
-    #     kw = dict(arrowstyle="Simple, tail_width=0.5, head_width=4, head_length=8")
-        
-    #      # Loop through experiments
-    #     for output_directory in tqdm(self.outputs_directories): 
-    #         self.logger.debug(f"Experiment id {output_directory}")
-    #         # Load contingency table
-    #         outputs = Outputs(
-    #             output_directory,
-    #             self.settings,
-    #             log_to_console=False
-    #         )
-
-    #         # Load geometry 
-    #         geometry = outputs.load_geometry(self.settings['geometry'])
-            
-    #         # Load table
-    #         if self.settings['statistic'][0][0].lower() == 'mean_variance':
-    #             table = outputs.compute_sample_statistics(
-    #                 outputs.experiment.results[self.settings['sample'][0]],
-    #                 self.settings['sample'][0],
-    #                 'signedmean',
-    #             )
-    #             origin_demand = outputs.compute_sample_statistics(
-    #                 outputs.experiment.results[self.settings['sample'][0]],
-    #                 self.settings['sample'][0],
-    #                 'rowsums',
-    #             )
-    #             destination_demand = outputs.compute_sample_statistics(
-    #                 outputs.experiment.results[self.settings['sample'][0]],
-    #                 self.settings['sample'][0],
-    #                 'colsums',
-    #             )
-
-    #             table_variance = outputs.compute_sample_statistics(
-    #                 outputs.experiment.results[self.settings['sample'][0]],
-    #                 self.settings['sample'][0],
-    #                 'signedvariance',
-    #             )
-    #         else:
-    #             table = outputs.compute_sample_statistics(
-    #                 outputs.experiment.results[self.settings['sample'][0]],
-    #                 self.settings['sample'][0],
-    #                 self.settings['statistic'][0][0],
-    #             )
-    #             origin_demand = outputs.compute_sample_statistics(
-    #                 outputs.experiment.results[self.settings['sample'][0]],
-    #                 self.settings['sample'][0],
-    #                 'rowsums',
-    #             )
-    #             destination_demand = outputs.compute_sample_statistics(
-    #                 outputs.experiment.results[self.settings['sample'][0]],
-    #                 self.settings['sample'][0],
-    #                 'colsums',
-    #             )
-            
-    #         self.settings['viz_type'] = 'spatial'
-    #         filename = outputs.create_filename()
-
-    #         # Define filepath
-    #         filepath = os.path.join(outputs.outputs_path,'figures',filename)
-
-    #         # Add rowsums and column sums to geometry
-    #         geometry.loc[geometry.geometry_type==self.settings['origin_geometry_type'],'origin_demand'] = table.sum(axis=1)
-    #         geometry.loc[geometry.geometry_type==self.settings['destination_geometry_type'],'destination_demand'] = table.sum(axis=0)
-
-    #         # Compile table records in geodataframe
-    #         table_gdf = self.compile_table_records_in_geodataframe(table,geometry)
-    #         # Add variance table records in geodataframe
-    #         if self.settings['statistic'][0][0].lower() == 'mean_variance':
-    #             # Compile variance records
-    #             table_variance_gdf = self.compile_table_records_in_geodataframe(table_variance,geometry)
-    #             table_variance_gdf.rename(columns={"flow":"flow_variance"},inplace=True)
-    #             # Merge in current records
-    #             table_gdf = table_gdf.merge(
-    #                     table_variance_gdf[['origin','destination','flow_variance']],
-    #                     on=['origin','destination'],
-    #                     how='left'
-    #             )
-
-    #         flow_colorbar_min,flow_colorbar_max = None, None
-    #         if "main_colorbar_limit" in list(self.settings.keys()
-    #             flow_colorbar_min,flow_colorbar_max = self.settings['main_colorbar_limit']
-            
-    #         origin_colorbar_min,origin_colorbar_max = None, None
-    #         destination_colorbar_min,destination_colorbar_max = None, None
-    #         if "auxiliary_colorbar_limit" in list(self.settings.keys()
-    #             if len(np.shape(self.settings['auxiliary_colorbar_limit'])) == 1:
-    #                 origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit']
-    #             elif len(np.shape(self.settings['auxiliary_colorbar_limit'])) > 1:
-    #                 origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit'][0]
-    #                 destination_colorbar_min,destination_colorbar_max = self.settings['auxiliary_colorbar_limit'][1]
-
-    #         # Normalise colormaps
-    #         if flow_colorbar_min is not None and flow_colorbar_max is not None:    
-    #             flow_norm = mpl.colors.Normalize(vmin=flow_colorbar_min, vmax=flow_colorbar_max)
-    #         else:
-    #             flow_norm = mpl.colors.Normalize(vmin=np.min(table.ravel()), vmax=np.max(table.ravel()))
-            
-    #         if origin_colorbar_min is not None and origin_colorbar_max is not None:    
-    #             origin_norm = mpl.colors.Normalize(vmin=origin_colorbar_min, vmax=origin_colorbar_max)
-    #         else:
-    #             origin_norm = mpl.colors.Normalize(vmin=np.min(origin_demand.ravel()), vmax=np.max(origin_demand.ravel()))
-            
-    #         if destination_colorbar_min is not None and destination_colorbar_max is not None:    
-    #             destination_norm = mpl.colors.Normalize(vmin=destination_colorbar_min, vmax=destination_colorbar_max)
-    #         else:
-    #             destination_norm = mpl.colors.Normalize(vmin=np.min(destination_demand.ravel()), vmax=np.max(destination_demand.ravel()))
-
-    #         print(flow_norm.vmin,flow_norm.vmax)
-    #         print(origin_norm.vmin,origin_norm.vmax)
-    #         print(destination_norm.vmin,destination_norm.vmax)
-
-    #         # Define colorbars for flows, and margins
-    #         flow_base_cmap = cm.get_cmap(self.settings['main_colormap'])
-    #         # Clip colors in colorbar to specific range
-    #         colors = flow_base_cmap( 
-    #             np.linspace(
-    #                     self.settings['color_segmentation_limits'][0], 
-    #                     self.settings['color_segmentation_limits'][1], 
-    #                     self.settings['x_tick_frequency']
-    #             )
-    #         )
-    #         # flow_color_segmented_cmap = mpl.colors.LinearSegmentedColormap.from_list(self.settings['main_colormap'], colors)
-    #         flow_mapper = cm.ScalarMappable(
-    #                     norm=flow_norm, 
-    #                     cmap=self.settings['main_colormap']
-    #         )
-    #         origin_flow_mapper = cm.ScalarMappable(
-    #                 norm=origin_norm, 
-    #                 cmap=self.settings['aux_colormap'][0]
-    #         )
-    #         destination_flow_mapper = cm.ScalarMappable(
-    #                 norm=destination_norm, 
-    #                 cmap=self.settings['aux_colormap'][1]
-    #         )
-
-    #         # Setup figure
-    #         fig = plt.figure(figsize=self.settings['figure_size'])
-    #         if self.settings['colorbar']:
-    #             gs = GridSpec(
-    #                 nrows=1,
-    #                 ncols=4,
-    #                 height_ratios=[1],
-    #                 width_ratios=[1,1,1,30],
-    #                 hspace=0.0,
-    #                 wspace=0.0
-    #             )
-    #             ax1 = fig.add_subplot(gs[3])
-    #             origin_cbar_ax = fig.add_subplot(gs[0])
-    #             destination_cbar_ax = fig.add_subplot(gs[1])
-    #             flow_cbar_ax = fig.add_subplot(gs[2])
-
-    #             flow_cbar_ax.axis('off')
-    #             origin_cbar_ax.axis('off')
-    #             destination_cbar_ax.axis('off')
-    #         else:
-    #             gs = GridSpec(
-    #                 nrows=1,
-    #                 ncols=1,
-    #                 height_ratios=[1],
-    #                 width_ratios=[10],
-    #                 hspace=0.0,
-    #                 wspace=0.0
-    #             )
-    #             ax1 = fig.add_subplot(gs[0])
-                
-    #         ax1.margins(x=0)
-
-    #         # Create copy of y axis
-    #         ax2 = ax1.twiny()
-    #         # Set orders of appearance
-    #         ax1.set_zorder(2)
-    #         ax2.set_zorder(1)
-
-    #         # Turn axes off
-    #         ax1.axis('off')
-    #         ax2.axis('off')
-
-    #         # Plot geometry polygons twice (side by side)
-    #         if np.abs(origin_norm.vmax - origin_norm.vmin) > 1e-3:
-    #             geometry.loc[geometry.geometry_type==self.settings['origin_geometry_type'],:].plot(
-    #                             ax=ax1,
-    #                             column='origin_demand',
-    #                             legend=False,
-    #                             edgecolor='none',
-    #                             alpha=1.0,#self.settings['opacity'],
-    #                             cmap=self.settings['aux_colormap'][0],
-    #                             vmin=origin_norm.vmin,
-    #                             vmax=origin_norm.vmax,
-    #                             zorder=1
-    #             )
-
-    #         # Horizontally and/or vertically translate geometries
-    #         x_shift = 8000.0
-    #         y_shift = 0.0
-    #         geometry_translated = deepcopy(geometry.loc[geometry.geometry_type==self.settings['destination_geometry_type']])
-    #         geometry_translated.loc[:,"geometry"] = geometry_translated.translate(x_shift,y_shift)
-
-    #         if np.abs(destination_norm.vmax - destination_norm.vmin) > 1e-3:
-    #             geometry_translated.plot(
-    #                 ax=ax2,
-    #                 column='destination_demand',
-    #                 legend=False,
-    #                 edgecolor='none',
-    #                 alpha=1.0,#self.settings['opacity'],
-    #                 cmap=self.settings['aux_colormap'][1],
-    #                 vmin=destination_norm.vmin,
-    #                 vmax=destination_norm.vmax,
-    #                 zorder=1
-    #             )
-            
-    #         # Plot centroids and transparent boundaries
-    #         geometry.loc[geometry.geometry_type==self.settings['origin_geometry_type'],:].plot(
-    #                 ax=ax1,
-    #                 facecolor="none",
-    #                 edgecolor='black',
-    #                 zorder=10
-    #         )
-    #         geometry_translated.loc[geometry.geometry_type==self.settings['destination_geometry_type'],:].plot(
-    #                 ax=ax1,
-    #                 facecolor="none",
-    #                 edgecolor='black',
-    #                 zorder=10
-    #         )
-    #         geometry.loc[geometry.geometry_type==self.settings['origin_geometry_type'],:].centroid.plot(
-    #                 ax=ax1,
-    #                 facecolor="black",
-    #                 edgecolor='black',
-    #                 zorder=10
-    #         )
-    #         geometry_translated.loc[geometry.geometry_type==self.settings['destination_geometry_type'],:].centroid.plot(
-    #                 ax=ax1,
-    #                 facecolor="black",
-    #                 edgecolor='black',
-    #                 zorder=10
-    #         )
-
-    #         # Axes limits
-    #         ax2.set_xlim(ax1.get_xlim())
-    #         ax2.set_ylim(ax1.get_ylim())
-
-    #         # Construct colorbars for flows
-    #         if self.settings['colorbar']: 
-    #             flow_cbar = fig.colorbar(
-    #                     flow_mapper, 
-    #                     ax=flow_cbar_ax,
-    #                     fraction=1.0,
-    #                     pad=0.0
-    #             )
-    #             flow_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-    #             if self.settings['colorbar_title'] is not None:
-    #                 flow_cbar.ax.set_title(self.settings['colorbar_title'].replace("_"," ").capitalize(),fontsize=self.settings['legend_label_size'])
-    #             else:
-    #                 flow_cbar.ax.set_title('Flow',fontsize=self.settings['legend_label_size'])
-    #             flow_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-    #             flow_cbar.ax.yaxis.set_ticks_position('left')
-    #             flow_cbar.update_ticks()
-                
-    #             # Construct colorbars for margins (rowsums column sums)
-    #             origin_flow_mapper._A = []
-    #             destination_flow_mapper._A = []
-
-    #             if np.abs(origin_norm.vmax - origin_norm.vmin) > 1e-3:
-    #                 origin_cbar = fig.colorbar(
-    #                     origin_flow_mapper, 
-    #                     ax=origin_cbar_ax,
-    #                     fraction=1.0,
-    #                     pad=0.0,
-    #                 )
-    #                 origin_cbar.ax.yaxis.set_ticks_position('left')
-    #                 origin_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-    #                 origin_cbar.ax.set_title('Origin',fontsize=self.settings['legend_label_size'])
-    #                 origin_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-    #                 origin_cbar.update_ticks()
-                
-    #             # Origin demand colorbar
-    #             if np.abs(destination_norm.vmax - destination_norm.vmin) > 1e-3:
-    #                 destination_cbar = fig.colorbar(
-    #                     destination_flow_mapper, 
-    #                     ax=destination_cbar_ax,
-    #                     fraction=1.0,
-    #                     pad=0.0,
-    #                 )
-    #                 destination_cbar.ax.yaxis.set_ticks_position('left')
-    #                 destination_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-    #                 destination_cbar.ax.set_title('Destination',fontsize=self.settings['legend_label_size'])
-    #                 destination_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-    #                 destination_cbar.update_ticks()
-
-    #         # Plot arrows from origin to destination
-    #         for i in range(len(table_gdf)):
-    #             # Extact origin centroid
-    #             p1 = np.array([
-    #                 table_gdf.iloc[i].origin_geometry.centroid.xy[0][0],
-    #                 table_gdf.iloc[i].origin_geometry.centroid.xy[1][0]
-    #             ])
-    #             # Extract destination centroid
-    #             p2 = np.array([
-    #                 table_gdf.iloc[i].destination_geometry.centroid.xy[0][0]+x_shift,
-    #                 table_gdf.iloc[i].destination_geometry.centroid.xy[1][0]+y_shift
-    #             ])
-
-    #             # Add arrow if the two points are not the same
-    #             if not np.all(np.abs(p1-p2)<=1e-10):
-    #                 # Compute angle between points
-    #                 angle = (p2[1]-p1[1])/(p2[0]-p1[0])
-    #                 # If variance records are available make line as thick as variance associated with flow
-    #                 # Apply sigmoid function to variance to a value in [0,1]
-    #                 if self.settings['statistic'][0][0].lower() == 'mean_variance':
-    #                     # Define line width
-    #                     linewidth = self.settings['linewidth']*positive_sigmoid(table_gdf.iloc[i].flow_variance,30)
-    #                     # (table_gdf.iloc[i].flow_variance)
-    #                     # positive_sigmoid(table_gdf.iloc[i].flow_variance,30)
-    #                     # Define transparency percentage
-    #                     #((table_gdf.iloc[i].flow/table_gdf.iloc[i].origin_demand))
-    #                     opacity = self.settings['opacity']
-    #                     #min(table_gdf.iloc[i].flow/table_gdf.iloc[i].flow_variance,1.0)
-    #                     #self.settings['opacity'] #positive_sigmoid((table_gdf.iloc[i].flow/table_gdf.iloc[i].origin_demand),1)# self.settings['opacity']#positive_sigmoid(table_gdf.iloc[i].flow_mean/table_gdf.iloc[i].flow_variance,30)
-    #                 else:
-    #                     # Define line width
-    #                     linewidth = self.settings['linewidth']
-    #                     # Define transparency percentage
-    #                     opacity = self.settings['opacity']
-
-    #                 # Do not show arrows if origin or destination ids are not in the subset provided
-    #                 plot_arrow = True
-    #                 if len(self.settings['origin_ids']) > 0 and (table_gdf.iloc[i].origin not in self.settings['origin_ids']):
-    #                     plot_arrow = False
-    #                 if len(self.settings['destination_ids']) > 0 and (table_gdf.iloc[i].destination not in self.settings['destination_ids']):
-    #                     plot_arrow = False
-
-    #                 if plot_arrow:
-    #                     # Create arrow from origin to destination
-    #                     arrow = patches.ConnectionPatch(
-    #                         xyA=p1,
-    #                         xyB=p2,
-    #                         coordsA = "data", 
-    #                         coordsB = "data", 
-    #                         axesA = ax1,
-    #                         axesB = ax2,
-    #                         connectionstyle=f"arc3,rad={np.sign(angle)*0.3}",
-    #                         color=flow_mapper.to_rgba(table_gdf.iloc[i].flow), 
-    #                         linewidth=linewidth,
-    #                         arrowstyle="-|>",
-    #                         mutation_scale=2.0*self.settings['linewidth'], # controls arrow head size
-    #                         alpha=opacity,
-    #                         zorder=1,
-    #                     )
-    #                     # Add arrow to patches
-    #                     ax1.add_artist(arrow)
-
-    #         # Annotate
-    #         if self.settings['annotate']:
-    #             origin_geometry_ids = sorted(geometry[geometry.geometry_type==self.settings['origin_geometry_type']].geometry_id.values)
-    #             destination_geometry_ids = sorted(geometry[geometry.geometry_type==self.settings['destination_geometry_type']].geometry_id.values)
-    #             for i,oid in enumerate(origin_geometry_ids):
-    #                 # Get geometry info
-    #                 geom = geometry.loc[geometry.geometry_id == oid,:]
-    #                 # Get annotation x,y coordinates
-    #                 coords = list(geom.geometry.values[0].centroid.coords[0])
-    #                 coords[1] *= 5000/4999
-    #                 ax1.annotate(
-    #                     text=str(i), 
-    #                     color='black',
-    #                     xy=coords,
-    #                     horizontalalignment='center',
-    #                     fontsize=self.settings['annotation_label_size'],
-    #                     zorder=10
-    #                 )
-    #             for j,did in enumerate(destination_geometry_ids):
-    #                 # Get geometry info
-    #                 geom = geometry_translated.loc[geometry_translated.geometry_id == did,:]
-    #                 # Get annotation x,y coordinates
-    #                 coords = list(geom.geometry.values[0].centroid.coords[0])
-    #                 coords[1] *= 5000/4999
-    #                 ax1.annotate(
-    #                     text=str(j), 
-    #                     color='black',
-    #                     xy=coords,
-    #                     horizontalalignment='center',
-    #                     fontsize=self.settings['annotation_label_size'],
-    #                     zorder=10
-    #                 )
-
-    #         # Remove space
-    #         gs.tight_layout(fig)
-    #         # Write figure
-    #         write_figure(fig,filepath,**self.settings)
-
-    def origin_destination_table_tabular(self):
+    def plot_2d_heatmap(self):
         
         self.logger.info('Running origin_destination_table_tabular')
 
@@ -2636,171 +1305,581 @@ class Plot(object):
                             data_precision=self.settings['data_precision']
                         )
 
+    def plot_2d_contours(self):
 
-    # def origin_destination_table_colorbars(self):
-        
-    #     self.logger.info('Running origin_destination_table_colorbars')
-    #     # Define arrow kwargs
-    #     kw = dict(arrowstyle="Simple, tail_width=0.5, head_width=4, head_length=8")
-        
-    #     for output_directory in tqdm(self.outputs_directories): 
-    #         self.logger.debug(f"Experiment id {output_directory}")
-    #         # Load contingency table
-    #         outputs = Outputs(
-    #             output_directory,
-    #             self.settings,
-    #             log_to_console=False
-    #         )
+        self.logger.info('Running parameter_2d_contours')
+
+        for output_directory in tqdm(self.outputs_directories): 
+            self.logger.debug(f"Experiment id {output_directory}")
+            # Load contingency table
+            outputs = Outputs(
+                output_directory,
+                self.settings,
+                log_to_console=False,
+                logger = self.logger
+            )
+            # dummy_config = Namespace(**{'settings':outputs.experiment.config})
+            # sim = instantiate_sim(dummy_config)
+            # Convert to path object
+            output_directory = Path(output_directory)
+
+            # Take burnin and apply thinning
+            parameter_samples = outputs.load_samples('theta')
+            sign_samples = outputs.load_samples('sign')
+            
+            # Get filename
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_contours_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}"
+
+            # Define filepath
+            filepath = os.path.join(outputs.outputs_path,'figures',filename)
+
+             # Store values for upper and lower bounds of colorbar
+            colorbar_min = None
+            colorbar_max = None
+            if "colorbar_limit" in list(self.settings.keys()):
+                colorbar_min = self.settings['colorbar_limit'][0]
+                colorbar_max = self.settings['colorbar_limit'][1]
+                # Get colormap
+                colorbar_kwargs = { 
+                                    "levels":np.linspace(0,1.0,self.settings['n_bins']+1)
+                                }
+            else:
+                colorbar_kwargs = {
+                                    "thresh":0,
+                                }
+
+            # Plot parameter distribution
+            # Figure size 
+            fig,ax = plt.subplots(1,1,figsize=self.settings['figure_size'])
+            # Contour plot
+            kdeplot = sns.kdeplot(
+                    ax=ax,
+                    x=parameter_samples[:, 0],
+                    y=parameter_samples[:, 1],
+                    shade=True,
+                    cbar=True,
+                    cmap=self.settings["main_colormap"],
+                    **colorbar_kwargs
+            )
+            
+            # Axis labels
+            ax.set_xlabel(
+                r'$\alpha$',
+                fontsize=self.settings['axis_font_size'],
+                labelpad=self.settings['axis_labelpad'],
+                rotation=self.settings['axis_label_rotation']
+            )
+            ax.set_ylabel(
+                r'$\beta$',
+                fontsize=self.settings['axis_font_size'],
+                labelpad=self.settings['axis_labelpad'],
+                rotation=self.settings['axis_label_rotation']
+            )
+            # Plot empirical mean
+            parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
+            ax.plot(
+                parameter_mean[0],
+                parameter_mean[1],
+                color='black',
+                label=r'$\hat{\mu}$',
+                marker='x', 
+                markersize=int(self.settings['marker_size'])
+            )
+            
+            # X,Y limits
+            x_min,x_max = self.settings['x_limit']
+            if x_min is not None and x_max is not None:
+                ax.set_xlim(x_min,min(x_max,parameter_samples.shape[0]))
+            y_min,y_max = self.settings['y_limit']
+            if y_min is not None and y_max is not None:
+                ax.set_ylim(max(0.0,y_min),min(y_max,2.0))
+            # Legend
+            leg = plt.legend()
+            leg._ncol = 1
+            
+            # Figure title
+            if self.settings['figure_title'] is not None:
+                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
+            # Tight layout
+            plt.tight_layout()
+            # Save figure
+            write_figure(fig,filepath,**self.settings)
+            
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
     
-    #         # Define filepath
-    #         filename = f"table_{outputs.experiment.config['table_dim']}_total_{self.settings['table_total']}_{self.settings['sample'][0]}_flows_colorbar"
+    def plot_autocorrelation_function(self):
 
-    #         filepath = os.path.join(outputs.outputs_path,'figures',filename)
+        self.logger.info('Running parameter_acf')
 
-    #         flow_colorbar_min,flow_colorbar_max = None, None
-    #         if "main_colorbar_limit" in list(self.settings.keys()
-    #             flow_colorbar_min,flow_colorbar_max = self.settings['main_colorbar_limit']
+        for output_directory in tqdm(self.outputs_directories): 
+            self.logger.debug(f"Experiment id {output_directory}")
+            # Load contingency table
+            outputs = Outputs(
+                output_directory,
+                self.settings,
+                log_to_console=False,
+                logger = self.logger
+            )
+
+            # Get only first n_samples as specified by settings
+            parameter_samples = outputs.load_samples('theta')
+
+            # Get filename
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_" + \
+                    f"parameter_acf_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}"
+
             
-    #         origin_colorbar_min,origin_colorbar_max = None, None
-    #         destination_colorbar_min,destination_colorbar_max = None, None
-    #         if "auxiliary_colorbar_limit" in list(self.settings.keys()
-    #             if len(np.shape(self.settings['auxiliary_colorbar_limit'])) == 1:
-    #                 origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit']
-    #             elif len(np.shape(self.settings['auxiliary_colorbar_limit'])) > 1:
-    #                 origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit'][0]
-    #                 destination_colorbar_min,destination_colorbar_max = self.settings['auxiliary_colorbar_limit'][1]
+            # Define filepath
+            filepath = os.path.join(outputs.outputs_path,'figures',filename)
 
-    #         table = outputs.compute_sample_statistics(
-    #                 outputs.experiment.results[self.settings['sample'][0]],
-    #                 self.settings['sample'][0],
-    #                 self.settings['statistic'][0][0]
-    #         )
-    #         origin_demand = outputs.compute_sample_statistics(
-    #                 outputs.experiment.results[self.settings['sample'][0]],
-    #                 self.settings['sample'][0],
-    #                 'rowsums'
-    #         )
-    #         destination_demand = outputs.compute_sample_statistics(
-    #             outputs.experiment.results[self.settings['sample'][0]],
-    #             self.settings['sample'][0],
-    #             'colsums'
-    #         )
-    #         self.settings['viz_type'] = 'colorbars'
-    #         filename = outputs.create_filename()
-
-    #         # Normalise colormaps
-    #         if flow_colorbar_min is not None and flow_colorbar_max is not None:    
-    #             flow_norm = mpl.colors.Normalize(vmin=flow_colorbar_min, vmax=flow_colorbar_max)
-    #         else:
-    #             flow_norm = mpl.colors.Normalize(vmin=np.min(table.ravel()), vmax=np.max(table.ravel()))
+            # Plot parameter autocorrelation function
+            # Figure size 
+            fig,axs = plt.subplots(1,2,figsize=self.settings['figure_size'])
+            # Alpha plot
+            plot_acf(parameter_samples[:, 0],lags=self.settings['n_bins'],ax=axs[0],title='')
+            axs[0].set_ylabel(r'$\alpha$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
+            if self.settings['x_label'] is None:
+                axs[0].set_xlabel('Lags',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
+                axs[0].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            axs[0].set_ylim(0,None)
+            # Plot 0.2 acf hline
+            if self.settings['benchmark']:
+                axs[0].axhline(y=0.2,color='red')
+            # Beta plot
+            plot_acf(parameter_samples[:, 1],lags=self.settings['n_bins'],ax=axs[1],title='')
+            axs[1].set_ylabel(r'$\beta$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
+            if self.settings['x_label'] is None:
+                axs[1].set_xlabel('Lags',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
+                axs[1].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            axs[1].set_ylim(0,None)
+            if self.settings['benchmark']:
+                axs[1].axhline(y=0.2,color='red')
+            # Figure title
+            if self.settings['figure_title'] is not None:
+                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
+            # Tight layout
+            plt.tight_layout()
+            # Save figure
+            write_figure(fig,filepath,**self.settings)
             
-    #         if origin_colorbar_min is not None and origin_colorbar_max is not None:    
-    #             origin_norm = mpl.colors.Normalize(vmin=origin_colorbar_min, vmax=origin_colorbar_max)
-    #         else:
-    #             origin_norm = mpl.colors.Normalize(vmin=np.min(origin_demand.ravel()), vmax=np.max(origin_demand.ravel()))
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
+
+
+    '''    
+    ╔═╗┬  ┌─┐┌┬┐  ┬ ┬┬─┐┌─┐┌─┐┌─┐┌─┐┬─┐┌─┐
+    ╠═╝│  │ │ │   │││├┬┘├─┤├─┘├─┘├┤ ├┬┘└─┐
+    ╩  ┴─┘└─┘ ┴   └┴┘┴└─┴ ┴┴  ┴  └─┘┴└─└─┘
+    '''
+    
+    def data_plot_2d_scatter(self):
             
-    #         if destination_colorbar_min is not None and destination_colorbar_max is not None:    
-    #             destination_norm = mpl.colors.Normalize(vmin=destination_colorbar_min, vmax=destination_colorbar_max)
-    #         else:
-    #             destination_norm = mpl.colors.Normalize(vmin=np.min(destination_demand.ravel()), vmax=np.max(destination_demand.ravel()))
+        self.logger.info('Running data_plot_2d_scatter')
 
-    #         print(flow_norm.vmin,flow_norm.vmax)
-    #         print(origin_norm.vmin,origin_norm.vmax)
-    #         print(destination_norm.vmin,destination_norm.vmax)
-
-    #         # Define colorbars for flows, and margins
-    #         flow_base_cmap = cm.get_cmap(self.settings['main_colormap'])
-    #         # Clip colors in colorbar to specific range
-    #         colors = flow_base_cmap( 
-    #             np.linspace(
-    #                     self.settings['color_segmentation_limits'][0], 
-    #                     self.settings['color_segmentation_limits'][1], 
-    #                     self.settings['x_tick_frequency']
-    #             )
-    #         )
-    #         flow_color_segmented_cmap = mpl.colors.LinearSegmentedColormap.from_list(self.settings['main_colormap'], colors)
-    #         flow_mapper = cm.ScalarMappable(
-    #                     norm=flow_norm, 
-    #                     cmap=self.settings['main_colormap']#flow_color_segmented_cmap
-    #         )
-    #         origin_flow_mapper = cm.ScalarMappable(
-    #                 norm=origin_norm, 
-    #                 cmap=self.settings['aux_colormap'][0]
-    #         )
-    #         destination_flow_mapper = cm.ScalarMappable(
-    #                 norm=destination_norm, 
-    #                 cmap=self.settings['aux_colormap'][1]
-    #         )
-
-    #         # Setup figure
-    #         fig = plt.figure(figsize=(3,6))
-    #         gs = GridSpec(
-    #             nrows=1,
-    #             ncols=3,
-    #             width_ratios=[1,1,1],
-    #             hspace=0.0,
-    #             wspace=1.0
-    #         )
-    #         origin_cbar_ax = fig.add_subplot(gs[0])
-    #         destination_cbar_ax = fig.add_subplot(gs[1])
-    #         flow_cbar_ax = fig.add_subplot(gs[2])
-            
-    #         flow_cbar_ax.axis('off')
-    #         origin_cbar_ax.axis('off')
-    #         destination_cbar_ax.axis('off')
-
-    #         # Construct colorbars for flows
-    #         flow_cbar = fig.colorbar(
-    #                 flow_mapper, 
-    #                 ax=flow_cbar_ax,
-    #                 fraction=1.0,
-    #                 pad=0.0,
-    #                 # location = 'left'
-    #         )
-    #         flow_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-    #         if self.settings['colorbar_title'] is not None:
-    #             flow_cbar.ax.set_title(self.settings['colorbar_title'].replace("_"," ").capitalize(),fontsize=self.settings['legend_label_size'])
-    #         else:
-    #             flow_cbar.ax.set_title('Flow',fontsize=self.settings['legend_label_size'])
-    #         flow_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-    #         flow_cbar.ax.yaxis.set_ticks_position('left')
-    #         flow_cbar.update_ticks()
-            
-    #         # Construct colorbars for margins (rowsums column sums)
-    #         origin_flow_mapper._A = []
-    #         destination_flow_mapper._A = []
+        # Run output handler
+        outputs_summary = OutputSummary(
+            settings=self.settings,
+            logger=self.logger
+        )
+        sys.exit()
         
-    #         if np.abs(origin_norm.vmax - origin_norm.vmin) > 1e-3:
-    #             origin_cbar = fig.colorbar(
-    #                 origin_flow_mapper, 
-    #                 ax=origin_cbar_ax,
-    #                 fraction=1.0,
-    #                 pad=0.1,
-    #                 # location = 'left'
-    #             )
-    #             origin_cbar.ax.yaxis.set_ticks_position('left')
-    #             origin_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-    #             origin_cbar.ax.set_title('Origin',fontsize=self.settings['legend_label_size'])
-    #             origin_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-    #             origin_cbar.update_ticks()
+        data = {}
+        for output_directory in tqdm(
+            outputs_summary.experiment_metadata
+        ): 
+            # Add data
+            data[output_directory] =  {
+                'label':label,
+                'x':mu_x.squeeze(),
+                'y':outputs.inputs.data.log_destination_attraction.squeeze(),
+                'marker':'o',
+                'outputs':outputs
+            }
+
+        self.plot_2d_scatter(
+            data = data,
+            name = self.settings.get('title','NONAME')
+        )
+
+    def low_dimensional_embedding(self):
+        
+        self.logger.info('Running table_distribution_low_dimensional_embedding')
+        valid_experiment_types = ['table_mcmc','jointtablesim_mcmc','sim_mcmc','sim_nn','jointtablesim_nn']
+        
+        # Add ground truth table to embedding
+        outputs = Outputs(
+            self.outputs_directories[0],
+            self.settings,
+            ['ground_truth_table'],
+            slice_samples=False,
+            log_to_console=False,
+            logger = self.logger
+        )
+        # Store sample name, the actual sample (y), and its size (x)
+        dims = np.shape(np.squeeze(outputs.ground_truth_table))
+        # ground_truth_table
+        embedded_data_ids = np.array(['ground_truth'],dtype=str)
+        embedded_data_vals = np.array([outputs.ground_truth_table.ravel()],dtype='int32')
+        
+        # Decide on figure output dir
+        if len(self.outputs_directories) > 1:
+            output_dir = 'paper_figures'
+        else:
+            output_dir = os.path.join('figures',outputs.experiment_id)
+
+        for output_directory in tqdm(sorted(self.outputs_directories)): 
+            self.logger.info(f"Experiment id {output_directory}")
+            # Load contingency table
+            outputs = Outputs(
+                output_directory,
+                self.settings,
+                list(self.settings.get('sample')),
+                slice_samples=True,
+                log_to_console=True,
+                logger = self.logger
+            )
+            # Make sure the right experiments are provided
+            try:
+                assert np.any([exp_type in outputs.experiment.config['type'].lower() for exp_type in valid_experiment_types])
+            except:
+                self.logger.warning(f"Skipping invalid experiment {outputs.experiment.config['type'].lower()}")
+                continue
             
-    #         # Origin demand colorbar
-    #         if np.abs(destination_norm.vmax - destination_norm.vmin) > 1e-3:
-    #             destination_cbar = fig.colorbar(
-    #                 destination_flow_mapper, 
-    #                 ax=destination_cbar_ax,
-    #                 fraction=1.0,
-    #                 pad=0.1,
-    #                 # location = 'left'
-    #             )
-    #             destination_cbar.ax.yaxis.set_ticks_position('left')
-    #             destination_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-    #             destination_cbar.ax.set_title('Destination',fontsize=self.settings['legend_label_size'])
-    #             destination_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-    #             destination_cbar.update_ticks()
+            # Read label(s) from settings
+            try:
+                label = ''
+                for k in list(self.settings['label_by']):
+                    value = list(deep_get(key=k,value=outputs.experiment.config.settings))[0]
+                    # If label not included in metadata ignore it
+                    if value is not None:
+                        label += '_'+str(value)
+                        if k == 'noise_regime':
+                            label += '_noise'
+            except:
+                label = outputs.experiment_id
+            # Get only first n_samples as specified by settings
+            if 'table' in list(outputs.experiment.results.keys()):
+                table_samples = outputs.experiment.results['table']
+                table_samples = table_samples.reshape((table_samples.shape[0], np.prod(table_samples.shape[1:])))
+                # Add to data
+                embedded_data_ids = np.append(embedded_data_ids,np.repeat(("table"+label),table_samples.shape[0]))
+                embedded_data_vals = np.append(embedded_data_vals,table_samples,axis=0)
+                
+            if 'intensity' in list(outputs.experiment.results.keys()):
+                intensity_samples = outputs.experiment.results['intensity']
+                intensity_samples = intensity_samples.reshape((intensity_samples.shape[0], np.prod(intensity_samples.shape[1:])))
+                # Get only the first n_samples after burnin
+                embedded_data_ids = np.append(embedded_data_ids,np.repeat(("intensity"+label),intensity_samples.shape[0]))
+                embedded_data_vals = np.append(embedded_data_vals,intensity_samples,axis=0)
 
-    #         # Remove space
-    #         gs.tight_layout(fig)
+        self.logger.info(f"Getting lower dimensional embedding of {embedded_data_vals.shape[0]} table samples using {self.settings['embedding_method']}, nearest neighbours = {self.settings['nearest_neighbours']} and distance metric = {self.settings['distance_metric']}")
+        
+        # Get data embedding
+        if self.settings['embedding_method'] == 'isomap':
+            # Instantiate isomap
+            isomap = sklearn.manifold.Isomap(
+                    n_components=2,
+                    n_neighbors=self.settings['nearest_neighbours'],
+                    max_iter=int(1e4),
+                    path_method='auto',#'D',
+                    eigen_solver='auto',
+                    neighbors_algorithm='auto',#'ball_tree',
+                    n_jobs=int(self.settings['n_workers']),
+                    metric=map_distance_name_to_function(self.settings['distance_metric']),
+                    metric_params={"dims":dims,"ord":self.settings.get('ord',None)}
+            )
+            # Get lower dimensional embedding
+            embedded_data_vals = isomap.fit_transform(embedded_data_vals)
+            print(f"Reconstruction error = {isomap.reconstruction_error()}")
+        
+        elif self.settings['embedding_method'] == 'tsne':
+            # Instantiate tsne
+            tsne = sklearn.manifold.TSNE(
+                n_components=2,
+                perplexity=float(self.settings['nearest_neighbours']),
+                learning_rate='auto',
+                n_iter=self.settings.get('K',int(1e4)),
+                n_iter_without_progress=300,
+                n_jobs=int(self.settings['n_workers']),
+                metric=map_distance_name_to_function(self.settings['distance_metric']),
+                metric_params={"dims":dims,"ord":self.settings.get('ord',None)}
+            )
+            # Get lower dimensional embedding
+            embedded_data_vals = tsne.fit_transform(embedded_data_vals)
+            print(f"KL Divergence = {tsne.kl_divergence_}")
+        
+        # Store projection data
+        embedded_data_df = pd.DataFrame(
+            data = np.array([
+                embedded_data_ids,
+                embedded_data_vals[:,0],
+                embedded_data_vals[:,1]
+            ]).T,
+            columns = ['sample_name','x','y']
+        )
+        # Change types
+        embedded_data_df = embedded_data_df.astype({'x': 'float32','y': 'float32'})
+        
+        # Get filename for comparison plot
+        filename = f"2d_{self.settings['embedding_method']}_embedding_" + \
+                    f"label_by_{'_'.join(list(self.settings['label_by']))}_" + \
+                    f"burnin{self.settings['burnin']}_" + \
+                    f"thinning{self.settings['thinning']}_" + \
+                    f"{self.settings['distance_metric']}_" + \
+                    f"nearest_neighbours{self.settings['nearest_neighbours']}"
 
-    #         # Write figure
-    #         write_figure(fig,filepath,**self.settings)
+        # Get filepath
+        figure_filepath = os.path.join(
+            outputs.experiment.config['outputs']['directory'],
+            outputs.experiment.config['inputs']['dataset'],
+            output_dir,
+            filename
+        )
+
+        # Plot lower dimensional embedding
+        self.plot_lower_dimensional_embedding(
+            figure_filepath,
+            embedded_data_df
+        )
+
+
+    def parameter_mixing(self):
+
+        self.logger.info('Running parameter_mixing')
+
+        for i,output_directory in tqdm(enumerate(self.outputs_directories),total=len(self.outputs_directories)): 
+            # Load samples and SIM model
+            outputs = Outputs(
+                output_directory,
+                self.settings,
+                log_to_console=False,
+                logger = self.logger
+            )
+            # Convert to path object
+            output_directory = Path(output_directory)
+
+            # Get only first n_samples as specified by settings
+            parameter_samples = outputs.load_samples('theta')
+            sign_samples = outputs.load_samples('sign')
+            # Plot empirical mean
+            parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
+
+            # Get filename
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_mixing_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}" 
+
+            # Define filepath
+            filepath = os.path.join(output_directory.parent.absolute(),outputs.experiment_id,'figures',filename)
+    
+            # Plot parameter mixing
+            # Figure size 
+            fig,axs = plt.subplots(1,2,figsize=self.settings['figure_size'])
+            # Alpha plot
+            axs[0].plot(parameter_samples[:, 0],label='samples')
+            axs[0].set_ylabel(r'$\alpha$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
+            if self.settings['x_label'] is None:
+                axs[0].set_xlabel('MCMC iteration',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
+                axs[0].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            # if hasattr(sim,'alpha_true'):
+                # axs[0].axhline(y=sim.alpha_true, color='black', linestyle='-',label='true')
+            axs[0].axhline(y=parameter_mean[0],color='red',label=r'$\hat{\mu(\alpha)}$')
+            # X,Y limits
+            x_min,x_max = self.settings['x_limit']
+            if x_min is not None and x_max is not None:
+                axs[0].set_xlim(x_min,min(x_max,parameter_samples.shape[0]))
+            y_min,y_max = self.settings['y_limit']
+            if y_min is not None and y_max is not None:
+                axs[0].set_ylim(max(0.0,y_min),min(y_max,2.0))
+            # X,Y label ticks
+            axs[0].locator_params(axis='x', nbins=self.settings['x_tick_frequency'])
+            # Legend
+            leg0 = axs[0].legend()
+            leg0._ncol = 1
+
+            # Beta plot
+            axs[1].plot(parameter_samples[:, 1],label='samples')
+            axs[1].set_ylabel(r'$\beta$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
+            if self.settings['x_label'] is None:
+                axs[1].set_xlabel('MCMC iteration',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
+                axs[1].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            # if hasattr(sim,'beta_true'):
+                # axs[1].axhline(y=sim.beta_true, color='black', linestyle='-',label='true')
+            axs[1].axhline(y=parameter_mean[1],color='red',label=r'$\hat{\mu(\beta)}$')
+            # X,Y limits
+            x_min,x_max = self.settings['x_limit']
+            if x_min is not None and x_max is not None:
+                axs[1].set_xlim(x_min,min(x_max,parameter_samples.shape[0]))
+            y_min,y_max = self.settings['y_limit']
+            if y_min is not None and y_max is not None:
+                axs[1].set_ylim(max(0.0,y_min),min(y_max,2.0))
+            # X,Y label ticks
+            axs[1].locator_params(axis='x', nbins=self.settings['x_tick_frequency'])
+            # Legend
+            leg1 = axs[1].legend()
+            leg1._ncol = 1
+            
+            # Figure title
+            if self.settings['figure_title'] is not None:
+                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
+            # Tight layout
+            plt.tight_layout()
+            # Save figure
+            write_figure(fig,filepath,**self.settings)
+            
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
+    
+     
+    def predictions(self):
+
+        self.logger.info('Running destination_attraction_predictions')
+        predictions = {}
+
+        for output_directory in tqdm(self.outputs_directories): 
+            self.logger.debug(f"Experiment id {output_directory}")
+            # Load contingency table
+            outputs = Outputs(
+                output_directory,
+                output_names=['log_destination_attraction','sign'],
+                settings=self.settings,
+                slice_samples=True,
+                output_dir=self.settings.get('out_directory',''),
+                logger = self.logger,
+            )
+            # Receive outputs
+            outputs.inputs.receive_from_device()
+
+            # Create label
+            label,\
+            _, \
+            _ = create_dynamic_data_label(
+                __self__=self,
+                data=outputs.config.settings
+            )
+            
+            # Get sample values
+            log_destination_attraction = outputs.get_sample('log_destination_attraction')
+            # Get mean 
+            mu_x = outputs.compute_sample_statistics(
+                log_destination_attraction,
+                'log_destination_attraction',
+                'signedmean',
+                dim=['id']
+            )
+            # Compute R squared
+            # Total sum squares
+            w_data = np.exp(outputs.inputs.data.log_destination_attraction).squeeze()
+            w_pred = np.exp(mu_x).squeeze()
+            w_data_centred = w_data - np.mean(w_data)
+            ss_tot = np.dot(w_data_centred, w_data_centred)
+            # Residual sum squares
+            res = w_pred - w_data
+            ss_res = np.dot(res.squeeze(), res.squeeze())
+            # Regression sum squares
+            r2 = 1. - ss_res/ss_tot
+            # Add data
+            predictions[outputs.experiment_id] =  {
+                'label':label+fr", $R^2 = {np.round(r2,2)}$)",
+                'x':mu_x.squeeze(),
+                'y':outputs.inputs.data.log_destination_attraction.squeeze(),
+                'marker':'o',
+                'outputs':outputs
+            }
+
+        self.plot_2d_scatter(
+            data=predictions,
+            name='log_destination_attraction_predictions'
+        )
+
+
+    def residuals(self):
+
+        self.logger.info('Running destination_attraction_residuals')
+
+        for output_directory in tqdm(self.outputs_directories): 
+            self.logger.debug(f"Experiment id {output_directory}")
+            # Load contingency table
+            outputs = Outputs(
+                output_directory,
+                self.settings,
+                log_to_console=False,
+                logger = self.logger
+            )
+            dummy_config = Namespace(**{'settings':outputs.experiment.config})
+            sim = instantiate_sim(dummy_config)
+
+            # Get only first n_samples as specified by settings
+            log_destination_attraction_samples = outputs.load_samples('log_destination_attraction')
+            sign_samples = outputs.load_samples('sign')
+
+            # Get filename
+            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
+                    f"gamma_{outputs.experiment.config['spatial_interaction_model']['gamma']}" + \
+                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_log_destination_attraction_residuals_thinning_{self.settings['thinning']}_"+\
+                    f"N_{outputs.experiment.config['mcmc']['N']}"
+
+            # Define filepath
+            filepath = os.path.join(outputs.outputs_path,'figures',filename)
+
+            # Plot parameter mixing
+            # Figure size 
+            fig = plt.figure(figsize=self.settings['figure_size'])
+            # Get relative noise
+            # relative_noise = np.sqrt(sim.noise_var)/np.log(sim.dims[1])
+            # relative_noise_percentage = round(100*relative_noise)
+            # upper_bound = sim.log_destination_attraction + np.log((1.0+2*relative_noise_percentage/100))
+            # lower_bound = sim.log_destination_attraction - np.log((1.0+2*relative_noise_percentage/100))
+            # Get mean
+            mu_x = np.dot(log_destination_attraction_samples.T,sign_samples)/np.sum(sign_samples)
+            mu_x = mu_x.flatten()
+            # Get residuals
+            residuals = sim.log_destination_attraction-mu_x
+            # Compute R squared
+            # Total sum squares
+            w_data = np.exp(sim.log_destination_attraction)
+            w_pred = np.exp(mu_x)
+            w_data_centred = w_data - np.mean(w_data)
+            ss_tot = np.dot(w_data_centred, w_data_centred)
+            # Residiual sum squares
+            res = w_pred - w_data
+            ss_res = np.dot(res, res)
+            # Regression sum squares
+            r2 = 1. - ss_res/ss_tot
+
+            # Plot predictions against data
+            plt.scatter(x=residuals,y=mu_x,marker='o',s=int(self.settings['marker_size']))
+            # Plot true mean of errors
+            if self.settings['annotate']:
+                plt.axhline(y=0,color='black')
+            if self.settings['x_label'] is None:
+                plt.xlabel(r'$\log{\mathbf{Y}} - \mathbb{{E}}[\mathbf{X}|\mathbf{Y}]$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
+                plt.xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            if self.settings['y_label'] is None:
+                plt.ylabel(r'$\mathbb{{E}}[\mathbf{x}|\mathbf{Y}]$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
+                plt.ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
+            # Legend                
+            leg = plt.legend()
+            leg._ncol = 1
+            # Figure title
+            if self.settings['figure_title'] is not None:
+                plt.title(fr"{self.settings['figure_title'].replace('_',' ').capitalize()} ($R^2 = {np.round(r2,2)}$)",fontsize=self.settings['title_label_size'])
+            # Tight layout
+            plt.tight_layout()
+            
+            # Write figure
+            write_figure(fig,filepath,**self.settings)
+            
+            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
+            self.logger.info(f"Filename: {filename}")
