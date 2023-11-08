@@ -5,6 +5,7 @@ from numpy import arange
 from torch import float32
 
 
+
 SDE_POT_ARGS = ['log_destination_attraction','cost_matrix','grand_total','alpha','beta','delta','gamma','kappa','epsilon']
 FLOW_MATRIX_ARGS = ['log_destination_attraction','cost_matrix','grand_total','alpha','beta']
 
@@ -98,23 +99,42 @@ def log_flow_matrix(**kwargs):
         if log_destination_attraction.ndim > 2:
             N = log_destination_attraction.size(dim=0)
             time = log_destination_attraction.size(dim=1)
+            sweep = len(log_destination_attraction['sweep'].values)
         elif log_destination_attraction.ndim > 1:
             N = 1
+            sweep = 1
             time = log_destination_attraction.size(dim=0)
         else:
             N = 1
+            sweep = 1
             time = 1
     # If input is xarray use the following code
     else:
+        try:
+            assert len(log_destination_attraction['sweep'].values) == 1
+        except:
+            raise Exception(f"Sweep dimensions are NOT unidimensional")
         # Extract dimensions
-        N = log_destination_attraction['iter'].shape[0]
+        N = log_destination_attraction['N'].shape[0]
         time = log_destination_attraction['time'].shape[0]
+        sweep = len(log_destination_attraction['sweep'].values)
+        dims = ['id','origin','destination','sweep']
+        # Merge all coordinates
+        coords = kwargs['log_destination_attraction'].coords
+        coords = coords.assign(origin = arange(1,origin+1,dtype='int32'))
+
+        # Drop sweep dimension
+        # log_destination_attraction = log_destination_attraction.drop('sweep')
+        # alpha = alpha.drop('sweep')
+        # beta = beta.drop('sweep')
+
         # Use the .sel() method to select the dimensions you want to convert
         log_destination_attraction = log_destination_attraction.sel(
-            **{dim: slice(None) for dim in ['iter','time','destination']}
+            **{dim: slice(None) for dim in ['N','time','destination']}
         )
-        alpha = alpha.sel(iter=slice(None))
-        beta = beta.sel(iter=slice(None))
+        alpha = alpha.sel(N=slice(None))
+        beta = beta.sel(N=slice(None))
+        
         # Convert the selected_data to torch tensor
         log_destination_attraction = torch.tensor(
             log_destination_attraction.values
@@ -126,12 +146,12 @@ def log_flow_matrix(**kwargs):
             beta.values
         ).to(dtype=float32,device=device)
 
-    log_flow = torch.zeros((N,origin,destination)).to(dtype=float32,device=device)
+    log_flow = torch.zeros((N,origin,destination,sweep)).to(dtype=float32,device=device)
     # Reshape tensors to ensure operations are possible
-    log_destination_attraction = torch.reshape(log_destination_attraction,(N,time,destination))
-    cost_matrix = torch.reshape(cost_matrix,(1,origin,destination))
-    alpha = torch.reshape(alpha,(N,1,1))
-    beta = torch.reshape(beta,(N,1,1))
+    log_destination_attraction = torch.reshape(log_destination_attraction,(N,time,destination,sweep))
+    cost_matrix = torch.reshape(cost_matrix,(1,origin,destination,sweep))
+    alpha = torch.reshape(alpha,(N,1,1,sweep))
+    beta = torch.reshape(beta,(N,1,1,sweep))
 
     # Compute log unnormalised expected flow
     # Compute log utility
@@ -139,7 +159,7 @@ def log_flow_matrix(**kwargs):
     # Compute log normalisation factor
     normalisation = torch.logsumexp(log_utility,dim=(1,2))
     # and reshape it
-    normalisation = torch.reshape(normalisation,(N,1,1))
+    normalisation = torch.reshape(normalisation,(N,1,1,sweep))
     # Evaluate log flow scaled
     log_flow = log_utility - normalisation + torch.log(grand_total).to(device=log_utility.device)
     
@@ -147,15 +167,11 @@ def log_flow_matrix(**kwargs):
         # Return torch tensor
         return log_flow
     else:
-        group = {}
-        group['id'] = kwargs['log_destination_attraction'].coords['id']
-        group['origin'] = arange(1,origin+1,1,dtype='int32')
-        group['destination'] = arange(1,destination+1,1,dtype='int32')
         # Create outputs xr data array
         return xr.DataArray(
             data=log_flow.detach().cpu().numpy(), 
-            dims=list(group.keys()),
-            coords=group
+            dims=dims,
+            coords=[coords[k] for k in dims]
         ) 
 
 def flow_matrix_expanded(log_destination_attraction,cost_matrix,grand_total,alpha,beta):

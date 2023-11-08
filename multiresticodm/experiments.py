@@ -390,7 +390,7 @@ class Experiment(object):
                     chunks=True,
                     compression=3,
                 )
-                self.tables.attrs["dim_names"] = ["origin","destination","iter"]
+                self.tables.attrs["dim_names"] = ["origin","destination","N"]
                 self.tables.attrs["coords_mode__time"] = "start_and_step"
                 
             # Setup acceptances

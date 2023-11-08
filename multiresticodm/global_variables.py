@@ -20,79 +20,79 @@ XARRAY_SCHEMA = {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     }, 
     'beta': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     }, 
     'kappa': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     }, 
     'delta': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     }, 
     'sigma': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     }, 
     'log_destination_attraction': {
         "coords":["time","destination"],
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "new_shape":["iter","T","J"]
+        "new_shape":["iter","time","destination"]
     },
     'table': {
         "coords":["origin","destination"],
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "new_shape":["iter","I","J"]
+        "new_shape":["iter","origin","destination"]
     },
     'loss': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     },
     'log_target': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     },
     'theta_acc': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     },
     'log_destination_attraction_acc': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     },
     'table_acc': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     },
     'computation_time': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter","1"]
+        "new_shape":["iter"]
     },
 }
 
@@ -154,12 +154,10 @@ INPUT_TYPES = {
 
 TABLE_TYPES = {
     'table':torch.int32,
-    'tableerror':torch.float32,
 }
     
 INTENSITY_TYPES = {
     'intensity':torch.float32,
-    'intensityerror':torch.float32,
     'log_destination_attraction':torch.float32,
     'log_origin_attraction':torch.float32,
     'alpha':torch.float32,
@@ -169,6 +167,7 @@ INTENSITY_TYPES = {
     'sigma':torch.float32,
     'gamma':torch.float32,
 }
+
 
 OUTPUT_TYPES = {
     'loss':torch.float32,
@@ -180,12 +179,21 @@ OUTPUT_TYPES = {
 
 DATA_TYPES = {**INPUT_TYPES,**OUTPUT_TYPES}
 
+SAMPLE_DATA_REQUIREMENTS = {
+    **dict(zip(list(OUTPUT_TYPES.keys()),list(OUTPUT_TYPES.keys())))
+}
+SAMPLE_DATA_REQUIREMENTS['intensity'] = [k for k in INTENSITY_TYPES.keys() if k != 'intensity']
+
 AUXILIARY_COORDINATES_DTYPES = {
     'N':torch.int32,
     'dataset':str,
     'covariance':str,
     'step_size':torch.float32,
     'to_learn':object,
+    'alpha':torch.float32,
+    'beta':torch.float32,
+    'delta':torch.float32,
+    'kappa':torch.float32,
     'sigma':object,
     'title':str,
     'axes':object,
@@ -196,13 +204,16 @@ AUXILIARY_COORDINATES_DTYPES = {
 
 CORE_COORDINATES_DTYPES = {
  'iter':torch.int32,
- 'seed':torch.int32,
  'time':torch.int32,
- 'origin':torch.int32,
- 'destination':torch.int32,
+ 'origin':torch.int16,
+ 'destination':torch.int16,
+ 'seed':torch.int32,
+#  'table_steps':torch.int32,
+#  'theta_steps':torch.int32,
+#  'destination_attraction_steps':torch.int32,
 }
 
-COORDINATES_DTYPES = {**CORE_COORDINATES_DTYPES,**AUXILIARY_COORDINATES_DTYPES,**DATA_TYPES}
+COORDINATES_DTYPES = {**CORE_COORDINATES_DTYPES,**AUXILIARY_COORDINATES_DTYPES}
 
 
 NUMPY_TYPE_TO_DAT_TYPE = {

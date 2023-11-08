@@ -232,7 +232,9 @@ class Inputs:
                     self.data.margins[tuplize(axis)] = margin['value']
                 else:
                     raise Exception(f"margin for axis {axis} not found in {filepath}.")
-                
+        else:
+            self.logger.note('Margins not provided')
+    
     def import_cells(self):
         if 'cells' in list(self.config.settings['inputs']['data'].keys()):
             cell_filename = os.path.join(
@@ -268,7 +270,7 @@ class Inputs:
                 else:
                     raise Exception(f"Cell values not found in {cell_filename}.")
         else:
-            self.logger.debug(f"Cells file not provided")
+            self.logger.note(f"Cells file not provided")
 
     def receive_from_device(self):
         
