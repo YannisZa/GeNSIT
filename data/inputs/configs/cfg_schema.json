@@ -717,27 +717,14 @@
         "exclude": false,
 
         "file": {
-          "sweepable": true,
+          "sweepable": false,
           "optional": true,
           "exclude": false,
 
-          "sweep": {
-            "default": {
-              "dtype": "file",
-              "file-exists": false,
-              "file-extension": "txt",
-              "default-value": "ground_truth_table.txt"
-            },
-            "range": {
-              "dtype": "list",
-              "list-length": [1, null],
-              "list-dtype": "file",
-              "file-exists": false,
-              "file-extension": "txt",
-              "default-value": "ground_truth_table.txt",
-              "unique-vals": true
-            }
-          }
+          "dtype": "file",
+          "file-exists": false,
+          "file-extension": "txt",
+          "default-value": "ground_truth_table.txt"
         },
         "distribution": {
           "sweepable": false,
@@ -749,23 +736,13 @@
           "is-any-of": ["poisson"]
         },
         "value": {
-          "sweepable": true,
+          "sweepable": false,
           "optional": true,
           "exclude": false,
 
-          "sweep": {
-            "default": {
-              "dtype": "list",
-              "list-dtype": "int",
-              "default-value": []
-            },
-            "range": {
-              "dtype": "list",
-              "list-dtype": "list",
-              "list-list-dtype": "int",
-              "default-value": []
-            }
-          }
+          "dtype": "list",
+          "list-dtype": "int",
+          "default-value": []
         },
         "parameters": {
           "sweepable": false,

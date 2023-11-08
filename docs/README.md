@@ -10,6 +10,15 @@ This repository is a work in progress. More detailed instructions and updates so
 
 Give the repository a star and fork it if you like it!
 
+## Installation
+
+```
+conda create --name mrticodm
+conda activate mrticodm
+python3 -m pip install -e .
+multiresticodm --help
+```
+
 ## Datasets
 
 QS702EW - Distance travelled to work
