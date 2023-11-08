@@ -1484,29 +1484,59 @@ class Plot(object):
         self.logger.info('Running data_plot_2d_scatter')
 
         # Run output handler
-        outputs_summary = OutputSummary(
-            settings=self.settings,
-            logger=self.logger
-        )
+        if self.settings.get('metric',[]):
+            outputs_summary = OutputSummary(
+                settings=self.settings,
+                logger=self.logger
+            )
+            return
+
+            data = {}
+            for output_directory in tqdm(
+                outputs_summary.experiment_metadata
+            ): 
+                # Add data
+                data[output_directory] =  {
+                    'label':label,
+                    'x':mu_x.squeeze(),
+                    'y':outputs.inputs.data.log_destination_attraction.squeeze(),
+                    'marker':'o',
+                    'outputs':outputs
+                }
+
+            self.plot_2d_scatter(
+                data = data,
+                name = self.settings.get('title','NONAME')
+            )
+        else:
+            for output_directory in tqdm(self.outputs_directories,'Generating 2D scatter plot(s)...'):
+
+                # Read outputs
+                outputs = Outputs(
+                    config = output_directory,
+                    settings=self.settings,
+                    dataset = (list(self.settings['sample'])+['ground_truth_table']),
+                    console_handling_level = self.settings['logging_mode'],
+                    logger=self.logger
+                )
+
+                # Add data
+                data[output_directory] =  {
+                    'label':label,
+                    'x':mu_x.squeeze(),
+                    'y':outputs.inputs.data.log_destination_attraction.squeeze(),
+                    'marker':'o',
+                    'outputs':outputs
+                }
+
+                self.plot_2d_scatter(
+                    data = data,
+                    name = self.settings.get('title','NONAME')
+                )
+
         sys.exit()
         
-        data = {}
-        for output_directory in tqdm(
-            outputs_summary.experiment_metadata
-        ): 
-            # Add data
-            data[output_directory] =  {
-                'label':label,
-                'x':mu_x.squeeze(),
-                'y':outputs.inputs.data.log_destination_attraction.squeeze(),
-                'marker':'o',
-                'outputs':outputs
-            }
-
-        self.plot_2d_scatter(
-            data = data,
-            name = self.settings.get('title','NONAME')
-        )
+        
 
     def low_dimensional_embedding(self):
         
