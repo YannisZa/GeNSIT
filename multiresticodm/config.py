@@ -9,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk
+from multiresticodm.utils import deep_apply, flatten, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk
 
 class Config:
 
@@ -317,6 +317,17 @@ class Config:
         # Remove them from isolated sweeps
         for k in list(common_keys):
             del self.isolated_sweep_paths[k]
+        # Get sweep parameter names
+        sweep_param_names = list(self.isolated_sweep_paths.keys())
+        sweep_param_names += [
+            item
+            for nested_dict in self.coupled_sweep_paths.values() 
+            for item in nested_dict.keys()
+        ]
+        self.sweep_param_names = list(flatten(sweep_param_names))
+        # Get sweep target names (exclude coupled names that are not targets)
+        self.sweep_target_names = list(self.isolated_sweep_paths.keys())
+        self.sweep_target_names += list(self.coupled_sweep_paths.keys())
         
     def validate_config(self,parameters=None,settings=None,base_schema=None,key_path=[],**kwargs):
         # Pass defaults if no meaningful arguments are provided
@@ -714,7 +725,7 @@ class Config:
         return sweep_params
     
 
-    def prepare_experiment_config(self,sweep_params,sweep_configuration):
+    def prepare_experiment_config(self,sweep_params,sweep_configuration,cast_to_str:bool=False):
         # Create new config
         new_config = deepcopy(self)
         # Deactivate sweep             
@@ -732,7 +743,9 @@ class Config:
                 value['path']
             )
             # Update current sweep
-            sweep[value['var']] = sweep_configuration[i]
+            sweep[value['var']] = sweep_configuration[i] \
+                if not cast_to_str \
+                else str(sweep_configuration[i])
             i += 1
         for sweep_group in sweep_params['coupled'].values():
             for value in sweep_group.values():
@@ -742,7 +755,9 @@ class Config:
                     value['path']
                 )
                 # Update current sweep
-                sweep[value['var']] = sweep_configuration[i]
+                sweep[value['var']] = sweep_configuration[i] \
+                if not cast_to_str \
+                else str(sweep_configuration[i])
                 i += 1
         # Return config and sweep params
         return new_config,sweep
