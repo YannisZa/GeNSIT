@@ -1,8 +1,11 @@
+# import memray
+
+from memory_profiler import profile
+
 import os
 import re
 import gc
 import sys
-import time
 import logging
 import traceback
 import h5py as h5
@@ -10,24 +13,25 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import geopandas as gpd
+import dask.array as da
+import scipy.sparse as sp
 import concurrent.futures as concurrency
 
 from tqdm import tqdm
 from torch import int32
 from pathlib import Path
 from copy import deepcopy
-from functools import partial
 from datetime import datetime
+from operator import itemgetter
 from typing import Union,List,Tuple
 from itertools import product,chain
-from multiprocessing.pool import Pool
-from multiresticodm.inputs import Inputs
 
 import multiresticodm.probability_utils as ProbabilityUtils
 
 from multiresticodm.utils import *
 from multiresticodm.math_utils import *
 from multiresticodm.config import Config
+from multiresticodm.inputs import Inputs
 from multiresticodm.global_variables import *
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.spatial_interaction_model import *
@@ -139,14 +143,12 @@ class OutputSummary(object):
                 __self__.logger.error(f'No directories found in {os.path.join(output_directory,"*")}')
                 raise Exception('Cannot read outputs.')
         return output_dirs
-
+    
+    @profile
     def collect_experiment_metadata(self):
         # Find matching directories
         output_dirs = self.find_matching_output_folders(self)
         for i,output_folder in enumerate(output_dirs):
-            
-            # Get name of folder
-            folder_name = Path(output_folder).stem
             
             # Read metadata config
             self.config = Config(
@@ -180,87 +182,240 @@ class OutputSummary(object):
             self.logger.info(f"Total = {total_size_str}.")
             self.logger.info("----------------------------------------------------------------------------------")
 
-            # Get sweep parameter names
-            sweep_param_names = list(self.config.isolated_sweep_paths.keys())
-            sweep_param_names += [
-                item
-                for nested_dict in self.config.coupled_sweep_paths.values() 
-                for item in nested_dict.keys()
-            ]
-            sweep_param_names = list(flatten(sweep_param_names))
             # Get sweep slice parameter names
             sweep_slice_param_names = list(input_slice.keys())+list(coordinate_slice.keys())
-
+            
             # If there is no overlap between slice and available sweep params continue
             # as long as some slice params have been provided
-            if set(sweep_slice_param_names) and not set(sweep_slice_param_names).intersection(set(sweep_param_names)):
+            if set(sweep_slice_param_names) and \
+                not set(sweep_slice_param_names).intersection(set(self.config.sweep_param_names)):
                 continue
             
+            # If inputs are not sweeped pre-load them
+            
+            # Import all input data
+            inputs = Inputs(
+                config = self.config,
+                synthetic_data = False,
+                logger = self.logger,
+            )
+
+            # Try to load ground truth table
+            self.settings['table_total'] = self.settings.get('table_total',1)
+            # Read ground truth table
+            if hasattr(inputs.data,'ground_truth_table'):
+                # Gather dims from ground truth table
+                # which is guaranteed to NOT be sweepable
+                origin,destination = np.shape(inputs.data.ground_truth_table)
+                self.ground_truth_table = xr.DataArray(
+                    data=torch.tensor(inputs.data.ground_truth_table,dtype=int32,device=self.device),
+                    name='ground_truth_table',
+                    dims=['origin','destination'],
+                    coords=dict(
+                        origin=np.arange(1,origin+1,1,dtype='int16'),
+                        destination=np.arange(1,destination+1,1,dtype='int16')
+                    )
+                )
+                # Delete inputs ground truth table 
+                # and keep only the current ground truth table xarray
+                safe_delete(inputs.data.ground_truth_table)
+                # Try to update metadata on table samples
+                self.settings['table_total'] = self.ground_truth_table.sum(dim=['origin','destination']).values
+            else:
+                raise Exception('Inputs are missing ground truth table.')
+            
+            # If sweep is over input data
+            if self.config.sweep_param_names and (
+                (set(self.config.sweep_param_names).intersection(set(list(INPUT_SCHEMA.keys())))) or \
+                (set(self.config.sweep_param_names).intersection(set(list(PARAMETER_DEFAULTS.keys()))))
+            ):
+                # Load inputs for every single output
+                passed_inputs = None
+            else:
+                passed_inputs = deepcopy(inputs)
+
+            # Gather results
+            output_datasets = []
             # Do it concurrently
+            stop = None
             if self.settings.get('n_workers',1) > 1:
 
                 # Initialise progress bar
-                pbar = tqdm(
-                    sweep_configurations,
-                    desc='Collecting metadata',
+                with tqdm(
+                    sweep_configurations[:stop],
+                    desc='Collecting outputs',
                     leave=False,
                     position=0
-                )
-                with concurrency.ProcessPoolExecutor(self.settings.get('n_workers',1)*2) as executor:
-                    # Start the processes and ignore the results
-                    futures = [executor.submit(
-                        fn = self.get_sweep_metric_data,
-                        output_folder = output_folder,
-                        sweep_configuration = sweep_configuration,
-                        coordinate_slice = coordinate_slice
-                    ) for sweep_configuration in sweep_configurations]
+                ) as pbar:
+                    with concurrency.ProcessPoolExecutor(self.settings.get('n_workers',1)*2) as executor:
+                        # Start the processes and ignore the results
+                        futures = [executor.submit(
+                            self.get_sweep_outputs,
+                            sweep_configuration = sweep_configuration,
+                            inputs = passed_inputs,
+                            coordinate_slice = coordinate_slice
+                        ) for sweep_configuration in sweep_configurations[:stop]]
 
-                    # Wait for all processes to finish
-                    for index,fut in enumerate(concurrency.as_completed(futures)):
-                        try:
-                            metric_data = fut.result()
-                        except:
-                            self.logger.error(traceback.format_exc())
-                            raise Exception(f"Future {index} failed")
-                        pbar.update(1)
 
-                        # Store useful metadata
-                        if not output_folder in list(self.experiment_metadata.keys()):
-                            self.experiment_metadata[output_folder] = metric_data
-                        else:
-                            self.experiment_metadata[output_folder] = np.append(
-                                self.experiment_metadata[output_folder],
-                                metric_data,
-                                axis=0
-                            )
-
+                        # Wait for all processes to finish
+                        for index,fut in enumerate(concurrency.as_completed(futures)):
+                            try:
+                                None
+                                output_datasets.append(fut.result())
+                            except:
+                                self.logger.error(traceback.format_exc())
+                                raise Exception(f"Future {index} failed")
+                            pbar.update(1)
+            # Do it sequentially
             else:
                 for sweep_configuration in tqdm(
-                    sweep_configurations,
+                    sweep_configurations[:stop],
                     desc='Collecting metadata',
                     leave=False,
                     position=0
                 ):
                     # Get metric data for sweep dataset
-                    metric_data = self.get_sweep_metric_data(
-                        output_folder,
-                        sweep_configuration,
-                        coordinate_slice = coordinate_slice
-                    )
-                    # Store useful metadata
-                    if not output_folder in list(self.experiment_metadata.keys()):
-                        self.experiment_metadata[output_folder] = metric_data
-                    else:
-                        self.experiment_metadata[output_folder] = np.append(
-                            self.experiment_metadata[output_folder],
-                            metric_data,
-                            axis=0
+                    output_datasets.append(
+                        self.get_sweep_outputs(
+                            sweep_configuration,
+                            inputs = passed_inputs,
+                            coordinate_slice = coordinate_slice
                         )
+                    )
+                    # sys.exit()
+
+            # Reload global outputs
+            outputs = Outputs(
+                config = self.config,
+                settings = self.settings,
+                dataset = self.settings['sample'],
+                base_dir = self.base_dir,
+                console_handling_level = self.settings['logging_mode'],
+                logger = self.logger
+            )
+
+            # Get found output names
+            first_output = deepcopy(output_datasets[0])
+            output_names = deepcopy(list(first_output.keys()))
+            # Gather sweep dimension names
+            sweep_dims = list(self.sweep_params['isolated'].keys())
+            sweep_dims += list(self.sweep_params['coupled'].keys())
+
+            # Create xarray dataset
+            try:
+                self.logger.info(f"{len(output_names)} outputs found: {','.join(output_names)}.")
+                for sample_name in output_names[:-2]:
+                    sample_dims = XARRAY_SCHEMA[sample_name]['new_shape']+sweep_dims
+                    with tqdm(
+                        total = len(output_datasets[:stop]),
+                        desc=f'Creating xarray dataset for {sample_name}',
+                        position=0,
+                        leave=False
+                    ) as pbar:
+                        setattr(outputs.data,sample_name,[])
+                        indx = 0
+                        while indx < len(sweep_configurations[:stop]):
+                            # Get sample xr_data
+                            xr_data = output_datasets[indx].pop(sample_name)
+                            # Coordinates of output dataset
+                            data_coords = xr_data.pop('coordinates')
+                            # Create slice dictionary
+                            slice_dict = {
+                                k: [stringify_index(parse(elem)) for elem in data_coords[k]]
+                                for k in data_coords.keys()
+                                if k in sample_dims
+                            }
+                            # Store data
+                            getattr(
+                                outputs.data,
+                                sample_name
+                            ).append(
+                                xr.DataArray(
+                                    da.from_array(xr_data.pop('data'),chunks=1),
+                                    name = sample_name,
+                                    dims = list(slice_dict.keys()),
+                                    coords = slice_dict,
+                                    attrs = dict(
+                                        experiment_id = outputs.experiment_id,
+                                        name = sample_name,
+                                    )
+                                )
+                            )
+                                
+                            # Update progress bar
+                            pbar.update(1)
+                            indx += 1
                     
-    def get_sweep_metric_data(
+                    # Combine dataarrays by coordinates
+                    self.logger.info(f"Combinining {sample_name} DataArrays by coordinates")
+                    setattr(
+                        outputs.data,
+                        sample_name,
+                        xr.combine_by_coords(
+                            getattr(
+                                outputs.data,
+                                sample_name
+                            )
+                        )
+                    )
+                    # Chunk dataarray  by seed
+                    setattr(
+                        outputs.data,
+                        sample_name,
+                        getattr(
+                            outputs.data,
+                            sample_name
+                        ).chunk(dict(seed=1))
+                    )
+
+                # print(getattr(
+                #         outputs.data,
+                #         sample_name
+                #     ))
+                # sys.exit()
+                # for sample_name in vars(outputs.data).keys():
+                #     # Slice according to coordinate slice
+                #     if len(coordinate_slice) > 0:
+                #         setattr(
+                #             outputs.data,
+                #             sample_name, 
+                #             getattr(outputs.data,sample_name).sel(
+                #                 **{
+                #                     k:(v['values'] \
+                #                         if len(v['values']) > 1 \
+                #                         else v['values'][0]) \
+                #                     for k,v in coordinate_slice.items()
+                #                 }
+                #             )
+                #         )
+
+            except:
+                print(traceback.format_exc())
+            return
+            # Apply these metrics to the data 
+            metric_data = self.apply_metrics(
+                experiment_id = output_folder,
+                outputs = outputs
+            )
+            for j in range(len(metric_data)):
+                metric_data[j]['folder'] = os.path.join(self.base_dir)
+                for k,v in folder_metadata.items():
+                    metric_data[j][k] = v                 
+            # Store useful metadata
+            if not output_folder in list(self.experiment_metadata.keys()):
+                self.experiment_metadata[output_folder] = metric_data
+            else:
+                self.experiment_metadata[output_folder] = np.append(
+                    self.experiment_metadata[output_folder],
+                    metric_data,
+                    axis=0
+                )            
+    
+                    
+    def get_sweep_outputs(
         self,
-        output_folder,
         sweep_configuration,
+        inputs:Inputs=None,
         coordinate_slice:dict={}
     ):
             
@@ -269,46 +424,23 @@ class OutputSummary(object):
             sweep_params = self.sweep_params,
             sweep_configuration = sweep_configuration
         )
-
-        # Extract useful data
-        useful_metadata = {}
-        for key in self.settings['metadata_keys']:
-            try:
-                # Get first instance of key
-                useful_metadata[key] = list(deep_get(key=key,value=new_config))[0]
-            except:
-                self.logger.error(f"{key} not found in experiment metadata.")
-            
+        
         # Get outputs and unpack its statistics
         # This is the case where there are SOME input slices provided
         outputs = Outputs(
             config = new_config,
             settings = self.settings,
-            output_names = (list(self.settings['sample'])+['ground_truth_table']),
+            dataset = self.settings['sample'],
             coordinate_slice = coordinate_slice,
             sweep_params = sweep,
             base_dir = self.base_dir,
             console_handling_level = self.settings['logging_mode'],
             logger = self.logger
         )
-        outputs.load()
+        # Get dictionary output data to be passed into xarray
+        xr_dict_data = outputs.load(inputs=inputs)
 
-        # Apply these metrics to the data 
-        metric_data = self.apply_metrics(
-            experiment_id=output_folder,
-            outputs=outputs
-        )
-        for j in range(len(metric_data)):
-            metric_data[j]['folder'] = folder_name
-            for k,v in useful_metadata.items():
-                metric_data[j][k] = v
-        
-        safe_delete(outputs)
-        gc.collect()
-        # self.logger.progress('Sleeping for 3 seconds...')
-        # time.sleep(3)
-
-        return metric_data
+        return xr_dict_data
 
 
     def write_metadata_summaries(self):
@@ -655,7 +787,7 @@ class Outputs(object):
     def __init__(self,
                  config:Config, 
                  settings:dict={}, 
-                 output_names:list=['ground_truth_table'],
+                 dataset:list=['ground_truth_table'],
                  sweep_params:dict={},
                  **kwargs):
         # Setup logger
@@ -669,14 +801,24 @@ class Outputs(object):
             console_level = level
         )
         # Store output names
-        self.output_names = output_names
+        self.data_names = dataset
+        # Store sample data requirements
+        self.output_names = list(
+            flatten([
+                SAMPLE_DATA_REQUIREMENTS[sam] 
+                for sam in set(self.data_names).intersection(set(list(OUTPUT_TYPES.keys())))]
+            )
+        )
+        self.input_names = [
+            sam for sam in set(self.data_names).intersection(set(list(INPUT_TYPES.keys())))
+        ]
 
         # Sample names must be a subset of all data names
         try:
-            assert set(self.output_names).issubset(set(DATA_TYPES.keys()))
-        except Exception as e:
+            assert set(self.data_names).issubset(set(DATA_TYPES.keys()))
+        except Exception:
             self.logger.error('Some sample names provided are not recognized')
-            self.logger.error(','.join(self.output_names))
+            self.logger.error(','.join(self.data_names))
             self.logger.debug(traceback.format_exc())
             raise Exception('Cannot load outputs.')
 
@@ -750,17 +892,8 @@ class Outputs(object):
             else:
                 self.sweep_id = ''
 
-    def load(self,input_slice:dict={},slice_samples:bool=True):
+    def load(self,inputs=None,input_slice:dict={},slice_samples:bool=True):
 
-        # Update config based on slice of coordinate-like sweeped params
-        # affecting only the outputs of the model
-        # if self.coordinate_slice:
-        #     for param in self.coordinate_slice.keys():
-        #         self.config.path_set(
-        #             settings = self.config.settings,
-        #             value = self.coordinate_slice[param]['values'], 
-        #             path = self.coordinate_slice[param]['path']
-        #         )
         # Update config based on slice of NON-coordinate-like sweeped params
         # affecting only the inputs of the model
         if input_slice:
@@ -769,84 +902,24 @@ class Outputs(object):
                 value = input_slice['value'], 
                 path = input_slice['path']
             )
+
+        if inputs is None:
+            # Import all input data
+            self.inputs = Inputs(
+                config = self.config,
+                synthetic_data = False,
+                logger = self.logger,
+            )
+        else:
+            self.inputs = inputs
+            # Convert all inputs to tensors
+            self.inputs.pass_to_device()
         
-        # Import all input data
-        self.inputs = Inputs(
-            config = self.config,
-            synthetic_data = False,
-            logger = self.logger,
+        # Load output h5 file to dictionary
+        output_dict_data = self.load_h5_data(
+            slice_samples = slice_samples
         )
-        # Convert all inputs to tensors
-        self.inputs.pass_to_device()
-
-        # Try to load ground truth table
-        self.ground_truth_table = None
-        self.settings['table_total'] = self.settings.get('table_total',1)
-        
-        if 'ground_truth_table' in self.output_names:
-            # Try reading it from settings path
-            try:
-                self.ground_truth_table = np.loadtxt(
-                    os.path.join(
-                        self.config['inputs']['dataset'],
-                        self.settings['table']
-                    )
-                )
-                # Convert to xarray dataarray
-                dims = np.shape(self.ground_truth_table)
-                self.ground_truth_table = xr.DataArray(
-                    data=torch.tensor(self.ground_truth_table).to(dtype=int32,device=self.device),
-                    name='ground_truth_table',
-                    dims=['origin','destination'],
-                    coords=dict(
-                        origin=np.arange(1,dims[0]+1,1,dtype='int32'),
-                        destination=np.arange(1,dims[1]+1,1,dtype='int32')
-                    )
-                )
-            
-            except:
-                # Try reading it from inputs
-                try:
-                    self.ground_truth_table = xr.DataArray(
-                        data=self.inputs.table.to(dtype=int32,device=self.device),
-                        name='ground_truth_table',
-                        dims=['origin','destination'],
-                        coords=dict(
-                            origin=np.arange(1,dims[0]+1,1,dtype='int32'),
-                            destination=np.arange(1,dims[1]+1,1,dtype='int32')
-                        )
-                    )
-                except:
-                    pass
-        
-        # Try to get table total (number of agents)
-        if self.ground_truth_table is not None:
-            # Remove it from sample names
-            self.output_names.remove('ground_truth_table')
-            # Extract metadata
-            self.settings['table_total'] = self.ground_truth_table.values.ravel().sum()
-            self.settings['dims'] = list(np.shape(self.ground_truth_table))
-            self.logger.progress(f'Ground truth table loaded')
-
-
-        # Load output h5 file to xarrays
-        self.load_h5_data(
-            slice_samples=slice_samples
-        )
-        
-        # Try to update metadata on table samples
-        try:
-            if 'table' in self.output_names and self.settings['table_total'] == 1:
-                table = self.get_sample('table')
-                self.settings['table_total'] = table.sum(dim=['origin','destination']).values[0]
-        except:
-            self.logger.debug(traceback.format_exc())
-            self.logger.warning(f'Sample table could not be loaded')
-            sys.exit()
-
-        if self.settings['table_total'] == 0:
-            print(self.ground_truth_table)
-            self.logger.warning('Ground truth missing')
+        return output_dict_data
 
     def update_experiment_directory_id(self,sweep_experiment_id:str=None):
 
@@ -1035,6 +1108,9 @@ class Outputs(object):
                 self.logger.debug('Store dataset')
                 # Store dataset
                 for sample_name,sample_data in h5data[group_id].items():
+                    # If this data is not required, skip storing it
+                    if sample_name not in self.output_names:
+                        continue
                     # Apply burning, thinning and trimming
                     self.logger.debug(f'Data {sample_name} {np.shape(sample_data)}')
                     if kwargs.get('slice_samples',True):
@@ -1089,7 +1165,7 @@ class Outputs(object):
                     data_vars[sample_name] = deepcopy(sample_data)
         return local_coords,file_global_coords,data_vars
 
-    def load_h5_data(self,coordinate_slice:dict={},slice_samples:bool=True):
+    def load_h5_data(self,slice_samples:bool=True):
         self.logger.note('Loading h5 data into xarrays...')
 
         # Get all h5 files
@@ -1108,9 +1184,10 @@ class Outputs(object):
                             dtype=TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
                         ) for k,v in global_coords.items()}
         
-        self.logger.progress('Creating xarray dataset(s)')
+        # self.logger.progress('Creating xarray dataset(s)')
         
         # Create an xarray dataset for each sample
+        xr_dict = {}
         for sample_name,sample_data in data_vars.items():
             
             coordinates = {}
@@ -1120,7 +1197,7 @@ class Outputs(object):
             if len(np.shape(sample_data)) > 2:
                 # Get data dims
                 dims = np.shape(sample_data)[2:]
-                # # For each dim create coordinate
+                # For each dim create coordinate
                 for i,d in enumerate(dims):
                     obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
                     # Create coordinate ranges based on schema
@@ -1134,34 +1211,26 @@ class Outputs(object):
                     ).astype(XARRAY_SCHEMA[sample_name]['args_dtype'][i])
             
             # Update coordinates to include schema and sweep coordinates
-            # print('coordinates',coordinates.keys())
-            # print('coords',coords.keys())
+            # Keep only coordinates that are 1) core
+            # 2) isolated sweeps 
+            # or 3) the targets of coupled sweeps
             coordinates = {
-                **{k:v for k,v in local_coords.items() if k != sample_name},
+                **{k:v for k,v in local_coords.items() \
+                   if k != sample_name and k in self.config.sweep_target_names},
                 **global_coords,
                 **coordinates
             }
-            # For each coordinate name
-            # get data variable
-            data = torch.tensor(sample_data.reshape(tuple([len(val) for val in coordinates.values()]))).to(
-                dtype=DATA_TYPES[sample_name],
-                device=self.device
-            )
-            # Create xarray dataarray
-            xr_data = xr.DataArray(
-                name = sample_name,
-                data = data,
-                coords = coordinates,
-                attrs = dict(
-                    experiment_id = self.experiment_id
-                ),
-            )
-            # Slice according to coordinate slice
-            if len(coordinate_slice) > 0:
-                xr_data = xr_data.sel(**{k:(v['values'] if len(v['values']) > 1 else v['values'][0]) for k,v in coordinate_slice.items()})
-            # Store dataset
-            setattr(self.data,sample_name,xr_data)
-            
+
+            # Populate dictionary 
+            xr_dict[sample_name] = {
+                "data": sample_data.reshape(tuple([len(val) for val in coordinates.values()])),
+                "coordinates": {k:list(flatten(v)) for k,v in coordinates.items()},
+                "attrs": {
+                    "experiment_id": self.experiment_id
+                }
+            }
+
+        return xr_dict
 
     def check_data_availability(self,sample_name:str,input_names:list=[],output_names:list=[]):
         available = True
@@ -1184,47 +1253,36 @@ class Outputs(object):
 
         if sample_name == 'intensity':
             # Get sim model 
+            self.logger.debug('getting sim model')
             sim_model = globals()[self.config.settings['spatial_interaction_model']['name']+'SIM']
             # Check that required data is available
+            self.logger.debug('checking sim data availability')
             self.check_data_availability(
                 sample_name=sample_name,
                 input_names=sim_model.REQUIRED_INPUTS,
                 output_names=sim_model.REQUIRED_OUTPUTS,
             )
-
-            # Prepare input arguments 
-            data = {}
-            for input in sim_model.REQUIRED_INPUTS:
-                data[input] = self.get_sample(input)
-
             # Compute intensities for all samples
             table_total = self.settings.get('table_total') if self.settings.get('table_total',-1.0) > 0 else 1.0
-
+            self.logger.debug('instantiate sim')
             # Instantiate ct
             sim = instantiate_sim(
                 config = self.config,
                 logger=self.logger,
-                **data
+                **{input:self.get_sample(input) for input in sim_model.REQUIRED_INPUTS}
             )
-            
-            data = []
-            # Prepare output arguments
-            for output in sim_model.REQUIRED_OUTPUTS:
-                data.append(self.get_sample(output))
-            # Merge into xarray dataset
-            data = xr.merge(data)
-            # Group by non core coordinates and compute log intensity
-            samples = data.groupby('sweep').apply(
-                lambda group: sim.log_intensity(
-                    grand_total = torch.tensor(table_total,dtype=int32),
-                    torch = False,
-                    **group
-                )
+            self.logger.debug('groupby apply intensity function')
+            # CAUTION: Sweep coordinates must be unidimensional here!!!
+            samples = sim.log_intensity(
+                grand_total = torch.tensor(table_total,dtype=int32),
+                torch = False,
+                **{output:self.get_sample(output) for output in sim_model.REQUIRED_OUTPUTS}
             )
             # Create new dataset
             samples = samples.rename('intensity')
             # Exponentiate
-            samples = samples.groupby('sweep').apply(np.exp)
+            self.logger.debug('groupby exponentiate intensity')
+            samples = np.exp(samples)
 
         elif sample_name.endswith("__error"):
             # Load all samples
@@ -1249,8 +1307,8 @@ class Outputs(object):
                 name='ground_truth_table',
                 dims=['origin','destination'],
                 coords=dict(
-                    origin=np.arange(1,ct.dims[0]+1,1,dtype='int32'),
-                    destination=np.arange(1,ct.dims[1]+1,1,dtype='int32')
+                    origin=np.arange(1,ct.dims[0]+1,1,dtype='int16'),
+                    destination=np.arange(1,ct.dims[1]+1,1,dtype='int16')
                 )
             )
         
@@ -1343,7 +1401,7 @@ class Outputs(object):
         
         elif statistic.lower() == 'signedmean' and \
             sample_name in list(OUTPUT_TYPES.keys()):
-            if sample_name in list(INTENSITY_TYPES.keys()) and hasattr(self.data,'sign'):
+            if sample_name in list(INTENSITY_TYPES.keys())+['intensity'] and hasattr(self.data,'sign'):
                 signs = self.get_sample('sign')
                 print(signs)
                 # Compute moments
@@ -1354,7 +1412,7 @@ class Outputs(object):
         elif (statistic.lower() == 'signedvariance' or statistic.lower() == 'signedvar') and \
             sample_name in list(OUTPUT_TYPES.keys()):
 
-            if sample_name in list(INTENSITY_TYPES.keys()):
+            if sample_name in list(INTENSITY_TYPES.keys())+['intensity']:
                 # Compute mean
                 samples_mean = self.compute_sample_statistics(data,sample_name,'signedmean',**kwargs)
                 # Compute squared mean
