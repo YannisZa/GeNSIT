@@ -37,8 +37,11 @@ clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
 ## Figure 4
 
 clear; multiresticodm plot seed N -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
--et NonJointTableSIM_NN -l noise_regime \
--p dss -b 0 -t 1 -fs 5 5 -ms 20 -ff pdf -tfs 14 -afs 14 -lls 18 -als 18
+-et NonJointTableSIM_NN -s table -s intensity \
+-l noise_regime -m SRMSE -m coverage_probability \
+-p dss -b 0 -t 1
+
+<!-- -fs 5 5 -ms 20 -ff pdf -tfs 14 -afs 14 -lls 18 -als 18 -->
 
 ## Summaries and Metrics
 
