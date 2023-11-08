@@ -228,6 +228,8 @@ def parse(value,default=None):
             pass
     elif hasattr(value,'__len__') and len(value) <= 0:
         return default
+    elif isinstance(value,float):
+        return np.float32(np.round(value,5))
     
     return value
 
@@ -247,6 +249,17 @@ def str_to_tuple(s:str) -> Tuple[int,int]:
 def ndims(__self__,time_dims:bool=True):
     return np.sum([1 for dim in unpack_dims(__self__.data.dims,time_dims=time_dims) if dim > 1],dtype='uint8')
 
+def deep_merge(dict1,dict2):
+    result = dict1.copy()
+    for key, value in dict2.items():
+        if key in result:
+            if isinstance(result[key], list) and isinstance(value, list):
+                result[key].extend(value)
+            else:
+                result[key] = [result[key]] + [value]
+        else:
+            result[key] = value
+    return result
 
 def deep_get(key, value):
     for k, v in (value.items() if isinstance(value, dict) else
@@ -550,6 +563,16 @@ def parse_slice_by(slice_by:list):
     # Map set values to list
     slices = {k:list(v) for k,v in slices.items()}
     return slices
+
+def stringify_index(d):
+    if d is None:
+        return 'none'
+    elif not np.isfinite(d):
+        return 'none'
+    elif isinstance(d,float) or (hasattr(d,'dtype') and 'float' in str(d.dtype)):
+        return str(d)
+    else:
+        return d
 
 def stringify(data):
     if isinstance(data,Iterable) and not isinstance(data,str) and len(data) > 0:
@@ -1012,3 +1035,18 @@ def unique(data):
         return list(set(hashable_data))
     else:
         return data
+    
+def invert_dict(data):
+    inverse = {}
+    for k,v in data.items():
+        for x in v:
+            inverse.setdefault(x, []).append(k)
+    return inverse
+
+def sizeof_fmt(num, suffix='B'):
+    ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f %s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f %s%s" % (num, 'Yi', suffix)
