@@ -313,6 +313,10 @@ def create(
     synthesis_method,
     synthesis_n_samples
 ):
+    """
+    Create synthetic data for origin-destination matrix reconstruction.
+    """
+
     # Unpack dimensions
     if list(dims) != [(None,None)]:
         dims = {v[0]:v[1] for v in dims}
@@ -480,8 +484,7 @@ def run(
         n
     ):
     """
-    Run Data Augementation Spatial Interaction Model Markov Chain Monte Carlo.
-    :param config_path: Configuration file path    
+    Run Multiresolution Table Inference based on Physics-Driven Intensity Models.
     """
     # Gather all arguments in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
@@ -737,8 +740,7 @@ def plot(
         colorbar
     ):
     """
-    Postprocess and plot multiresticodm experimental outputs.
-    :param experiment_outputs_path: Path to experimental outputs directory
+    Plot experimental outputs.
     """
 
     # Gather all options in dictionary
@@ -821,9 +823,7 @@ def summarise(
         ascending,
     ):
     """
-    
-    Compute metrics for multiresticodm experimental outputs in tabular format.
-    :param experiment_outputs_path: Path to experimental outputs directory
+    Create tabular summary of metadata and metrics computed for experimental outputs.
     """
     # Gather all options in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
@@ -864,6 +864,6 @@ def summarise(
     logger.info('Done')
 
 if __name__ == '__main__':
-    run()
-    # plot()
+    # run()
+    plot()
     # summarise()
