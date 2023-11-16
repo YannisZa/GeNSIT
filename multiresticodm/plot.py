@@ -21,7 +21,6 @@ from statsmodels.graphics.tsaplots import plot_acf
 
 from multiresticodm.utils import *
 from multiresticodm.colormaps import *
-from multiresticodm.config import Config
 from multiresticodm.global_variables import *
 from multiresticodm.outputs import Outputs,OutputSummary
 from multiresticodm.contingency_table import instantiate_ct
@@ -50,10 +49,7 @@ class Plot(object):
 
         # Store settings
         self.settings = settings
-        # Find matching output directories
-        self.outputs_directories = OutputSummary.find_matching_output_folders(self)
 
-        self.logger.info(f"Loaded {len(self.outputs_directories)} experiments")
         # self.logger.info(f"{','.join([Path(out_dir).stem for out_dir in self.outputs_directories])}")
         # Run plots
         for plot_id in plot_ids:
@@ -169,15 +165,15 @@ class Plot(object):
     ╚═╝└─┘┘└┘└─┘┴└─┴└─┘  ┴  ┴─┘└─┘ ┴   └  └─┘┘└┘└─┘ ┴ ┴└─┘┘└┘└─┘
     '''
 
-    def plot_2d_scatter(self,data,**kwargs):
+    def plot_2d_scatter(self,plot_settings,**kwargs):
         # Axes limits from settings (read only x limit)
         axes_lims = [self.settings.get('x_limit',[None,None])[0],self.settings.get('x_limit',[None,None])[1]]
         # Otherwise read from data
         if None in axes_lims:
             min_val,max_val = np.infty,-np.infty
-            for data in data.values():
-                min_val = min([np.min(data['x']),np.min(data['y']),min_val])
-                max_val = max([np.max(data['x']),np.max(data['y']),max_val])
+            for plot_setting in plot_settings:
+                min_val = min([np.min(plot_setting['x']),np.min(plot_setting['y']),min_val])
+                max_val = max([np.max(plot_setting['x']),np.max(plot_setting['y']),max_val])
             axes_lims = [min_val-0.02,max_val+0.02]
         
         # Figure size 
@@ -191,31 +187,33 @@ class Plot(object):
                 linewidth=0.2,
                 color='black'
             )
-        if self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
+        if self.settings.get('x_label',''):
             plt.xlabel(
                 self.settings['x_label'].replace("_"," "),
                 fontsize=self.settings['axis_font_size'],
                 labelpad=self.settings['axis_labelpad']
             )
-        if self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
+        if self.settings.get('y_label',''):
             plt.ylabel(
                 self.settings['y_label'].replace("_"," "),
                 fontsize=self.settings['axis_font_size'],
                 labelpad=self.settings['axis_labelpad']
             )
         
-        # Axis limits 
+        # Axis limits
         plt.xlim(left=axes_lims[0], right=axes_lims[1])
         plt.ylim(bottom=axes_lims[0], top=axes_lims[1])
         
-        for v in data.values():
+        print(plot_settings)
+        for plot_setting in plot_settings:
             # Plot x versus y
             plt.scatter(
-                x=v['x'],
-                y=v['y'],
-                marker=v.get('marker','o'),
-                s=int(self.settings['marker_size']),
-                label=v.get('label','')
+                x = plot_setting['x'],
+                y = plot_setting['y'],
+                marker = plot_setting.get('marker','o'),
+                s = plot_setting.get('size',int(self.settings['marker_size'])),
+                label = plot_setting.get('label',''),
+                alpha = plot_setting.get('visibility',1.0)
             )
             
         # Aspect ratio equal
@@ -232,58 +230,27 @@ class Plot(object):
         # Tight layout
         plt.tight_layout()
 
-        # Get experiment id and its data
-        experiment_id = list(data.keys())[0]
-        # Decide on figure output dir
-        if len(self.outputs_directories) > 1:
-            # Get filename
-            filename = kwargs.get('name','NO_NAME')+'_'+\
-                    f"burnin_{self.settings['burnin']}_" + \
-                    f"thinning_{self.settings['thinning']}"
-            # Define filepath
-            parent_directory = Path(data[experiment_id]['outputs'].outputs_path)
-            if 'synthetic' in str(parent_directory):
-                parent_directory = data[experiment_id]['outputs'].config.out_directory
-            else:
-                parent_directory.parent.absolute()
-            dirpath = os.path.join(parent_directory,'paper_figures')
-            filepath = os.path.join(dirpath,filename)
-        else:
-
-            # Get filename
-            dims = unpack_dims(
-                data[experiment_id]['outputs'].inputs.data.dims,
-                time_dims=False
-            )
-            filename = f"table_{'x'.join(list(map(str,list(dims))))}_" + \
-                    f"{experiment_id[:-21]}_{kwargs.get('name','NO_NAME')}_"+ \
-                    f"burnin_{self.settings.get('burnin',0)}_" + \
-                    f"thinning_{self.settings.get('thinning',1)}_" + \
-                    f"N_{data[experiment_id]['outputs'].config['training']['N']}"
-
-            # Define filepath
-            dirpath = os.path.join(
-                data[experiment_id]['outputs'].outputs_path,
-                'figures'
-            )
-            filepath = os.path.join(dirpath,filename)
+        # Get directory path and file name
+        dirpath = kwargs['dirpath']
+        filename = kwargs['filename']
+        filepath = os.path.join(dirpath,filename)
 
         # Make outputs directories (if necessary)
         makedir(dirpath)
+
         # Write figure
         write_figure(
             fig,
             filepath,
             **self.settings
         )
+        # Write figure data
         write_figure_data(
-            data,
-            Path(filepath).parent,
-            groupby=[],
+            plot_settings,
+            filepath=filepath,
             key_type={'x':'float','y':'float'},
             **self.settings
         )
-        
         self.logger.info(f"Figure exported to {dirpath}")
         self.logger.info(f"Filename: {filename}")
 
@@ -591,10 +558,7 @@ class Plot(object):
         if self.settings['figure_title'] is not None:
             plt.title(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
         # X,Y labels
-        if self.settings['x_label'] is None:
-            plt.xlabel('Iteration',fontsize=self.settings['axis_font_size'])
-        elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-            plt.xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'])
+        plt.xlabel(self.settings.get('x_label','Iteration').replace("_"," "),fontsize=self.settings['axis_font_size'])
         if self.settings['y_label'] is None:
             norm_name = self.settings['norm'].replace("relative_","").capitalize()
             plt.ylabel(fr"${{{norm_name}}}$ norm of ${{{statistic_symbol}}}$",fontsize=self.settings['axis_font_size'])
@@ -1472,7 +1436,119 @@ class Plot(object):
             self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
             self.logger.info(f"Filename: {filename}")
 
+    '''
+    Extracting plotting data
+    '''
 
+    def extract_plot_setting(self,var:str,meta:dict):
+        if var in ['x','y','colour','size','visibility']:
+            # Get value from metadata element
+            if self.settings[var] in meta:
+                value = meta[self.settings[var]]
+            # Get value from data
+            elif self.settings[var] == meta['sample_name'] and meta['metric'] in [meta['sample_name'],'','none']:
+                value = meta.get('value',None)
+            # Data not found
+            else:
+                self.logger.debug(f"Could not find data for {var} var.")
+                return None
+            # Convert x or y coordinate to list
+            if isinstance(value,Iterable) and not isinstance(value,str):
+                return list(value)
+            else:
+                return [value]
+        
+        elif var == 'label':
+            label_str = []
+            # Get label key and value
+            for label_key in self.settings['label']:
+                label_str.append(
+                    str(label_key) + ' = ' + \
+                    str(meta[label_key]).replace('%','percent').replace(' ','_').replace(':','_').replace(',','_')
+                )
+                
+            return ', '.join(label_str)
+
+        else: 
+            return [meta[var]]
+
+    def merge_plot_settings(self,plot_settings:list):
+        merged_settings = {}
+        # Iterate through the list of dictionaries
+        for d in plot_settings:
+            # Concatenate values to the merged_dict
+            for key, value in d.items():
+                if value is None:
+                    continue
+                if key in ['x','y','z','label','colour','size']:
+                    merged_settings.setdefault(key, []).append(value)
+                else:
+                    # Keep only the first value of this key for each
+                    # plot setting
+                    if key not in merged_settings:
+                        merged_settings[key] = value
+        
+        for k,v in merged_settings.items():
+            if isinstance(v,Iterable):
+                merged_settings[k] = list(flatten(v))
+        
+        return [merged_settings]
+
+    def create_plot_filename(self,plot_setting,**kwargs):
+        # Decide on figure output dir
+        experiment_id = plot_setting['experiment_id']
+        
+        if not self.settings['by_experiment']:
+            # Get filename
+            filename = kwargs.get('name','NO_NAME')+'_'+\
+                    f"burnin_{self.settings['burnin']}_" + \
+                    f"thinning_{self.settings['thinning']}"
+            if not plot_setting['outputs'].config['training']['N'].get('sweep',{}):
+                filename += f"N_{plot_setting['outputs'].config['training']['N']}"
+            if self.settings['label'] is not None:
+                filename += f"label_{'&'.join([str(elem) for elem in self.settings['label']])}"
+            if self.settings['colour'] is not None:
+                filename += f"colour_{'&'.join([str(elem) for elem in self.settings['colour']])}"
+            if self.settings['size'] is not None:
+                filename +=  f"size_{'&'.join([str(elem) for elem in self.settings['size']])}"
+            if self.settings['visibility'] is not None:
+                filename += f"visibility_{'&'.join([str(elem) for elem in self.settings['visibility']])}"
+            # Get dirpath
+            parent_directory = Path(plot_setting['outputs'].outputs_path)
+            if 'synthetic' in str(parent_directory):
+                parent_directory = plot_setting['outputs'].config.out_directory
+            else:
+                parent_directory.parent.absolute()
+            dirpath = os.path.join(parent_directory,'paper_figures')
+        else:
+
+            # Get filename
+            dims = unpack_dims(
+                plot_setting['outputs'].inputs.data.dims,
+                time_dims=False
+            )
+            filename = f"table_{'x'.join(list(map(str,list(dims))))}_" + \
+                    f"{experiment_id[:-21]}_{kwargs.get('name','NO_NAME')}_"+ \
+                    f"burnin_{self.settings.get('burnin',0)}_" + \
+                    f"thinning_{self.settings.get('thinning',1)}_" 
+            if not plot_setting['outputs'].config['training']['N'].get('sweep',{}):
+                filename += f"N_{plot_setting['outputs'].config['training']['N']}"
+            if self.settings['label'] is not None:
+                filename += f"label_{'&'.join([str(elem) for elem in self.settings['label']])}"
+            if self.settings['colour'] is not None:
+                filename += f"colour_{'&'.join([str(elem) for elem in self.settings['colour']])}"
+            if self.settings['size'] is not None:
+                filename +=  f"size_{'&'.join([str(elem) for elem in self.settings['size']])}"
+            if self.settings['visibility'] is not None:
+                filename += f"visibility_{'&'.join([str(elem) for elem in self.settings['visibility']])}"
+            # Get dirpath
+            dirpath = os.path.join(
+                plot_setting['outputs'].outputs_path,
+                'figures'
+            )
+        
+        return dirpath,filename
+                
     '''    
     ╔═╗┬  ┌─┐┌┬┐  ┬ ┬┬─┐┌─┐┌─┐┌─┐┌─┐┬─┐┌─┐
     ╠═╝│  │ │ │   │││├┬┘├─┤├─┘├─┘├┤ ├┬┘└─┐
@@ -1484,56 +1560,77 @@ class Plot(object):
         self.logger.info('Running data_plot_2d_scatter')
 
         # Run output handler
-        if self.settings.get('metric',[]):
-            outputs_summary = OutputSummary(
-                settings=self.settings,
-                logger=self.logger
-            )
-            return
+        outputs_summary = OutputSummary(
+            settings=self.settings,
+            logger=self.logger
+        )
+        
+        # Loop through output folder
+        plot_settings = []
+        for i,output_folder in enumerate(outputs_summary.output_folders):
+            
+            self.logger.info(f"Scanning folder {i+1}/{len(outputs_summary.output_folders)}")
 
-            data = {}
-            for output_directory in tqdm(
-                outputs_summary.experiment_metadata
-            ): 
-                # Add data
-                data[output_directory] =  {
-                    'label':label,
-                    'x':mu_x.squeeze(),
-                    'y':outputs.inputs.data.log_destination_attraction.squeeze(),
-                    'marker':'o',
-                    'outputs':outputs
-                }
+            # Collect outputs from folder's Data Collection
+            outputs = outputs_summary.get_folder_outputs(output_folder)
+            
+            # Create plot settings
+            plot_setting = {
+                'marker':'o',
+                'outputs':outputs,
+                'experiment_id':outputs.experiment_id
+            }
+            # Loop through each member of the data collection
+            for j in range(len(outputs.data)):
+                
+                # Get metadata for this experiment and this element
+                # of the Data Collection
+                metadata = outputs_summary.get_experiment_metadata(j,outputs)
 
-            self.plot_2d_scatter(
-                data = data,
-                name = self.settings.get('title','NONAME')
-            )
-        else:
-            for output_directory in tqdm(self.outputs_directories,'Generating 2D scatter plot(s)...'):
+                # Loop through each entry of metadata
+                for meta in metadata:
 
-                # Read outputs
-                outputs = Outputs(
-                    config = output_directory,
-                    settings=self.settings,
-                    dataset = (list(self.settings['sample'])+['ground_truth_table']),
-                    console_handling_level = self.settings['logging_mode'],
-                    logger=self.logger
+                    for var in ['x','y','label','colour','size','visibility']:
+                        plot_setting[var] = self.extract_plot_setting(
+                            var = var,
+                            meta = meta
+                        )
+
+                    # Add data
+                    plot_settings.append(plot_setting)
+            
+            # If plot is by experiment
+            # plot all element from data collection 
+            # for every output folder
+            if self.settings['by_experiment']:
+                # Create output dirpath and filename
+                dirpath,filename = self.create_plot_filename(
+                    plot_setting = plot_settings[0],
+                    name = self.settings.get('figure_title','NONAME')
                 )
-
-                # Add data
-                data[output_directory] =  {
-                    'label':label,
-                    'x':mu_x.squeeze(),
-                    'y':outputs.inputs.data.log_destination_attraction.squeeze(),
-                    'marker':'o',
-                    'outputs':outputs
-                }
-
+                # Merge all settings into one
+                # Plot
                 self.plot_2d_scatter(
-                    data = data,
-                    name = self.settings.get('title','NONAME')
+                    plot_settings = self.merge_plot_settings(plot_settings),
+                    dirpath = dirpath,
+                    filename = filename
                 )
-
+        # If plot is NOT by experiment
+        # plot all elements from data collection
+        # from all output folder(s)
+        if not self.settings['by_experiment']:
+            # Create output dirpath and filename
+            dirpath,filename = self.create_plot_filename(
+                plot_setting = plot_settings[0],
+                name = self.settings.get('figure_title','NONAME')
+            )
+            # Plot
+            self.plot_2d_scatter(
+                plot_settings = self.merge_plot_settings(plot_settings),
+                name = self.settings.get('title','NONAME'),
+                dirpath = dirpath,
+                filename = filename
+            )
         sys.exit()
         
         
