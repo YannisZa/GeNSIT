@@ -6,7 +6,7 @@ from numpy import array
 
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger, to_json_format
-from multiresticodm.global_variables import PARAMETER_DEFAULTS, Dataset
+from multiresticodm.global_variables import PARAMETER_DEFAULTS, Dataset, INTENSITY_INPUTS, INTENSITY_OUTPUTS
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
 from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
 
@@ -273,11 +273,10 @@ class SpatialInteraction2D():
     
 
 
-
 class ProductionConstrainedSIM(SpatialInteraction2D):
     """ Object including flow (O/D) matrix inference routines of singly constrained SIM. """
-    REQUIRED_INPUTS = ['cost_matrix','origin_demand']
-    REQUIRED_OUTPUTS = ['alpha','beta','log_destination_attraction']
+    REQUIRED_INPUTS = INTENSITY_INPUTS['ProductionConstrained']
+    REQUIRED_OUTPUTS = INTENSITY_OUTPUTS['ProductionConstrained']
     def __init__(
         self,
         config:Config=None,
@@ -312,8 +311,8 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
     
 class TotallyConstrainedSIM(SpatialInteraction2D):
     """ Object including flow (O/D) matrix inference routines of SIM with only total constrained. """
-    REQUIRED_INPUTS = ['cost_matrix','origin_demand']
-    REQUIRED_OUTPUTS = ['alpha','beta','log_destination_attraction']
+    REQUIRED_INPUTS = INTENSITY_INPUTS['TotallyConstrained']
+    REQUIRED_OUTPUTS = INTENSITY_OUTPUTS['TotallyConstrained']
     def __init__(
         self,
         config:Config=None,
