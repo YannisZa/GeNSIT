@@ -137,14 +137,22 @@ class Config:
 
     def parse_data(self,settings,key_path):
         # Get schema given the path
-        schema,_ = self.path_get(settings=self.schema,path=key_path)
+        schema,_ = self.path_get(settings=self.schema,key_path=key_path)
         # Instantiate data type
         data = instantiate_data_type(settings,schema,key_path)
         # return parsed data
         return data.value()
 
-    def has_sweep(self,key_path):
-        return 'sweep' in list(key_path)
+    def has_sweep(self,key_path,settings=None):
+        if settings is None:
+            settings = self.settings
+        # Return True if sweep is a key in the path
+        if 'sweep' in list(key_path):
+            return True
+        else:
+            value,_ = self.path_get(settings = settings, key_path = key_path)
+            # Return whether sweep is later down the path
+            return isinstance(value,dict) and value.get('sweep',None) is not None
     
     def path_exists(self, key, value, found:bool=False):
         for k, v in (value.items() if isinstance(value, dict) else
@@ -156,33 +164,35 @@ class Config:
         
         return found
 
-    def path_find(self, key, value, path:list=[], found:bool=False):        
-        for k, v in (value.items() if isinstance(value, dict) else
-            enumerate(value) if isinstance(value, list) else []):
+    def path_find(self, key, settings, key_path:list=[], found:bool=False):
+        for k, v in (settings.items() if isinstance(settings, dict) else
+            enumerate(settings) if isinstance(settings, list) else []):
             
-            path.append(str(k))
-            
+            key_path.append(k)
             if k == key:
-                found = True
+                return key_path,True
             elif isinstance(v, (list,dict)):
-                path,found = self.path_find(key,v,path,found)
-            
-            if found:
-                return path,True
-            
-            path.remove(str(k))
+                key_path,found = self.path_find(
+                    key = key,
+                    settings = v,
+                    key_path = key_path,
+                    found = found
+                )
+                if found:
+                    return key_path,found
+            key_path.remove(k)
 
-        return path,found
+        return key_path,found
 
 
-    def path_get(self,settings=None,path=[]):
-        if len(path) <= 0:
+    def path_get(self,settings=None,key_path=[]):
+        if len(key_path) <= 0:
             return None,False
         if settings is None:
             settings = self.settings
         
         settings_copy = deepcopy(settings)
-        for i,key in enumerate(path):
+        for i,key in enumerate(key_path):
             if key == 'sweep':
                 if isinstance(settings_copy,dict):
                     if settings_copy.get(key,'not-found') == 'not-found':
@@ -195,51 +205,51 @@ class Config:
                 if isinstance(settings_copy,dict):
                     settings_copy = settings_copy.get(key,'not-found')
                 else:
-                    return settings_copy,(settings_copy!='not-found')
+                    settings_copy = settings_copy[key]
         
         return settings_copy,(settings_copy!='not-found')
 
-    def path_delete(self,settings,path:list,deleted:bool=False):
-        if len(path) <= 0:
+    def path_delete(self,settings,key_path:list,deleted:bool=False):
+        if len(key_path) <= 0:
             return False
         deleted = False
-        if len(path) == 1:
-            safe_delete(settings[path[0]])
+        if len(key_path) == 1:
+            safe_delete(settings[key_path[0]])
             deleted = True
         else:
-            deleted = self.path_delete(settings[path[0]],path[1:],deleted)
+            deleted = self.path_delete(settings[key_path[0]],key_path[1:],deleted)
         
         return deleted
 
-    def path_set(self,settings,value,path=[],overwrite:bool=False):
-        if len(path) <= 0:
+    def path_set(self,settings,value,key_path=[],overwrite:bool=False):
+        if len(key_path) <= 0:
             return False
         value_set = False
-        if len(path) == 1:
-            settings[path[0]] = value
+        if len(key_path) == 1:
+            settings[key_path[0]] = value
             value_set = True
         else:
             if overwrite:
-                settings[path[0]] = {}
-                value_set = self.path_set(settings[path[0]],value,path[1:],overwrite)
+                settings[key_path[0]] = {}
+                value_set = self.path_set(settings[key_path[0]],value,key_path[1:],overwrite)
             else: 
-                value_set = self.path_set(settings.get(path[0],{}),value,path[1:],overwrite)
+                value_set = self.path_set(settings.get(key_path[0],{}),value,key_path[1:],overwrite)
         
         return value_set
     
-    def path_modify(self,settings,value,path):
-        if len(path) <= 0:
+    def path_modify(self,settings,value,key_path):
+        if len(key_path) <= 0:
             return False
-        elif len(path) == 1:
-            if path[0] in settings:
-                settings[path[0]] = value
+        elif len(key_path) == 1:
+            if key_path[0] in settings:
+                settings[key_path[0]] = value
                 return True
             else:
                 return False
         else:
-            key = path[0]
+            key = key_path[0]
             if key in settings:
-                self.path_modify(settings[key], value, path[1:])
+                self.path_modify(settings[key], value, key_path[1:])
             else:
                 return False
         return True
@@ -286,6 +296,21 @@ class Config:
             print(key_path)
             self.path_delete(self.settings,key_path)
 
+    def is_sweepable(self,variable):
+        # Find target name
+        variable_key_path,found = self.path_find(
+            key = variable,
+            settings = self.schema,
+            key_path = [],
+            found = False
+        )
+        # If no path found raise exception
+        if not found:
+            raise Exception(f"{variable} not found in config schema.")
+        print(variable_key_path)
+        # Return sweepable flag
+        return self.path_get(self.schema,variable_key_path).get('sweepable',False)
+
     def find_sweep_key_paths(self):
         for key_val_path in deep_walk(self.settings):
             
@@ -302,7 +327,12 @@ class Config:
                         self.coupled_sweep_paths[target_name][key_val_path[indx-1]] = deepcopy(key_val_path[:indx])
                     else:
                         # Find target name
-                        target_name_path,found = self.path_find(target_name,self.settings,path=[],found=False)
+                        target_name_path,found = self.path_find(
+                            key = target_name,
+                            settings = self.settings,
+                            key_path = [],
+                            found = False
+                        )
                         if found and len(target_name_path) > 0:
                             self.coupled_sweep_paths[target_name] = {    
                                 target_name : target_name_path,
@@ -485,7 +515,12 @@ class Config:
                                 }
                             # Otherwise find the target name in settings
                             else:
-                                target_name_path,found = self.path_find(target_name,self.settings,path=[],found=False)
+                                target_name_path,found = self.path_find(
+                                    key = target_name,
+                                    settings = self.settings,
+                                    key_path = [],
+                                    found = False
+                                )
                                 if found and len(target_name_path) > 0:
                                     self.coupled_sweep_paths[target_name] = {    
                                         target_name : target_name_path,
@@ -667,7 +702,7 @@ class Config:
             # Get sweep configuration
             sweep_input,_ = self.path_get(
                 settings=self.settings,
-                path=(key_path+["sweep","range"])
+                key_path=(key_path+["sweep","range"])
             )
             # Parse values
             sweep_vals = self.parse_data(sweep_input,(key_path+["sweep","range"]))
@@ -689,7 +724,7 @@ class Config:
                 # Get sweep configuration
                 sweep_input,_ = self.path_get(
                     settings=self.settings,
-                    path=(key_path+["sweep","range"])
+                    key_path=(key_path+["sweep","range"])
                 )
                 # Parse values
                 sweep_vals = self.parse_data(sweep_input,(key_path+["sweep","range"]))
