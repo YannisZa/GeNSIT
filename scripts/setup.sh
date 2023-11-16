@@ -16,8 +16,10 @@ printf "\n"
 pip3 install -e .
 
 # printf "\n"
-# echo "Generating stopping times"
-# printf "\n"
+echo "Creating directories"
+printf "\n"
+mkdir -p ./data/outputs/
+mkdir -p ./logs/
 
 # echo "Creating stopping times for each dataset"
 # datasets=(`cat ./docs/datasets.txt`)
