@@ -1,5 +1,6 @@
-import logging
+import json
 import torch 
+import operator
 
 from torch import int32, float32, uint8, int8, float64, int64, int16
 from torch import bool as tbool
@@ -14,6 +15,27 @@ PARAMETER_DEFAULTS = {
     'noise_percentage': 3,
     'sigma': 3,
 }
+
+SWEEPABLE_PARAMS = ['iter']
+with open('./data/inputs/configs/cfg_parameters.json', 'r') as f:
+    config_params = json.load(f)
+    # Find all sweepable parameters
+    stack = list(config_params.items()) 
+    visited = set()
+    while stack: 
+        k, v = stack.pop() 
+        
+        # Add to sweepable params
+        if isinstance(v, dict):
+            if v.get('sweep',None) is not None and k != 'file':
+                SWEEPABLE_PARAMS.append(k)
+            if v.get('file',None) is not None and v['file'].get('sweep',None) is not None:
+                SWEEPABLE_PARAMS.append(k)
+
+            if k not in visited: 
+                stack.extend(v.items()) 
+            visited.add(k)
+SWEEPABLE_LENGTH_METADATA = ['seed','iter','origin','destination','time',]
 
 XARRAY_SCHEMA = {
     'alpha': {
@@ -96,6 +118,24 @@ XARRAY_SCHEMA = {
     },
 }
 
+SIM_TYPE_CONSTRAINTS = {
+    'TotallyConstrained':'grand_total',
+    'ProductionConstrained':'row_margin'
+}
+
+INTENSITY_INPUTS = {
+    'TotallyConstrained':['cost_matrix','origin_demand'],
+    'ProductionConstrained':['cost_matrix','origin_demand']
+}
+
+INTENSITY_OUTPUTS = {
+    'TotallyConstrained':['alpha','beta','log_destination_attraction'],
+    'ProductionConstrained':['alpha','beta','log_destination_attraction']
+}
+
+TABLE_SOLVERS = ['monte_carlo_sample', 'maximum_entropy_solution',
+                 'iterative_residual_filling_solution', 'iterative_uniform_residual_filling_solution']
+MARGINAL_SOLVERS = ['multinomial']
 
 NORMS = ['relative_l_0','relative_l_1','relative_l_2','l_0','l_1','l_2']
 
@@ -137,7 +177,8 @@ INPUT_SCHEMA = {
     "dims":{},
     "grand_total":{},
     "to_learn":{},
-    "true_parameters":{}
+    "true_parameters":{},
+    "dataset":{}
 }
 
 TABLE_INFERENCE_EXPERIMENTS = ['nonjointtablesim_nn','jointtablesim_nn','jointtablesim_mcmc','table_mcmc','table_mcmc','tablesummaries_mcmcconvergence']
@@ -182,7 +223,7 @@ DATA_TYPES = {**INPUT_TYPES,**OUTPUT_TYPES}
 SAMPLE_DATA_REQUIREMENTS = {
     **dict(zip(list(OUTPUT_TYPES.keys()),list(OUTPUT_TYPES.keys())))
 }
-SAMPLE_DATA_REQUIREMENTS['intensity'] = [k for k in INTENSITY_TYPES.keys() if k != 'intensity']
+SAMPLE_DATA_REQUIREMENTS['intensity'] = INTENSITY_OUTPUTS
 
 AUXILIARY_COORDINATES_DTYPES = {
     'N':torch.int32,
@@ -221,20 +262,11 @@ NUMPY_TYPE_TO_DAT_TYPE = {
     'int':'start,stop,step',
 }
 
-SIM_TYPE_CONSTRAINTS = {
-    'TotallyConstrained':'grand_total',
-    'ProductionConstrained':'row_margin'
-}
-
-TABLE_SOLVERS = ['monte_carlo_sample', 'maximum_entropy_solution',
-                 'iterative_residual_filling_solution', 'iterative_uniform_residual_filling_solution']
-MARGINAL_SOLVERS = ['multinomial']
-
 
 METRICS = {
-    'SRMSE':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'srmse':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
     'p_distance':{'shape':'(N,dims)','loop_over':[],'apply_axis':(1,2),'dtype':'float32'},
-    'SSI':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'ssi':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
     'sparsity':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
     'shannon_entropy':{'shape':'(1,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
     'von_neumann_entropy':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
@@ -242,6 +274,16 @@ METRICS = {
     'edit_degree_higher_error':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
     'edit_degree_one_error':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
     'none':{'shape':'(N,dims)','loop_over':[],'apply_axis':(0,1,2),'dtype':''},
+    '':{'shape':'(N,dims)','loop_over':[],'apply_axis':(0,1,2),'dtype':''},
+}
+
+OPERATORS = {
+    '+' : operator.add,
+    '-' : operator.sub,
+    '*' : operator.mul,
+    '/' : operator.truediv,
+    '%' : operator.mod,
+    '^' : operator.xor,
 }
 
 COLORS = {'monte_carlo_sample_degree_one':'tab:blue',
@@ -282,66 +324,6 @@ PLOT_HASHMAP = {
         '40':'origin_destination_table_tabular',
         '41':'origin_destination_table_spatial',
         '42':'origin_destination_table_colorbars'
-}
-
-SWEEPABLE_PARAMS = {
-    "seed": {
-        "is_coord": True        
-    },
-    "origin_demand": {
-        "is_coord": True
-    },
-    "destination_attraction_ts": {
-        "is_coord": True
-    },
-    "cost_matrix": {
-        "is_coord": True
-    },
-    "total_cost_by_origin": {
-        "is_coord": False
-    },
-    "name": {
-        "is_coord": True
-    },
-    "alpha": {
-        "is_coord": True
-    },
-    "beta": {
-        "is_coord": True
-    },
-    "bmax": {
-        "is_coord": False
-    },
-    "dt": {
-        "is_coord": True
-    },
-    "delta": {
-        "is_coord": True
-    },
-    "kappa": {
-        "is_coord": True
-    },
-    "sigma": {
-        "is_coord": True
-    },
-    "epsilon": {
-        "is_coord": True
-    },
-    "N": {
-        "is_coord": True
-    },
-    "to_learn": {
-        "is_coord": False
-    },
-    "num_layers": {
-        "is_coord": True
-    },
-    "optimizer": {
-        "is_coord": True
-    },
-    "learning_rate": {
-        "is_coord": True
-    }
 }
 
 INTENSITY_MODELS = ['spatial_interaction_model']
@@ -445,7 +427,5 @@ OPTIMIZERS = {
     'SGD': torch.optim.SGD,
 }
 
-
 class Dataset(object):
     pass
-
