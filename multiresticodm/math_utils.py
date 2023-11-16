@@ -1,3 +1,5 @@
+from copy import deepcopy
+import sys
 import torch
 import numpy as np
 import xarray as xr
@@ -101,7 +103,7 @@ def l_2(tab:xr.DataArray,tab0:xr.DataArray,progress_proxy):
 
 def p_distance(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     # Type of norm
-    p = float(kwargs['kwargs'].get('p_norm',2))
+    p = float(kwargs.get('p_norm',2))
     # Get dimensions
     dims = shape(tab)
     # Return difference in case of 0-norm
@@ -186,7 +188,7 @@ def chi_squared_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     return chi_squared_column_distance(tab1,tab2,dims) + chi_squared_row_distance(tab1,tab2,dims)
 
 
-def SRMSE(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
+def srmse(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     """ Computes standardised root mean square error. See equation (22) of
     "A primer for working with the Spatial Interaction modeling (SpInt) module
     in the python spatial analysis library (PySAL)" for more details.
@@ -214,7 +216,7 @@ def SRMSE(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     
     return srmse
 
-def SSI(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
+def ssi(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     """ Computes Sorensen similarity index. See equation (23) of
     "A primer for working with the Spatial Interaction modeling (SpInt) module
     in the python spatial analysis library (PySAL)" for more details.
@@ -248,9 +250,9 @@ def shannon_entropy(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     tab0 : log intensity
     """
     try:
-        log_distribution = globals()[kwargs['kwargs']['distribution_name']]
+        log_distribution = globals()[kwargs['distribution_name']]
     except:
-        raise Exception(f"No distribution function found for distribution name {kwargs['kwargs']['distribution_name']}")
+        raise Exception(f"No distribution function found for distribution name {kwargs['distribution_name']}")
     _tab = np.copy(tab)
     _tab0 = np.copy(tab0)
     # Apply distribution
@@ -268,7 +270,7 @@ def von_neumann_entropy(tab:xr.DataArray,tab0:xr.DataArray,**kwargs):
     # Convert matrix to square
     matrix = (tab@tab.T).astype('float32')
     # Add jitter
-    matrix += kwargs['kwargs']['epsilon_threshold'] * torch.eye(matrix.shape[0],dtype='float32')
+    matrix += kwargs['epsilon_threshold'] * torch.eye(matrix.shape[0],dtype='float32')
     # Find eigenvalues
     eigenval = torch.real(torch.linalg.eigvals(matrix))
     # Get all non-zero eigenvalues
@@ -299,39 +301,80 @@ def sparsity(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
 
 def coverage_probability(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     # High posterior density mass
-    alpha = 1-kwargs['kwargs'].get('region_mass',0.95)
+    alpha = 1-kwargs.get('region_mass',0.95)
+    # Copy unstacked dimension sizes
+    sizes = deepcopy(tab.sizes)
+    unstacked_coords = deepcopy(tab.coords)
+    # Stack iteration-related dimensions and space-related dimensions
+    stacked_id_dims = set(['iter','seed']).intersection(tab.dims)
+    tab = tab.stack(id=list(stacked_id_dims),space=['origin','destination'])
+    # Get all dimensions comprising sweep
+    sweep_dims = deepcopy(tab.indexes['sweep'].names)
+    # Copy stacked dimensions and coordinates
+    stacked_dims = deepcopy(tab.dims)
     # Get cell of table and sort all samples
-    table_cell_value = tab.sortby(dim=['origin','destination'])
+    tab = np.sort(tab,axis=stacked_dims.index('space'))
+    
     # Get lower and upper bound high posterior density regions
-    lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(table_cell_value,alpha)
+    lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(
+        tab,
+        alpha,
+        dims=list(stacked_dims)
+    )
+    # # Reshape boundaries
+    new_shape = [sizes['sweep'],
+                 sizes['origin'],
+                 sizes['destination']]
+    lower_bound_hpdr = lower_bound_hpdr.reshape(tuple(new_shape))
+    upper_bound_hpdr = upper_bound_hpdr.reshape(tuple(new_shape))
+    # Reshape ground truth table to match 
+    tab0 = np.repeat(tab0.values[np.newaxis,...], sizes['sweep'],axis=0)
+
     # Compute flag for whether ground truth table is covered
-    cell_coverage = torch.logical_and(torch.ge(tab0,lower_bound_hpdr), torch.le(tab0,upper_bound_hpdr))
-    return cell_coverage
+    cell_coverage = np.logical_and(np.greater_equal(tab0,lower_bound_hpdr), np.less_equal(tab0,upper_bound_hpdr))
+    # Return xr data array
+    return xr.DataArray(
+        cell_coverage,
+        name = 'coverage_probability',
+        dims = ['sweep','origin','destination'],
+        coords = dict(
+            sweep = unstacked_coords['sweep'],
+            origin = unstacked_coords['origin'],
+            destination = unstacked_coords['destination']
+        ),
+        attrs = dict(
+            region_mass = kwargs.get('region_mass',0.95)
+        )
+    )
 
 
-def calculate_min_interval(x, alpha):
+def calculate_min_interval(x, alpha, dims):
     """
     Taken from https://github.com/aloctavodia/Doing_bayesian_data_analysis/blob/a34212340de7e2eb1723046dead980a3a13447ff/hpd.py#L7
     Internal method to determine the minimum interval of a given width
     Assumes that x is sorted numpy array.
     """
-
-    N = len(x)
+    N = x.shape[dims.index('id')]
     credible_interval_mass = 1.0-alpha
     # Get number of intervals within that bass
     interval_index0 = int(np.floor(credible_interval_mass*N))
     n_intervals = N - interval_index0
     # Get all possible credible_interval_mass% probability intervals
-    interval_width = x[interval_index0:,...] - x[:n_intervals,...]
+    right_boundary_index = tuple([slice(None) if d != 'id' else slice(interval_index0,None) for d in dims])
+    right_boundary = x[right_boundary_index]
+    left_boundary_index = tuple([slice(None) if d != 'id' else slice(0,n_intervals) for d in dims])
+    left_boundary = x[left_boundary_index]
+    interval_width = right_boundary - left_boundary
 
-    if len(interval_width) == 0:
+    if interval_width.shape[dims.index('id')] == 0:
         raise ValueError('Too few elements for interval calculation')
     # Find index of smallest probability interval
-    min_idx = torch.argmin(interval_width,dim=0)
+    min_idx = np.argmin(interval_width,axis=dims.index('id'))
+    min_idx = np.expand_dims(min_idx,axis=dims.index('id'))
     # Get hpd boundaries
-    hdi_min = x.gather(0, min_idx.unsqueeze(1))
-    hdi_max = x.gather(0, (min_idx+interval_index0).unsqueeze(1))
-    return hdi_min.squeeze(1), hdi_max.squeeze(1)
+    hdi_min = np.take(x,min_idx)
+    hdi_max = np.take(x,min_idx+interval_index0)
+    return np.squeeze(hdi_min), np.squeeze(hdi_max)
 
 
 def logsumexp(input, dim=None, keepdim=False):
