@@ -1092,9 +1092,9 @@
           "range": {
             "dtype": "list",
             "list-dtype": "float",
+            "allow-nan": true,
             "default-value": null,
             "valid-range": [0.0, null],
-            "allow-nan": true,
             "unique-vals": true
           }
         }
