@@ -2440,3 +2440,4 @@ class ExperimentSweep():
                         """)
                         raise Exception(f"Future {index} failed")
                     pbar.update(1)
+        pbar.close()
