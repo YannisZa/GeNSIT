@@ -1,8 +1,9 @@
 import torch
 import xarray as xr
 
-from numpy import arange
+from copy import deepcopy
 from torch import float32
+from numpy import arange, array
 
 
 
@@ -110,30 +111,21 @@ def log_flow_matrix(**kwargs):
             time = 1
     # If input is xarray use the following code
     else:
-        try:
-            assert len(log_destination_attraction['sweep'].values) == 1
-        except:
-            raise Exception(f"Sweep dimensions are NOT unidimensional")
         # Extract dimensions
-        N = log_destination_attraction['N'].shape[0]
+        N = log_destination_attraction['iter'].shape[0]
         time = log_destination_attraction['time'].shape[0]
-        sweep = len(log_destination_attraction['sweep'].values)
+        sweep = len(log_destination_attraction.coords['sweep'].values.tolist())
         dims = ['id','origin','destination','sweep']
         # Merge all coordinates
         coords = kwargs['log_destination_attraction'].coords
         coords = coords.assign(origin = arange(1,origin+1,dtype='int32'))
 
-        # Drop sweep dimension
-        # log_destination_attraction = log_destination_attraction.drop('sweep')
-        # alpha = alpha.drop('sweep')
-        # beta = beta.drop('sweep')
-
         # Use the .sel() method to select the dimensions you want to convert
         log_destination_attraction = log_destination_attraction.sel(
-            **{dim: slice(None) for dim in ['N','time','destination']}
+            **{dim: slice(None) for dim in ['iter','time','destination','sweep']}
         )
-        alpha = alpha.sel(N=slice(None))
-        beta = beta.sel(N=slice(None))
+        alpha = alpha.sel(iter=slice(None),sweep=slice(None))
+        beta = beta.sel(iter=slice(None),sweep=slice(None))
         
         # Convert the selected_data to torch tensor
         log_destination_attraction = torch.tensor(
@@ -149,7 +141,7 @@ def log_flow_matrix(**kwargs):
     log_flow = torch.zeros((N,origin,destination,sweep)).to(dtype=float32,device=device)
     # Reshape tensors to ensure operations are possible
     log_destination_attraction = torch.reshape(log_destination_attraction,(N,time,destination,sweep))
-    cost_matrix = torch.reshape(cost_matrix,(1,origin,destination,sweep))
+    cost_matrix = torch.reshape(cost_matrix.unsqueeze(1).repeat(1, 1, 1, sweep),(1,origin,destination,sweep))
     alpha = torch.reshape(alpha,(N,1,1,sweep))
     beta = torch.reshape(beta,(N,1,1,sweep))
 
@@ -171,7 +163,7 @@ def log_flow_matrix(**kwargs):
         return xr.DataArray(
             data=log_flow.detach().cpu().numpy(), 
             dims=dims,
-            coords=[coords[k] for k in dims]
+            coords=[coords[k] if len(coords[k].values.tolist()) > 1 else array([coords[k].values]) for k in dims]
         ) 
 
 def flow_matrix_expanded(log_destination_attraction,cost_matrix,grand_total,alpha,beta):
