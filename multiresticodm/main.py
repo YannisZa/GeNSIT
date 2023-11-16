@@ -132,7 +132,7 @@ _common_options = [
     click.option('--n','-n', type=click.IntRange(min=1), help = 'Overwrites number of MCMC samples'),
     click.option('--table','-tab', type=click.STRING,default=None, help = 'Overwrites input table filename in config'),
     click.option('--device','-dev', type=click.Choice(['cpu', 'cuda', 'mps']), default='cpu', 
-            help=f'Type of device used for torch operations.'),   
+            help=f'Type of device used for torch operations.')
 ]
 
 _create_and_run_options = [
@@ -164,7 +164,7 @@ _common_run_options = [
                    help='Defines path to existing experiment output in order to load it and resume experimentation.'),
     click.option('--run_experiments','-re', type=click.STRING, multiple=True, callback=to_list,
                default = None, help = 'Decides which experiments to run'),
-    click.option('--title','-en', type=click.STRING,
+    click.option('--title','-ttl', type=click.STRING,
                default = None, help = 'Title appended to output filename of experiment'),
     click.option('--sweep_mode/--no-sweep_mode', default=None,is_flag=True, show_default=True,
               help=f'Flag for whether parameter sweep mode is activated or not.'),
@@ -530,18 +530,18 @@ _output_options = [
     click.option('--experiment_type','-et', multiple=True, type=click.STRING ,cls=NotRequiredIf, not_required_if='directories'),
     click.option('--title','-en', multiple=True, type=click.STRING, default = None, cls=NotRequiredIf, not_required_if='directories'),
     click.option('--exclude','-exc', type=click.STRING, default = [], multiple = True, cls=NotRequiredIf, not_required_if='directories'),
-    click.option('--filename_ending', '-fe', default = None, type=click.STRING),
+    click.option('--filename_ending', '-fe', default = '', type=click.STRING),
     click.option('--burnin', '-b', default=0, show_default=True,
                 type=click.IntRange(min=0), help=f'Sets number of initial samples to discard.'),
     click.option('--thinning', '-t', default=1, show_default=True,
                 type=click.IntRange(min=1), help=f'Sets number of samples to skip.'),
     click.option('--sample', '-s', multiple = True, required = False,
                 type=click.Choice(DATA_TYPES.keys()), help=f'Sets type of samples to compute metrics over.'),
-    click.option('--statistic','-stat', multiple=True, default=None, type = (click.STRING,click.STRING),required=False,
-            help='Every argument corresponds to a list of statistics and their corresponding axes e.g. passing  (\"mean|sum\",  \"0|0_1\") corresponds to applying mean across axis 0 and then sum across axes 0,1'),
-    click.option('--slice_by','-sb', multiple=True, default=None, type = (click.Choice(SWEEPABLE_PARAMS.keys()),click.STRING),required=False,
+    click.option('--statistic','-stat', multiple=True, default=None, type = (click.Choice(METRICS.keys()),click.STRING,click.STRING),required=False,
+            help='Every argument corresponds to a list of metrics, statistics and their corresponding axes e.g. passing  ("SRMSE", \"mean|sum\",  \"iter|sweep\") corresponds to applying mean across the iter dimension and then sum across sweep dimension before applying SRMSE metric'),
+    click.option('--slice_by','-sb', multiple=True, default=None, type = (click.Choice(SWEEPABLE_PARAMS),click.STRING),required=False,
             help='Every argument corresponds to a list of keys and values by which the output sweeped parameters will be sliced.'),
-    click.option('--group_by','-gb', multiple=True, default=None, type = click.Choice(SWEEPABLE_PARAMS.keys()),required=False,
+    click.option('--group_by','-gb', multiple=True, default=None, type = click.Choice(SWEEPABLE_PARAMS),required=False,
             help='Every argument corresponds to a list of sweeped parameters that the outputs will be grouped by.'),
     click.option('--metric','-m', multiple=True, type=click.Choice(METRICS.keys()), required=False, default=None,
                 help=f'Sets list of metrics to compute over samples.'),
@@ -551,7 +551,9 @@ _output_options = [
         type=click.FLOAT, help=f'Sets error norm threshold below which convergence is achieved. Used only in convergence plots.'),
     click.option('--metadata_keys','-k', multiple=True, type=click.STRING, required=False),
     click.option('--region_mass', '-r', default=[0.95], show_default=True, multiple=True,
-              type=click.FloatRange(0,1), help=f'Sets high posterior density region mass.')
+              type=click.FloatRange(0,1), help=f'Sets high posterior density region mass.'),
+    click.option('--force_reload/--no-force_reload', default=False,is_flag=True, show_default=True,
+              help=f'Flag for whether output collections should be re-compiled and re-written to file.'),
 ]
 
 def output_options(func):
@@ -572,6 +574,14 @@ def output_options(func):
                     \b
                     {json.dumps(PLOT_HASHMAP,indent=4,separators=(',', ':')).replace('{','').replace('}','')}
                     ''')
+@click.option('--label', '-l', default=None, show_default=False, multiple=True,
+              type=click.STRING, help=f'Sets metadata key(s) to label figure elements by.')
+@click.option('--colour', '-c', default=None, show_default=False,
+              type=click.STRING, help=f'Sets metadata key(s) to colour figure elements by.')
+@click.option('--size', '-sz', default=None, show_default=False,
+              type=click.STRING, help=f'Sets metadata key(s) to size figure elements by.')
+@click.option('--visibility', '-v', default=None, show_default=False,
+              type=click.STRING, help=f'Sets metadata key(s) to determine figure element visibility (transparency) by.')
 @click.option('--geometry','-g', multiple=False, type=click.File(), default=None, 
                 help='Defines path to geometry geojson for visualising flows on a map.')
 @click.option('--origin_geometry_type', '-ogt', default='lsoa', show_default=True,
@@ -595,18 +605,16 @@ def output_options(func):
               help=f'Sets distance metric for lower dimensional embedding method')
 @click.option('--figure_format', '-ff', default='pdf', show_default=True,
               type=click.Choice(['eps', 'png', 'pdf', 'tex']), help=f'Sets figure format.')#, case_sensitive=False)
-@click.option('--data_format', '-df', default='dat', show_default=True,
-              type=click.Choice(['dat', 'txt']), help=f'Sets figure data format.')#, case_sensitive=False)
+@click.option('--data_format', '-df', default='json', show_default=True,
+              type=click.Choice(['dat', 'txt', 'json']), help=f'Sets figure data format.')#, case_sensitive=False)
 @click.option('--data_precision', '-dp', default=5, show_default=True,
               type=click.INT, help=f'Sets figure data precision.')#, case_sensitive=False)
 @click.option('--figure_size', '-fs', default=(7,5), show_default=True,
               type=(float, float), help=f'Sets figure format.')
-@click.option('--main_colormap', '-mc', default='cblue',required=False, show_default=True,
-              type=click.STRING, help=f'Sets main colormap (e.g. colormap corresponding to flows).')
-@click.option('--aux_colormap', '-ac', multiple=True, required=False, default=['Greens','Blues'],
-              type=click.STRING, help=f'Sets auxiliary colormap (e.g. colormap corresponding to margins).')
-@click.option('--label_by', '-l', default=None, show_default=False, multiple=True,
-              type=click.STRING, help=f'Sets metadata key(s) to label figure by.')
+@click.option('--main_colourmap', '-mc', default='cblue',required=False, show_default=True,
+              type=click.STRING, help=f'Sets main colourmap (e.g. colourmap corresponding to flows).')
+@click.option('--aux_colourmap', '-ac', multiple=True, required=False, default=['Greens','Blues'],
+              type=click.STRING, help=f'Sets auxiliary colourmap (e.g. colourmap corresponding to margins).')
 @click.option('--x_label', '-xlab', default=None, show_default=False,
               type=click.STRING, help=f'Sets x axis label.')
 @click.option('--y_label', '-ylab', default=None, show_default=False,
@@ -615,31 +623,31 @@ def output_options(func):
               type=(float, float), help=f'Sets x limits.')
 @click.option('--y_limit', '-ylim', default=(None,None), show_default=False,
               type=(float, float), help=f'Sets y limits.')
-@click.option('--color_segmentation_limits', '-csl', default=(0,1), show_default=False,
+@click.option('--colour_segmentation_limits', '-csl', default=(0,1), show_default=False,
               type=(click.FloatRange(0,1), click.FloatRange(0,1)), 
-              help=f'Sets main colorbar\'s color segmentation limits.')
-@click.option('--main_colorbar_limit', '-mcl', type=(float, float), help=f'Sets main colorbar limits.')
-@click.option('--auxiliary_colorbar_limit', '-acl', type=(float, float), multiple=True, help=f'Sets auxiliary colorbar(s) limits.')
+              help=f'Sets main colourbar\'s colour segmentation limits.')
+@click.option('--main_colourbar_limit', '-mcl', type=(float, float), help=f'Sets main colourbar limits.')
+@click.option('--auxiliary_colourbar_limit', '-acl', type=(float, float), multiple=True, help=f'Sets auxiliary colourbar(s) limits.')
 @click.option('--linewidth', '-lw', default=10, show_default=False,
               type=click.INT, help=f'Sets line width in plots.')
 @click.option('--figure_title', '-ft', default=None, show_default=False,
               type=click.STRING, help=f'Sets figure title.')
-@click.option('--colorbar_title', '-ct', default=None, show_default=False,
-              type=click.STRING, help=f'Sets colobar title (if colorbar exists).')
+@click.option('--colourbar_title', '-ct', default=None, show_default=False,
+              type=click.STRING, help=f'Sets colobar title (if colourbar exists).')
 @click.option('--opacity', '-op', default=1.0, show_default=True,
               type=click.FloatRange(0,1), help=f'Sets level of transparency in plot.')
 @click.option('--axis_font_size', '-afs', default=13, show_default=True,
               type=click.INT, help=f'Sets axis font size.')
 @click.option('--tick_font_size', '-tfs', default=13, show_default=True,
-              type=click.INT, help=f'Sets axis tick or colorbar font size.')
+              type=click.INT, help=f'Sets axis tick or colourbar font size.')
 @click.option('--axis_labelpad', '-alp', default=7, show_default=True,
               type=click.INT, help=f'Sets axis label padding.')
 @click.option('--axis_label_rotation', '-alr', default=0, show_default=True,
               type=click.INT, help=f'Sets axis label rotation.')
-@click.option('--colorbar_labelpad', '-clp', default=7, show_default=True,
-              type=click.INT, help=f'Sets colorbar label padding.')
-@click.option('--colorbar_label_rotation', '-clr', default=0, show_default=True,
-              type=click.INT, help=f'Sets colorbar label rotation.')
+@click.option('--colourbar_labelpad', '-clp', default=7, show_default=True,
+              type=click.INT, help=f'Sets colourbar label padding.')
+@click.option('--colourbar_label_rotation', '-clr', default=0, show_default=True,
+              type=click.INT, help=f'Sets colourbar label rotation.')
 @click.option('--title_label_size', '-tls', default=16, show_default=True,
               type=click.INT, help=f'Sets title font size.')
 @click.option('--legend_label_size', '-lls', default=None, show_default=False,
@@ -654,14 +662,16 @@ def output_options(func):
             type=click.INT, help='Plots marker every n-th poInt in dataset')
 @click.option('--marker_size','-ms', default = 1, show_default = True,
             type=click.INT, help='Sets marker size in plot')
+@click.option('--by_experiment/--no-by_experiment', '-be', default=False, is_flag=True, show_default=True,
+              help=f'Flag for plotting data separately for each experiment or not.')
 @click.option('--benchmark/--no-benchmark', '-bm', default=None, is_flag=True, show_default=True,
               help=f'Flag for plotting data along with benchmark/baseline (if provided).')
 @click.option('--annotate/--no-annotate', default=None, is_flag=True, show_default=True,
               help=f'Flag for annotating plot with text')
 @click.option('--transpose/--no-transpose', default=None, is_flag=True, show_default=True,
               help=f'Flag for taking switching origins with destinations in plots.')
-@click.option('--colorbar/--no-colorbar', default=None, is_flag=True, show_default=True,
-              help=f'Flag for plotting colorbars or not.')
+@click.option('--colourbar/--no-colourbar', default=None, is_flag=True, show_default=True,
+              help=f'Flag for plotting colourbars or not.')
 @click.pass_context
 def plot(
         ctx,
@@ -690,9 +700,14 @@ def plot(
         device,
         metadata_keys,
         region_mass,
+        force_reload,
         x,
         y,
         plots,
+        label,
+        colour,
+        size,
+        visibility,
         geometry,
         origin_geometry_type,
         destination_geometry_type,
@@ -707,24 +722,23 @@ def plot(
         data_format,
         data_precision,
         figure_size,
-        main_colormap,
-        aux_colormap,
-        label_by,
+        main_colourmap,
+        aux_colourmap,
         x_label,
         y_label,
         x_limit,
         y_limit,
-        color_segmentation_limits,
-        main_colorbar_limit,
-        auxiliary_colorbar_limit,
+        colour_segmentation_limits,
+        main_colourbar_limit,
+        auxiliary_colourbar_limit,
         linewidth,
         opacity,
         figure_title,
-        colorbar_title,
+        colourbar_title,
         axis_labelpad,
-        colorbar_labelpad,
+        colourbar_labelpad,
         axis_label_rotation,
-        colorbar_label_rotation,
+        colourbar_label_rotation,
         title_label_size,
         legend_label_size,
         annotation_label_size,
@@ -734,15 +748,15 @@ def plot(
         marker_size,
         x_tick_frequency,
         marker_frequency,
+        by_experiment,
         benchmark,
         annotate,
         transpose,
-        colorbar
+        colourbar
     ):
     """
     Plot experimental outputs.
     """
-
     # Gather all options in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
     # Capitalise all single-letter arguments
@@ -818,6 +832,7 @@ def summarise(
         device,
         metadata_keys,
         region_mass,
+        force_reload,
         algorithm,
         sort_by,
         ascending,
@@ -857,9 +872,10 @@ def summarise(
         settings=settings,
         logger=logger
     )
+    # Collect
+    experiment_metadata = outsum.collect_experiments_metadata()
     # Write experiment metadata to file
-    outsum.collect_experiment_metadata()
-
+    outsum.write_metadata_summaries(experiment_metadata)
 
     logger.info('Done')
 
