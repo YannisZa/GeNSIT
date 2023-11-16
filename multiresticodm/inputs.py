@@ -671,28 +671,28 @@ class Inputs:
         return destination_attraction_ts
 
     def __str__(self):
-        od = self.config.settings['inputs']['data']['origin_demand']
-        od = Path(od['file'] if isinstance(od,dict) else od)
-        dd = self.config.settings['inputs']['data']['destination_demand']
-        dd = Path(dd['file'] if isinstance(dd,dict) else dd)
-        oats = self.config.settings['inputs']['data']['origin_attraction_ts']
-        oats = Path(oats['file'] if isinstance(oats,dict) else oats)
-        dats = self.config.settings['inputs']['data']['destination_attraction_ts']
-        dats = Path(dats['file'] if isinstance(dats,dict) else dats)
-        cost = self.config.settings['inputs']['data']['cost_matrix']
-        cost = Path(cost['file'] if isinstance(cost,dict) else cost)
-        table = self.config.settings['inputs']['data']['table']
-        table = Path(table['file'] if isinstance(table,dict) else table)
-        total_cost_by_origin = self.config.settings['inputs']['data']['total_cost_by_origin']
-        total_cost_by_origin = Path(total_cost_by_origin['file'] if isinstance(total_cost_by_origin,dict) else total_cost_by_origin)
+        od = self.config.settings['inputs']['data'].get('origin_demand','not-found')
+        od = Path(od['file']).stem if isinstance(od,dict) else od
+        dd = self.config.settings['inputs']['data'].get('destination_demand','not-found')
+        dd = Path(dd['file']) if isinstance(dd,dict) else dd
+        oats = self.config.settings['inputs']['data'].get('origin_attraction_ts','not-found')
+        oats = Path(oats['file']) if isinstance(oats,dict) else oats
+        dats = self.config.settings['inputs']['data'].get('destination_attraction_ts','not-found')
+        dats = Path(dats['file']).stem if isinstance(dats,dict) else dats
+        cost = self.config.settings['inputs']['data'].get('cost_matrix','not-found')
+        cost = Path(cost['file']).stem if isinstance(cost,dict) else cost
+        table = self.config.settings['inputs']['data'].get('table','not-found')
+        table = Path(table['file']).stem if isinstance(table,dict) else table
+        total_cost_by_origin = self.config.settings['inputs']['data'].get('total_cost_by_origin','not-found')
+        total_cost_by_origin = Path(total_cost_by_origin['file']).stem if isinstance(total_cost_by_origin,dict) else total_cost_by_origin
 
         return f"""
             Dataset: {Path(self.config.settings['inputs']['dataset']).stem}
-            Cost matrix: {cost.stem if len(cost) > 0 else ''}
-            Total cost by origin: {total_cost_by_origin.stem if len(total_cost_by_origin) > 0 else ''}
-            Origin demand: {od.stem if len(od) > 0 else ''}
-            Destination demand: {dd.stem if len(dd) > 0 else ''}
-            Origin attraction time series: {oats.stem if len(oats) > 0 else ''}
-            Destination attraction time series: {dats.stem if len(dats) > 0 else ''}
-            Ground truth table: {table.stem if len(table) > 0 else ''}
+            Cost matrix: {cost}
+            Total cost by origin: {total_cost_by_origin}
+            Origin demand: {od}
+            Destination demand: {dd}
+            Origin attraction time series: {oats}
+            Destination attraction time series: {dats}
+            Ground truth table: {table}
         """
