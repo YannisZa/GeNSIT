@@ -1,7 +1,5 @@
-from glob import glob
 import os
 import re
-import gc
 import sys
 import zlib
 import gzip
@@ -15,10 +13,11 @@ import operator
 import tikzplotlib
 import numpy as np
 import pandas as pd
-from pathlib import Path
+import xarray as xr
 import matplotlib.pyplot as plt
 
 
+from pathlib import Path
 from copy import deepcopy
 from itertools import chain, count
 from difflib import SequenceMatcher
@@ -27,7 +26,7 @@ from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
 
 from multiresticodm.logger_class import *
-from multiresticodm.global_variables import NUMPY_TYPE_TO_DAT_TYPE
+from multiresticodm.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -62,6 +61,16 @@ def write_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
     np.save(file=filepath, arr=data)
 
 
+def write_netcdf(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
+    # Writing the DataArray to a NetCDF file inside a with context
+    data.to_netcdf(
+        path = filepath, 
+        mode = kwargs.get('mode','w'), 
+        engine = 'netcdf4',
+        group = kwargs.get('group','')
+    )
+
+
 def write_compressed_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
     # Write array to npy format
     with gzip.GzipFile(filepath, "wb", compresslevel=6) as f:
@@ -70,7 +79,10 @@ def write_compressed_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
 
 def write_figure(figure,filepath,**settings):
     
-    filepath += f"{settings.get('filename_ending','') if len(settings.get('filename_ending','')) == 0 else '_'+settings.get('filename_ending','')}.{settings['figure_format']}"
+    if settings.get('filename_ending','') == '':
+        filepath += '.'+settings['figure_format']
+    else:
+        filepath += '_'+str(settings.get('filename_ending',''))+'.'+settings['figure_format']
         
     if settings['figure_format'] == 'tex':
         # tikzplotlib.clean_figure(fig=figure)
@@ -81,44 +93,36 @@ def write_figure(figure,filepath,**settings):
     plt.close(figure)
 
 
-def write_figure_data(figure_data:Union[dict,pd.DataFrame],dirpath:str,groupby:list=[],key_type:dict={},**settings):
-    if isinstance(figure_data,dict):
-        for fgid in figure_data.keys():
+def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_type:dict={},**settings):
+    
+    for plot_setting in plot_settings:
+        # Keys must be included in figure data
+        assert set(key_type.keys()).issubset(set(list(plot_setting.keys())))
 
-
-            # Keys must be included in figure data
-            assert set(key_type.keys()).issubset(set(list(figure_data[fgid].keys())))
-
-            # Get filename
-            filename = figure_data[fgid]['label'].replace('%','percent').replace(' ','_').replace(':','_').replace(',','_')
-            # Add file extension
-            filename += '.'+settings.get('data_format','dat')
-            # Create filepath
-            filepath = os.path.join(dirpath,filename)
-
+        if settings.get('data_format','dat') == 'dat':
             # Write dat file
             write_tex_data(
                 key_type=key_type,
-                data=list(zip(*[np.asarray(figure_data[fgid][k],dtype=key_type[k]) for k in key_type.keys()])),
+                data=list(zip(*[np.asarray(plot_setting[k],dtype=key_type[k]) for k in key_type.keys()])),
                 filepath=filepath,
                 precision=settings.get('data_precision',19)
             )
-    elif isinstance(figure_data,pd.DataFrame):
-        for group_id,group in figure_data.groupby(groupby):
-            # Get filename
-            filename = group_id.replace('%','percent')
-            # Add file extension
-            filename += '.'+settings.get('data_format','dat')
-            # Create filepath
-            filepath = os.path.join(dirpath,filename)
-
-            # Write dat file
-            write_tex_data(
-                key_type=key_type,
-                data=group.loc[:,key_type.keys()].values,
-                filepath=filepath
+        else:
+            settings_copy = deepcopy(plot_settings)
+            settings_copy = deep_apply(settings_copy, type)
+            try:
+                print(json.dumps(settings_copy,indent=2))
+            except:
+                print(settings_copy)
+            write_json(
+                plot_settings,
+                filepath
             )
-
+        # Write plot settings to file
+        write_json(
+            settings,
+            filepath+'_settings.json'
+        )
 
 def read_file(filepath:str,**kwargs) -> np.ndarray:
     if filepath.endswith('.npy'):
@@ -138,6 +142,14 @@ def read_npy(filepath:str,**kwargs:Dict) -> np.ndarray:
     data = np.load(filepath).astype('float32')
     return data
 
+def read_netcdf_array(filepath:str,**kwargs:Dict) -> xr.DataArray:
+    if len(kwargs.get('group','')) > 0:
+        return xr.open_dataarray(
+            filepath,
+            group = kwargs['group']
+        )
+    else:
+        return xr.open_dataarray(filepath)
 
 def read_compressed_npy(filepath:str,**kwargs:Dict) -> np.ndarray:
     # Write array to npy format
@@ -147,6 +159,8 @@ def read_compressed_npy(filepath:str,**kwargs:Dict) -> np.ndarray:
 
 
 def write_tex_data(data:Union[np.array,np.ndarray],key_type:Union[list,np.array,np.ndarray],filepath:str,**kwargs:Dict) -> None:
+    if not filepath.endswith('.dat'):
+        filepath += '.dat'
     with open(filepath, 'w') as f:
         np.savetxt(
             f, 
@@ -165,6 +179,8 @@ def write_txt(data:Union[np.array,np.ndarray],filepath:str,**kwargs:Dict) -> Non
 
 
 def write_json(data:Dict,filepath:str,**kwargs:Dict) -> None:
+    if not filepath.endswith('.json'):
+        filepath += '.json'
     with open(filepath, 'w') as f:
         json.dump(data,f,**kwargs)
 
@@ -319,6 +335,24 @@ def deep_call(input:object,expressions:str,defaults:object,**kwargs):
             )
     return value
 
+def operate(input:object,operations:str,**kwargs):
+    operators_and_args = re.split(r"(\(.*\)|\[.*\]|\W+)",operations)
+    operators_and_args = [s for s in operators_and_args if len(s) > 0]
+    # Assert that the list of operators and arguments must by divisible by 2
+    # that is every operator is accopanied by an argument
+    try:
+        assert len(operators_and_args) % 2 == 0
+    except:
+        raise Exception(f"{operators_and_args} has length {len(operators_and_args)} which is not divisible by 2.")
+    value = input
+    for operator_arg in [operators_and_args[x:x+2] for x in range(0, len(operators_and_args), 2)]:
+        operator = operator_arg[0]
+        attr = operator_arg[1]
+        if attr.isnumeric():
+            value = OPERATORS[operator](value,string_to_numeric(attr))
+        else:
+            value = OPERATORS[operator](value,kwargs[attr])
+    return value
 
 # https://stackoverflow.com/questions/27265939/comparing-python-dictionaries-and-nested-dictionaries
 def findDiff(d1,d2,path:str="") -> None:
@@ -347,16 +381,26 @@ def find_common_substring(names):
 
     return substring_counts
 
-def get_all_subdirectories(out_path,stop_at:str='config.json'):
+def get_all_subdirectories(out_path,stop_at:str='config.json',level:int=2):
     directories = []
-    for entry in os.walk(out_path):
+    for root, dirs, files in walklevel(out_path,level=level):
         # If this is a dir that matches the stopping condition
         # or has a file that matches the stopping condition
-        if any([stop_at in subentry for subentry in entry[2]]):
-            entry_path = Path(entry[0])
+        if any([stop_at in file for file in files]):
+            entry_path = Path(root)
             directories.append(str(entry_path.absolute()))
 
     return directories
+
+def walklevel(some_dir, level=1):
+    some_dir = some_dir.rstrip(os.path.sep)
+    assert os.path.isdir(some_dir)
+    num_sep = some_dir.count(os.path.sep)
+    for root, dirs, files in os.walk(some_dir):
+        yield root, dirs, files
+        num_sep_this = root.count(os.path.sep)
+        if num_sep + level <= num_sep_this:
+            del dirs[:]
 
 def find_dataset_directory(dataset_name):
     # If only dataset is provide - save to that directory
@@ -487,8 +531,8 @@ def safe_delete(variable,instance=None):
 def unpack_statistics(settings):
     # Unpack statistics if they exist
     if 'statistic' in list(settings.keys()) and len(settings['statistic']) > 0:
-        statistics = []
-        for stat,dim in settings['statistic']:
+        statistics = {}
+        for metric,stat,dim in settings['statistic']:
             # print('stat',stat)
             # print('dim',dim)
             if isinstance(stat,str):
@@ -500,7 +544,6 @@ def unpack_statistics(settings):
                 stat_unpacked = deepcopy(stat)
             else:
                 raise Exception(f'Statistic name {stat} of type {type(stat)} not recognized')
-            
             if isinstance(dim,str): 
                 if '&' in dim:
                     dim_unpacked = dim.split('&')
@@ -529,8 +572,10 @@ def unpack_statistics(settings):
                 substatistics.append(list(zip(substat_unpacked,subdim_unpacked)))
             
             # Add statistic name and axes pair to list
-            statistics.append(substatistics)
-
+            if metric in statistics:
+                statistics[metric].append(substatistics)
+            else:
+                statistics[metric] = substatistics
         return {'statistic': statistics}
 
 def parse_slice_by(slice_by:list):
@@ -569,7 +614,7 @@ def stringify_index(d):
         return 'none'
     elif not np.isfinite(d):
         return 'none'
-    elif isinstance(d,float) or (hasattr(d,'dtype') and 'float' in str(d.dtype)):
+    elif isinstance(d,float) or ((hasattr(d,'dtype') and 'float' in str(d.dtype))):
         return str(d)
     else:
         return d
