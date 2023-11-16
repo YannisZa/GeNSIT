@@ -36,10 +36,21 @@ clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
 
 ## Figure 4
 
-clear; multiresticodm plot seed N -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
--et NonJointTableSIM_NN -s table -s intensity \
--l noise_regime -m SRMSE -m coverage_probability \
--p dss -b 0 -t 1
+-s intensity
+
+clear; multiresticodm plot seed iter -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
+-et NonJointTableSIM_NN -s table -ft 'seed_vs_epoch_smrse_and_coverage_prob_tradeoff' \
+-stat 'srmse' 'signedmean&' 'iter_seed&' \
+-stat 'coverage_probability' '&mean' '&origin_destination' \
+-l sample_name -l sigma -c srmse -sz coverage_probability -k seed -k iter -k type \
+-p dss -b 0 -t 1 -lls 8 -xlim -10 100000 -ylim -10 100000
+
+clear; multiresticodm plot seed iter -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
+-et NonJointTableSIM_NN -s table -s intensity -ft 'seed_vs_epoch_smrse_and_coverage_prob_tradeoff' \
+-stat 'srmse' 'signedmean&' 'iter_seed&' \
+-stat 'coverage_probability' '&mean' '&origin_destination' \
+-l type -l sample_name -l sigma -k seed -k iter -k type \
+-p dss -b 0 -t 1 -nw 20 --force_reload
 
 <!-- -fs 5 5 -ms 20 -ff pdf -tfs 14 -afs 14 -lls 18 -als 18 -->
 
