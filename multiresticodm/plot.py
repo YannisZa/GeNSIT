@@ -9,11 +9,12 @@ import sklearn.manifold
 import scipy.stats as stats
 import matplotlib as mpl
 import matplotlib.cm as cm
-from itertools import product
 import matplotlib.pyplot as plt
 
+from glob import glob
 from pathlib import Path
 from tqdm.auto import tqdm
+from itertools import product
 from scipy import interpolate
 from argparse import Namespace
 from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
@@ -21,12 +22,13 @@ from statsmodels.graphics.tsaplots import plot_acf
 
 from multiresticodm.utils import *
 from multiresticodm.colormaps import *
+from multiresticodm.config import Config
 from multiresticodm.global_variables import *
 from multiresticodm.outputs import Outputs,OutputSummary
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.spatial_interaction_model import instantiate_sim
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
-from multiresticodm.math_utils import apply_norm,map_distance_name_to_function,coverage_probability
+from multiresticodm.math_utils import map_distance_name_to_function,coverage_probability
 
 latex_preamble = r'''
 \usepackage{amsmath}
@@ -167,14 +169,31 @@ class Plot(object):
 
     def plot_2d_scatter(self,plot_settings,**kwargs):
         # Axes limits from settings (read only x limit)
-        axes_lims = [self.settings.get('x_limit',[None,None])[0],self.settings.get('x_limit',[None,None])[1]]
-        # Otherwise read from data
-        if None in axes_lims:
-            min_val,max_val = np.infty,-np.infty
-            for plot_setting in plot_settings:
-                min_val = min([np.min(plot_setting['x']),np.min(plot_setting['y']),min_val])
-                max_val = max([np.max(plot_setting['x']),np.max(plot_setting['y']),max_val])
-            axes_lims = [min_val-0.02,max_val+0.02]
+        axes_lims = {}
+        for var in ['x','y']:
+            axes_lims[var] = [self.settings.get(f'{var}_limit',[None,None])[0],self.settings.get(f'{var}_limit',[None,None])[1]]
+            # Otherwise read from data
+            if None in axes_lims[var]:
+
+                if axes_lims[var][0] is None:
+                    min_val = np.infty
+                else:
+                    min_val = axes_lims[var][0]
+                
+                if axes_lims[var][1] is None:
+                    max_val = -np.infty
+                else:
+                    max_val = axes_lims[var][1]
+                
+                for plot_setting in plot_settings:
+                    if self.settings.get(f'{var}_discrete',False):
+                        min_val = min([1,min_val])
+                        max_val = max([len(set(len(plot_setting[var])))+1,max_val])
+                    else:
+                        min_val = min([np.min(plot_setting[var]),min_val])
+                        max_val = max([np.max(plot_setting[var]),max_val])
+                # Update axis limits
+                axes_lims[var] = [min_val,max_val]
         
         # Figure size 
         fig = plt.figure(figsize=self.settings['figure_size'])
@@ -182,8 +201,8 @@ class Plot(object):
         # Plot benchmark (perfect predictions)
         if self.settings['benchmark']:
             plt.plot(
-                np.linspace(*axes_lims),
-                np.linspace(*axes_lims),
+                np.linspace(*axes_lims['x']),
+                np.linspace(*axes_lims['y']),
                 linewidth=0.2,
                 color='black'
             )
@@ -201,31 +220,84 @@ class Plot(object):
             )
         
         # Axis limits
-        plt.xlim(left=axes_lims[0], right=axes_lims[1])
-        plt.ylim(bottom=axes_lims[0], top=axes_lims[1])
-        
-        print(plot_settings)
-        for plot_setting in plot_settings:
-            # Plot x versus y
-            plt.scatter(
-                x = plot_setting['x'],
-                y = plot_setting['y'],
-                marker = plot_setting.get('marker','o'),
-                s = plot_setting.get('size',int(self.settings['marker_size'])),
-                label = plot_setting.get('label',''),
-                alpha = plot_setting.get('visibility',1.0)
+        plt.xlim(left=axes_lims['x'][0], right=axes_lims['x'][1])
+        plt.ylim(bottom=axes_lims['y'][0], top=axes_lims['y'][1])
+        print(axes_lims)
+        # Ticks
+        if self.settings.get('x_discrete',False):
+            # Get sorted unique x values
+            unique_x = set(list(flatten([plot_sett['x'] for plot_sett in plot_settings])))
+            unique_x = sorted(list(unique_x))
+            # Create a discrete hashmap
+            x_hashmap = dict(zip(unique_x,range(1,len(unique_x)+1)))
+            plt.xticks(
+                ticks = list(x_hashmap.values()),
+                labels = list(x_hashmap.keys())
             )
-            
+        if self.settings.get('y_discrete',False):
+            # Get sorted unique x values
+            unique_y = set(list(flatten([plot_sett['y'] for plot_sett in plot_settings])))
+            unique_y = sorted(list(unique_y))
+            # Create a discrete hashmap
+            y_hashmap = dict(zip(unique_y,range(1,len(unique_y)+1)))
+            plt.yticks(
+                ticks = list(y_hashmap.values()),
+                labels = list(y_hashmap.keys())
+            )
+        
+        # 2D scatter plot
+        for plot_sett in plot_settings:
+            # Extract data
+            x_range = list(map(lambda v: x_hashmap[v], plot_sett['x'])) \
+                    if self.settings.get('x_discrete',False) \
+                    else plot_sett['x']
+            y_range = list(map(lambda v: y_hashmap[v], plot_sett['y'])) \
+                    if self.settings.get('y_discrete',False) \
+                    else plot_sett['y']
+            sizes = plot_sett.get('size',int(self.settings['marker_size']))
+            colours = plot_sett.get('colour',None)
+            print('colours',colours)
+            alphas = plot_sett.get('visibility',np.array([1.0]))/max(plot_sett.get('visibility',np.array([1.0])))
+            labels = plot_sett.get('label','')
+            marker = plot_sett.get('marker','o')
+            hatch = plot_sett.get('hatch',None)
+            # Plot x versus y
+            for i in range(len(y_range)):
+                plt.scatter(
+                    x = x_range[i],
+                    y = y_range[i],
+                    s = sizes[i] if isinstance(sizes,Iterable) else sizes,
+                    c = colours[i] if isinstance(colours,Iterable) else colours,
+                    alpha = alphas[i] if len(alphas) > 1 else alphas[0],
+                    label = labels[i] if not isinstance(alphas,str) else labels,
+                    marker = marker,
+                    hatch = hatch
+                )
+
+            # Annotate data
+            if self.settings.get('annotate',False):
+                for i, txt in enumerate(plot_sett.get(self.settings.get('annotation_label',''),[])):
+                    plt.annotate(str(string_to_numeric(txt) if str(txt).isnumeric() else str(txt)), (x_range[i], y_range[i]))
+
+
         # Aspect ratio equal
-        # ax.set_aspect('equal', 'box')
         plt.gca().set_aspect('equal')
     
         # Legend
         try:
-            leg = plt.legend()
+            # Ensure no duplicate entries in legend exist
+            handles, labels = plt.gca().get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            leg = plt.legend(
+                by_label.values(), 
+                by_label.keys(),
+                frameon = False,
+                prop = {'size': self.settings.get('legend_label_size',None)}
+            )
             leg._ncol = 1
         except:
             pass
+
         
         # Tight layout
         plt.tight_layout()
@@ -249,1306 +321,220 @@ class Plot(object):
             plot_settings,
             filepath=filepath,
             key_type={'x':'float','y':'float'},
+            aux_keys=['label','marker','hatch','size','visibility','outputs'],
             **self.settings
         )
         self.logger.info(f"Figure exported to {dirpath}")
         self.logger.info(f"Filename: {filename}")
 
-    def plot_2d_histogram(self):
-
-        self.logger.info('Running parameter_histogram')
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            sim = instantiate_sim(dummy_config)
-
-            # Get only first n_samples as specified by settings
-            parameter_samples = outputs.load_samples('theta')
-            sign_samples = outputs.load_samples('sign')
-
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_histogram_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}"
-
-            # Define filepath
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
-            # Plot empirical mean
-            parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
-
-            # Plot parameter mixing
-            # Figure size 
-            fig,axs = plt.subplots(1,2,figsize=self.settings['figure_size'])
-            # Alpha plot
-            alpha_density = stats.gaussian_kde(parameter_samples[:, 0])
-            _,alpha_his = np.histogram(parameter_samples[:, 0],bins=self.settings['n_bins'], density=True)
-            smoothed_alpha_his = alpha_density(alpha_his)
-            axs[0].plot(alpha_his,alpha_density(alpha_his),label='samples')
-            axs[0].set_xlabel(r'$\alpha$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            # Prior plot
-            axs[0].axhline(y=0.5,color='blue',label='prior')
-            if self.settings['y_label'] is None:
-                axs[0].set_ylabel('Density',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
-                axs[0].set_ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            if hasattr(sim,'alpha_true') and sim.noise_regime == 'low':
-                axs[0].axvline(x=sim.alpha_true, color='black', linestyle='-',label='MAP')
-                axs[0].axvline(x=alpha_his[np.argmax(smoothed_alpha_his)],color='m',label='$\hat{MAP}$')
-            axs[0].axvline(x=parameter_mean[0],color='red',label=r'$\hat{\mu(\alpha)}$')
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                axs[0].set_xlim(max(0.0,x_min),min(x_max,2.0))
-            axs[0].set_ylim(0.0,None)
-            # Legend
-            leg0 = axs[0].legend()
-            leg0._ncol = 1
-
-            # Beta plot
-            beta_density = stats.gaussian_kde(parameter_samples[:, 1])
-            _,beta_his = np.histogram(parameter_samples[:, 1],bins=self.settings['n_bins'], density=True)
-            smoothed_beta_his = beta_density(beta_his)
-            axs[1].plot(beta_his,smoothed_beta_his,label='samples')
-            axs[1].set_xlabel(r'$\beta$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            # Prior plot
-            axs[1].axhline(y=0.5,color='blue',label='prior')
-            if self.settings['y_label'] is None:
-                axs[1].set_ylabel('Density',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
-                axs[1].set_ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            if hasattr(sim,'beta_true') and sim.noise_regime == 'low':
-                axs[1].axvline(x=sim.beta_true, color='black', linestyle='-',label='MAP')
-                axs[1].axvline(x=beta_his[np.argmax(smoothed_beta_his)],color='m',label='$\hat{MAP}$')
-            axs[1].axvline(x=parameter_mean[1],color='red',label=r'$\hat{\mu(\beta)}$')
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                axs[1].set_xlim(max(0.0,x_min),min(x_max,2.0))
-            axs[1].set_ylim(0.0,None)
-            # Legend
-            leg1 = axs[1].legend()
-            leg1._ncol = 1
-            
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Save figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-
-    def plot_2d_grid(self,index,experiment_id,sample_name,sample_symbol):
-            
-        # Options
-        params = {
-            'text.usetex' : True,
-            'font.size' : 20,
-            'legend.fontsize': 20,
-            'legend.handlelength': 2,
-            'font.family' : 'sans-serif',
-            'font.sans-serif':['Helvetica']
-        }
-
-        # plt.rcParams.update(params)
-        grid_size = outputs.experiment.config['grid_size']
-        amin,amax = outputs.experiment.config['a_range']
-        bmin,bmax = outputs.experiment.config['b_range']
-        # Get config and sim
-        outputs = Outputs(
-            output_directory,
-            self.settings,
-            log_to_console=False,
-            logger = self.logger
-        )
-        dummy_config = Namespace(**{'settings':outputs.experiment.config})
-        sim = instantiate_sim(dummy_config)
-        
-        # Update max values
-        bmin *= sim.bmax
-        bmax *= sim.bmax
-        # Create grid
-        alpha_values = np.linspace(amin, amax, grid_size,endpoint=True)
-        beta_values = np.linspace(bmin, bmax, grid_size,endpoint=True)
-        XX, YY = np.meshgrid(alpha_values, beta_values)
-        # Get values
-        values = outputs.load_samples(sample_name)
-
-        # Store values for upper and lower bounds of colorbar
-        colorbar_min = None
-        colorbar_max = None
-        if "colorbar_limit" in list(self.settings.keys()):
-            colorbar_min = self.settings['colorbar_limit'][0]
-            colorbar_max = self.settings['colorbar_limit'][1]
-        
-        # Update colorbar range if necessary
-        if colorbar_min is not None:
-            values[values<colorbar_min] = np.nan
-        if colorbar_max is not None:
-            values[values>colorbar_max] = np.nan
-
-        # Construct interpolator
-        interpolated_data = interpolate.griddata((XX[np.isfinite(values)].ravel(), 
-                                                YY[np.isfinite(values)].ravel()), 
-                                                values[np.isfinite(values)].ravel(), 
-                                                (XX[~np.isfinite(values)].ravel(), 
-                                                YY[~np.isfinite(values)].ravel()), 
-                                                method='nearest')
-        # Interpolate zero values
-        # values[~np.isfinite(values)] = interpolated_data
-
-        # Get output directory
-        output_directory = Path(self.outputs_directories[index])
-        
-        # Save R2 figure to file
-        filepath = os.path.join(
-                output_directory,
-                "figures",
-                f"table_{'x'.join([str(s) for s in sim.shape()])}_" + \
-                f"total_{sim.total_flow}_" + \
-                f"{outputs.experiment.config['type']}" + \
-                f"{self.settings['experiment_title']}" + \
-                f"{sim.noise_regime.title()}Noise"
-        )
-
-        # plt.hist(values.ravel())
-        # # Save figure to file
-        # write_figure(fig,filepath,**self.settings)
-        # Close figure
-        # plt.close()
-        # return 
-
-        # Initialise plot
-        fig = plt.figure(figsize=self.settings['figure_size'])
-        # Plot values
-        plt.contourf(XX, YY*(1/sim.bmax), values, cmap = self.settings['main_colormap'], vmin = colorbar_min, vmax = colorbar_max,levels=self.settings['n_bins'])
-        # plt.contourf(XX, YY*(1/sim.bmax), values, cmap = self.settings['main_colormap'])
-        # Plot x,y limits
-        plt.xlim([np.min(XX), np.max(XX)])
-        plt.ylim([np.min(YY)*(1/sim.bmax), np.max(YY)*(1/sim.bmax)])
-        # Plot colorbar
-        cbar = plt.colorbar()
-        cbar.set_label(sample_symbol,rotation=self.settings['colorbar_label_rotation'],labelpad=self.settings['colorbar_labelpad'])
-        # Plot ground truth and fitted value
-        plt.scatter(outputs.experiment.config['fitted_alpha'],outputs.experiment.config['fitted_scaled_beta'],color='blue',s=self.settings['marker_size']*(2/3),label='fitted')
-        # *(1/sim.bmax)
-        if hasattr(sim,'alpha_true') and hasattr(sim,'beta_true'):
-            plt.scatter(sim.alpha_true,sim.beta_true,color='red',s=self.settings['marker_size'],label='true',marker='x')
-        # Axis labels
-        plt.ylabel(r'$\beta$',rotation=self.settings['axis_label_rotation'],labelpad=self.settings['axis_labelpad'])
-        plt.xlabel(r'$\alpha$')
-        # X axis tick fontsize
-        plt.xticks(fontsize=self.settings['tick_font_size'])
-        plt.yticks(fontsize=self.settings['tick_font_size'])
-        # Legend
-        if self.settings['legend_label_size'] is not None:
-            leg = plt.legend(frameon=False,prop={'size': self.settings['legend_label_size']})
-        else:
-            leg = plt.legend(frameon=False)
-        leg._ncol = 1
-        for text in leg.get_texts():
-            text.set_color("white")
-        # Tight layout
-        plt.tight_layout()
-
-        # Write figure
-        write_figure(fig,filepath,**self.settings)
-
-    def plot_2d_error_norms(self,errors,statistic_name,statistic_symbol,sample_name,K:int=None):
-        self.logger.info(f"Plotting {self.settings['norm']} error norms")
-        # Define output filename
-        if len(errors.keys()) > 1:
-            # Get filename for comparison plot
-            filename = f"{statistic_name}_{sample_name}_" + \
-                        f"{self.settings['norm']}_norm_vs_iteration_comparison_" + \
-                        f"burnin{self.settings['burnin']}_" + \
-                        f"thinning{self.settings['thinning']}_" + \
-                        f"by_{'_'.join(list(self.settings['label_by']))}"
-            if K is not None:
-                filename += f"_{K}"
-
-            # Get path of first output directory
-            output_directory = Path(self.outputs_directories[0])
-            # Find dataset directory name
-            dataset = find_dataset_directory(self.settings['dataset_name'])
-            # Make directory for paper figures in parent directory
-            new_output_directory = os.path.join(
-                output_directory.parents[1].absolute(),
-                'paper_figures',
-                dataset
-            )
-            # Make new directory
-            makedir(new_output_directory)
-            # Define filepath
-            filepath = os.path.join(
-                new_output_directory,
-                filename
-            )
-        else:
-            config = errors[list(errors.keys())[0]]['config']
-            outputs_path = errors[list(errors.keys())[0]]['outputs_path']
-            filename = f"{config['table_dim']}_{statistic_name}_{sample_name}_" + \
-                    f"{self.settings['norm']}_norm_vs_iteration_" + \
-                    f"N{config['mcmc']['N']}_" + \
-                    f"burnin{self.settings['burnin']}_" + \
-                    f"thinning{self.settings['thinning']}_" + \
-                    f"{config['mcmc']['contingency_table']['proposal']}"
-            filepath = os.path.join(outputs_path,'figures',filename)
-
-        # Plot
-        fig = plt.figure(figsize=self.settings['figure_size'])
-        x_min = self.settings.get('burnin',0)
-
-        for i,experiment_id in enumerate(list(errors.keys())):
-            # Read outputs
-            self.logger.debug(f"Experiment id {experiment_id}")
-
-            # Read label(s) from settings
-            errors[experiment_id]['label'], \
-            label_by_key, \
-            label_by_val = create_dynamic_data_label(__self__=self,data=errors[experiment_id]['config'])
-
-            # Plot error norm for current file
-            x_max = self.settings.get('N',errors[experiment_id]['config']['mcmc'].get('N',-1))
-            x_range = list(range(
-                        self.settings['burnin'],
-                        errors[experiment_id]['config']['mcmc'].get('N',1),
-                        self.settings['thinning']
-            ))
-            x_range = x_range[0:int(x_max):1]
-            # Add x range to error data
-            errors[experiment_id]['x'] = x_range
-            print('experiment_id',experiment_id,'x_range',np.min(x_range),np.max(x_range))
-
-            try:
-                assert len(x_range) == len(errors[experiment_id]['y'])
-            except:
-                print('x range',np.shape(x_range))
-                print('y range',np.shape(errors[experiment_id]['y']))
-                raise Exception('Mismatch in x and y range shapes')
-
-            # Plot error norms for each value in x range
-            if self.settings['marker_frequency'] is not None:
-                plt.plot(
-                    x_range,
-                    errors[experiment_id]['y'], 
-                    label=errors[experiment_id]['label'], 
-                    marker='o',
-                    markevery=int(self.settings['marker_frequency']), 
-                    markersize=int(self.settings['marker_size'])
-                )
-            else:
-                plt.plot(
-                    x_range,
-                    errors[experiment_id]['y'], 
-                    label=errors[experiment_id]['label']
-                )
-
-        # Title
-        if self.settings['figure_title'] is not None:
-            plt.title(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-        # X,Y labels
-        plt.xlabel(self.settings.get('x_label','Iteration').replace("_"," "),fontsize=self.settings['axis_font_size'])
-        if self.settings['y_label'] is None:
-            norm_name = self.settings['norm'].replace("relative_","").capitalize()
-            plt.ylabel(fr"${{{norm_name}}}$ norm of ${{{statistic_symbol}}}$",fontsize=self.settings['axis_font_size'])
-        elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
-            plt.ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'])
-        # X,Y limits
-        if x_min is not None and x_max is not None:
-            plt.xlim(x_min,min(x_max,np.max(x_range)))
-        else:
-            plt.xlim(-10,np.max(x_range))
-        # Legend
-        if len(errors.keys()) > 0:
-            leg = plt.legend()
-            leg._ncol = 1
-
-        y_min,y_max = self.settings['y_limit']
-        if y_min is not None and y_max is not None:
-            plt.ylim(y_min,min(y_max,np.max([max(errors[k]['y']) for k in errors.keys()])))
-        else:
-            plt.ylim(0.0,np.max([np.max(errors[k]['y']) for k in errors.keys()]))
-
-        # X,Y label ticks
-        plt.locator_params(axis='x', nbins=self.settings['x_tick_frequency'])
-        # benchmark
-        if self.settings['benchmark']:
-            plt.axhline(y=0,color='red')
-        # Tight layout
-        plt.tight_layout()
-        # Export figure
-        write_figure_data(
-            errors,
-            Path(filepath).parent,
-            groupby=[],
-            key_type={'x':'int','y':'float'},
-            **self.settings
-        )
-        write_figure(fig,filepath,**self.settings)
-        
-    
-    def plot_2d_lower_dimensional_embedding(self,filepath,embedded_data):
-        
-        self.logger.info(f"Plotting lower dimensional embedding of table data")
-
-        if embedded_data.shape[1] == 3:
-
-            # Figure size 
-            fig,ax = plt.subplots(1,1,figsize=self.settings['figure_size'])
-            # Title
-            if self.settings['figure_title'] is not None:
-                ax.set_title(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            
-            # Plot embedded tabular data
-            for sample_name,projected_sample in embedded_data.groupby("sample_name"):
-                if sample_name == 'ground_truth':
-                    ax.scatter(
-                        projected_sample.x.values,
-                        projected_sample.y.values,
-                        label=sample_name,
-                        zorder=1,
-                        s=200,
-                        linewidth=5
-                    )
-                else:
-                    ax.scatter(
-                        projected_sample.x.values,
-                        projected_sample.y.values,
-                        label=sample_name,
-                        zorder=11,
-                        s=5
-                    )
-            
-            # ax.scatter(
-            #     0.0000375,
-            #     0.00003,
-            #     label='ground truth',
-            #     marker="+",
-            #     s=200,
-            #     linewidths=5,
-            #     zorder=1
-            # )
-
-            # Plot axis labels
-            if self.settings['x_label'] is None:
-                ax.set_xlabel('Projected dimension 1',fontsize=self.settings['axis_font_size'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                ax.set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'])
-            if self.settings['y_label'] is None:
-                ax.set_ylabel('Projected dimension 2',fontsize=self.settings['axis_font_size'])
-            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
-                ax.set_ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size']) 
-            # Legend
-            if 'legend_label_size' in list(self.settings.keys()):
-                leg = plt.legend(prop={'size': self.settings['legend_label_size']},loc = 'upper left')
-            else:
-                leg = plt.legend(loc = 'upper left')
-            leg._ncol = 1
-            # Ticks
-            # plt.xticks(fontsize=self.settings['tick_font_size'])
-            # plt.yticks(fontsize=self.settings['tick_font_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Write figure
-            write_figure_data(
-                embedded_data,
-                Path(filepath).parent,
-                key_type={'x':'float','y':'float'},
-                groupby=['sample_name'],
-                **self.settings
-            )
-            write_figure(
-                fig,
-                filepath,
-                **self.settings
-            )
-
-            self.logger.info(f"Figure exported to {Path(filepath).parent}")
-            self.logger.info(f"Filename: {Path(filepath).parent}")
-
-        else:
-            raise Exception(f"Cannot handled embedded data of dimension {embedded_data.shape[1]}")
-
-    def plot_2d_heatmap(self):
-        
-        self.logger.info('Running origin_destination_table_tabular')
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                experiment=output_directory,
-                settings=self.settings,
-                # order is important in output_names
-                output_names = (['ground_truth_table']+list(self.settings['sample'])),
-                slice_samples=True,
-                log_to_console=False,
-                logger = self.logger
-            )
-
-            for sample in self.settings['sample']:
-                
-                # Load table
-                try:
-                    table = outputs.apply_sample_statistics(
-                        samples=outputs.experiment.results[sample],
-                        sample_name=sample,
-                        statistic_axes=self.settings['statistic'][0]
-                    )
-                    origin_demand = outputs.apply_sample_statistics(
-                        samples=table,
-                        sample_name=sample,
-                        statistic_axes=self.settings['statistic'][1]
-                    )
-                    destination_demand = outputs.apply_sample_statistics(
-                        samples=table,
-                        sample_name=sample,
-                        statistic_axes=self.settings['statistic'][2]
-                    )
-                except:
-                    self.logger.debug(traceback.format_exc())
-                    self.logger.error(f"Could not load sample {sample} for experiment {outputs.experiment_id}. Tabular heatmap could not be plotted.")
-                    continue
-
-                # Get table dimensions
-                I,J = np.shape(table)
-                cells = [(i,j) for i in range(I+1) for j in range(J+1)]
-
-                # Define filepath
-                self.settings['viz_type'] = 'tabular'
-                filename = outputs.create_filename(sample=sample)
-                filepath = os.path.join(outputs.outputs_path,'figures',filename)
-
-                flow_colorbar_min,flow_colorbar_max = None, None
-                if self.settings.get('main_colorbar_limit',None) is not None:
-                    flow_colorbar_min,flow_colorbar_max = self.settings['main_colorbar_limit']
-                else:
-                    flow_colorbar_min,flow_colorbar_max = np.min(table.ravel()),np.max(table.ravel())
-                
-                origin_colorbar_min,origin_colorbar_max = None, None
-                destination_colorbar_min,destination_colorbar_max = None, None
-                if len(self.settings.get('auxiliary_colorbar_limit',[])) > 0:
-                    if len(np.shape(self.settings['auxiliary_colorbar_limit'])) == 1:
-                        origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit']
-                    elif len(np.shape(self.settings['auxiliary_colorbar_limit'])) > 1:
-                        origin_colorbar_min,origin_colorbar_max = self.settings['auxiliary_colorbar_limit'][0]
-                        destination_colorbar_min,destination_colorbar_max = self.settings['auxiliary_colorbar_limit'][1]
-                else:
-                    origin_colorbar_min,origin_colorbar_max = np.min(origin_demand.ravel()),np.max(origin_demand.ravel())
-                    destination_colorbar_min,destination_colorbar_max = np.min(destination_demand.ravel()), np.max(destination_demand.ravel())
-                    
-                # Normalise colormaps
-                if flow_colorbar_min < 0:
-                    # If error flows are plotted, center colormap at zero
-                    flow_norm = mpl.colors.SymLogNorm(vmin=flow_colorbar_min, vmax=flow_colorbar_max, linthresh=0.001)
-                else:
-                    flow_norm = mpl.colors.TwoSlopeNorm(vmin=flow_colorbar_min, vmax=flow_colorbar_max,vcenter=float(self.settings.get('fvcenter',np.mean(table))))
-                if origin_colorbar_min < 0:
-                    # If error origin demand is plotted, center colormap at zero
-                    origin_norm = mpl.colors.SymLogNorm(vmin=origin_colorbar_min, vmax=origin_colorbar_max, linthresh=0.001)
-                else:
-                    origin_norm = mpl.colors.Normalize(vmin=origin_colorbar_min, vmax=origin_colorbar_max)
-                if destination_colorbar_min < 0:
-                    # If error destination demand is plotted, center colormap at zero
-                    destination_norm = mpl.colors.SymLogNorm(vmin=destination_colorbar_min, vmax=destination_colorbar_max, linthresh=0.001)
-                else:
-                    destination_norm = mpl.colors.Normalize(vmin=destination_colorbar_min, vmax=destination_colorbar_max)
-                print('\n')
-                print(outputs.experiment_id)
-                print(sample)
-                print('\n')
-                print('flow')
-                print('data',np.min(table.ravel()),np.max(table.ravel()))
-                print('settings',flow_norm.vmin,flow_norm.vmax)
-                print('\n')
-                print('origin')
-                print('data',np.min(origin_demand.ravel()),np.max(origin_demand.ravel()))
-                print('settings',origin_norm.vmin,origin_norm.vmax)
-                print('\n')
-                print('destination')
-                print('data',np.min(destination_demand.ravel()), np.max(destination_demand.ravel()))
-                print('settings',destination_norm.vmin,destination_norm.vmax)
-
-                # Define colorbars for flows, and margins
-                flow_base_cmap = cm.get_cmap(self.settings['main_colormap'])
-                # Clip colors in colorbar to specific range
-                colors = flow_base_cmap( 
-                    np.linspace(
-                            self.settings['color_segmentation_limits'][0], 
-                            self.settings['color_segmentation_limits'][1], 
-                            self.settings['x_tick_frequency']
-                    )
-                )
-                flow_color_segmented_cmap = mpl.colors.LinearSegmentedColormap.from_list(self.settings['main_colormap'], colors)
-                flow_mapper = cm.ScalarMappable(
-                            norm=flow_norm, 
-                            cmap=flow_color_segmented_cmap
-                )
-                origin_flow_mapper = cm.ScalarMappable(
-                    norm = origin_norm,
-                    cmap = cm.get_cmap(self.settings['aux_colormap'][0])
-                )
-                destination_flow_mapper = cm.ScalarMappable(
-                    norm = destination_norm, 
-                    cmap = cm.get_cmap(self.settings['aux_colormap'][1])
-                )
-                
-                # Setup plot
-                fig = plt.figure(figsize=self.settings['figure_size'])
-                if self.settings['colorbar']:
-                    widths_ratios = [2,2,2,J,1]
-                    height_ratios = [1,I]
-                    if self.settings['transpose']:
-                        widths_ratios = [4,4,4,I,1]
-                        height_ratios = [1,J]
-                    
-                    gs = GridSpec(
-                            nrows=2,
-                            ncols=5,
-                            hspace=0.0,
-                            wspace=0.0,
-                            width_ratios=widths_ratios,
-                            height_ratios=height_ratios
-                    )
-
-                    cbar_gs = GridSpecFromSubplotSpec(1, 3, subplot_spec = gs[:,0:3], wspace = 0.5, hspace=0.0, width_ratios = [3,2,1])
-                    table_ax = fig.add_subplot(gs[1,3])
-                    # flow_cbar_ax = fig.add_subplot(gs[:,0])
-                    # origin_cbar_ax = fig.add_subplot(gs[:,1])
-                    # destination_cbar_ax = fig.add_subplot(gs[:,2])
-                    flow_cbar_ax = fig.add_subplot(cbar_gs[0])
-                    origin_cbar_ax = fig.add_subplot(cbar_gs[1])
-                    destination_cbar_ax = fig.add_subplot(cbar_gs[2])
-                    if self.settings['transpose']:
-                        origin_margin_ax = fig.add_subplot(gs[0,3])
-                        destination_margin_ax = fig.add_subplot(gs[1,4])
-                    else:
-                        origin_margin_ax = fig.add_subplot(gs[1,4])
-                        destination_margin_ax = fig.add_subplot(gs[0,3])
-                    # Set order of appearance
-                    # flow_cbar_ax.set_zorder(2)
-                    # origin_cbar_ax.set_zorder(3)
-                    # destination_cbar_ax.set_zorder(3)
-                    flow_cbar_ax.axis('off')
-                    origin_cbar_ax.axis('off')
-                    destination_cbar_ax.axis('off')
-                else:
-                    image_widths_ratios = [J,1]
-                    image_heights_ratios = [1,I]
-                    if self.settings['transpose']:
-                        image_widths_ratios = [I,1]
-                        image_heights_ratios = [1,J]
-                    
-                    image_gs = GridSpec(
-                        nrows = 2,
-                        ncols = 2,
-                        width_ratios = image_widths_ratios,
-                        height_ratios = image_heights_ratios,
-                        wspace = 0.0,
-                        hspace = 0.0
-                    )
-
-                    table_ax = fig.add_subplot(image_gs[1,0])
-                    if self.settings['transpose']:
-                        destination_margin_ax = fig.add_subplot(image_gs[1,1])                
-                        origin_margin_ax = fig.add_subplot(image_gs[0,0])
-                    else:
-                        origin_margin_ax = fig.add_subplot(image_gs[1,1])
-                        destination_margin_ax = fig.add_subplot(image_gs[0,0])
-                    
-                
-                # Set order of appearance
-                table_ax.set_zorder(1)
-                origin_margin_ax.set_zorder(2)
-                destination_margin_ax.set_zorder(2)
-                # Set axes off
-                table_ax.axis('off')
-                
-                # Plot table
-                if self.settings['transpose']:
-                    table_ax.imshow(
-                        table.T,
-                        cmap=flow_mapper.get_cmap(),
-                        interpolation='nearest',
-                        norm = flow_norm,
-                        zorder = 1,
-                        aspect='auto',
-                    )
-                else:
-                    table_ax.imshow(
-                        table,
-                        cmap=flow_color_segmented_cmap,#flow_mapper.get_cmap(),#self.settings['main_colormap'],
-                        interpolation='nearest',
-                        norm = flow_norm,
-                        zorder = 1,
-                        aspect='auto'
-                    )
-                # Plot margins
-                if self.settings['transpose']:
-                    origin_margin_ax.imshow(
-                        table.T.sum(axis=0)[np.newaxis,:], 
-                        cmap=self.settings['aux_colormap'][0],
-                        interpolation='nearest', 
-                        # norm = origin_norm,
-                        aspect='auto'
-                    )
-                else:
-                    origin_margin_ax.imshow(
-                        table.sum(axis=1)[np.newaxis,:], 
-                        cmap=self.settings['aux_colormap'][0],
-                        interpolation='nearest', 
-                        norm = origin_norm,
-                        aspect='auto'
-                    )
-                if self.settings['transpose']:
-                    destination_margin_ax.imshow(
-                        table.T.sum(axis=1)[:,np.newaxis], 
-                        cmap=self.settings['aux_colormap'][1],
-                        interpolation='nearest', 
-                        norm = destination_norm,
-                        aspect='auto'
-                    )
-                else:
-                    destination_margin_ax.imshow(
-                        table.sum(axis=0)[:,np.newaxis], 
-                        cmap=self.settings['aux_colormap'][1],
-                        interpolation='nearest', 
-                        norm = destination_norm,
-                        aspect='auto'
-                    )
-                    
-                # X-Y ticks
-                if self.settings['transpose']:
-
-                    origin_margin_ax.set_yticks([])
-                    origin_margin_ax.set_xticks(range(I))
-                    origin_margin_ax.set_xticklabels(range(I),fontsize=self.settings['tick_font_size'])
-                    origin_margin_ax.set_title(
-                        'Origins',
-                        fontsize=self.settings['legend_label_size'],
-                        # labelpad=self.settings['axis_labelpad']
-                    )
-                    origin_margin_ax.xaxis.locator = mpl.ticker.MaxNLocator(nbins=I)
-                    origin_margin_ax.xaxis.set_minor_locator(mpl.ticker.NullLocator())
-                    origin_margin_ax.xaxis.set_label_position("top")
-                    origin_margin_ax.xaxis.tick_top()                
-
-                    destination_margin_ax.set_xticks([])
-                    destination_margin_ax.set_yticks(range(J))
-                    destination_margin_ax.set_yticklabels(range(J),fontsize=self.settings['tick_font_size'])
-                    destination_margin_ax.set_ylabel(
-                        'Destinations',
-                        fontsize=self.settings['legend_label_size'],
-                        rotation=270,
-                        labelpad=self.settings['axis_labelpad']
-                    )
-                    destination_margin_ax.yaxis.locator = mpl.ticker.MaxNLocator(nbins=J)
-                    destination_margin_ax.yaxis.set_minor_locator(mpl.ticker.NullLocator())
-                    destination_margin_ax.yaxis.set_label_position("right")
-                    destination_margin_ax.yaxis.tick_right()
-                    
-                else:
-                    origin_margin_ax.set_xticks([])
-                    origin_margin_ax.set_yticks(range(I))
-                    origin_margin_ax.set_yticklabels(range(I),fontsize=self.settings['tick_font_size'])
-                    origin_margin_ax.set_ylabel(
-                        'Origins',
-                        fontsize=self.settings['tick_font_size'],
-                        rotation=270,
-                        labelpad=self.settings['axis_labelpad']
-                    )
-                    origin_margin_ax.locator = mpl.ticker.MaxNLocator(nbins=I)
-                    origin_margin_ax.yaxis.set_minor_locator(mpl.ticker.NullLocator())
-                    origin_margin_ax.yaxis.set_label_position("right")
-                    origin_margin_ax.yaxis.tick_right()
-
-                    destination_margin_ax.set_yticks([])
-                    destination_margin_ax.set_xticks(range(J))
-                    destination_margin_ax.set_xticklabels(range(J),fontsize=self.settings['tick_font_size'])
-                    destination_margin_ax.set_title(
-                        'Destinations',
-                        fontsize=self.settings['legend_label_size'],
-                        # labelpad=self.settings['axis_labelpad']
-                    )
-                    destination_margin_ax.locator = mpl.ticker.MaxNLocator(nbins=J)
-                    destination_margin_ax.xaxis.set_minor_locator(mpl.ticker.NullLocator())
-                    destination_margin_ax.xaxis.set_label_position("top")
-                    destination_margin_ax.xaxis.tick_top()
-                
-                table_ax.xaxis.set_tick_params(labelbottom=False)
-                table_ax.yaxis.set_tick_params(labelleft=False)
-                table_ax.set_xticks([])
-                table_ax.set_yticks([])
-                table_ax.get_xaxis().set_ticks([])
-                table_ax.get_yaxis().set_ticks([])
-
-                # Annotate
-                covered_cells = None
-                if self.settings['annotate']:
-                    try:
-                        # Compute coverage probabilities
-                        coverage_probabilities = coverage_probability(
-                                            tab=outputs.experiment.results.get(sample,None),
-                                            tab0=outputs.ground_truth_table,
-                                            kwargs={"region_mass":0.99}
-                                        )
-
-                        # Eliminate last axis
-                        coverage_probabilities = coverage_probabilities.sum(axis=-1)
-                    except:
-                        self.logger.debug(traceback.format_exc())
-                        self.logger.error(f"Annotation by coverage probabilities omitted")
-                        continue
-                    # dummy_config = Namespace(**{'settings':outputs.experiment.config})
-                    # ct = instantiate_ct(table=None,config=dummy_config,log_to_console=False)
-                    # print('\n')
-                    for (i,j),label in np.ndenumerate(coverage_probabilities):
-                        # lower_bound_hpdr,upper_bound_hpdr =     calculate_min_interval(np.sort(outputs.experiment.results.get(sample,None)[(...,i,j)]),0.01)
-                        # print(
-                        #     'covered' if bool(label) else '',
-                        #     'fixed cell' if bool((i,j) in ct.constraints['cells']) else '',
-                        #     (i,j),
-                        #     ct.table[i,j],
-                        #     lower_bound_hpdr,
-                        #     upper_bound_hpdr
-                        # )
-                        if bool(label):
-                            if self.settings['transpose']:
-                                table_ax.text(
-                                    i,
-                                    j,
-                                    u'\u2713',
-                                    ha='center',
-                                    va='center',
-                                    fontsize=self.settings['annotation_label_size']
-                                )
-                            else:
-                                table_ax.text(
-                                    i,
-                                    j,
-                                    u'\u2713',
-                                    ha='center',
-                                    va='center',
-                                    fontsize=self.settings['annotation_label_size']
-                                )
-                    # Get covered cells
-                    print(np.mean(coverage_probabilities))
-                    covered_cell_locations = np.argwhere(coverage_probabilities==1)
-                    covered_cells = {
-                        "x":covered_cell_locations[:,0].astype('int32'),
-                        "y":covered_cell_locations[:,1].astype('int32'),
-                        "label":f"{sample}_covered_cell_coordinates",
-                        "config":outputs.experiment.config,
-                        "outputs_path":outputs.outputs_path
-                    }
-
-                if self.settings['colorbar']:
-                    # Colorbar
-                    flow_cbar = fig.colorbar(
-                        flow_mapper,
-                        ax=flow_cbar_ax,
-                        fraction=1,
-                        pad=0.0,
-                        location='left',
-                    )
-
-                    flow_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-                    if self.settings['colorbar_title'] is not None:
-                        flow_cbar.ax.set_title(self.settings['colorbar_title'].replace("_"," ").capitalize(),fontsize=self.settings['legend_label_size'])
-                    else:
-                        flow_cbar.ax.set_title('Flow',fontsize=self.settings['legend_label_size'])
-                    flow_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-                    flow_cbar.ax.yaxis.set_ticks_position('left')
-                    flow_cbar.update_ticks()
-
-                    origin_margin_cbar = fig.colorbar(
-                        origin_flow_mapper,
-                        ax=origin_cbar_ax,
-                        fraction=1, 
-                        pad=0.0,
-                    )
-                    origin_margin_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-                    origin_margin_cbar.ax.set_title(
-                        r'$O_i$',
-                        fontsize=self.settings['legend_label_size']
-                    )
-                    origin_margin_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-                    origin_margin_cbar.ax.yaxis.set_ticks_position('left')
-                    origin_margin_cbar.update_ticks()
-
-                    destination_margin_cbar = fig.colorbar(
-                        destination_flow_mapper,
-                        ax=destination_cbar_ax,
-                        fraction=1, 
-                        pad=0.0,
-                    )
-
-                    destination_margin_cbar.ax.tick_params(labelsize=self.settings['tick_font_size'])
-                    destination_margin_cbar.ax.set_title(
-                        r'$D_j$',
-                        fontsize=self.settings['legend_label_size']
-                    )
-                    destination_margin_cbar.locator = mpl.ticker.MaxNLocator(nbins=self.settings['x_tick_frequency'])
-                    destination_margin_cbar.ax.yaxis.set_ticks_position('left')
-                    destination_margin_cbar.update_ticks()
-
-                # Title
-                # if self.settings['figure_title'] is not None:
-                #     table_ax.set_title(
-                #         self.settings['figure_title'].replace("_"," ").capitalize(),
-                #         fontsize=self.settings['title_label_size']
-                #     )
-                # else:
-                #     table_ax.set_title(
-                #         self.settings['sample'][0].replace("_"," ").capitalize(),
-                #         fontsize=self.settings['title_label_size']
-                #     )
-
-                # Remove space
-                plt.tight_layout()
-                # Write figure
-                write_figure(
-                    fig,
-                    filepath,
-                    **self.settings
-                )
-                # Collect table data
-                table_data = {
-                    "x":np.array([cell[0] for cell in cells],dtype='int32'),
-                    "y":np.array([cell[1] for cell in cells],dtype='int32'),
-                    "z":np.array([table[cell[0]-1,cell[1]-1] if ((cell[0] > 0) and (cell[1] > 0)) else 0 for cell in cells],dtype='float64'),
-                    "color":np.array([flow_norm(table[cell[0]-1,cell[1]-1]) if ((cell[0] > 0) and (cell[1] > 0)) else 0.5 for cell in cells],dtype='float64'),
-                    "label":f"{sample}_cell_data",
-                    "config":outputs.experiment.config,
-                    "outputs_path":outputs.outputs_path
-                }
-                origin_demand_data = {
-                    "x":np.array([cell[0] for cell in cells if (cell[1] >= J-1) and (cell[0] < I)],dtype='int32'),
-                    "y":np.array([cell[1]+1 for cell in cells if (cell[1] >= J-1) and (cell[0] < I)],dtype='int32'),
-                    "z":np.array([origin_demand[cell[0]-1] for cell in cells if (cell[1] >= J-1) and (cell[0] < I)],dtype='float64'),
-                    "color":np.array([origin_norm(origin_demand[cell[0]-1]) for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='float64'),
-                    "label":f"{sample}_origin_demand_cell_data",
-                    "config":outputs.experiment.config,
-                    "outputs_path":outputs.outputs_path
-                }
-                destination_demand_data = {
-                    "x":np.array([cell[0]+1 for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='int32'),
-                    "y":np.array([cell[1] for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='int32'),
-                    "z":np.array([destination_demand[cell[1]-1] for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='float64'),
-                    "color":np.array([destination_norm(destination_demand[cell[1]-1]) for cell in cells if (cell[0] >= I-1) and (cell[1] < J)],dtype='float64'),
-                    "label":f"{sample}_destination_demand_cell_data",
-                    "config":outputs.experiment.config,
-                    "outputs_path":outputs.outputs_path
-                }
-                print(table.sum(axis=0))
-                print(destination_demand_data['z'])
-                print(destination_demand_data['x'].shape)
-                print(destination_demand_data['y'].shape)
-                print(destination_demand_data['z'].shape)
-
-                flow_colorbar_data = {
-                    "ticks":np.array([t for t in flow_cbar.ax.get_yticks()],dtype='float32'),
-                    "locations":np.array([flow_norm(t) for t in flow_cbar.ax.get_yticks()],dtype='float32'),
-                    "label":f"{sample}_colorbar_ticks",
-                    "config":outputs.experiment.config,
-                    "outputs_path":outputs.outputs_path
-                }
-                origin_demand_colorbar_data = {
-                    "ticks":np.array([t for t in origin_margin_cbar.ax.get_yticks()],dtype='float32'),
-                    "locations":np.array([origin_norm(t) for t in origin_margin_cbar.ax.get_yticks()],dtype='float32'),
-                    "label":f"{sample}_origin_demand_colorbar_ticks",
-                    "config":outputs.experiment.config,
-                    "outputs_path":outputs.outputs_path
-                }
-                destination_demand_colorbar_data = {
-                    "ticks":np.array([t for t in destination_margin_cbar.ax.get_yticks()],dtype='float32'),
-                    "locations":np.array([destination_norm(t) for t in destination_margin_cbar.ax.get_yticks()],dtype='float32'),
-                    "label":f"{sample}_destination_demand_colorbar_ticks",
-                    "config":outputs.experiment.config,
-                    "outputs_path":outputs.outputs_path
-                }
-                # Write figure data
-                write_figure_data(
-                    {outputs.experiment_id:flow_colorbar_data},
-                    Path(filepath).parent,
-                    groupby=[],
-                    key_type={'ticks':'float','locations':'float'},
-                    data_format='txt',
-                    data_precision=4,
-                )
-                write_figure_data(
-                    {outputs.experiment_id:origin_demand_colorbar_data},
-                    Path(filepath).parent,
-                    groupby=[],
-                    key_type={'ticks':'float','locations':'float'},
-                    data_format='txt',
-                    data_precision=4,
-                )
-                write_figure_data(
-                    {outputs.experiment_id:destination_demand_colorbar_data},
-                    Path(filepath).parent,
-                    groupby=[],
-                    key_type={'ticks':'float','locations':'float'},
-                    data_format='txt',
-                    data_precision=4,
-                )
-                write_figure_data(
-                    {outputs.experiment_id:table_data},
-                    Path(filepath).parent,
-                    groupby=[],
-                    key_type={'x':'int','y':'int','z':'float','color':'float'},
-                    **self.settings
-                )
-                write_figure_data(
-                    {outputs.experiment_id:origin_demand_data},
-                    Path(filepath).parent,
-                    groupby=[],
-                    key_type={'x':'int','y':'int','z':'float','color':'float'},
-                    **self.settings
-                )
-                write_figure_data(
-                    {outputs.experiment_id:destination_demand_data},
-                    Path(filepath).parent,
-                    groupby=[],
-                    key_type={'x':'int','y':'int','z':'float','color':'float'},
-                    **self.settings
-                )
-                if covered_cells is not None:
-                    write_figure_data(
-                        {outputs.experiment_id:covered_cells},
-                        Path(filepath).parent,
-                        groupby=[],
-                        key_type={'x':'int','y':'int'},
-                        data_format='dat',
-                        precision=0
-                    )
-                if sample == 'table':
-                    dummy_config = Namespace(**{'settings':outputs.experiment.config})
-                    ct = instantiate_ct(
-                        config=dummy_config,
-                        log_to_console=False
-                    )
-                    # for cell in ct.constraints['cells']:
-                        # print('ground truth', ct.table[cell[0],cell[1]])
-                        # print('min',min(outputs.experiment.results['table'][:,cell[0],cell[1]]))
-                        # print('max',max(outputs.experiment.results['table'][:,cell[0],cell[1]]))
-                        # print('\n')
-                    all_cells = sorted([tuplize(cell) for cell in product(*[range(dim) for dim in ct.dims])])
-
-                    fixed_cells = []
-                    for cell in sorted(all_cells):
-                        if min(outputs.experiment.results['table'][:,cell[0],cell[1]]) == max(outputs.experiment.results['table'][:,cell[0],cell[1]]):
-                            fixed_cells.append(cell)
-                    
-                    
-                    if 'cells' in list(ct.constraints.keys()):
-                        fixed_cells = {
-                            "x":np.array([c[0] for c in ct.constraints['cells']],dtype='int32'),
-                            "y":np.array([c[1] for c in ct.constraints['cells']],dtype='int32'),
-                            "label":f"{sample}_fixed_cell_coordinates",
-                            "config":outputs.experiment.config,
-                            "outputs_path":outputs.outputs_path
-                        }
-                        write_figure_data(
-                            {outputs.experiment_id:fixed_cells},
-                            Path(filepath).parent,
-                            groupby=[],
-                            key_type={'x':'int','y':'int'},
-                            data_format='dat',
-                            data_precision=self.settings['data_precision']
-                        )
-
-    def plot_2d_contours(self):
-
-        self.logger.info('Running parameter_2d_contours')
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            # dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            # sim = instantiate_sim(dummy_config)
-            # Convert to path object
-            output_directory = Path(output_directory)
-
-            # Take burnin and apply thinning
-            parameter_samples = outputs.load_samples('theta')
-            sign_samples = outputs.load_samples('sign')
-            
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_contours_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}"
-
-            # Define filepath
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
-
-             # Store values for upper and lower bounds of colorbar
-            colorbar_min = None
-            colorbar_max = None
-            if "colorbar_limit" in list(self.settings.keys()):
-                colorbar_min = self.settings['colorbar_limit'][0]
-                colorbar_max = self.settings['colorbar_limit'][1]
-                # Get colormap
-                colorbar_kwargs = { 
-                                    "levels":np.linspace(0,1.0,self.settings['n_bins']+1)
-                                }
-            else:
-                colorbar_kwargs = {
-                                    "thresh":0,
-                                }
-
-            # Plot parameter distribution
-            # Figure size 
-            fig,ax = plt.subplots(1,1,figsize=self.settings['figure_size'])
-            # Contour plot
-            kdeplot = sns.kdeplot(
-                    ax=ax,
-                    x=parameter_samples[:, 0],
-                    y=parameter_samples[:, 1],
-                    shade=True,
-                    cbar=True,
-                    cmap=self.settings["main_colormap"],
-                    **colorbar_kwargs
-            )
-            
-            # Axis labels
-            ax.set_xlabel(
-                r'$\alpha$',
-                fontsize=self.settings['axis_font_size'],
-                labelpad=self.settings['axis_labelpad'],
-                rotation=self.settings['axis_label_rotation']
-            )
-            ax.set_ylabel(
-                r'$\beta$',
-                fontsize=self.settings['axis_font_size'],
-                labelpad=self.settings['axis_labelpad'],
-                rotation=self.settings['axis_label_rotation']
-            )
-            # Plot empirical mean
-            parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
-            ax.plot(
-                parameter_mean[0],
-                parameter_mean[1],
-                color='black',
-                label=r'$\hat{\mu}$',
-                marker='x', 
-                markersize=int(self.settings['marker_size'])
-            )
-            
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                ax.set_xlim(x_min,min(x_max,parameter_samples.shape[0]))
-            y_min,y_max = self.settings['y_limit']
-            if y_min is not None and y_max is not None:
-                ax.set_ylim(max(0.0,y_min),min(y_max,2.0))
-            # Legend
-            leg = plt.legend()
-            leg._ncol = 1
-            
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Save figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-    
-    def plot_autocorrelation_function(self):
-
-        self.logger.info('Running parameter_acf')
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-
-            # Get only first n_samples as specified by settings
-            parameter_samples = outputs.load_samples('theta')
-
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_" + \
-                    f"parameter_acf_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}"
-
-            
-            # Define filepath
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
-
-            # Plot parameter autocorrelation function
-            # Figure size 
-            fig,axs = plt.subplots(1,2,figsize=self.settings['figure_size'])
-            # Alpha plot
-            plot_acf(parameter_samples[:, 0],lags=self.settings['n_bins'],ax=axs[0],title='')
-            axs[0].set_ylabel(r'$\alpha$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            if self.settings['x_label'] is None:
-                axs[0].set_xlabel('Lags',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                axs[0].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            axs[0].set_ylim(0,None)
-            # Plot 0.2 acf hline
-            if self.settings['benchmark']:
-                axs[0].axhline(y=0.2,color='red')
-            # Beta plot
-            plot_acf(parameter_samples[:, 1],lags=self.settings['n_bins'],ax=axs[1],title='')
-            axs[1].set_ylabel(r'$\beta$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            if self.settings['x_label'] is None:
-                axs[1].set_xlabel('Lags',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                axs[1].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            axs[1].set_ylim(0,None)
-            if self.settings['benchmark']:
-                axs[1].axhline(y=0.2,color='red')
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Save figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-
     '''
     Extracting plotting data
     '''
 
-    def extract_plot_setting(self,var:str,meta:dict):
-        if var in ['x','y','colour','size','visibility']:
-            # Get value from metadata element
-            if self.settings[var] in meta:
-                value = meta[self.settings[var]]
-            # Get value from data
-            elif self.settings[var] == meta['sample_name'] and meta['metric'] in [meta['sample_name'],'','none']:
-                value = meta.get('value',None)
-            # Data not found
-            else:
-                self.logger.debug(f"Could not find data for {var} var.")
-                return None
-            # Convert x or y coordinate to list
-            if isinstance(value,Iterable) and not isinstance(value,str):
-                return list(value)
-            else:
-                return [value]
-        
-        elif var == 'label':
-            label_str = []
-            # Get label key and value
-            for label_key in self.settings['label']:
-                label_str.append(
-                    str(label_key) + ' = ' + \
-                    str(meta[label_key]).replace('%','percent').replace(' ','_').replace(':','_').replace(',','_')
-                )
-                
-            return ', '.join(label_str)
-
-        else: 
-            return [meta[var]]
+    def extract_plot_settings(self,vars:list,meta:dict):
+        # print_json(meta)
+        # print('\n')
+        var_values = {}
+        for var in vars:
+            if var in PLOT_COORDINATES+PLOT_CORE_FEATURES:
+                # Get value from metadata element
+                if self.settings[var] in meta:
+                    value = meta[self.settings[var]]
+                # Data not found
+                else:
+                    value = None
+                    self.logger.debug(f"Could not find data for {var} var.")
+                # Convert x or y coordinate to list
+                if isinstance(value,Iterable) and not isinstance(value,str):
+                    value = list(value)
+            elif var == 'label':
+                label_str = []
+                # Get label key and value
+                for label_key in self.settings['label']:
+                    label_str.append(
+                        str(label_key) + ' = ' + \
+                        str(meta[label_key]).replace('%','percent').replace(' ','_').replace(':','_').replace(',','_')
+                    )
+                value = ', '.join(label_str)
+            elif var in ['marker','hatch']:
+                # Get label key and value
+                var_key = self.settings[var]
+                # Get value from metadata element
+                if self.settings[var_key] in meta:
+                    if var_key == 'marker':
+                        marker_value = PLOT_MARKERS[meta[self.settings[var_key]]]
+                    elif var_key == 'hatch':
+                        marker_value = PLOT_HATCHES[meta[self.settings[var_key]]]
+                # Data not found
+                else:
+                    marker_value = None
+                    self.logger.debug(f"Could not find data for {var_key} var.")
+                # Convert x or y coordinate to list
+                if isinstance(value,Iterable) and not isinstance(value,str):
+                    marker_value = list(value)
+                # Add to dictionary
+                value = marker_value
+            else: 
+                value = meta[var]
+            # Set variable value
+            var_values[var] = value
+        return var_values
 
     def merge_plot_settings(self,plot_settings:list):
         merged_settings = {}
         # Iterate through the list of dictionaries
         for d in plot_settings:
+            # print_json(d,newline=True)
             # Concatenate values to the merged_dict
             for key, value in d.items():
                 if value is None:
                     continue
                 if key in ['x','y','z','label','colour','size']:
                     merged_settings.setdefault(key, []).append(value)
+                elif key in ['marker','hatch']:
+                    if key not in merged_settings:
+                        merged_settings[key] = value
+                    else:
+                        merged_settings[key] = deep_merge(
+                            merged_settings[key],
+                            value
+                        )
                 else:
                     # Keep only the first value of this key for each
                     # plot setting
                     if key not in merged_settings:
                         merged_settings[key] = value
-        
         for k,v in merged_settings.items():
-            if isinstance(v,Iterable):
+            if isinstance(v,Iterable) and not isinstance(v,str):
                 merged_settings[k] = list(flatten(v))
-        
         return [merged_settings]
 
     def create_plot_filename(self,plot_setting,**kwargs):
         # Decide on figure output dir
-        experiment_id = plot_setting['experiment_id']
-        
         if not self.settings['by_experiment']:
             # Get filename
             filename = kwargs.get('name','NO_NAME')+'_'+\
                     f"burnin_{self.settings['burnin']}_" + \
                     f"thinning_{self.settings['thinning']}"
             if not plot_setting['outputs'].config['training']['N'].get('sweep',{}):
-                filename += f"N_{plot_setting['outputs'].config['training']['N']}"
-            if self.settings['label'] is not None:
-                filename += f"label_{'&'.join([str(elem) for elem in self.settings['label']])}"
-            if self.settings['colour'] is not None:
-                filename += f"colour_{'&'.join([str(elem) for elem in self.settings['colour']])}"
-            if self.settings['size'] is not None:
-                filename +=  f"size_{'&'.join([str(elem) for elem in self.settings['size']])}"
-            if self.settings['visibility'] is not None:
-                filename += f"visibility_{'&'.join([str(elem) for elem in self.settings['visibility']])}"
+                filename += f"_N_{plot_setting['outputs'].config['training']['N']}"
+            if self.settings.get('label',None) is not None:
+                filename += f"_label_{'&'.join([str(elem) for elem in self.settings['label']])}"
+            if self.settings.get('marker',None) is not None:
+                filename += f"_marker_{self.settings['marker']}"
+            if self.settings.get('hatch',None) is not None:
+                filename += f"_hatch_{self.settings['hatch']}"
+            if self.settings.get('colour',None) is not None:
+                filename += f"_colour_{self.settings['colour']}"
+            if self.settings.get('size',None) is not None:
+                filename +=  f"_size_{self.settings['size']}"
+            if self.settings.get('visibility',None) is not None:
+                filename += f"_visibility_{self.settings['visibility']}"
             # Get dirpath
             parent_directory = Path(plot_setting['outputs'].outputs_path)
-            if 'synthetic' in str(parent_directory):
-                parent_directory = plot_setting['outputs'].config.out_directory
+            if self.settings.get('plot_data_dir',None) is not None:
+                dirpath = self.settings['plot_data_dir']
             else:
-                parent_directory.parent.absolute()
-            dirpath = os.path.join(parent_directory,'paper_figures')
+                if 'synthetic' in str(parent_directory):
+                    parent_directory = plot_setting['outputs'].config.out_directory
+                else:
+                    parent_directory.parent.parent.absolute()
+                dirpath = os.path.join(parent_directory,'paper_figures')
         else:
-
+            
             # Get filename
             dims = unpack_dims(
                 plot_setting['outputs'].inputs.data.dims,
                 time_dims=False
             )
-            filename = f"table_{'x'.join(list(map(str,list(dims))))}_" + \
-                    f"{experiment_id[:-21]}_{kwargs.get('name','NO_NAME')}_"+ \
-                    f"burnin_{self.settings.get('burnin',0)}_" + \
-                    f"thinning_{self.settings.get('thinning',1)}_" 
+            filename = f"table_{'x'.join(list(map(str,list(dims))))}" + \
+                    f"_{plot_setting['outputs'].experiment_id[:-21]}_{kwargs.get('name','NO_NAME')}"+ \
+                    f"_burnin_{self.settings.get('burnin',0)}" + \
+                    f"_thinning_{self.settings.get('thinning',1)}" 
             if not plot_setting['outputs'].config['training']['N'].get('sweep',{}):
-                filename += f"N_{plot_setting['outputs'].config['training']['N']}"
-            if self.settings['label'] is not None:
-                filename += f"label_{'&'.join([str(elem) for elem in self.settings['label']])}"
-            if self.settings['colour'] is not None:
-                filename += f"colour_{'&'.join([str(elem) for elem in self.settings['colour']])}"
-            if self.settings['size'] is not None:
-                filename +=  f"size_{'&'.join([str(elem) for elem in self.settings['size']])}"
-            if self.settings['visibility'] is not None:
-                filename += f"visibility_{'&'.join([str(elem) for elem in self.settings['visibility']])}"
+                filename += f"_N_{plot_setting['outputs'].config['training']['N']}"
+            if self.settings.get('label',None) is not None:
+                filename += f"_label_{'&'.join([str(elem) for elem in self.settings['label']])}"
+            if self.settings.get('marker',None) is not None:
+                filename += f"_marker_{self.settings['marker']}"
+            if self.settings.get('hatch',None) is not None:
+                filename += f"_hatch_{self.settings['hatch']}"
+            if self.settings.get('colour',None) is not None:
+                filename += f"_colour_{self.settings['colour']}"
+            if self.settings.get('size',None) is not None:
+                filename +=  f"_size_{self.settings['size']}"
+            if self.settings.get('visibility',None) is not None:
+                filename += f"_visibility_{self.settings['visibility']}"
             # Get dirpath
-            dirpath = os.path.join(
-                plot_setting['outputs'].outputs_path,
-                'figures'
-            )
+            if self.settings.get('plot_data_dir',None) is not None:
+                dirpath = self.settings['plot_data_dir']
+            else:
+                dirpath = os.path.join(
+                    plot_setting['outputs'].outputs_path,
+                    'figures'
+                )
         
         return dirpath,filename
-                
+    
+    def read_plot_data(self):
+        # If directory exists and loading of plot data is instructed
+        if self.settings.get('plot_data_dir','') is not None and \
+            os.path.exists(self.settings.get('plot_data_dir','')) and \
+            os.path.isdir(self.settings.get('plot_data_dir','')):
+
+            # Find data in json format
+            # no other format is acceptable
+            files = list(glob(f"{self.settings['plot_data_dir']}/*[!settings].json",recursive=False))
+
+            # If nothing was found return false
+            if len(files) <= 0:
+                return False,None
+            # Try to read file
+            plot_settings = read_file(files[0])
+
+            # Canonicalise the data
+            if isinstance(plot_settings,dict):
+                plot_settings = [plot_settings]
+            elif isinstance(plot_settings,pd.DataFrame):
+                plot_settings = [dict(plot_settings.to_dict())]
+            elif isinstance(plot_settings,list):
+                plot_settings = plot_settings
+            else:
+                self.logger.warning(f"Cannot recognise plot settings of type {type(plot_settings)}")
+                return False,None
+            
+            # Extract outputs
+            for i in range(len(plot_settings)):
+                if 'outputs' not in plot_settings[i]:
+                    self.logger.debug(plot_settings[i])
+                    self.logger.warning(f"Outputs are not included in plot settings")
+                    return False,None
+                else:
+                    # Try to load outputs
+                    if isinstance(plot_settings[i]['outputs'],dict):
+                        # Instantiate config
+                        config = Config(
+                            settings = plot_settings[i]['outputs'],
+                            logger = self.logger
+                        )
+                        # Instantiate outputs
+                        plot_settings[i].update(dict(
+                            outputs = Outputs(
+                                config = config,
+                                settings = self.settings,
+                                data_names = self.settings['sample'],
+                                logger = self.logger
+                            )
+                        ))
+                    else:
+                        self.logger.warning(f"Outputs are of type {type(plot_settings[i]['outputs'])} and not dict.")
+                        return False,None
+            return True,plot_settings
+
+        else:
+            return False,None
+
+    
     '''    
     ╔═╗┬  ┌─┐┌┬┐  ┬ ┬┬─┐┌─┐┌─┐┌─┐┌─┐┬─┐┌─┐
     ╠═╝│  │ │ │   │││├┬┘├─┤├─┘├─┘├┤ ├┬┘└─┐
@@ -1558,70 +544,91 @@ class Plot(object):
     def data_plot_2d_scatter(self):
             
         self.logger.info('Running data_plot_2d_scatter')
-
-        # Run output handler
-        outputs_summary = OutputSummary(
-            settings=self.settings,
-            logger=self.logger
-        )
+    
+        # Try to load plot data from file
+        loaded, plot_settings = self.read_plot_data()
         
-        # Loop through output folder
-        plot_settings = []
-        for i,output_folder in enumerate(outputs_summary.output_folders):
+        if not loaded:
+            # Run output handler
+            outputs_summary = OutputSummary(
+                settings=self.settings,
+                logger=self.logger
+            )
             
-            self.logger.info(f"Scanning folder {i+1}/{len(outputs_summary.output_folders)}")
-
-            # Collect outputs from folder's Data Collection
-            outputs = outputs_summary.get_folder_outputs(output_folder)
-            
-            # Create plot settings
-            plot_setting = {
-                'marker':'o',
-                'outputs':outputs,
-                'experiment_id':outputs.experiment_id
-            }
-            # Loop through each member of the data collection
-            for j in range(len(outputs.data)):
+            # Loop through output folder
+            plot_settings = []
+            for i,output_folder in enumerate(outputs_summary.output_folders):
                 
-                # Get metadata for this experiment and this element
-                # of the Data Collection
-                metadata = outputs_summary.get_experiment_metadata(j,outputs)
+                self.logger.info(f"Scanning folder {i+1}/{len(outputs_summary.output_folders)}")
 
-                # Loop through each entry of metadata
-                for meta in metadata:
+                # Collect outputs from folder's Data Collection
+                outputs = outputs_summary.get_folder_outputs(output_folder)
+                
+                # Create plot settings
+                plot_sett = {
+                    'outputs':outputs
+                }
+                # Loop through each member of the data collection
+                for j in range(len(outputs.data)):
+                    
+                    # Get metadata for this experiment and this element
+                    # of the Data Collection
+                    metadata = outputs_summary.get_experiment_metadata(j,outputs)
 
-                    for var in ['x','y','label','colour','size','visibility']:
-                        plot_setting[var] = self.extract_plot_setting(
-                            var = var,
-                            meta = meta
+                    # Loop through each entry of metadata
+                    for meta in metadata:
+                        plot_sett.update(
+                            self.extract_plot_settings(
+                                vars = ['x','y','label','colour','size','marker','hatch','visibility'],
+                                meta = meta,
+                            )
                         )
+                        # print_json({k:plot_sett[k] for k in ['x','y','label','colour','size','marker','hatch','visibility']})
 
-                    # Add data
-                    plot_settings.append(plot_setting)
+                        # Add data
+                        plot_settings.append(deepcopy(plot_sett))
+                
+                # If plot is by experiment
+                # plot all element from data collection
+                # for every output folder
+                if self.settings['by_experiment']:
+                    # Create output dirpath and filename
+                    dirpath,filename = self.create_plot_filename(
+                        plot_setting = plot_sett,
+                        name = self.settings.get('figure_title','NONAME')
+                    )
+                    # Merge all settings into one
+                    # Plot
+                    self.plot_2d_scatter(
+                        plot_settings = self.merge_plot_settings(plot_settings),
+                        dirpath = dirpath,
+                        filename = filename
+                    )
+                    # Reset list of plot settings
+                    plot_settings = []
             
-            # If plot is by experiment
-            # plot all element from data collection 
-            # for every output folder
-            if self.settings['by_experiment']:
+            # If plot is NOT by experiment
+            # plot all elements from data collection
+            # from all output folder(s)
+            if not self.settings['by_experiment']:
                 # Create output dirpath and filename
                 dirpath,filename = self.create_plot_filename(
-                    plot_setting = plot_settings[0],
+                    plot_setting = plot_sett,
                     name = self.settings.get('figure_title','NONAME')
                 )
-                # Merge all settings into one
                 # Plot
                 self.plot_2d_scatter(
                     plot_settings = self.merge_plot_settings(plot_settings),
+                    name = self.settings.get('title','NONAME'),
                     dirpath = dirpath,
                     filename = filename
                 )
-        # If plot is NOT by experiment
-        # plot all elements from data collection
-        # from all output folder(s)
-        if not self.settings['by_experiment']:
+        else:
+            # Get first plot setting
+            plot_sett = plot_settings[0]
             # Create output dirpath and filename
             dirpath,filename = self.create_plot_filename(
-                plot_setting = plot_settings[0],
+                plot_setting = plot_sett,
                 name = self.settings.get('figure_title','NONAME')
             )
             # Plot
@@ -1631,382 +638,3 @@ class Plot(object):
                 dirpath = dirpath,
                 filename = filename
             )
-        sys.exit()
-        
-        
-
-    def low_dimensional_embedding(self):
-        
-        self.logger.info('Running table_distribution_low_dimensional_embedding')
-        valid_experiment_types = ['table_mcmc','jointtablesim_mcmc','sim_mcmc','sim_nn','jointtablesim_nn']
-        
-        # Add ground truth table to embedding
-        outputs = Outputs(
-            self.outputs_directories[0],
-            self.settings,
-            ['ground_truth_table'],
-            slice_samples=False,
-            log_to_console=False,
-            logger = self.logger
-        )
-        # Store sample name, the actual sample (y), and its size (x)
-        dims = np.shape(np.squeeze(outputs.ground_truth_table))
-        # ground_truth_table
-        embedded_data_ids = np.array(['ground_truth'],dtype=str)
-        embedded_data_vals = np.array([outputs.ground_truth_table.ravel()],dtype='int32')
-        
-        # Decide on figure output dir
-        if len(self.outputs_directories) > 1:
-            output_dir = 'paper_figures'
-        else:
-            output_dir = os.path.join('figures',outputs.experiment_id)
-
-        for output_directory in tqdm(sorted(self.outputs_directories)): 
-            self.logger.info(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                list(self.settings.get('sample')),
-                slice_samples=True,
-                log_to_console=True,
-                logger = self.logger
-            )
-            # Make sure the right experiments are provided
-            try:
-                assert np.any([exp_type in outputs.experiment.config['type'].lower() for exp_type in valid_experiment_types])
-            except:
-                self.logger.warning(f"Skipping invalid experiment {outputs.experiment.config['type'].lower()}")
-                continue
-            
-            # Read label(s) from settings
-            try:
-                label = ''
-                for k in list(self.settings['label_by']):
-                    value = list(deep_get(key=k,value=outputs.experiment.config.settings))[0]
-                    # If label not included in metadata ignore it
-                    if value is not None:
-                        label += '_'+str(value)
-                        if k == 'noise_regime':
-                            label += '_noise'
-            except:
-                label = outputs.experiment_id
-            # Get only first n_samples as specified by settings
-            if 'table' in list(outputs.experiment.results.keys()):
-                table_samples = outputs.experiment.results['table']
-                table_samples = table_samples.reshape((table_samples.shape[0], np.prod(table_samples.shape[1:])))
-                # Add to data
-                embedded_data_ids = np.append(embedded_data_ids,np.repeat(("table"+label),table_samples.shape[0]))
-                embedded_data_vals = np.append(embedded_data_vals,table_samples,axis=0)
-                
-            if 'intensity' in list(outputs.experiment.results.keys()):
-                intensity_samples = outputs.experiment.results['intensity']
-                intensity_samples = intensity_samples.reshape((intensity_samples.shape[0], np.prod(intensity_samples.shape[1:])))
-                # Get only the first n_samples after burnin
-                embedded_data_ids = np.append(embedded_data_ids,np.repeat(("intensity"+label),intensity_samples.shape[0]))
-                embedded_data_vals = np.append(embedded_data_vals,intensity_samples,axis=0)
-
-        self.logger.info(f"Getting lower dimensional embedding of {embedded_data_vals.shape[0]} table samples using {self.settings['embedding_method']}, nearest neighbours = {self.settings['nearest_neighbours']} and distance metric = {self.settings['distance_metric']}")
-        
-        # Get data embedding
-        if self.settings['embedding_method'] == 'isomap':
-            # Instantiate isomap
-            isomap = sklearn.manifold.Isomap(
-                    n_components=2,
-                    n_neighbors=self.settings['nearest_neighbours'],
-                    max_iter=int(1e4),
-                    path_method='auto',#'D',
-                    eigen_solver='auto',
-                    neighbors_algorithm='auto',#'ball_tree',
-                    n_jobs=int(self.settings['n_workers']),
-                    metric=map_distance_name_to_function(self.settings['distance_metric']),
-                    metric_params={"dims":dims,"ord":self.settings.get('ord',None)}
-            )
-            # Get lower dimensional embedding
-            embedded_data_vals = isomap.fit_transform(embedded_data_vals)
-            print(f"Reconstruction error = {isomap.reconstruction_error()}")
-        
-        elif self.settings['embedding_method'] == 'tsne':
-            # Instantiate tsne
-            tsne = sklearn.manifold.TSNE(
-                n_components=2,
-                perplexity=float(self.settings['nearest_neighbours']),
-                learning_rate='auto',
-                n_iter=self.settings.get('K',int(1e4)),
-                n_iter_without_progress=300,
-                n_jobs=int(self.settings['n_workers']),
-                metric=map_distance_name_to_function(self.settings['distance_metric']),
-                metric_params={"dims":dims,"ord":self.settings.get('ord',None)}
-            )
-            # Get lower dimensional embedding
-            embedded_data_vals = tsne.fit_transform(embedded_data_vals)
-            print(f"KL Divergence = {tsne.kl_divergence_}")
-        
-        # Store projection data
-        embedded_data_df = pd.DataFrame(
-            data = np.array([
-                embedded_data_ids,
-                embedded_data_vals[:,0],
-                embedded_data_vals[:,1]
-            ]).T,
-            columns = ['sample_name','x','y']
-        )
-        # Change types
-        embedded_data_df = embedded_data_df.astype({'x': 'float32','y': 'float32'})
-        
-        # Get filename for comparison plot
-        filename = f"2d_{self.settings['embedding_method']}_embedding_" + \
-                    f"label_by_{'_'.join(list(self.settings['label_by']))}_" + \
-                    f"burnin{self.settings['burnin']}_" + \
-                    f"thinning{self.settings['thinning']}_" + \
-                    f"{self.settings['distance_metric']}_" + \
-                    f"nearest_neighbours{self.settings['nearest_neighbours']}"
-
-        # Get filepath
-        figure_filepath = os.path.join(
-            outputs.experiment.config['outputs']['directory'],
-            outputs.experiment.config['inputs']['dataset'],
-            output_dir,
-            filename
-        )
-
-        # Plot lower dimensional embedding
-        self.plot_lower_dimensional_embedding(
-            figure_filepath,
-            embedded_data_df
-        )
-
-
-    def parameter_mixing(self):
-
-        self.logger.info('Running parameter_mixing')
-
-        for i,output_directory in tqdm(enumerate(self.outputs_directories),total=len(self.outputs_directories)): 
-            # Load samples and SIM model
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            # Convert to path object
-            output_directory = Path(output_directory)
-
-            # Get only first n_samples as specified by settings
-            parameter_samples = outputs.load_samples('theta')
-            sign_samples = outputs.load_samples('sign')
-            # Plot empirical mean
-            parameter_mean = np.dot(parameter_samples.T,sign_samples)/np.sum(sign_samples)
-
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_parameter_mixing_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}" 
-
-            # Define filepath
-            filepath = os.path.join(output_directory.parent.absolute(),outputs.experiment_id,'figures',filename)
-    
-            # Plot parameter mixing
-            # Figure size 
-            fig,axs = plt.subplots(1,2,figsize=self.settings['figure_size'])
-            # Alpha plot
-            axs[0].plot(parameter_samples[:, 0],label='samples')
-            axs[0].set_ylabel(r'$\alpha$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            if self.settings['x_label'] is None:
-                axs[0].set_xlabel('MCMC iteration',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                axs[0].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            # if hasattr(sim,'alpha_true'):
-                # axs[0].axhline(y=sim.alpha_true, color='black', linestyle='-',label='true')
-            axs[0].axhline(y=parameter_mean[0],color='red',label=r'$\hat{\mu(\alpha)}$')
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                axs[0].set_xlim(x_min,min(x_max,parameter_samples.shape[0]))
-            y_min,y_max = self.settings['y_limit']
-            if y_min is not None and y_max is not None:
-                axs[0].set_ylim(max(0.0,y_min),min(y_max,2.0))
-            # X,Y label ticks
-            axs[0].locator_params(axis='x', nbins=self.settings['x_tick_frequency'])
-            # Legend
-            leg0 = axs[0].legend()
-            leg0._ncol = 1
-
-            # Beta plot
-            axs[1].plot(parameter_samples[:, 1],label='samples')
-            axs[1].set_ylabel(r'$\beta$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'],rotation=self.settings['axis_label_rotation'])
-            if self.settings['x_label'] is None:
-                axs[1].set_xlabel('MCMC iteration',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                axs[1].set_xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            # if hasattr(sim,'beta_true'):
-                # axs[1].axhline(y=sim.beta_true, color='black', linestyle='-',label='true')
-            axs[1].axhline(y=parameter_mean[1],color='red',label=r'$\hat{\mu(\beta)}$')
-            # X,Y limits
-            x_min,x_max = self.settings['x_limit']
-            if x_min is not None and x_max is not None:
-                axs[1].set_xlim(x_min,min(x_max,parameter_samples.shape[0]))
-            y_min,y_max = self.settings['y_limit']
-            if y_min is not None and y_max is not None:
-                axs[1].set_ylim(max(0.0,y_min),min(y_max,2.0))
-            # X,Y label ticks
-            axs[1].locator_params(axis='x', nbins=self.settings['x_tick_frequency'])
-            # Legend
-            leg1 = axs[1].legend()
-            leg1._ncol = 1
-            
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                fig.suptitle(self.settings['figure_title'],fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            # Save figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
-    
-     
-    def predictions(self):
-
-        self.logger.info('Running destination_attraction_predictions')
-        predictions = {}
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                output_names=['log_destination_attraction','sign'],
-                settings=self.settings,
-                slice_samples=True,
-                output_dir=self.settings.get('out_directory',''),
-                logger = self.logger,
-            )
-            # Receive outputs
-            outputs.inputs.receive_from_device()
-
-            # Create label
-            label,\
-            _, \
-            _ = create_dynamic_data_label(
-                __self__=self,
-                data=outputs.config.settings
-            )
-            
-            # Get sample values
-            log_destination_attraction = outputs.get_sample('log_destination_attraction')
-            # Get mean 
-            mu_x = outputs.compute_sample_statistics(
-                log_destination_attraction,
-                'log_destination_attraction',
-                'signedmean',
-                dim=['id']
-            )
-            # Compute R squared
-            # Total sum squares
-            w_data = np.exp(outputs.inputs.data.log_destination_attraction).squeeze()
-            w_pred = np.exp(mu_x).squeeze()
-            w_data_centred = w_data - np.mean(w_data)
-            ss_tot = np.dot(w_data_centred, w_data_centred)
-            # Residual sum squares
-            res = w_pred - w_data
-            ss_res = np.dot(res.squeeze(), res.squeeze())
-            # Regression sum squares
-            r2 = 1. - ss_res/ss_tot
-            # Add data
-            predictions[outputs.experiment_id] =  {
-                'label':label+fr", $R^2 = {np.round(r2,2)}$)",
-                'x':mu_x.squeeze(),
-                'y':outputs.inputs.data.log_destination_attraction.squeeze(),
-                'marker':'o',
-                'outputs':outputs
-            }
-
-        self.plot_2d_scatter(
-            data=predictions,
-            name='log_destination_attraction_predictions'
-        )
-
-
-    def residuals(self):
-
-        self.logger.info('Running destination_attraction_residuals')
-
-        for output_directory in tqdm(self.outputs_directories): 
-            self.logger.debug(f"Experiment id {output_directory}")
-            # Load contingency table
-            outputs = Outputs(
-                output_directory,
-                self.settings,
-                log_to_console=False,
-                logger = self.logger
-            )
-            dummy_config = Namespace(**{'settings':outputs.experiment.config})
-            sim = instantiate_sim(dummy_config)
-
-            # Get only first n_samples as specified by settings
-            log_destination_attraction_samples = outputs.load_samples('log_destination_attraction')
-            sign_samples = outputs.load_samples('sign')
-
-            # Get filename
-            filename = f"table_{outputs.experiment.config['table_dim']}_" + \
-                    f"gamma_{outputs.experiment.config['spatial_interaction_model']['gamma']}" + \
-                    f"{outputs.experiment.config['type']}_{self.settings['experiment_title']}_log_destination_attraction_residuals_thinning_{self.settings['thinning']}_"+\
-                    f"N_{outputs.experiment.config['mcmc']['N']}"
-
-            # Define filepath
-            filepath = os.path.join(outputs.outputs_path,'figures',filename)
-
-            # Plot parameter mixing
-            # Figure size 
-            fig = plt.figure(figsize=self.settings['figure_size'])
-            # Get relative noise
-            # relative_noise = np.sqrt(sim.noise_var)/np.log(sim.dims[1])
-            # relative_noise_percentage = round(100*relative_noise)
-            # upper_bound = sim.log_destination_attraction + np.log((1.0+2*relative_noise_percentage/100))
-            # lower_bound = sim.log_destination_attraction - np.log((1.0+2*relative_noise_percentage/100))
-            # Get mean
-            mu_x = np.dot(log_destination_attraction_samples.T,sign_samples)/np.sum(sign_samples)
-            mu_x = mu_x.flatten()
-            # Get residuals
-            residuals = sim.log_destination_attraction-mu_x
-            # Compute R squared
-            # Total sum squares
-            w_data = np.exp(sim.log_destination_attraction)
-            w_pred = np.exp(mu_x)
-            w_data_centred = w_data - np.mean(w_data)
-            ss_tot = np.dot(w_data_centred, w_data_centred)
-            # Residiual sum squares
-            res = w_pred - w_data
-            ss_res = np.dot(res, res)
-            # Regression sum squares
-            r2 = 1. - ss_res/ss_tot
-
-            # Plot predictions against data
-            plt.scatter(x=residuals,y=mu_x,marker='o',s=int(self.settings['marker_size']))
-            # Plot true mean of errors
-            if self.settings['annotate']:
-                plt.axhline(y=0,color='black')
-            if self.settings['x_label'] is None:
-                plt.xlabel(r'$\log{\mathbf{Y}} - \mathbb{{E}}[\mathbf{X}|\mathbf{Y}]$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['x_label'].lower() != 'none' or self.settings['x_label'].lower() != '':
-                plt.xlabel(self.settings['x_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            if self.settings['y_label'] is None:
-                plt.ylabel(r'$\mathbb{{E}}[\mathbf{x}|\mathbf{Y}]$',fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            elif self.settings['y_label'].lower() != 'none' or self.settings['y_label'].lower() != '':
-                plt.ylabel(self.settings['y_label'].replace("_"," "),fontsize=self.settings['axis_font_size'],labelpad=self.settings['axis_labelpad'])
-            # Legend                
-            leg = plt.legend()
-            leg._ncol = 1
-            # Figure title
-            if self.settings['figure_title'] is not None:
-                plt.title(fr"{self.settings['figure_title'].replace('_',' ').capitalize()} ($R^2 = {np.round(r2,2)}$)",fontsize=self.settings['title_label_size'])
-            # Tight layout
-            plt.tight_layout()
-            
-            # Write figure
-            write_figure(fig,filepath,**self.settings)
-            
-            self.logger.info(f"Figure exported to {os.path.join(outputs.experiment_id,'figures')}")
-            self.logger.info(f"Filename: {filename}")
