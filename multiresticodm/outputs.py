@@ -1557,11 +1557,12 @@ class OutputSummary(object):
                 samples = outputs.get_sample(sample_name)
                 # Unstack id multi-dimensional index
                 samples = samples.unstack('id')
-            except Exception as e:
+            except Exception:
                 self.logger.error(f'Experiment {os.path.basename(experiment_id)} does not have sample {sample_name}')
                 continue
             self.logger.progress(f"samples {np.shape(samples)}, {samples.dtype}")
-            
+
+            sample_data = {}
             for metric,statistics in self.settings['statistic'].items():
                 # Issue warning if three set of statistics are provided
                 # even though we need 2; one for the samples and one for the metric
@@ -1581,7 +1582,7 @@ class OutputSummary(object):
                         sample_name = sample_name,
                         statistic_dims = sample_statistics_axes
                     )
-                except Exception as e:
+                except Exception:
                     self.logger.debug(traceback.format_exc())
                     self.logger.error(f"samples {np.shape(samples)}, {samples.dtype}")
                     self.logger.error(f"Applying statistic {' over axes '.join([str(s) for s in sample_statistics_axes])} \
@@ -1592,179 +1593,128 @@ class OutputSummary(object):
 
                 # Get all attributes and their values
                 attribute_keys = METRICS[metric.lower()]['loop_over']
-                if len(attribute_keys) > 0:
-                    # Get all combinations of metric attribute values
-                    attribute_values = product(*[self.settings[attr] for attr in attribute_keys])
-                    # Get copy of settings
-                    settings_copy = deepcopy(self.settings)
-                    other_attrs = list(set(attribute_keys).difference(set(attribute_keys)))                
-                    # Delete all other attributes in metrics
-                    if len(other_attrs) > 0:
-                        settings_copy = deep_delete(settings_copy,other_attrs)
-                    # Loop over all possible combinations of attribute values                        
-                    for value_tuple in attribute_values:
-                        attribute_settings = dict(zip(attribute_keys,value_tuple))
-                        attribute_settings_string = ','.join([f"{k}_{v}" for k,v in attribute_settings.items()])
-                        for key,val in attribute_settings.items():
-                            # Update settings values of attributes
-                            settings_copy[key] = val
 
-                        # Update kwargs specific for each metric
-                        try:
-                            metric_kwargs = self.update_metric_arguments(
-                                metric.lower(),
-                                outputs,
-                                settings_copy
-                            )
-                        except Exception as e:
-                            self.logger.debug(traceback.format_exc())
-                            self.logger.error(f"metric {np.shape(metric)}, {metric.dtype}")
-                            self.logger.error(f'Arguments for metric {metric} cannot be updated')
-                            print('\n')
+                # Get all combinations of metric attribute values
+                attribute_values = list(product(*[self.settings.get(attr,['none']) for attr in attribute_keys]))
+                
+                # Get copy of settings
+                settings_copy = deepcopy(self.settings)
+                    
+                # Loop over all possible combinations of attribute values                        
+                for attr_id, value_tuple in enumerate(attribute_values):
+                    # Create metric attribute dictionary
+                    attribute_settings = dict(zip(attribute_keys,value_tuple))
+                    # Remove invalid ('none') attribute values
+                    attribute_settings = {k:v for k,v in attribute_settings.items() if v != 'none'}
 
-                        try:
-                            if metric.lower() != 'none' and metric.lower() != '' and metric.lower() in METRICS:
-                                samples_metric = globals()[metric.lower()](
-                                    tab=samples_summarised,
-                                    **metric_kwargs
-                                )
-                            else:
-                                samples_metric = deepcopy(samples_summarised)
-                        except Exception as e:
-                            self.logger.debug(traceback.format_exc())
-                            self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
-                            self.logger.error(f"tab0 {np.shape(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}")
-                            self.logger.error(f'Applying metric {metric.lower()} for {attribute_settings_string} \
-                                                over sample {sample_name} \
-                                                for experiment {experiment_id} failed')
-                            print('\n')
-                            continue
+                    # Create an attributes string
+                    attribute_settings_string = ','.join([f"{k}_{v}" for k,v in attribute_settings.items()])
+                    for key,val in attribute_settings.items():
+                        # Update settings values of attributes
+                        settings_copy[key] = val
 
-                        # print(sample_name,metric,samples_metric)
-                        self.logger.progress(f"Samples metric is {np.shape(samples_metric)}")
-                        # Apply statistics after metric
-                        try:
-                            self.settings['axis'] = METRICS[metric.lower()]['apply_axis']
-                            metric_summarised = outputs.apply_sample_statistics(
-                                samples = samples_metric,
-                                sample_name = metric.lower(),
-                                statistic_dims = metric_statistics_axes
-                            )
-                        except Exception as e:
-                            self.logger.debug(traceback.format_exc())
-                            self.logger.error(f"samples_metric {np.shape(samples_metric)}, {samples_metric.dtype}")
-                            self.logger.error(f"Applying statistic(s) {'>'.join([str(m) for m in metric_statistics_axes])} \
-                                                over metric {metric.lower()} and sample {sample_name} for experiment {experiment_id} failed")
-                            print('\n')
-                            continue
-                        self.logger.debug(f"Summarised metric is {np.shape(metric_summarised)}")
-                        
-                        # Squeeze output
-                        metric_summarised = np.squeeze(metric_summarised)
-                        self.logger.progress(f"Summarised metric is squeezed to {np.shape(metric_summarised)}")
-                        # Get metric data in pandas dataframe
-                        metric_summarised = metric_summarised.to_dataframe().reset_index(drop=True)
-                        # Add to data records
-                        metric_data_keys = [
-                            "sample_statistic",
-                            "sample_name",
-                            "metric",
-                            "metric_statistic",
-                            *attribute_settings.keys(),
-                        ]
-                        metric_data_vals = [
-                            f"{'|'.join([stringify_statistic(_stat_dim) for _stat_dim in sample_statistics_axes])}",
-                            f"{sample_name}",
-                            f"{metric.lower()}",
-                            f"{'|'.join([stringify_statistic(_stat_dim) for _stat_dim in metric_statistics_axes])}",
-                            *attribute_settings.values(),
-                        ]
-                        for _,row in metric_summarised.iterrows():
-                            # Gather all key-value pairs from every row (corresponding to a single sweep setting)
-                            item = {(k if k != metric.lower() else 'value'):str(v) for k,v in row.to_dict().items()}
-                            # Add them to list of metric data
-                            metric_data.append(
-                                dict(
-                                    zip(
-                                        metric_data_keys+list(item.keys()),
-                                        metric_data_vals+list(item.values())
-                                    )
-                                )
-                            )
-                else:              
                     # Update kwargs specific for each metric
-                    metric_kwargs = self.update_metric_arguments(
-                        metric.lower(),
-                        outputs,
-                        self.settings
-                    )
+                    try:
+                        metric_kwargs = self.update_metric_arguments(
+                            metric.lower(),
+                            outputs,
+                            settings_copy
+                        )
+                    except Exception:
+                        self.logger.debug(traceback.format_exc())
+                        self.logger.error(f"metric {np.shape(metric)}, {metric.dtype}")
+                        self.logger.error(f'Arguments for metric {metric} cannot be updated')
+                        print('\n')
+                        continue
                     try:
                         if metric.lower() != 'none' and metric.lower() != '' and metric.lower() in METRICS:
-                            samples_metric = samples_summarised.groupby('sweep').apply(
-                                lambda group: globals()[metric.lower()](
-                                    tab=group,
-                                    **metric_kwargs
-                                )
+                            samples_metric = globals()[metric.lower()](
+                                tab=samples_summarised,
+                                **metric_kwargs
                             )
                             # Rename metric xr data array
                             samples_metric = samples_metric.rename(metric.lower())
                         else:
                             samples_metric = deepcopy(samples_summarised)
-                    except Exception as e:
+                    except Exception:
                         self.logger.debug(traceback.format_exc())
                         self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
-                        self.logger.error(f"tab0 {metric_kwargs['tab0'].shape}, {metric_kwargs['tab0'].dtype}")
-                        self.logger.error(f'Applying metric {metric.lower()} over sample {sample_name} for experiment {experiment_id} failed')
+                        self.logger.error(f"tab0 {np.shape(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}")
+                        self.logger.error(f'Applying metric {metric.lower()} for {attribute_settings_string} \
+                                            over sample {sample_name} \
+                                            for experiment {experiment_id} failed')
                         print('\n')
                         continue
-                    
+
+                    # print(sample_name,metric,samples_metric)
+                    self.logger.progress(f"Samples metric is {np.shape(samples_metric)}")
                     # Apply statistics after metric
                     try:
+                        self.settings['axis'] = METRICS[metric.lower()]['apply_axis']
                         metric_summarised = outputs.apply_sample_statistics(
                             samples = samples_metric,
                             sample_name = metric.lower(),
                             statistic_dims = metric_statistics_axes
                         )
-                    except Exception as e:
+                    except Exception:
                         self.logger.debug(traceback.format_exc())
-                        self.logger.error(f"Shape of metric is {np.shape(samples_metric)}")
-                        self.logger.error(f"Applying statistic {'|'.join([stringify_statistic(_stat_ax) for _stat_ax in metric_statistics_axes])}>" + \
-                                          f"over metric {metric.lower()} and sample {sample_name} for experiment {experiment_id} failed")
+                        self.logger.error(f"samples_metric {np.shape(samples_metric)}, {samples_metric.dtype}")
+                        self.logger.error(f"Applying statistic(s) {'>'.join([str(m) for m in metric_statistics_axes])} \
+                                            over metric {metric.lower()} and sample {sample_name} for experiment {experiment_id} failed")
                         print('\n')
                         continue
-                    self.logger.progress(f"Summarised metric is {np.shape(metric_summarised)}")
+                    self.logger.debug(f"Summarised metric is {np.shape(metric_summarised)}")
+                    
                     # Squeeze output
                     metric_summarised = np.squeeze(metric_summarised)
-                    self.logger.progress(f"Summarised metric is sqeezed to {np.shape(metric_summarised)}")
+                    self.logger.progress(f"Summarised metric is squeezed to {np.shape(metric_summarised)}")
                     # Get metric data in pandas dataframe
                     metric_summarised = metric_summarised.to_dataframe().reset_index(drop=True)
 
-                    # Add to data records
-                    metric_data_keys = [
-                        "sample_statistic",
-                        "sample_name",
-                        "metric",
-                        "metric_statistic"
-                    ]
-                    metric_data_vals = [
-                        f"{'|'.join([stringify_statistic(_stat_dim) for _stat_dim in sample_statistics_axes])}",
-                        f"{sample_name}",
-                        f"{metric.lower()}",
-                        f"{'|'.join([stringify_statistic(_stat_dim) for _stat_dim in metric_statistics_axes])}",
-                    ]
-                    for _,row in metric_summarised.iterrows():
+                    # This loops over remaining sweep configurations
+                    for _,sweep in metric_summarised.iterrows():
+                        # Get sweep id
+                        sweep_id = '& '.join([str(k)+'_'+str(v) for k,v in sweep.to_dict().items() if k != metric])
                         # Gather all key-value pairs from every row (corresponding to a single sweep setting)
-                        item = {(k if k != metric.lower() else 'value'):str(v) for k,v in row.to_dict().items()}
-                        # Add them to list of metric data
-                        metric_data.append(
-                            dict(
-                                zip(
-                                    metric_data_keys+list(item.keys()),
-                                    metric_data_vals+list(item.values())
-                                )
-                            )
-                        )
-
+                        # this is corresponds to variable 'row'
+                        # Add every sweep configuration to this metric data
+                        if sweep_id not in sample_data:
+                            sample_data[sweep_id] = [{
+                                **{
+                                   "sample_name" : sample_name,
+                                   f"{metric}_sample_statistic" : '|'.join(
+                                       [stringify_statistic(_stat_dim) 
+                                        for _stat_dim in sample_statistics_axes]
+                                    ),
+                                    f"{metric}_metric_statistic" : '|'.join(
+                                        [stringify_statistic(_stat_dim) 
+                                         for _stat_dim in metric_statistics_axes]
+                                    )
+                                },
+                                **sweep.to_dict(),
+                                **attribute_settings
+                            }]*len(attribute_values)
+                            
+                        else:
+                            # Skip first element to avoid overwritting 
+                            # metric settings
+                            sample_data[sweep_id][attr_id].update({
+                                f"{metric}_sample_statistic" : '|'.join(
+                                       [stringify_statistic(_stat_dim) 
+                                        for _stat_dim in sample_statistics_axes]
+                                ),
+                                f"{metric}_metric_statistic" : '|'.join(
+                                    [stringify_statistic(_stat_dim) 
+                                        for _stat_dim in metric_statistics_axes]
+                                ),
+                                metric:sweep[metric],
+                                **attribute_settings
+                            })
+                
+                # Add sample data to metric data
+                for sweep_metric_list in sample_data.values():
+                    metric_data += list(sweep_metric_list)
+            
         return metric_data
     
     def update_metric_arguments(self,metric,outputs,settings):        
