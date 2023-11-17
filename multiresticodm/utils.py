@@ -93,29 +93,42 @@ def write_figure(figure,filepath,**settings):
     plt.close(figure)
 
 
-def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_type:dict={},**settings):
+def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_type:dict={},aux_keys:list=[],**settings):
     
-    for plot_setting in plot_settings:
+    for plot_sett in plot_settings:
         # Keys must be included in figure data
-        assert set(key_type.keys()).issubset(set(list(plot_setting.keys())))
+        assert set(key_type.keys()).issubset(set(list(plot_sett.keys())))
 
         if settings.get('data_format','dat') == 'dat':
             # Write dat file
             write_tex_data(
                 key_type=key_type,
-                data=list(zip(*[np.asarray(plot_setting[k],dtype=key_type[k]) for k in key_type.keys()])),
+                data=list(zip(*[np.asarray(plot_sett[k],dtype=key_type[k]) for k in key_type.keys()])),
                 filepath=filepath,
                 precision=settings.get('data_precision',19)
             )
-        else:
-            settings_copy = deepcopy(plot_settings)
-            settings_copy = deep_apply(settings_copy, type)
-            try:
-                print(json.dumps(settings_copy,indent=2))
-            except:
-                print(settings_copy)
+        elif settings.get('data_format','dat') == 'json':
             write_json(
-                plot_settings,
+                {k:(
+                    plot_sett.get(k,np.array([])).tolist() 
+                    if isinstance(plot_sett.get(k),np.ndarray)
+                    else plot_sett.get(k,None)
+                    if k != 'outputs'
+                    else plot_sett.get(k,None).config.settings
+                )
+                for k in list(key_type.keys())+aux_keys},
+                filepath
+            )
+        elif settings.get('data_format','dat') == 'csv':
+            write_csv(
+                pd.DataFrame.from_dict(
+                    {k:(
+                        plot_sett.get(k,np.array([])).tolist() 
+                        if isinstance(plot_sett.get(k),np.ndarray)
+                        else plot_sett.get(k,None)
+                    )
+                    for k in list(key_type.keys())+aux_keys}
+                ),
                 filepath
             )
         # Write plot settings to file
@@ -186,13 +199,11 @@ def write_json(data:Dict,filepath:str,**kwargs:Dict) -> None:
 
 
 def print_json(data:Dict,**kwargs:Dict):
-    print(json.dumps(data,cls=NumpyEncoder,**kwargs))
-
-
-def json_print_newline(data:Dict):
-    for k in data.keys():
-        print(f"{k}: {data[k]}",sep='')
-
+    if kwargs.get('newline',False):
+        for k in data.keys():
+            print(f"{k}: {data[k]}",sep='')
+    else:
+        print(json.dumps(data,cls=NumpyEncoder,**kwargs))
 
 def write_compressed_string(data:str,filepath:str) -> None:
     with gzip.GzipFile(filename=filepath, mode="w") as f:
