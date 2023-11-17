@@ -9,7 +9,7 @@ import psutil
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger
 from multiresticodm.logger_class import *
-from multiresticodm.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
+from multiresticodm.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS, PLOT_COORDINATES
 
 
 def set_threads(n_threads):
@@ -561,6 +561,25 @@ def output_options(func):
         func = option(func)
     return func
 
+_plot_coordinate_options = []
+for var in PLOT_COORDINATES:
+    _plot_coordinate_options += [
+        click.option(f'--{var}_label', f'-{var}lab', default=None, show_default=False,
+              type=click.STRING, help=f'Sets {var} axis label.'),
+        click.option(f'--{var}_discrete/--no-{var}_discrete', default=False, show_default=True,
+                is_flag=True, help=f'Flag for whether {var} is discrete or not.'),
+        click.option(f'--{var}_limit', f'-{var}lim', default=(None,None), show_default=False,
+                type=(float, float), help=f'Sets {var} limits.'),
+        click.option(f'--{var}_tick_frequency', f'-{var}fq', default=20, show_default=True,
+                type=click.INT, help=f'Sets frequency of {var} ticks font size.')
+    ]
+
+
+def plot_coordinate_options(func):
+    for option in reversed(_plot_coordinate_options):
+        func = option(func)
+    return func
+
 @cli.command(name='plot',context_settings=dict(
     ignore_unknown_options=True,
     allow_extra_args=True,
@@ -569,19 +588,25 @@ def output_options(func):
 @common_options
 @click.argument('x', type=click.STRING, required=True)
 @click.argument('y', type=click.STRING, required=True)
+@click.argument('z', type=click.STRING, required=False)
 @click.option('--plots', '-p', type=click.Choice(list(PLOT_HASHMAP.keys())), multiple=True, default = [], required=True,
               help=f'''Sets plotting functions
                     \b
                     {json.dumps(PLOT_HASHMAP,indent=4,separators=(',', ':')).replace('{','').replace('}','')}
                     ''')
+@click.option('--plot_data_dir', '-pdd', type=click.Path(exists=True), required=False)
 @click.option('--label', '-l', default=None, show_default=False, multiple=True,
               type=click.STRING, help=f'Sets metadata key(s) to label figure elements by.')
 @click.option('--colour', '-c', default=None, show_default=False,
               type=click.STRING, help=f'Sets metadata key(s) to colour figure elements by.')
 @click.option('--size', '-sz', default=None, show_default=False,
-              type=click.STRING, help=f'Sets metadata key(s) to size figure elements by.')
+              type=click.STRING, help=f'Sets metadata key(s) to size figure element markers by.')
 @click.option('--visibility', '-v', default=None, show_default=False,
               type=click.STRING, help=f'Sets metadata key(s) to determine figure element visibility (transparency) by.')
+@click.option('--marker', '-mrkr', default=None, show_default=False,
+              type=click.STRING, help=f'Sets metadata key(s) to determine figure element marker type by.')
+@click.option('--hatch', '-hch', default=None, show_default=False,
+              type=click.STRING, help=f'Sets metadata key(s) to determine figure element marker texture by.')
 @click.option('--geometry','-g', multiple=False, type=click.File(), default=None, 
                 help='Defines path to geometry geojson for visualising flows on a map.')
 @click.option('--origin_geometry_type', '-ogt', default='lsoa', show_default=True,
@@ -606,7 +631,7 @@ def output_options(func):
 @click.option('--figure_format', '-ff', default='pdf', show_default=True,
               type=click.Choice(['eps', 'png', 'pdf', 'tex']), help=f'Sets figure format.')#, case_sensitive=False)
 @click.option('--data_format', '-df', default='json', show_default=True,
-              type=click.Choice(['dat', 'txt', 'json']), help=f'Sets figure data format.')#, case_sensitive=False)
+              type=click.Choice(['dat', 'txt', 'json', 'csv']), help=f'Sets figure data format.')#, case_sensitive=False)
 @click.option('--data_precision', '-dp', default=5, show_default=True,
               type=click.INT, help=f'Sets figure data precision.')#, case_sensitive=False)
 @click.option('--figure_size', '-fs', default=(7,5), show_default=True,
@@ -615,14 +640,6 @@ def output_options(func):
               type=click.STRING, help=f'Sets main colourmap (e.g. colourmap corresponding to flows).')
 @click.option('--aux_colourmap', '-ac', multiple=True, required=False, default=['Greens','Blues'],
               type=click.STRING, help=f'Sets auxiliary colourmap (e.g. colourmap corresponding to margins).')
-@click.option('--x_label', '-xlab', default=None, show_default=False,
-              type=click.STRING, help=f'Sets x axis label.')
-@click.option('--y_label', '-ylab', default=None, show_default=False,
-              type=click.STRING, help=f'Sets y axis label.')
-@click.option('--x_limit', '-xlim', default=(None,None), show_default=False,
-              type=(float, float), help=f'Sets x limits.')
-@click.option('--y_limit', '-ylim', default=(None,None), show_default=False,
-              type=(float, float), help=f'Sets y limits.')
 @click.option('--colour_segmentation_limits', '-csl', default=(0,1), show_default=False,
               type=(click.FloatRange(0,1), click.FloatRange(0,1)), 
               help=f'Sets main colourbar\'s colour segmentation limits.')
@@ -634,6 +651,8 @@ def output_options(func):
               type=click.STRING, help=f'Sets figure title.')
 @click.option('--colourbar_title', '-ct', default=None, show_default=False,
               type=click.STRING, help=f'Sets colobar title (if colourbar exists).')
+@click.option('--annotation_label', '-al', default=None, show_default=False,
+              type=click.STRING, help=f'Sets annotation label variable.')
 @click.option('--opacity', '-op', default=1.0, show_default=True,
               type=click.FloatRange(0,1), help=f'Sets level of transparency in plot.')
 @click.option('--axis_font_size', '-afs', default=13, show_default=True,
@@ -656,8 +675,6 @@ def output_options(func):
               type=click.INT, help=f'Sets text annotation font size.')
 @click.option('--axis_label_size', '-als', default=15, show_default=False,
               type=click.INT, help=f'Sets plot labels font size.')
-@click.option('--x_tick_frequency', '-xfq', default=20, show_default=True,
-              type=click.INT, help=f'Sets frequency of x ticks font size.')
 @click.option('--marker_frequency','-mf', default = None, show_default = False,
             type=click.INT, help='Plots marker every n-th poInt in dataset')
 @click.option('--marker_size','-ms', default = 1, show_default = True,
@@ -672,6 +689,7 @@ def output_options(func):
               help=f'Flag for taking switching origins with destinations in plots.')
 @click.option('--colourbar/--no-colourbar', default=None, is_flag=True, show_default=True,
               help=f'Flag for plotting colourbars or not.')
+@plot_coordinate_options
 @click.pass_context
 def plot(
         ctx,
@@ -703,11 +721,15 @@ def plot(
         force_reload,
         x,
         y,
+        z,
         plots,
+        plot_data_dir,
         label,
         colour,
         size,
         visibility,
+        marker,
+        hatch,
         geometry,
         origin_geometry_type,
         destination_geometry_type,
@@ -724,10 +746,6 @@ def plot(
         figure_size,
         main_colourmap,
         aux_colourmap,
-        x_label,
-        y_label,
-        x_limit,
-        y_limit,
         colour_segmentation_limits,
         main_colourbar_limit,
         auxiliary_colourbar_limit,
@@ -735,6 +753,7 @@ def plot(
         opacity,
         figure_title,
         colourbar_title,
+        annotation_label,
         axis_labelpad,
         colourbar_labelpad,
         axis_label_rotation,
@@ -746,13 +765,24 @@ def plot(
         axis_font_size,
         tick_font_size,
         marker_size,
-        x_tick_frequency,
         marker_frequency,
         by_experiment,
         benchmark,
         annotate,
         transpose,
-        colourbar
+        colourbar,
+        x_label,
+        y_label,
+        z_label,
+        x_limit,
+        y_limit,
+        z_limit,
+        x_discrete,
+        y_discrete,
+        z_discrete,
+        x_tick_frequency,
+        y_tick_frequency,
+        z_tick_frequency
     ):
     """
     Plot experimental outputs.
