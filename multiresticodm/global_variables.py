@@ -264,17 +264,17 @@ NUMPY_TYPE_TO_DAT_TYPE = {
 
 
 METRICS = {
-    'srmse':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
-    'p_distance':{'shape':'(N,dims)','loop_over':[],'apply_axis':(1,2),'dtype':'float32'},
-    'ssi':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
-    'sparsity':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
-    'shannon_entropy':{'shape':'(1,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
-    'von_neumann_entropy':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
+    'srmse':{'shape':'(N,1)','loop_over':['none'],'apply_axis':(0,1),'dtype':'float32'},
+    'p_distance':{'shape':'(N,dims)','loop_over':['none'],'apply_axis':(1,2),'dtype':'float32'},
+    'ssi':{'shape':'(N,1)','loop_over':['none'],'apply_axis':(0,1),'dtype':'float32'},
+    'sparsity':{'shape':'(N,1)','loop_over':['none'],'apply_axis':(0,1),'dtype':'float32'},
+    'shannon_entropy':{'shape':'(1,1)','loop_over':['none'],'apply_axis':(0,1),'dtype':'float32'},
+    'von_neumann_entropy':{'shape':'(N,1)','loop_over':['none'],'apply_axis':(0,1),'dtype':'float32'},
     'coverage_probability':{'shape':'(1,dims)','loop_over':['region_mass'],'apply_axis':(1,2),'dtype':'int32'},
-    'edit_degree_higher_error':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
-    'edit_degree_one_error':{'shape':'(N,1)','loop_over':[],'apply_axis':(0,1),'dtype':'float32'},
-    'none':{'shape':'(N,dims)','loop_over':[],'apply_axis':(0,1,2),'dtype':''},
-    '':{'shape':'(N,dims)','loop_over':[],'apply_axis':(0,1,2),'dtype':''},
+    'edit_degree_higher_error':{'shape':'(N,1)','loop_over':['none'],'apply_axis':(0,1),'dtype':'float32'},
+    'edit_degree_one_error':{'shape':'(N,1)','loop_over':['none'],'apply_axis':(0,1),'dtype':'float32'},
+    'none':{'shape':'(N,dims)','loop_over':['none'],'apply_axis':(0,1,2),'dtype':''},
+    '':{'shape':'(N,dims)','loop_over':['none'],'apply_axis':(0,1,2),'dtype':''},
 }
 
 OPERATORS = {
@@ -303,28 +303,6 @@ LINESTYLES = {'monte_carlo_sample_degree_one':'dashed',
             'iterative_residual_filling_solution_degree_higher':'solid',
             'maximum_entropy_solution_degree_higher':'solid',
             'iterative_uniform_residual_filling_solution_degree_higher':'solid'}
-
-
-# Type of plots
-PLOT_HASHMAP = {
-        'dss':'data_plot_2d_scatter',
-        '01':'colsum_posterior_mean_convergence_fixed_intensity',
-        '02':'table_posterior_mean_convergence',
-        '10':'table_distribution_low_dimensional_embedding',
-        '20':'parameter_mixing',
-        '21':'parameter_2d_contours',
-        '22':'parameter_histogram',
-        '23':'parameter_acf',
-        '24':'r2_parameter_grid_plot',
-        '25':'log_target_parameter_grid_plot',
-        '26':'absolute_error_parameter_grid_plot',
-        '30':'destination_attraction_mixing',
-        '31':'destination_attraction_predictions',
-        '32':'destination_attraction_residuals',
-        '40':'origin_destination_table_tabular',
-        '41':'origin_destination_table_spatial',
-        '42':'origin_destination_table_colorbars'
-}
 
 INTENSITY_MODELS = ['spatial_interaction_model']
 
@@ -429,3 +407,44 @@ OPTIMIZERS = {
 
 class Dataset(object):
     pass
+
+
+PLOT_COORDINATES = ['x','y','z']
+PLOT_CORE_FEATURES = ['marker','hatch','size','visibility','colour']
+
+
+# Type of plots
+PLOT_HASHMAP = {
+        'dss':'data_plot_2d_scatter',
+        '01':'colsum_posterior_mean_convergence_fixed_intensity',
+        '02':'table_posterior_mean_convergence',
+        '10':'table_distribution_low_dimensional_embedding',
+        '20':'parameter_mixing',
+        '21':'parameter_2d_contours',
+        '22':'parameter_histogram',
+        '23':'parameter_acf',
+        '24':'r2_parameter_grid_plot',
+        '25':'log_target_parameter_grid_plot',
+        '26':'absolute_error_parameter_grid_plot',
+        '30':'destination_attraction_mixing',
+        '31':'destination_attraction_predictions',
+        '32':'destination_attraction_residuals',
+        '40':'origin_destination_table_tabular',
+        '41':'origin_destination_table_spatial',
+        '42':'origin_destination_table_colorbars'
+}
+
+PLOT_MARKERS = {
+    "sample_name": {
+        "table": "s",
+        "intensity":"^" 
+    }
+}
+
+PLOT_HATCHES = {
+    "sigma": {
+        "-1.0": "x",
+        "0.14142": "/",
+        "0.01414": "\\"
+    }
+}
