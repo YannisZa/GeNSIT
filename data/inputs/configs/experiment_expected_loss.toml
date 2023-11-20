@@ -10,12 +10,12 @@ dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
   default = 1
-  range = ["1:100:1"]
+  # range = ["1:100:1"]
 [inputs.to_learn.sweep]
-  default = ['alpha', 'beta']
-  range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
-  coupled = true
-  target_name = 'sigma'
+  default = ['alpha', 'beta', 'sigma'] 
+  # range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
+  # coupled = true
+  # target_name = 'sigma'
   
 [inputs.data]
     [inputs.data.origin_demand]
@@ -24,7 +24,7 @@ load_experiment = ''
       file ='destination_attraction_time_series_sum_normalised.txt'
     [inputs.data.cost_matrix]
       file = """cost_matrices/clustered_facilities_sample_20x20_20_01_2023_\
-      sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_\
+  sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_\
       prob_origin_destination_adjusted_normalised_boundary_only_\
       edge_corrected_cost_matrix_max_normalised.txt"""
     [inputs.data.ground_truth_table]
@@ -62,51 +62,39 @@ load_experiment = ''
   [harris_wilson_model.parameters]
     epsilon = 1.0
     [harris_wilson_model.parameters.sigma.sweep]
-      default = 0.0141421356
-      range = [0.0141421356, 0.1414213562, nan]
+      default = nan
+      # range = [0.0141421356, 0.1414213562, nan]
 
 [training]
   num_steps = +1
   batch_size = +1
-  [training.N.sweep]
-    default = 1000
-    range = ["repeat(1000,100)"]
-    coupled = true
-    target_name = 'seed'
+  N = 10000
 
 [mcmc]
     disable_tqdm = true
     mcmc_workers = +1
     
     [mcmc.contingency_table]
-      table_steps = +1
       proposal = 'direct_sampling'
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
+      [mcmc.contingency_table.table_steps.sweep]
+        default = 10
+        range = [1,10,50,100]
 
 [neural_network]
   disable_tqdm = true
   [neural_network.loss.loss_name.sweep]
-    default = ['dest_attraction_ts']
-    range = [
-          ['dest_attraction_ts','total_distance','table_likelihood'],
-          ['dest_attraction_ts','total_distance'],
-          ['dest_attraction_ts','table_likelihood'],
-          ['total_distance'],
-          ['table_likelihood']
-    ]
+    default = ['table_likelihood']
+    range = [['table_likelihood'],['dest_attraction_ts','table_likelihood']]
   [neural_network.loss.loss_function.sweep]
-    default = ['mseloss']
+    default = ['custom']
     range = [
-      ['mseloss','mseloss','custom'],
-      ['mseloss','mseloss'],
+      ['custom'],
       ['mseloss','custom'],
-      ['mseloss'],
-      ['custom']
     ]
     coupled = true
     target_name = 'loss_name'
-
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
@@ -127,7 +115,6 @@ load_experiment = ''
   type = 'JointTableSIM_NN'
   comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
   disable_tqdm = true
-  print_statements = true
   export_samples = true
   export_metadata = true
   overwrite = true
@@ -138,7 +125,7 @@ load_experiment = ''
     write_start = +1
     write_every = +1
     out_directory = './data/outputs/'
-    out_group = 'exp3'
+    out_group = 'exp5_expected_loss'
     [outputs.title.sweep]
       default = '_uncostrained'
       range = ['_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']

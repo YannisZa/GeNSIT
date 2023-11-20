@@ -711,20 +711,32 @@
           }
         }
       },
-      "table": {
+      "ground_truth_table": {
         "sweepable": false,
         "optional": true,
         "exclude": false,
 
         "file": {
-          "sweepable": false,
+          "sweepable": true,
           "optional": true,
           "exclude": false,
 
-          "dtype": "file",
-          "file-exists": false,
-          "file-extension": "txt",
-          "default-value": "ground_truth_table.txt"
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "ground_truth_table.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "ground_truth_table.txt",
+              "unique-vals": true
+            }
+          }
         },
         "distribution": {
           "sweepable": false,
@@ -1155,10 +1167,21 @@
         "optional": true,
         "exclude": false,
 
-        "dtype": "int",
-        "default-value": 1,
-        "value-range": [1, null],
-        "inclusive": false
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "value-range": [1, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 1,
+            "value-range": [1, null],
+            "inclusive": false
+          }
+        }
       },
       "covariance": {
         "sweepable": true,
@@ -1225,10 +1248,21 @@
         "optional": true,
         "exclude": false,
 
-        "dtype": "int",
-        "default-value": 1,
-        "value-range": [1, null],
-        "inclusive": false
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "value-range": [1, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 1,
+            "value-range": [1, null],
+            "inclusive": false
+          }
+        }
       },
       "leapfrog_steps": {
         "sweepable": true,
@@ -1364,13 +1398,25 @@
       "exclude": false,
 
       "table_steps": {
-        "sweepable": false,
+        "sweepable": true,
         "optional": true,
         "exclude": false,
 
-        "dtype": "int",
-        "default-value": 1,
-        "value-range": [1, null]
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "value-range": [1, null],
+            "inclusive": false
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 1,
+            "value-range": [1, null],
+            "inclusive": false
+          }
+        }
       },
       "proposal": {
         "sweepable": true,
@@ -1858,13 +1904,6 @@
         "dtype": "bool",
         "default-value": true
       },
-      "print_statements": {
-        "sweepable": false,
-        "optional": true,
-        "exclude": false,
-        "dtype": "bool",
-        "default-value": false
-      },
       "export_samples": {
         "sweepable": false,
         "optional": true,
@@ -1929,6 +1968,15 @@
       "dtype": "directory",
       "directory-exists": true,
       "default-value": "./data/outputs/"
+    },
+    "out_group": {
+      "sweepable": false,
+      "optional": false,
+      "exclude": false,
+
+      "dtype": "directory",
+      "directory-exists": false,
+      "default-value": ""
     },
     "title": {
       "sweepable": true,

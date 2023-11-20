@@ -102,7 +102,7 @@
           "std": false
         }
       },
-      "table": {
+      "ground_truth_table": {
         "file": {
           "sweep": {
             "default": false,
@@ -252,7 +252,12 @@
     "disable_tqdm": true,
     "mcmc_workers": true,
     "parameters": {
-      "theta_steps": true,
+      "theta_steps": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
       "covariance": {
         "sweep": {
           "default": true,
@@ -267,7 +272,12 @@
       }
     },
     "destination_attraction": {
-      "log_destination_attraction_steps": true,
+      "log_destination_attraction_steps": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
       "leapfrog_steps": {
         "sweep": {
           "default": true,
@@ -306,7 +316,12 @@
       }
     },
     "contingency_table": {
-      "table_steps": true,
+      "table_steps": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
       "proposal": {
         "sweep": {
           "default": true,
@@ -371,7 +386,6 @@
       "type": true,
       "comment": true,
       "disable_tqdm": true,
-      "print_statements": true,
       "export_samples": true,
       "export_metadata": true,
       "overwrite": true
@@ -381,6 +395,7 @@
     "write_start": true,
     "write_every": true,
     "out_directory": true,
+    "out_group": true,
     "title": {
       "sweep": {
         "default": true,

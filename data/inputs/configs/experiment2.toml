@@ -138,6 +138,7 @@ load_experiment = ''
     write_start = +1
     write_every = +1
     out_directory = './data/outputs/'
+    out_group = 'exp2'
     title = ''
     # [outputs.title.sweep]
       # default = '_uncostrained'
