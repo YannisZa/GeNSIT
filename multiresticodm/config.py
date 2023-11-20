@@ -9,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, flatten, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk
+from multiresticodm.utils import deep_apply, flatten, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk, print_json
 
 class Config:
 
@@ -117,11 +117,18 @@ class Config:
         """
         # Store absolute paths
         out_dir = kwargs.get('output_dir','')
-        self.in_directory = os.path.join(ROOT,self.settings['inputs']['in_directory'].replace('./',''))
+        self.in_directory = os.path.join(
+            ROOT,
+            self.settings['inputs']['in_directory'].replace('./','')
+        )
         if len(out_dir) > 0:
             self.out_directory = out_dir
         else:
-            self.out_directory = os.path.join(ROOT,self.settings['outputs']['out_directory'].replace('./',''))
+            self.out_directory = os.path.join(
+                ROOT,
+                self.settings['outputs']['out_directory'].replace('./',''),
+                self.settings['outputs'].get('out_group','')
+            )
 
 
     def deep_apply(self,func,**kwargs):
@@ -164,25 +171,23 @@ class Config:
         
         return found
 
-    def path_find(self, key, settings, key_path:list=[], found:bool=False):
+    def path_find(self, key, settings, current_key_path:list=[],all_key_paths:list=[]):
         for k, v in (settings.items() if isinstance(settings, dict) else
             enumerate(settings) if isinstance(settings, list) else []):
             
-            key_path.append(k)
+            current_key_path.append(k)
             if k == key:
-                return key_path,True
-            elif isinstance(v, (list,dict)):
-                key_path,found = self.path_find(
+                all_key_paths.append(deepcopy(current_key_path))
+            if isinstance(v, (list,dict)):
+                all_key_paths = self.path_find(
                     key = key,
                     settings = v,
-                    key_path = key_path,
-                    found = found
+                    current_key_path = current_key_path,
+                    all_key_paths = all_key_paths
                 )
-                if found:
-                    return key_path,found
-            key_path.remove(k)
+            current_key_path.remove(k)
 
-        return key_path,found
+        return all_key_paths
 
 
     def path_get(self,settings=None,key_path=[]):
@@ -190,9 +195,9 @@ class Config:
             return None,False
         if settings is None:
             settings = self.settings
-        
         settings_copy = deepcopy(settings)
-        for i,key in enumerate(key_path):
+
+        for key in key_path:
             if key == 'sweep':
                 if isinstance(settings_copy,dict):
                     if settings_copy.get(key,'not-found') == 'not-found':
@@ -202,11 +207,11 @@ class Config:
                 else:
                     return None,False
             else:
-                if isinstance(settings_copy,dict):
-                    settings_copy = settings_copy.get(key,'not-found')
-                else:
+                try:
                     settings_copy = settings_copy[key]
-        
+                except:
+                    return None,False
+                    
         return settings_copy,(settings_copy!='not-found')
 
     def path_delete(self,settings,key_path:list,deleted:bool=False):
@@ -296,20 +301,44 @@ class Config:
             print(key_path)
             self.path_delete(self.settings,key_path)
 
+    def sweep_mode(self,settings:dict = None):
+        # Check if sweep mode is active
+        if settings is None:
+            settings = self.settings
+        
+        if not self.settings.get('sweep_mode',False):
+            return False
+        
+        # Try to find all sweep configs
+        variable_key_paths = list(self.path_find(
+            key = 'sweep',
+            settings = self.settings,
+            current_key_path = [],
+            all_key_paths = []
+        ))
+
+        # If no sweep key paths found return False
+        if len(variable_key_paths) <= 0:
+            return False
+        else:
+            # If there is at least one valid 
+            # (non-zero length) sweep configuration return True
+            return any([len(key_path) > 0 for key_path in variable_key_paths])
+
+        
     def is_sweepable(self,variable):
-        # Find target name
-        variable_key_path,found = self.path_find(
+        # Find first instance target name
+        variable_key_paths = list(self.path_find(
             key = variable,
             settings = self.schema,
-            key_path = [],
-            found = False
-        )
+            current_key_path = [],
+            all_key_paths = []
+        ))
         # If no path found raise exception
-        if not found:
+        if len(variable_key_paths) <= 0 or len(variable_key_paths[0]) <= 0:
             raise Exception(f"{variable} not found in config schema.")
-        print(variable_key_path)
-        # Return sweepable flag
-        return self.path_get(self.schema,variable_key_path).get('sweepable',False)
+        # Return sweepable flag for first instance of variable
+        return self.path_get(self.schema,variable_key_paths[0]).get('sweepable',False)
 
     def find_sweep_key_paths(self):
         for key_val_path in deep_walk(self.settings):
@@ -326,16 +355,16 @@ class Config:
                         # Add path to coupled sweeps
                         self.coupled_sweep_paths[target_name][key_val_path[indx-1]] = deepcopy(key_val_path[:indx])
                     else:
-                        # Find target name
-                        target_name_path,found = self.path_find(
+                        # Find first instance of target name
+                        target_name_paths = list(self.path_find(
                             key = target_name,
                             settings = self.settings,
-                            key_path = [],
-                            found = False
-                        )
-                        if found and len(target_name_path) > 0:
+                            current_key_path = [],
+                            all_key_paths = []
+                        ))
+                        if len(target_name_paths) > 0 and len(target_name_paths[0]):
                             self.coupled_sweep_paths[target_name] = {    
-                                target_name : target_name_path,
+                                target_name : target_name_paths[0],
                                 key_val_path[indx-1] : deepcopy(key_val_path[:indx])
                             }
                 # Else add to isolated sweep paths
@@ -474,7 +503,6 @@ class Config:
                     if "range" not in list(settings_val.keys()):
                         # Get child key settings
                         settings_child_val, settings_child_found = self.path_get(settings,(key_path+['default']))
-
                         # Update settings with sweep default
                         try:
                             assert self.path_set(settings,settings_child_val,key_path[:-1])
@@ -515,15 +543,15 @@ class Config:
                                 }
                             # Otherwise find the target name in settings
                             else:
-                                target_name_path,found = self.path_find(
+                                target_name_paths = list(self.path_find(
                                     key = target_name,
                                     settings = self.settings,
-                                    key_path = [],
-                                    found = False
-                                )
-                                if found and len(target_name_path) > 0:
+                                    current_key_path = [],
+                                    all_key_paths = []
+                                ))
+                                if len(target_name_paths) > 0:
                                     self.coupled_sweep_paths[target_name] = {    
-                                        target_name : target_name_path,
+                                        target_name : target_name_paths[0],
                                         key_path[-2] : deepcopy(key_path[:-1])
                                     }
                                 else:
@@ -630,7 +658,8 @@ class Config:
                 
                 # Remove it from path
                 key_path.remove(k)
-
+        
+        # return settings
     def prepare_sweep_configurations(self,sweep_params):
 
         # Compute all combinations of sweep parameters
