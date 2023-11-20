@@ -269,10 +269,22 @@ class HarrisWilson_NN:
             [torch.tensor(0.0, requires_grad=False)] * len(self.physics_model.params_to_learn)
         )
 
-    def evaluate_loss(self,prediction_data:dict,validation_data:dict,aux_inputs:dict={}):
+    def update_loss(
+            self,
+            previous_loss:dict,
+            n_processed_steps:dict,
+            prediction_data:dict,
+            validation_data:dict,
+            loss_function_names:list=None,
+            aux_inputs:dict={}
+        ):
         self.logger.debug('Loss function update')
-        result = torch.tensor(0.0, requires_grad=True) 
-        for name in self.loss_functions.keys():
+        
+        # Get subset of loss function names
+        loss_function_names = loss_function_names if loss_function_names is not None else list(self.loss_functions.keys())
+        loss_function_names = list(set(loss_function_names).intersection(set(list(self.loss_functions.keys()))))
+
+        for name in loss_function_names:
             # Make sure you have the necessary data
             for pred_dataset in LOSS_DATA_REQUIREMENTS[name]['prediction_data']:
                 try:
@@ -309,8 +321,18 @@ class HarrisWilson_NN:
                     prediction_data[pred_dataset].to(dtype=float32),
                     validation_data[validation_dataset].to(dtype=float32)
                 )
-        result = result + res
-        return result
+            # Add to existing loss or initialise new loss
+            if name in previous_loss:
+                previous_loss[name] = previous_loss[name] + res
+            else:
+                previous_loss[name] = torch.tensor(res,requires_grad=True)
+            # Keep track number of loss samples per loss function
+            if name in n_processed_steps:
+                n_processed_steps[name] += 1
+            else:
+                n_processed_steps[name] = 1
+
+        return previous_loss,n_processed_steps
 
     def epoch(
         self,
@@ -319,7 +341,7 @@ class HarrisWilson_NN:
         batch_size: int,
         validation_data: dict,
         prediction_data: dict = {},
-        loss_functions: dict = {},
+        loss_function_names: dict = {},
         aux_inputs:dict = {},
         dt: float = None,
         **kwargs,
@@ -339,7 +361,7 @@ class HarrisWilson_NN:
         loss = torch.tensor(0.0, requires_grad=True)
 
         # Count the number of batch items processed
-        experiment.n_processed_steps = 0
+        n_processed_steps = {}
 
         # Copy validation data to override on the fly
         validation_data_copy = deepcopy(validation_data)
@@ -360,28 +382,36 @@ class HarrisWilson_NN:
             # for evaluating the loss function
             prediction_data['destination_attraction_ts'] = torch.flatten(predicted_dest_attraction)
             # Update loss
-            loss = loss + self.evaluate_loss(
+            loss,n_processed_steps = self.update_loss(
+                previous_loss = loss,
+                n_processed_steps = n_processed_steps,
                 data = validation_data_copy,
                 predictions = prediction_data,
+                loss_function_names = loss_function_names,
                 aux_inputs = aux_inputs
             )
 
-            experiment.n_processed_steps += 1
-
             # Update the model parameters after every batch and clear the loss
             if t % batch_size == 0 or t == len(validation_data) - 1:
-                loss.backward()
+                # Extract values from each sub-loss
+                loss_values = sum([val for val in loss.values()])
+                loss_values.backward()
                 self._neural_net.optimizer.step()
                 self._neural_net.optimizer.zero_grad()
                 self._time += 1
+                # Compute average losses here
+                n_processed_steps = kwargs.pop('n_processed_steps',None)
+                if n_processed_steps is not None:
+                    for name in loss.items():
+                        loss[name] = loss[name] / n_processed_steps[name]
                 self._loss_sample = (
-                    loss.clone().detach().cpu().numpy().item() / experiment.n_processed_steps
+                    sum([val for val in loss.values()]).clone().detach().cpu().numpy().item()
                 )
                 self._theta_sample = predicted_theta.clone().detach().cpu()
                 self._log_destination_attraction_sample = torch.log(predicted_dest_attraction).clone().detach().cpu()
                 del loss
-                loss = torch.tensor(0.0, requires_grad=True)
-                experiment.n_processed_steps = 0
+                loss = {}
+                n_processed_steps = {}
 
         return loss, predicted_theta, torch.log(predicted_dest_attraction.squeeze())
 
@@ -412,9 +442,6 @@ class HarrisWilson_NN:
             dt=dt,
             requires_grad=True,
         )
-                
-        # Update number of processed steps
-        experiment.n_processed_steps += 1
         return predicted_theta, predicted_dest_attraction
 
 
