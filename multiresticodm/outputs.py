@@ -90,6 +90,7 @@ class Outputs(object):
             self.outputs_path = os.path.join(
                     self.config['outputs']['out_directory'],
                     self.config['inputs']['dataset'],
+                    self.config['outputs'].get('out_group',''),
                     self.experiment_id
             ) if kwargs.get('base_dir') is None else kwargs['base_dir']
 
@@ -1037,14 +1038,16 @@ class OutputSummary(object):
                     path_dir = os.path.join(
                         __self__.settings['out_directory'],
                         dataset_name,
+                        __self__.settings['outputs'].get('out_group',''),
                         _dir
                     )
                     if os.path.exists(path_dir):
                         output_dirs.append(path_dir)
         else:
             # Search metadata based on search parameters
-            # Get output directory
+            # Get output directory and group
             output_directory = __self__.settings['out_directory']
+            output_group = __self__.settings.get('out_group','')
             # Get experiment title
             experiment_titles = __self__.settings.get('experiment_title',[''])
             # Get dataset name
@@ -1075,7 +1078,15 @@ class OutputSummary(object):
             # Combine them all into one pattern
             folder_patterns_re = "(" + ")|(".join(folder_patterns) + ")"
             # Get all output directories matching dataset name(s)
-            output_dirs = flatten([get_all_subdirectories(output_directory+dataset) for dataset in dataset_names])
+            output_dirs = flatten([
+                get_all_subdirectories(
+                    os.path.join(
+                        output_directory,
+                        dataset,
+                        output_group
+                    ) for dataset in dataset_names
+                )
+            ])
             # Sort them by string
             output_dirs = sorted(list(output_dirs))
             # Get all output dirs that match the pattern
@@ -1510,6 +1521,7 @@ class OutputSummary(object):
             output_directory = os.path.join(
                 self.settings['out_directory'],
                 dataset,
+                self.settings['outputs'].get('out_group',''),
                 'summaries'
             )
             makedir(output_directory)
