@@ -2,51 +2,62 @@
 
 ## Experiment 2
 
-Set ulimit -n 50000
+Set `ulimit -n 50000`
 
 ### Dependent (joint) Table and SIM
 
 clear; multiresticodm run ./data/inputs/configs/experiment2.toml \
- -re JointTableSIM_NN -nw 10 -nt 1 -sm
+ -re JointTableSIM_NN -nw 10 -sm
 
 ## Experiment 3
 
-Set ulimit -n 50000
+Set `ulimit -n 50000`
 
 ### NN SIM
 
 clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
- -re SIM_NN -nw 10 -nt 1 -sm -ln dest_attraction_ts -lf mseloss
+ -re SIM_NN -nw 10 -sm -ln dest_attraction_ts -lf mseloss
 
 ### Independent (non-joint) Table and SIM
 
 clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
- -re NonJointTableSIM_NN -nw 10 -nt 1 -sm -ln dest_attraction_ts -lf mseloss
+ -re NonJointTableSIM_NN -nw 10 -sm -ln dest_attraction_ts -lf mseloss
 
 ### Dependent (joint) Table and SIM
 
 clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
- -re JointTableSIM_NN -nw 10 -nt 1 -sm \
+ -re JointTableSIM_NN -nw 10 -sm \
  -ln dest_attraction_ts -ln table_likelihood \
  -lf mseloss -lf custom
+
+## Experiment 4
+
+## Experiment 5 (Expected loss)
+
+Set `ulimit -n 50000`
+
+### Dependent (joint) Table and SIM
+
+clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml \
+ -re JointTableSIM_NN -nw 10 -sm
 
 ## Plots
 
 # Experiment 2
 
-## Figure 4
+Set `ulimit -n 50000`
 
-```
+## Figure 4
 
 -s intensity
 
--pdd /home/iz230/MultiResTICODM/data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp2/NonJointTableSIM_NN_SweepedNoise__31_10_2023_09_44_49/paper_figures/ -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
+-pdd /home/iz230/MultiResTICODM/data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp2/NonJointTableSIM_NN_SweepedNoise\_\_31_10_2023_09_44_49/paper_figures/ -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
 
 clear; multiresticodm plot seed iter \
 -et NonJointTableSIM_NN -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
 -s table -ft 'seed_vs_epoch_smrse_and_coverage_prob_tradeoff' \
 -stat 'srmse' 'signedmean&' 'iter_seed&' \
--stat 'coverage_probability' '&mean|*1000|floor' '&origin_destination||' \
+-stat 'coverage_probability' '&mean|\*1000|floor' '&origin_destination||' \
 -mrkr sample_name -hch sigma -c srmse -sz coverage_probability -k seed -k iter -k type \
 -p dss -b 0 -t 1 -lls 8 -xlim -1 7 -ylim -1 7 --x_discrete --y_discrete -xlab '# Seeds' -ylab '# Epochs'
 
@@ -65,7 +76,7 @@ clear; multiresticodm plot seed iter -dn cambridge_work_commuter_lsoas_to_msoas/
 
 ### SRMSE
 
-clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e NonJointTableSIM_NN -e JointTableSIM_NN -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 0 -t 1 -n 1000000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 12 -nt 1
+clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -e JointTableSIMLatentMCMC -e SIMLatentMCMC -e NonJointTableSIM_NN -e JointTableSIM_NN -e SIM_NN -m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 0 -t 1 -n 1000000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 12
 
 clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -d JointTableSIM_NN_SweepedNoise_both_margin_constrained_10%\_cells_25_09_2023_10_39_46 \
 -d JointTableSIM_NN_SweepedNoise_both_margin_constrained_20%\_cells_25_09_2023_10_40_06 \
@@ -73,10 +84,10 @@ clear;multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_ls
 -d NonJointTableSIM_NN_SweepedNoise_both_margin_constrained_10%\_cells_25_09_2023_10_38_14 \
 -d NonJointTableSIM_NN_SweepedNoise_both_margin_constrained_20%\_cells_25_09_2023_10_39_06 \
 -d NonJointTableSIM_NN_SweepedNoise_both_margin_constrained_25_09_2023_10_33_53 \
--m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 0 -t 1 -n 1000000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 12 -nt 12
+-m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 0 -t 1 -n 1000000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 12 2
 
 clear; memray run -m multiresticodm -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas -d JointTableSIM_NN_SweepedNoise_both_margin_constrained_10%\_cells_25_09_2023_10_39_46 \
--m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 0 -t 1 -n 1000000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 12 -nt 12
+-m SRMSE -s table -s intensity -stat 'mean&' 'N&' -b 0 -t 1 -n 1000000 -k experiment_title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 12 2
 
 ### SSI
 
@@ -149,7 +160,7 @@ clear; multiresticodm plot -p 10 -o ./data/outputs/ -dn cambridge_work_commuter_
 -e JointTableSIM_MCMC_LowNoise_unconstrained \
 --exclude ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIM_MCMC_HighNoise_row_margin_13_06_2023_14_03_14 \
 -tab table_lsoas_to_msoas.txt -s table -s intensity -nn 30 -dis l_p_distance -emb tsne --ord '1' \
--b 10000 -t 900 -n 100 -nw 16 -nt 16 -nt 1 -l type -l experiment_title -l noise_regime -fe table_and_intensity_space -ff pdf
+-b 10000 -t 900 -n 100 -nw 16 6  -l type -l experiment_title -l noise_regime -fe table_and_intensity_space -ff pdf
 
 <!-- edit_distance_degree_one -->
 <!-- chi_squared_distance -->
@@ -219,3 +230,4 @@ multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp
 multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIM_MCMCHighNoise_07_02_2023_16_15_43 -g ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson -p 41 -fs 20 10 -ff png -ac cgreen -ac cred -mc cool --annotate -s table -stat mean_variance '' '' -csl 0.0 1.0 -b 10000 -afs 26 -cfs 20 -mcl 2.7744176387786865 357.8244323730469 -acl 277.0 848.0 -acl 276.0 16340.0 -fe high_noise --no-colorbar -lw 10 -op 0.2
 
 multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIM_MCMCHighNoise_07_02_2023_16_15_43 -g ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson -p 41 -fs 20 10 -ff pdf -ac cgreen -ac cred -mc cblue --annotate -t posterior_table_mean_error -csl 0.5 1.0 -b 10000 -afs 26 -cfs 20 -mcl 7.592240947332791e-07 0.009970745312129123 -acl 0.0 0.0 -acl 0.000530141493261603 0.07746821280692036 -fe high_noise --no-colorbar -no relative_l1
+```
