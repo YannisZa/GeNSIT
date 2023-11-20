@@ -27,12 +27,9 @@ from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMon
 np.set_printoptions(suppress=True)
 
 def instantiate_experiment(experiment_type:str,config:Config,**kwargs):
-    # Get whether sweep is active and its settings available
-    has_coupled_sweep_paths = len(config.coupled_sweep_paths.values()) > 0
-    has_isolated_sweep_paths = len(config.isolated_sweep_paths.values()) > 0
     if hasattr(sys.modules[__name__], experiment_type):
-        if config.settings.get("sweep_mode",False) and \
-            (has_isolated_sweep_paths or has_coupled_sweep_paths):
+        # Get whether sweep is active
+        if config.sweep_mode(settings = config.settings):
             return ExperimentSweep(
                 config=config,
                 **kwargs
@@ -143,9 +140,8 @@ class Experiment(object):
         # self.config = self.sim.config.update_recursively(self.config,updated_config,overwrite=True)
         # print(self.config)
         # Decide how often to print statemtents
-        self.print_statements = self.config.get('print_statements',True)
         self.store_progress = self.config.get('store_progress',1.0)
-        self.print_percentage = min(0.05,self.store_progress)*int(self.print_statements)
+        self.print_percentage = min(0.05,self.store_progress)
 
         # Update seed if specified
         self.seed = None
@@ -166,7 +162,6 @@ class Experiment(object):
         self._time = 0
         self._write_every = self.config['outputs'].get('write_every',1)
         self._write_start = self.config['outputs'].get('write_start',1)
-        self.n_processed_steps = 0
         
         # Get experiment data
         self.logger.info(f"Experiment {self.config['experiment_type']} has been set up.")
@@ -313,17 +308,22 @@ class Experiment(object):
             
             # Setup neural net loss
             if 'loss' in self.output_names:
-                # Setup chunked dataset to store the state data in
-                self.losses = self.outputs.h5group.create_dataset(
-                    'loss',
-                    (0,),
-                    maxshape=(None,),
-                    chunks=True,
-                    compression=3,
-                )
-                self.losses.attrs['dim_names'] = XARRAY_SCHEMA['loss']['coords']
-                self.losses.attrs['coords_mode__time'] = 'start_and_step'
-                self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+                for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total']:
+                    # Setup chunked dataset to store the state data in
+                    setattr(
+                        self,
+                        loss_name,
+                        self.outputs.h5group.create_dataset(
+                            loss_name,
+                            (0,),
+                            maxshape=(None,),
+                            chunks=True,
+                            compression=3,
+                        )
+                    )
+                    getattr(self,loss_name).attrs['dim_names'] = XARRAY_SCHEMA['loss']['coords']
+                    getattr(self,loss_name).attrs['coords_mode__time'] = 'start_and_step'
+                    getattr(self,loss_name).attrs['coords__time'] = [self._write_start, self._write_every]
             
             # Setup sampled/predicted log destination attractions
             if 'log_destination_attraction' in self.output_names:
@@ -438,29 +438,38 @@ class Experiment(object):
             t: int,
             **kwargs
         ):
-        self.logger.progress('Update and export')
+        self.logger.note('Update and export')
         # Update the model parameters after every batch and clear the loss
         if t % batch_size == 0 or t == data_size - 1:
             # Update time
             self._time += 1
 
             # Update gradients
-            loss = kwargs.get('loss',None)
+            loss = kwargs.pop('loss',None)
             if loss is not None:
-                loss.backward()
+                # Extract values from each sub-loss
+                loss_values = sum([val for val in loss.values()])
+                # Perform gradient update
+                loss_values.backward()
                 self.harris_wilson_nn._neural_net.optimizer.step()
                 self.harris_wilson_nn._neural_net.optimizer.zero_grad()
 
+                # Compute average losses here
+                n_processed_steps = kwargs.pop('n_processed_steps',None)
+                if n_processed_steps is not None:
+                    for name in loss.keys():
+                        loss[name] = loss[name] / n_processed_steps[name]
+                # Store total loss too
+                loss['total'] = sum([val for val in loss.values()])
             # Write to file
             self.write_data(
-                **kwargs
+                **kwargs,
+                **loss
             )
             # Delete loss
             del loss
-            loss = torch.tensor(0.0, requires_grad=True)
-            self.n_processed_steps = 0
         
-        return loss
+        return {},{}
 
     def write_data(self,**kwargs):
         '''Write the current state into the state dataset.
@@ -472,11 +481,12 @@ class Experiment(object):
         self.logger.debug('Writing data')
         if self._time >= self._write_start and self._time % self._write_every == 0:
             if 'loss' in self.output_names:
-                # Store samples
-                _loss_sample = kwargs.get('loss',None) 
-                _loss_sample = _loss_sample.clone().detach().cpu().numpy().item() / self.n_processed_steps if _loss_sample is not None else None
-                self.losses.resize(self.losses.shape[0] + 1, axis=0)
-                self.losses[-1] = _loss_sample
+                for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total']:
+                    # Store samples
+                    _loss_sample = kwargs.get(loss_name,None)
+                    _loss_sample = _loss_sample.clone().detach().cpu().numpy().item() if _loss_sample is not None else None
+                    getattr(self,loss_name).resize(getattr(self,loss_name).shape[0] + 1, axis=0)
+                    getattr(self,loss_name)[-1] = _loss_sample
 
             if 'table' in self.output_names:
                 _table_sample = kwargs.get('table',None)
@@ -505,19 +515,19 @@ class Experiment(object):
 
             if 'theta_acc' in self.output_names:
                 _theta_acc = kwargs.get('theta_acc',None)
-                _theta_acc = _theta_acc / self.n_processed_steps if _theta_acc is not None else None
+                _theta_acc = _theta_acc if _theta_acc is not None else None
                 self.theta_acc.resize(self.theta_acc.shape[0] + 1, axis=0)
                 self.theta_acc[-1] = _theta_acc
 
             if 'log_destination_attraction_acc' in self.output_names:
                 _log_dest_attract_acc = kwargs.get('log_destination_attraction_acc',None)
-                _log_dest_attract_acc = _log_dest_attract_acc / self.n_processed_steps if _log_dest_attract_acc is not None else None
+                _log_dest_attract_acc = _log_dest_attract_acc if _log_dest_attract_acc is not None else None
                 self.log_destination_attraction_acc.resize(self.log_destination_attraction_acc.shape[0] + 1, axis=0)
                 self.log_destination_attraction_acc[-1] = _log_dest_attract_acc
 
             if 'table_acc' in self.output_names:
                 _table_acc = kwargs.get('table_acc',None)
-                _table_acc = _table_acc / self.n_processed_steps if _table_acc is not None else None
+                _table_acc = _table_acc if _table_acc is not None else None
                 self.table_acc.resize(self.table_acc.shape[0] + 1, axis=0)
                 self.table_acc[-1] = _table_acc
 
@@ -551,8 +561,10 @@ class Experiment(object):
         if hasattr(self,'table_acc'):
             self.config['table_acceptance'] = int(100*self.table_acc[:].mean(axis=0))
             self.logger.progress(f"Table acceptance: {self.config['table_acceptance']}")
-        if hasattr(self,'losses'):
-            self.logger.progress(f'Average loss: {self.losses[:].mean(axis=0)}')
+        if hasattr(self,'harris_wilson_nn'):
+            for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total']:
+                self.logger.progress(f'{loss_name} loss: {getattr(self,loss_name)[:].mean(axis=0)}')
+
 
 class DataGeneration(Experiment):
 
@@ -650,18 +662,17 @@ class RSquaredAnalysis(Experiment):
         # Output results
         idx = np.unravel_index(r2_values.argmax(), r2_values.shape)
 
-        if self.config['print_statements']:
-            print("Fitted alpha, beta and scaled beta values:")
-            print(alpha_values[idx[1]],beta_values[idx[0]], beta_values[idx[0]]*self.sim.bmax)
-            print("R^2 value:")
-            print(r2_values[idx],np.max(r2_values.ravel()))
-            print('Destination attraction prediction')
-            print(max_w_prediction)
-            print('True destination attraction')
-            print(np.exp(self.sim.log_destination_attraction))
-            if self.sim.ground_truth_known:
-                print('True theta')
-                print(self.sim.alpha_true,self.sim.beta_true)
+        print("Fitted alpha, beta and scaled beta values:")
+        print(alpha_values[idx[1]],beta_values[idx[0]], beta_values[idx[0]]*self.sim.bmax)
+        print("R^2 value:")
+        print(r2_values[idx],np.max(r2_values.ravel()))
+        print('Destination attraction prediction')
+        print(max_w_prediction)
+        print('True destination attraction')
+        print(np.exp(self.sim.log_destination_attraction))
+        if self.sim.ground_truth_known:
+            print('True theta')
+            print(self.sim.alpha_true,self.sim.beta_true)
 
         # Save fitted values to parameters
         self.config['noise_regime'] = self.sim.noise_regime
@@ -751,11 +762,10 @@ class LogTargetAnalysis(Experiment):
                     print(e)
                     None
 
-        if self.config['print_statements']:
-            print("Fitted alpha, beta and scaled beta values:")
-            print(XX[argmax_index],YY[argmax_index]*self.amax/(self.bmax), YY[argmax_index])
-            print("Log target:")
-            print(log_targets[argmax_index])
+        print("Fitted alpha, beta and scaled beta values:")
+        print(XX[argmax_index],YY[argmax_index]*self.amax/(self.bmax), YY[argmax_index])
+        print("Log target:")
+        print(log_targets[argmax_index])
 
         # Compute estimated flows
         theta[0] = XX[argmax_index]
@@ -1384,9 +1394,6 @@ class Table_MCMC(Experiment):
             # Track the epoch training time
             self.start_time = time.time()
 
-            # Count the number of batch items processed
-            self.n_processed_steps = 0
-
             # Sample table
             table_sample,accepted = self.ct_mcmc.table_gibbs_step(
                 table_prev = table_sample,
@@ -1394,7 +1401,7 @@ class Table_MCMC(Experiment):
             )
 
             # Clean and write to file
-            _ = self.update_and_export(
+            _,_ = self.update_and_export(
                 table = table_sample,
                 table_acceptance = accepted,
                 # Batch size is in training settings
@@ -1552,7 +1559,7 @@ class TableSummaries_MCMCConvergence(Experiment):
         # Total samples for joint posterior
         N = self.samplers['0'].ct.config.settings['mcmc']['N']
 
-        print('Running MCMC')
+        self.logger.info('Running MCMC')
         for i in tqdm(
             range(1,N),
             disable=self.config['disable_tqdm'],
@@ -1601,7 +1608,7 @@ class TableSummaries_MCMCConvergence(Experiment):
                 axis=0
             )
 
-            if (self.config['print_statements']) and (i in [int(p*N) for p in np.arange(0,1,0.1)]):
+            if (i in [int(p*N) for p in np.arange(0,1,0.1)]):
                 print('norm')
                 print(table_norm[-1])
 
@@ -1746,10 +1753,9 @@ class SIM_NN(Experiment):
             start_time = time.time()
 
             # Track the training loss
-            loss_sample = torch.tensor(0.0, requires_grad=True)
-
-            # Count the number of batch items processed
-            self.n_processed_steps = 0
+            loss_sample = {}
+            # Track number of elements in each loss function
+            n_processed_steps = {}
             
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
@@ -1765,8 +1771,10 @@ class SIM_NN(Experiment):
                 )
                 log_destination_attraction_sample = torch.log(destination_attraction_sample)
                 
-                # Update loss
-                loss_sample = loss_sample + self.harris_wilson_nn.evaluate_loss(
+                # Update losses
+                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
+                    previous_loss = loss_sample,
+                    n_processed_steps = n_processed_steps,
                     validation_data = dict(
                         destination_attraction_ts = training_data
                     ),
@@ -1776,8 +1784,9 @@ class SIM_NN(Experiment):
                 )
 
                 # Clean and write to file
-                loss_sample = self.update_and_export(
+                loss_sample,n_processed_steps = self.update_and_export(
                     loss = loss_sample,
+                    n_processed_steps = n_processed_steps,
                     theta = theta_sample,
                     log_destination_attraction = log_destination_attraction_sample,
                     # Batch size is in training settings
@@ -1944,10 +1953,9 @@ class NonJointTableSIM_NN(Experiment):
             start_time = time.time()
             
             # Track the training loss
-            loss_sample = torch.tensor(0.0, requires_grad=True)
-
-            # Count the number of batch items processed
-            self.n_processed_steps = 0
+            loss_sample = {}
+            # Track number of elements in each loss function
+            n_processed_steps = {}
             
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
@@ -1981,8 +1989,9 @@ class NonJointTableSIM_NN(Experiment):
                     log_intensity = log_intensity_sample
                 )
 
-                # Update loss
-                loss_sample = loss_sample + self.harris_wilson_nn.evaluate_loss(
+                # Update losses
+                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
+                    previous_loss = loss_sample,
                     validation_data = dict(
                         destination_attraction_ts = training_data
                     ),
@@ -1992,8 +2001,9 @@ class NonJointTableSIM_NN(Experiment):
                 )
 
                 # Clean and write to file
-                loss_sample = self.update_and_export(
+                loss_sample,n_processed_steps = self.update_and_export(
                     loss = loss_sample,
+                    n_processed_steps = n_processed_steps,
                     theta = theta_sample,
                     log_destination_attraction = log_destination_attraction_sample,
                     table = table_sample,
@@ -2166,10 +2176,9 @@ class JointTableSIM_NN(Experiment):
             start_time = time.time()
             
             # Track the training loss
-            loss_sample = torch.tensor(0.0, requires_grad=True)
-
-            # Count the number of batch items processed
-            self.n_processed_steps = 0
+            loss_sample = {}
+            # Track number of elements in each loss function
+            n_processed_steps = {}
 
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
@@ -2197,28 +2206,48 @@ class JointTableSIM_NN(Experiment):
                     **dict(zip(self.harris_wilson_nn.physics_model.params_to_learn,theta_sample_expanded.split(1,dim=1)))
                 ).squeeze()
                 
-                # Sample table
-                table_sample,accepted = self.ct_mcmc.table_gibbs_step(
-                    table_prev = table_sample,
-                    log_intensity = log_intensity_sample
-                )
-
-                # Update loss
-                loss_sample = loss_sample + self.harris_wilson_nn.evaluate_loss(
+                # Update destination_attraction loss
+                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
+                    previous_loss = loss_sample,
+                    n_processed_steps = n_processed_steps,
                     validation_data = dict(
                         destination_attraction_ts = training_data,
-                        log_intensity = log_intensity_sample
                     ),
                     prediction_data = dict(
-                        table = table_sample,
                         destination_attraction_ts = torch.flatten(destination_attraction_sample)
                     ),
+                    loss_function_names = ['dest_attraction_ts'],
                     aux_inputs = vars(self.inputs.data)
                 )
+                
+                # Sample table
+                for _ in range(self.config['mcmc']['contingency_table'].get('table_steps',1)):
+                    
+                    # Perform table step
+                    table_sample,accepted = self.ct_mcmc.table_gibbs_step(
+                        table_prev = table_sample,
+                        log_intensity = log_intensity_sample
+                    )
 
-                # Clean and write to file
-                loss_sample = self.update_and_export(
+                    # Update losses
+                    loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
+                        previous_loss = loss_sample,
+                        n_processed_steps = n_processed_steps,
+                        validation_data = dict(
+                            log_intensity = log_intensity_sample
+                        ),
+                        prediction_data = dict(
+                            table = table_sample,
+                        ),
+                        loss_function_names = [lf for lf in self.harris_wilson_nn.loss_functions.keys() if lf != 'dest_attraction_ts'],
+                        aux_inputs = vars(self.inputs.data)
+                    )
+
+                # Clean loss and write to file
+                # This will only store the last table sample
+                loss_sample,n_processed_steps = self.update_and_export(
                     loss = loss_sample,
+                    n_processed_steps = n_processed_steps,
                     theta = theta_sample,
                     log_destination_attraction = log_destination_attraction_sample,
                     table = table_sample,
@@ -2425,7 +2454,7 @@ class ExperimentSweep():
             with concurrency.ProcessPoolExecutor(self.n_workers*2) as executor:
                 # Start the processes and ignore the results
                 futures = [executor.submit(
-                    fn = self.prepare_instantiate_and_run,
+                    self.prepare_instantiate_and_run,
                     instance_num = instance,
                     sweep_configuration = sweep_config
                 ) for instance,sweep_config in enumerate(sweep_config_chunk)]
@@ -2440,4 +2469,5 @@ class ExperimentSweep():
                         """)
                         raise Exception(f"Future {index} failed")
                     pbar.update(1)
-        pbar.close()
+            # Close progress bar
+            pbar.close()
