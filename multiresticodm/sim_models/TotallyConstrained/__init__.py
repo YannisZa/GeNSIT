@@ -100,7 +100,7 @@ def log_flow_matrix(**kwargs):
         if log_destination_attraction.ndim > 2:
             N = log_destination_attraction.size(dim=0)
             time = log_destination_attraction.size(dim=1)
-            sweep = len(log_destination_attraction['sweep'].values)
+            sweep = log_destination_attraction.size(dim=2)
         elif log_destination_attraction.ndim > 1:
             N = 1
             sweep = 1
