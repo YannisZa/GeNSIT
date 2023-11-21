@@ -246,7 +246,9 @@ def get_dims(data):
     return res
 
 def parse(value,default=None):
-    if isinstance(value,str):
+    if value is None:
+        return 'none'
+    elif isinstance(value,str):
         if len(value) <= 0:
             return default
         try:
@@ -623,9 +625,7 @@ def parse_slice_by(slice_by:list):
 def stringify_index(d):
     if d is None:
         return 'none'
-    elif not np.isfinite(d):
-        return 'none'
-    elif isinstance(d,float) or ((hasattr(d,'dtype') and 'float' in str(d.dtype))):
+    elif isinstance(d,float) or ((hasattr(d,'dtype') and 'float' in str(d.dtype))) and not np.isfinite(d):
         return str(d)
     else:
         return d

@@ -116,15 +116,19 @@ class Outputs(object):
         
         # Get name of intensity model
         self.intensity_model_name = self.config.settings[self.intensity_model_class]['name']
-
+        # If these are sweeped store their range otherwse
+        self.intensity_model_name = self.intensity_model_name['sweep']['range'] if isinstance(self.intensity_model_name,dict) else [self.intensity_model_name]
         # Store sample data requirements
         self.output_names = list(
             flatten([
                 SAMPLE_DATA_REQUIREMENTS[sam] if sam != 'intensity' 
-                else SAMPLE_DATA_REQUIREMENTS[sam][self.intensity_model_name]
-                for sam in set(self.data_names).intersection(set(list(OUTPUT_TYPES.keys())))]
+                else SAMPLE_DATA_REQUIREMENTS[sam][model_name]
+                for sam in set(self.data_names).intersection(set(list(OUTPUT_TYPES.keys())))
+                for model_name in self.intensity_model_name]
             )
         )
+        # Keep only unique values
+        self.output_names = list(set(self.output_names))
         self.input_names = [
             sam for sam in set(self.data_names).intersection(set(list(INPUT_TYPES.keys())))
         ]
@@ -246,7 +250,6 @@ class Outputs(object):
 
     def load_h5_data(self,settings:dict={},slice_samples:bool=True):
         self.logger.note('Loading h5 data into xarrays...')
-
         # Get all h5 files
         h5files = list(Path(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}")).rglob("*.h5"))
         # Sort them by seed
@@ -267,6 +270,7 @@ class Outputs(object):
         
         # Create an xarray dataset for each sample
         xr_dict = {}
+
         for sample_name,sample_data in data_vars.items():
             
             coordinates = {}
@@ -278,6 +282,8 @@ class Outputs(object):
                 dims = np.shape(sample_data)[2:]
                 # For each dim create coordinate
                 for i,d in enumerate(dims):
+                    # print(np.shape(sample_data),dims)
+                    # print(sample_name,XARRAY_SCHEMA[sample_name])
                     obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
                     # Create coordinate ranges based on schema
                     coordinates[XARRAY_SCHEMA[sample_name]['coords'][i]] = deep_call(
@@ -341,11 +347,19 @@ class Outputs(object):
                         # self.logger.debug(f'After slicing {sample_name}: {np.shape(sample_data)}')
                     else:
                         # Get iterations
-                        iters = np.arange(start=1,stop=sample_data.shape[0]+1,step=1,dtype='int32')
+                        iters = np.arange(
+                            start=1,
+                            stop=sample_data.shape[0]+1,
+                            step=1,
+                            dtype='int32'
+                        )
                     global_coords['iter'] = iters
                     # Append
                     self.logger.debug(f'Appending {sample_name}')
                     data_vars[sample_name] = np.array([sample_data[:]])
+                    # print(h5data[group_id].attrs['sweep_params'])
+                    # print(h5data[group_id].attrs['sweep_values'])
+                    # print(sample_name,sample_data.shape,data_vars[sample_name].shape)
                 self.logger.debug(f'Done with file')
         except BlockingIOError:
             self.logger.debug(f"Skipping in-use file: {filename}")
@@ -1084,8 +1098,8 @@ class OutputSummary(object):
                         output_directory,
                         dataset,
                         output_group
-                    ) for dataset in dataset_names
-                )
+                    )
+                ) for dataset in dataset_names
             ])
             # Sort them by string
             output_dirs = sorted(list(output_dirs))
@@ -1129,15 +1143,15 @@ class OutputSummary(object):
             for j in range(len(outputs.data)):
                 # Collect metric metadata
                 metric_data = self.get_experiment_metadata(j,outputs)
-                
-                if output_folder in experiment_metadata:
-                    experiment_metadata[output_folder]= np.append(
-                        experiment_metadata[output_folder],
-                        metric_data,
-                        axis = 0
-                    )
-                else:
-                    experiment_metadata[output_folder] = experiment_metadata
+                if len(metric_data) > 0:
+                    if output_folder in experiment_metadata:
+                        experiment_metadata[output_folder]= np.append(
+                            experiment_metadata[output_folder],
+                            metric_data,
+                            axis = 0
+                        )
+                    else:
+                        experiment_metadata[output_folder] = metric_data
         
         return experiment_metadata
     
@@ -1159,23 +1173,23 @@ class OutputSummary(object):
         useful_metadata = {}
         for key in self.settings['metadata_keys']:
             # Replace iter with N
-            path, found = self.config.path_find(
+            key_paths = self.config.path_find(
                 key = key if key != 'iter' else 'N',
                 settings = new_outputs.config.settings,
-                key_path = [],
-                found = False
+                current_key_path = [],
+                all_key_paths = []
             )
-            if not found:
+            if len(key_paths) <= 0:
                 self.logger.error(f"{key if key != 'iter' else 'N'} not found in experiment metadata.")
                 continue
             # Extract directly from config
-            has_sweep = self.config.has_sweep(path)
-            if found and not has_sweep:
+            has_sweep = self.config.has_sweep(key_paths[0])
+            if len(key_paths) <= 0 and not has_sweep:
                 useful_metadata[key],_ = self.config.path_get(
-                    key_path = path
+                    key_path = key_paths[0]
                 )
             # Extract from data collection element
-            elif self.config.has_sweep(path):
+            elif self.config.has_sweep(key_paths[0]):
                 # Grab first dataarray
                 data_arr = list(new_outputs.data.data_vars().values())[0]
                 useful_metadata[key] = data_arr.sizes[key]
@@ -1224,7 +1238,6 @@ class OutputSummary(object):
             input_slice=input_slice,
             slice_samples=True
         )
-
         data_arr,slice_dict = {},{}
         for sample_name,xr_data in xr_dict_data.items():
             # Get sample dimensions
@@ -1239,11 +1252,7 @@ class OutputSummary(object):
                 for k in coords.keys()
             }
             data_arr[sample_name] = xr.DataArray(
-                data = torch.tensor(
-                    data,
-                    dtype=DATA_TYPES[sample_name],
-                    device=self.settings.get('device','cpu')
-                ),
+                data = data,
                 coords = slice_dict,
                 dims = (sweep_dims+sample_dims),
                 attrs = dict(
@@ -1255,7 +1264,6 @@ class OutputSummary(object):
                     }
                 )
             )
-
         return data_arr
 
     def get_folder_outputs(self,output_folder):
@@ -1437,8 +1445,8 @@ class OutputSummary(object):
                             sweep_configuration = sweep_configuration,
                             experiment_id = outputs.experiment_id,
                             sweep_dims = sweep_dims,
-                            group_by = self.settings.get('group_by',[]),
                             inputs = passed_inputs,
+                            group_by = self.settings.get('group_by',[]),
                             input_slice = input_slice,
                             coordinate_slice = coordinate_slice 
                         )
@@ -1455,11 +1463,10 @@ class OutputSummary(object):
                     # along all core dimensions and group_by dimensions
 
                     for dataset in output_datasets:
-                            
                         # Slice according to coordinate slice
                         if len(coordinate_slice) > 0:
                             outputs.data.update_sample(
-                                dataset.pop(sample_name).sel(
+                                dataset.pop(sample_name).sel( 
                                     **{
                                         k:(v['values'] \
                                             if len(v['values']) > 1 \
