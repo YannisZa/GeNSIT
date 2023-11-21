@@ -11,9 +11,10 @@ data/outputs_backup/**
 data/raw/**
 data/inputs/**/google/**
 tests/test_outputs/**
+notebooks/io_processing/logs/**
 
 # Files
-*temp.log
+*temp*.log
 *._*.txt
 *._*.geojson
 *.so

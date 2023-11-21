@@ -1243,7 +1243,7 @@
       "optional": true,
       "exclude": false,
 
-      "log_destination_attraction_steps": {
+      "destination_attraction_steps": {
         "sweepable": false,
         "optional": true,
         "exclude": false,

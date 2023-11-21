@@ -272,7 +272,7 @@
       }
     },
     "destination_attraction": {
-      "log_destination_attraction_steps": {
+      "destination_attraction_steps": {
         "sweep": {
           "default": true,
           "range": true
