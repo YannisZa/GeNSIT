@@ -1,3 +1,4 @@
+import os
 import json
 import torch 
 import operator
@@ -17,7 +18,8 @@ PARAMETER_DEFAULTS = {
 }
 
 SWEEPABLE_PARAMS = ['iter']
-with open('./data/inputs/configs/cfg_parameters.json', 'r') as f:
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+with open(os.path.join(ROOT,'data/inputs/configs/cfg_parameters.json'), 'r') as f:
     config_params = json.load(f)
     # Find all sweepable parameters
     stack = list(config_params.items()) 
@@ -87,6 +89,12 @@ XARRAY_SCHEMA = {
         "new_shape":["iter"]
     },
     'log_target': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    },
+    'sign': {
         "coords":[],
         "funcs":[],
         "args_dtype":[],
