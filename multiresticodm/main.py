@@ -395,7 +395,7 @@ def create(
             default = None, help = 'Overwrites size of square grid for R^2 and Log Target analyses.')
 @click.option('--theta_steps','-pn', type=click.IntRange(min=1),
             default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.')
-@click.option('--log_destination_attraction_steps','-dan', type=click.IntRange(min=1),
+@click.option('--destination_attraction_steps','-dan', type=click.IntRange(min=1),
             default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.')
 @click.option('--table_steps','-tn', type=click.IntRange(min=1),
             default = None, help = 'Overwrites number of Spatial Interaction Model MCMC steps in joint scheme.')
@@ -432,7 +432,7 @@ def run(
         loss_function,
         grid_size,
         theta_steps,
-        log_destination_attraction_steps,
+        destination_attraction_steps,
         table_steps,
         alpha0,
         beta0,
