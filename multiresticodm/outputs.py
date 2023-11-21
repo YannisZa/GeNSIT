@@ -135,32 +135,47 @@ class Outputs(object):
         
         # Name output sample directory according 
         # to sweep params (if they are provided)
-        self.sweep_id = ''
-        if len(sweep_params) > 0 and isinstance(sweep_params,dict):
-            # Create sweep id by grouping coupled sweep vars together
-            # and isolated sweep vars separately
-            sweep_id = []
-            for v in set(list(self.config.target_names_by_sweep_var.values())).difference(set(['dataset'])):
-                # Map sigma to noise regime
-                if str(v) == 'sigma':
-                    value = sigma_to_noise_regime(sweep_params[v])
-                # Else use passed sweep value
-                else:
-                    value = sweep_params[v]
-                # Add to key-value pair to unique sweep id
-                sweep_id.append(f"{str(v)}_{stringify(value)}")
-            # Join all grouped sweep vars into one sweep id 
-            # which will be used to create an output folder
-            if len(sweep_id) > 0:
-                self.sweep_id = os.path.join(*sorted(sweep_id,key=lambda x: x.split('_')[0]))
-            else:
-                self.sweep_id = ''
+        self.sweep_id = self.config.get_sweep_id(sweep_params = sweep_params)
+
+    def trim_sweep_configurations(self,sweep_configurations:list=[],sweep_params:dict={}):
+        # Loop through each sweep configuration
+        for sweep_conf in sweep_configurations:
+            # Extract sweep params for this configuration
+            _,sweep = self.config.prepare_experiment_config(
+                sweep_params,
+                sweep_conf
+            )
+            # Get sweep id
+            sweep_id = self.config.get_sweep_id(sweep_params = sweep)
+            # Check if 'metadata.json' or 'config.json' and 'data.h5' and 'outputs.log'
+            # exist in output directory
+            file_exists = {}
+            for file in ['metadata.json','data.h5','outputs.log']:
+                # Create filepath
+                filepath = os.path.join(
+                    self.outputs_path,
+                    'samples',
+                    sweep_id,
+                    f"outputs.log"
+                )
+                # Check if path exists and filepath corresponds to a file
+                file_exists[file] = os.path.exists(filepath) and os.path.isfile(filepath)
+            # Check if necessary data exists 
+            data_exists = file_exists['metadata.json'] and \
+                file_exists['data.h5'] and \
+                file_exists['outputs.log']
+            # If necessary data does not exist
+            # Add sweep configurations that need to be run
+            if not data_exists:
+                yield sweep_conf
+                
 
     def samples(self):
         if hasattr(self,'data') and isinstance(self.data,DataCollection):
             return list(vars(self.data).keys())
         else:
             return []
+        
         
     def has_sample(self,sample_name:str) -> bool:
         return sample_name in self.samples()
@@ -499,21 +514,35 @@ class Outputs(object):
         if hasattr(self,'config') and hasattr(self.config,'settings'):
             export_samples = list(deep_get(key='export_samples',value=self.config.settings))
             export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
+            # Keep first entry of these values
             export_samples = export_samples[0] if len(export_samples) > 0 else True
             export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
+            
             # Write to file
             if export_samples:
                 self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
                 try:
-                    self.h5file = h5.File(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5"), mode="w")
+                    self.h5file = h5.File(
+                        os.path.join(
+                            self.outputs_path,
+                            'samples',
+                            f"{self.sweep_id}",
+                            "data.h5"
+                        ), 
+                        mode='w'
+                    )
                 except:
                     print(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5"))
                     print(os.path.exists(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5")))
                     raise Exception('FAILED')
+                
+                # Store experiment id
                 self.h5group = self.h5file.create_group(self.experiment_id)
-                # Store sweep configurations as attributes 
+
+                # Store sweep configurations as attributes
                 self.h5group.attrs.create("sweep_params",list(sweep_params.keys()))
                 self.h5group.attrs.create("sweep_values",['' if val is None else str(val) for val in sweep_params.values()])
+                
                 # Update log filename
                 if isinstance(self.logger,DualLogger):
                     for i,hand in enumerate(self.logger.file.handlers):

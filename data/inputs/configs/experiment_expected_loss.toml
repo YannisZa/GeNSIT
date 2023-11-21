@@ -12,7 +12,7 @@ load_experiment = ''
   default = 1
   # range = ["1:100:1"]
 [inputs.to_learn.sweep]
-  default = ['alpha', 'beta', 'sigma'] 
+  default = ['alpha', 'beta', 'sigma']
   # range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
   # coupled = true
   # target_name = 'sigma'

@@ -168,6 +168,8 @@ _common_run_options = [
                default = None, help = 'Title appended to output filename of experiment'),
     click.option('--sweep_mode/--no-sweep_mode', default=None,is_flag=True, show_default=True,
               help=f'Flag for whether parameter sweep mode is activated or not.'),
+    click.option('--overwrite/--no-overwrite', default=None,is_flag=True, show_default=True,
+              help=f'Flag for whether parameter sweep mode is activated or not.'),
     click.option('--dataset','-d', type=click.Path(exists=False),
                default=None, help = 'Overwrites dataset name in config'),
     click.option('--in_directory','-id', type=click.Path(exists=True),
@@ -203,7 +205,8 @@ _common_run_options = [
     click.option('--cells','-c', type=click.STRING, default = None,
                help = 'Overwrites constrained cells filename in config. '),
     click.option('--seed','-seed', type=click.IntRange(min=0), show_default=True,
-               default=None, help = 'Overwrites random number generation seed for model runs.')
+               default=None, help = 'Overwrites random number generation seed for model runs.'),
+
 ]
 
 def common_options(func):
@@ -456,6 +459,7 @@ def run(
         run_experiments,
         title,
         sweep_mode,
+        overwrite,
         table,
         device,
         table0,

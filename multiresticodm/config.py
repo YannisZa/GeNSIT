@@ -9,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, flatten, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk, print_json
+from multiresticodm.utils import deep_apply, flatten, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk, sigma_to_noise_regime, stringify
 
 class Config:
 
@@ -298,7 +298,7 @@ class Config:
             )
         # Delete excluded key paths
         for key_path in self.excluded_key_paths:
-            print(key_path)
+            self.logger.warning(f"Excluding key path {' > '.join(key_path)}")
             self.path_delete(self.settings,key_path)
 
     def sweep_mode(self,settings:dict = None):
@@ -340,6 +340,30 @@ class Config:
         # Return sweepable flag for first instance of variable
         return self.path_get(self.schema,variable_key_paths[0]).get('sweepable',False)
 
+    def get_sweep_id(self,sweep_params:dict={}):
+        sweep_id = ''
+        if len(sweep_params) > 0 and isinstance(sweep_params,dict):
+            # Create sweep id by grouping coupled sweep vars together
+            # and isolated sweep vars separately
+            sweep_id = []
+            for v in set(list(self.target_names_by_sweep_var.values())).difference(set(['dataset'])):
+                # Map sigma to noise regime
+                if str(v) == 'sigma':
+                    value = sigma_to_noise_regime(sweep_params[v])
+                # Else use passed sweep value
+                else:
+                    value = sweep_params[v]
+                # Add to key-value pair to unique sweep id
+                sweep_id.append(f"{str(v)}_{stringify(value)}")
+            # Join all grouped sweep vars into one sweep id 
+            # which will be used to create an output folder
+            if len(sweep_id) > 0:
+                sweep_id = os.path.join(*sorted(sweep_id,key=lambda x: x.split('_')[0]))
+            else:
+                sweep_id = ''
+        
+        return sweep_id
+    
     def find_sweep_key_paths(self):
         for key_val_path in deep_walk(self.settings):
             
@@ -659,7 +683,6 @@ class Config:
                 # Remove it from path
                 key_path.remove(k)
         
-        # return settings
     def prepare_sweep_configurations(self,sweep_params):
 
         # Compute all combinations of sweep parameters

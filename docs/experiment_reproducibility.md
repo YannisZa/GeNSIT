@@ -1,9 +1,5 @@
 # Cambridge commuter LSOAs to MSOAs
 
-## Experiment 1
-
-Set `ulimit -n 50000`
-
 ## Experiment 2
 
 Set `ulimit -n 50000`
@@ -45,6 +41,9 @@ Set `ulimit -n 50000`
 clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml \
  -re JointTableSIM_NN -nw 10 -sm
 
+clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml \
+ -re JointTableSIM_NN -nw 10 -sm -le data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp5_expected_loss/JointTableSIM_NN_LearnedNoise\_\_20_11_2023_20_10_01/config.json
+
 ## Plots
 
 # Experiment 2
@@ -57,12 +56,11 @@ Set `ulimit -n 50000`
 
 -pdd /home/iz230/MultiResTICODM/data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp2/NonJointTableSIM_NN_SweepedNoise\_\_31_10_2023_09_44_49/paper_figures/ -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
 
-```
 clear; multiresticodm plot seed iter \
 -et NonJointTableSIM_NN -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
 -s table -ft 'seed_vs_epoch_smrse_and_coverage_prob_tradeoff' \
 -stat 'srmse' 'signedmean&' 'iter_seed&' \
--stat 'coverage_probability' '&mean|*1000|floor' '&origin_destination||' \
+-stat 'coverage_probability' '&mean|\*1000|floor' '&origin_destination||' \
 -mrkr sample_name -hch sigma -c srmse -sz coverage_probability -k seed -k iter -k type \
 -p dss -b 0 -t 1 -lls 8 -xlim -1 7 -ylim -1 7 --x_discrete --y_discrete -xlab '# Seeds' -ylab '# Epochs'
 
@@ -72,17 +70,12 @@ clear; multiresticodm plot seed iter -dn cambridge_work_commuter_lsoas_to_msoas/
 -stat 'coverage_probability' '&mean' '&origin_destination' \
 -l type -l sample_name -l sigma -k seed -k iter -k type \
 -p dss -b 0 -t 1 -nw 20 --force_reload
-```
 
 <!-- -fs 5 5 -ms 20 -ff pdf -tfs 14 -afs 14 -lls 18 -als 18 -->
 
-## Summaries
-
-### Experiment 1
-
 ```
-clear; multiresticodm summarise -o ./data/outputs/ -dn cambridge_work_commuter_lsoas_to_msoas/mcmc -e SIM_MCMC -s table -s intensity -stat srmse 'mean&' 'iter&' -b 0 -t 1 -n 1000000 -k title -k type -tab table_lsoas_to_msoas.txt -fe SRMSEs -dev cpu -nw 1
-```
+
+## Summaries and Metrics
 
 ### SRMSE
 
@@ -170,7 +163,7 @@ clear; multiresticodm plot -p 10 -o ./data/outputs/ -dn cambridge_work_commuter_
 -e JointTableSIM_MCMC_LowNoise_unconstrained \
 --exclude ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIM_MCMC_HighNoise_row_margin_13_06_2023_14_03_14 \
 -tab table_lsoas_to_msoas.txt -s table -s intensity -nn 30 -dis l_p_distance -emb tsne --ord '1' \
--b 10000 -t 900 -n 100 -nw 16 6 -l type -l experiment_title -l noise_regime -fe table_and_intensity_space -ff pdf
+-b 10000 -t 900 -n 100 -nw 16 6  -l type -l experiment_title -l noise_regime -fe table_and_intensity_space -ff pdf
 
 <!-- edit_distance_degree_one -->
 <!-- chi_squared_distance -->
@@ -240,7 +233,4 @@ multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp
 multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIM_MCMCHighNoise_07_02_2023_16_15_43 -g ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson -p 41 -fs 20 10 -ff png -ac cgreen -ac cred -mc cool --annotate -s table -stat mean_variance '' '' -csl 0.0 1.0 -b 10000 -afs 26 -cfs 20 -mcl 2.7744176387786865 357.8244323730469 -acl 277.0 848.0 -acl 276.0 16340.0 -fe high_noise --no-colorbar -lw 10 -op 0.2
 
 multiresticodm plot -d ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp14_JointTableSIM_MCMCHighNoise_07_02_2023_16_15_43 -g ./data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson -p 41 -fs 20 10 -ff pdf -ac cgreen -ac cred -mc cblue --annotate -t posterior_table_mean_error -csl 0.5 1.0 -b 10000 -afs 26 -cfs 20 -mcl 7.592240947332791e-07 0.009970745312129123 -acl 0.0 0.0 -acl 0.000530141493261603 0.07746821280692036 -fe high_noise --no-colorbar -no relative_l1
-
-```
-
 ```

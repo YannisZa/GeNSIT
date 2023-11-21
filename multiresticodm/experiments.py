@@ -169,6 +169,19 @@ class Experiment(object):
     def run(self,**kwargs) -> None:
         pass
 
+    def load(self):
+        if self.config['inputs'].get('load_experiment',''):
+            try:
+                # Load config
+                config = Config(
+                    path = self.config['inputs'].get('load_experiment',''),
+                    logger = self.logger
+                )
+            except:
+                return config
+            return None
+        return None            
+
     def reset(self,metadata:bool=False) -> None:
         self.logger.note(f"Resetting experimental results to release memory.")
         
@@ -302,6 +315,8 @@ class Experiment(object):
     def initialise_data_structures(self):
 
         if self.config.settings.get('export_samples',True):
+            # Flag for loading experiment data
+            load_experiment = self.config.settings['load_data']
 
             # Get dimensions
             dims = self.config['inputs']['dims']
@@ -310,127 +325,210 @@ class Experiment(object):
             if 'loss' in self.output_names:
                 for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total']:
                     # Setup chunked dataset to store the state data in
-                    setattr(
-                        self,
-                        loss_name,
-                        self.outputs.h5group.create_dataset(
+                    if loss_name in self.outputs.h5group and not load_experiment:
+                        # Delete current dataset
+                        safe_delete(getattr(self,loss_name))
+                    if loss_name not in self.outputs.h5group:
+                        setattr(
+                            self,
                             loss_name,
-                            (0,),
-                            maxshape=(None,),
-                            chunks=True,
-                            compression=3,
+                            self.outputs.h5group.create_dataset(
+                                loss_name,
+                                (0,),
+                                maxshape=(None,),
+                                chunks=True,
+                                compression=3,
+                            )
                         )
-                    )
-                    getattr(self,loss_name).attrs['dim_names'] = XARRAY_SCHEMA['loss']['coords']
-                    getattr(self,loss_name).attrs['coords_mode__time'] = 'start_and_step'
-                    getattr(self,loss_name).attrs['coords__time'] = [self._write_start, self._write_every]
-            
+                        getattr(self,loss_name).attrs['dim_names'] = XARRAY_SCHEMA['loss']['coords']
+                        getattr(self,loss_name).attrs['coords_mode__time'] = 'start_and_step'
+                        getattr(self,loss_name).attrs['coords__time'] = [self._write_start, self._write_every]
+                    else:
+                        setattr(
+                            self,
+                            loss_name,
+                            self.outputs.h5group[loss_name]
+                        )
+
+
+
             # Setup sampled/predicted log destination attractions
             if 'log_destination_attraction' in self.output_names:
-                self.log_destination_attractions = self.outputs.h5group.create_dataset(
-                    "log_destination_attraction",
-                    (0,self.inputs.data.destination_attraction_ts.shape[0],dims['destination']),
-                    maxshape=(None,self.inputs.data.destination_attraction_ts.shape[0],dims['destination']),
-                    chunks=True,
-                    compression=3,
-                )
-                self.log_destination_attractions.attrs["dim_names"] = XARRAY_SCHEMA['log_destination_attraction']['coords']
-                self.log_destination_attractions.attrs["coords_mode__time"] = "start_and_step"
-                self.log_destination_attractions.attrs["coords__time"] = [self._write_start, self._write_every]
-            
+                if 'log_destination_attraction' in self.outputs.h5group and not load_experiment:
+                    # Delete current dataset
+                    safe_delete(getattr(self,'log_destination_attraction'))
+                if 'log_destination_attraction' not in self.outputs.h5group:
+                    self.log_destination_attractions = self.outputs.h5group.create_dataset(
+                        "log_destination_attraction",
+                        (0,self.inputs.data.destination_attraction_ts.shape[0],dims['destination']),
+                        maxshape=(None,self.inputs.data.destination_attraction_ts.shape[0],dims['destination']),
+                        chunks=True,
+                        compression=3,
+                    )
+                    self.log_destination_attractions.attrs["dim_names"] = XARRAY_SCHEMA['log_destination_attraction']['coords']
+                    self.log_destination_attractions.attrs["coords_mode__time"] = "start_and_step"
+                    self.log_destination_attractions.attrs["coords__time"] = [self._write_start, self._write_every]
+                else:
+                    setattr(
+                        self,
+                        'log_destination_attraction',
+                        self.outputs.h5group['log_destination_attraction']
+                    )
             # Setup computation time
             if 'computation_time' in self.output_names:
-                self.compute_time = self.outputs.h5group.create_dataset(
-                    'computation_time',
-                    (0,),
-                    maxshape=(None,),
-                    chunks=True,
-                    compression=3,
-                )
-                self.compute_time.attrs['dim_names'] = XARRAY_SCHEMA['computation_time']['coords']
-                self.compute_time.attrs['coords_mode__epoch'] = 'trivial'
+                if 'compute_time' in self.outputs.h5group and not load_experiment:
+                    # Delete current dataset
+                    safe_delete(getattr(self,'compute_time'))
+                if 'compute_time' not in self.outputs.h5group:
+                    self.compute_time = self.outputs.h5group.create_dataset(
+                        'computation_time',
+                        (0,),
+                        maxshape=(None,),
+                        chunks=True,
+                        compression=3,
+                    )
+                    self.compute_time.attrs['dim_names'] = XARRAY_SCHEMA['computation_time']['coords']
+                    self.compute_time.attrs['coords_mode__epoch'] = 'trivial'
+                else:
+                    setattr(
+                        self,
+                        'computation_time',
+                        self.outputs.h5group['computation_time']
+                    )
 
             # Setup sampled/predicted theta
             if 'theta' in self.output_names:
-                predicted_thetas = []
+                self.thetas = []
                 for p_name in self.config['inputs']['to_learn']:
-                    dset = self.outputs.h5group.create_dataset(
-                        p_name, 
-                        (0,), 
-                        maxshape=(None,), 
-                        chunks=True, 
-                        compression=3
-                    )
-                    dset.attrs['dim_names'] = XARRAY_SCHEMA[p_name]['coords']
-                    dset.attrs['coords_mode__time'] = 'start_and_step'
-                    dset.attrs['coords__time'] = [self._write_start, self._write_every]
-
-                    predicted_thetas.append(dset)
-                self.thetas = predicted_thetas
+                    if p_name in self.outputs.h5group and not load_experiment:
+                        # Delete current dataset
+                        safe_delete(getattr(self,p_name))
+                    if p_name not in self.outputs.h5group:
+                        dset = self.outputs.h5group.create_dataset(
+                            p_name, 
+                            (0,), 
+                            maxshape=(None,), 
+                            chunks=True, 
+                            compression=3
+                        )
+                        dset.attrs['dim_names'] = XARRAY_SCHEMA[p_name]['coords']
+                        dset.attrs['coords_mode__time'] = 'start_and_step'
+                        dset.attrs['coords__time'] = [self._write_start, self._write_every]
+                    else:
+                        dset = self.outputs.h5group[p_name]
+                    # Append to thetas
+                    self.thetas.append(dset)
             
             # Setup sampled signs
             if 'sign' in self.output_names:
-                self.signs = self.outputs.h5group.create_dataset(
-                    "sign",
-                    (0,),
-                    maxshape=(None,),
-                    chunks=True,
-                    compression=3,
-                )
-                self.signs.attrs["dim_names"] = XARRAY_SCHEMA['sign']['coords']
-                self.signs.attrs["coords_mode__time"] = "start_and_step"
-                self.signs.attrs["coords__time"] = [self._write_start, self._write_every]
-
+                if 'sign' in self.outputs.h5group and not load_experiment:
+                    # Delete current dataset
+                    safe_delete(getattr(self,'sign'))
+                if 'sign' not in self.outputs.h5group:
+                    self.signs = self.outputs.h5group.create_dataset(
+                        "sign",
+                        (0,),
+                        maxshape=(None,),
+                        chunks=True,
+                        compression=3,
+                    )
+                    self.signs.attrs["dim_names"] = XARRAY_SCHEMA['sign']['coords']
+                    self.signs.attrs["coords_mode__time"] = "start_and_step"
+                    self.signs.attrs["coords__time"] = [self._write_start, self._write_every]
+                else:
+                    setattr(
+                        self,
+                        'sign',
+                        self.outputs.h5group['sign']
+                    )
             # Setup sampled tables
             if 'table' in self.output_names:
-                self.tables = self.outputs.h5group.create_dataset(
-                    "table",
-                    (0,*unpack_dims(dims,time_dims=False)),
-                    maxshape=(None,*unpack_dims(dims,time_dims=False)),
-                    chunks=True,
-                    compression=3,
-                )
-                self.tables.attrs["dim_names"] = ["origin","destination","N"]
-                self.tables.attrs["coords_mode__time"] = "start_and_step"
-                
+                if 'table' in self.outputs.h5group and not load_experiment:
+                    # Delete current dataset
+                    safe_delete(getattr(self,'table'))
+                if 'table' not in self.outputs.h5group:
+                    self.tables = self.outputs.h5group.create_dataset(
+                        "table",
+                        (0,*unpack_dims(dims,time_dims=False)),
+                        maxshape=(None,*unpack_dims(dims,time_dims=False)),
+                        chunks=True,
+                        compression=3,
+                    )
+                    self.tables.attrs["dim_names"] = ["origin","destination","N"]
+                    self.tables.attrs["coords_mode__time"] = "start_and_step"
+                else:
+                    setattr(
+                        self,
+                        'table',
+                        self.outputs.h5group['table']
+                    )
             # Setup acceptances
             if 'theta_acc' in self.output_names:
-                # Setup chunked dataset to store the state data in
-                self.theta_acc = self.outputs.h5group.create_dataset(
-                    'theta_acceptance',
-                    (0,),
-                    maxshape=(None,),
-                    chunks=True,
-                    compression=3,
-                )
-                self.losses.attrs['dim_names'] = XARRAY_SCHEMA['theta_acceptance']['coords']
-                self.losses.attrs['coords_mode__time'] = 'start_and_step'
-                self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+                if 'theta_acc' in self.outputs.h5group and not load_experiment:
+                    # Delete current dataset
+                    safe_delete(getattr(self,'theta_acc'))
+                if 'theta_acc' not in self.outputs.h5group:
+                    # Setup chunked dataset to store the state data in
+                    self.theta_acc = self.outputs.h5group.create_dataset(
+                        'theta_acc',
+                        (0,),
+                        maxshape=(None,),
+                        chunks=True,
+                        compression=3,
+                    )
+                    self.theta_acc.attrs['dim_names'] = XARRAY_SCHEMA['theta_acc']['coords']
+                    self.theta_acc.attrs['coords_mode__time'] = 'start_and_step'
+                    self.theta_acc.attrs['coords__time'] = [self._write_start, self._write_every]
+                else:
+                    setattr(
+                        self,
+                        'theta_acc',
+                        self.outputs.h5group['theta_acc']
+                    )
             if 'log_destination_attraction_acc' in self.output_names:
-                # Setup chunked dataset to store the state data in
-                self.log_destination_attraction_acc = self.outputs.h5group.create_dataset(
-                    'log_destination_attraction_acceptance',
-                    (0,),
-                    maxshape=(None,),
-                    chunks=True,
-                    compression=3,
-                )
-                self.losses.attrs['dim_names'] = XARRAY_SCHEMA['log_destination_attraction_acc']['coords']
-                self.losses.attrs['coords_mode__time'] = 'start_and_step'
-                self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
+                if 'log_destination_attraction_acc' in self.outputs.h5group and not load_experiment:
+                    # Delete current dataset
+                    safe_delete(getattr(self,'log_destination_attraction_acc'))
+                if 'log_destination_attraction_acc' not in self.outputs.h5group:
+                    # Setup chunked dataset to store the state data in
+                    self.log_destination_attraction_acc = self.outputs.h5group.create_dataset(
+                        'log_destination_attraction_acc',
+                        (0,),
+                        maxshape=(None,),
+                        chunks=True,
+                        compression=3,
+                    )
+                    self.log_destination_attraction_acc.attrs['dim_names'] = XARRAY_SCHEMA['log_destination_attraction_acc']['coords']
+                    self.log_destination_attraction_acc.attrs['coords_mode__time'] = 'start_and_step'
+                    self.log_destination_attraction_acc.attrs['coords__time'] = [self._write_start, self._write_every]
+                else:
+                    setattr(
+                        self,
+                        'log_destination_attraction_acc',
+                        self.outputs.h5group['log_destination_attraction_acc']
+                    )
             if 'table_acc' in self.output_names:
-                # Setup chunked dataset to store the state data in
-                self.table_acc = self.outputs.h5group.create_dataset(
-                    'table_acceptance',
-                    (0,),
-                    maxshape=(None,),
-                    chunks=True,
-                    compression=3,
-                )
-                self.losses.attrs['dim_names'] = XARRAY_SCHEMA['table_acc']['coords']
-                self.losses.attrs['coords_mode__time'] = 'start_and_step'
-                self.losses.attrs['coords__time'] = [self._write_start, self._write_every]
-        
+                if 'table_acc' in self.outputs.h5group and not load_experiment:
+                    # Delete current dataset
+                    safe_delete(getattr(self,'table_acc'))
+                if 'table_acc' not in self.outputs.h5group:
+                    # Setup chunked dataset to store the state data in
+                    self.table_acc = self.outputs.h5group.create_dataset(
+                        'table_acceptance',
+                        (0,),
+                        maxshape=(None,),
+                        chunks=True,
+                        compression=3,
+                    )
+                    self.table_acc.attrs['dim_names'] = XARRAY_SCHEMA['table_acc']['coords']
+                    self.table_acc.attrs['coords_mode__time'] = 'start_and_step'
+                    self.table_acc.attrs['coords__time'] = [self._write_start, self._write_every]
+                else:
+                    setattr(
+                        self,
+                        'table_acc',
+                        self.outputs.h5group['table_acc']
+                    )
     def update_and_export(
             self,
             batch_size: int,
@@ -2284,15 +2382,27 @@ class ExperimentSweep():
             console_level = config.level,
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
-
-        self.logger.info(f"Performing parameter sweep")
-
-        # Get config
+    
+        # Try to pre load config from previous unfinished experiment
         self.config = config
-
-        # Store one datetime
-        # for all sweeps
-        self.config.settings['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+        preloaded_config = self.load()
+        # Flag for appending experiment outputs
+        self.config.settings['load_data'] = False
+        if preloaded_config is not None:
+            self.logger.info(f"Resuming experiment in {config['inputs']['load_experiment']}")
+            # Update config to the one that is loaded
+            self.config = preloaded_config
+            # Use these settings from the new config
+            # Note that these parameters relate only to the computational/hardware
+            # aspect of the experiment and not any actual parameters of the experiment
+            for key in ['n_workers','n_threads','device', 'log_level']:
+                # Get settings from new config
+                new_setting = list(deep_get(key,config.settings))[0]
+                # Update preloaded config
+                deep_update(self.config.settings,key,new_setting)
+            # Load existing experiment data
+            self.config.settings['load_data'] = True
+        del preloaded_config
 
         # Load schema
         self.config.load_schemas()
@@ -2300,13 +2410,29 @@ class ExperimentSweep():
         # Store number of workers
         self.n_workers = self.config.settings['inputs'].get("n_workers",1)
 
+        self.logger.info(f"Performing parameter sweep")
+
         # Parse sweep configurations
         self.sweep_params = self.config.parse_sweep_params()
+
+        # Create sweep configurations
+        sweep_configurations, \
+        self.param_sizes_str, \
+        self.total_size_str = self.config.prepare_sweep_configurations(self.sweep_params)
+        
+        # If outputs should be loaded and appended
+        if not self.config.settings['load_data']:
+            # Store one datetime
+            # for all sweeps
+            self.config.settings['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+            # Store all sweep configurations
+            self.sweep_configurations = sweep_configurations
 
         # Temporarily disable sample output writing
         export_samples = deepcopy(self.config['experiments'][0]['export_samples'])
         deep_update(self.config.settings,'export_samples',False)
 
+        # Keep only first dataset just to instantiate outputs
         dir_range = []
         if isinstance(self.config['inputs']['dataset'],dict):
             dir_range = deepcopy(self.config['inputs']['dataset']['sweep']['range'])
@@ -2321,11 +2447,22 @@ class ExperimentSweep():
         # Make output home directory
         self.outputs_base_dir = self.outputs.outputs_path
         self.outputs_experiment_id = self.outputs.experiment_id
+
+        # Check if outputs exist 
+        # and remove them from sweep configurations
+        if self.config.settings['load_data']:
+            # Update sweep configurations
+            self.sweep_configurations = list(
+                self.outputs.trim_sweep_configurations(
+                    sweep_configurations = sweep_configurations,
+                    sweep_params = self.sweep_params
+                )
+            )
         
-        # # Prepare writing to file
+        # Prepare writing to file
         self.outputs.open_output_file(sweep_params={})
 
-        # # Enable it again
+        # Enable it again
         deep_updates(self.config.settings,{'export_samples':export_samples})
 
         # # Write metadata
@@ -2334,7 +2471,8 @@ class ExperimentSweep():
                 dir_path='',
                 filename=f"config"
             )
-
+        
+        # Restore dataset config entries
         if len(dir_range) > 0:
             self.config['inputs']['dataset'] = dir_range
         self.logger.note(f"ExperimentSweep: {self.outputs.experiment_id} prepared")
@@ -2348,16 +2486,28 @@ class ExperimentSweep():
             Sweep key paths: {self.sweep_key_paths}
         """
 
+    def load(self):
+        if self.config['inputs'].get('load_experiment',''):
+            try:
+                # Load config
+                config = Config(
+                    path = self.config['inputs'].get('load_experiment',''),
+                    logger = self.logger
+                )
+                # Validate preloaded config
+                # This does a bunch of useful stuff
+                config.validate_config()
+                return config
+            except:
+                return None
+        return None
 
     def run(self,**kwargs):
-        # Create sweep configurations
-        sweep_configurations, \
-        param_sizes_str, \
-        total_size_str = self.config.prepare_sweep_configurations(self.sweep_params)
 
         self.logger.info(f"{self.outputs.experiment_id}")
-        self.logger.info(f"Parameter space size: {param_sizes_str}")
-        self.logger.info(f"Total = {total_size_str}.")
+        self.logger.info(f"Parameter space size: {self.param_sizes_str}")
+        self.logger.info(f"Total = {self.total_size_str}")
+        self.logger.info(f"Of which unfinished = {len(self.sweep_configurations)}.")
         self.logger.info(f"Preparing configs...")
         # For each configuration update experiment config 
         # and instantiate new experiment
@@ -2365,18 +2515,21 @@ class ExperimentSweep():
             warnings.simplefilter("ignore")
             # Decide whether to run sweeps in parallel or not
             if self.n_workers > 1:
-                self.run_concurrent(sweep_configurations)
+                self.run_concurrent(self.sweep_configurations)
             else:
-                self.run_sequential(sweep_configurations)
+                self.run_sequential(self.sweep_configurations)
         
     def prepare_experiment(self,sweep_configuration):
         # Deactivate logging
         self.logger.setLevels(
-            console_level='ERROR',
+            console_level='ERROR',#'ERROR','DEBUG'
             file_level='DEBUG'
         )
         
-        return self.config.prepare_experiment_config(self.sweep_params,sweep_configuration)
+        return self.config.prepare_experiment_config(
+            self.sweep_params,
+            sweep_configuration
+        )
         
     
     def prepare_instantiate_and_run(self,instance_num:int,sweep_configuration:dict,semaphore=None,counter=None,pbar=None):
