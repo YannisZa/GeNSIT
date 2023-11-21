@@ -2162,7 +2162,6 @@ class JointTableSIM_NN(Experiment):
         
         # Store number of samples
         num_epochs = self.config['training']['N']
-
         # For each epoch
         for e in tqdm(
             range(num_epochs),
@@ -2174,7 +2173,6 @@ class JointTableSIM_NN(Experiment):
 
             # Track the epoch training time
             start_time = time.time()
-            
             # Track the training loss
             loss_sample = {}
             # Track number of elements in each loss function
@@ -2361,7 +2359,6 @@ class ExperimentSweep():
         self.logger.info(f"Parameter space size: {param_sizes_str}")
         self.logger.info(f"Total = {total_size_str}.")
         self.logger.info(f"Preparing configs...")
-        
         # For each configuration update experiment config 
         # and instantiate new experiment
         with warnings.catch_warnings():
@@ -2420,6 +2417,15 @@ class ExperimentSweep():
             raise Exception(f'failed running instance {instance_num}')
 
     def run_sequential(self,sweep_configurations):
+        sweep_configurations = [
+            (100, '_row_constrained', [[1]], '', ['dest_attraction_ts', 'table_likelihood'], ['mseloss', 'custom']),
+            (100, '_doubly_constrained', [[0], [1]], '', ['table_likelihood'], ['custom']),
+            (100, '_doubly_constrained', [[0], [1]], '', ['dest_attraction_ts', 'table_likelihood'], ['mseloss', 'custom']),
+            (100, '_doubly_10%_cell_constrained', [[0], [1]], 'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt', ['table_likelihood'], ['custom']),
+            (100, '_doubly_10%_cell_constrained', [[0], [1]], 'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt', ['dest_attraction_ts', 'table_likelihood'], ['mseloss', 'custom']),
+            (100, '_doubly_20%_cell_constrained', [[0], [1]], 'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt', ['table_likelihood'], ['custom']),
+            (100, '_doubly_20%_cell_constrained', [[0], [1]], 'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt', ['dest_attraction_ts', 'table_likelihood'], ['mseloss', 'custom'])
+        ]
         for instance,sweep_config in tqdm(
             enumerate(sweep_configurations),
             total=len(sweep_configurations),
@@ -2428,11 +2434,11 @@ class ExperimentSweep():
             position=0
         ):
             self.prepare_instantiate_and_run(
-                instance_num=instance,
-                sweep_configuration=sweep_config,
-                semaphore=None,
-                counter=None,
-                pbar=None
+                instance_num = instance,
+                sweep_configuration = sweep_config,
+                semaphore = None,
+                counter = None,
+                pbar = None
             )
     
     def run_concurrent(self,sweep_configurations):
