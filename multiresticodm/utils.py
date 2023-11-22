@@ -625,7 +625,7 @@ def parse_slice_by(slice_by:list):
     slices = {k:list(v) for k,v in slices.items()}
     return slices
 
-def stringify_index(d):
+def stringify_coordinate(d):
     if d is None:
         return 'none'
     elif isinstance(d,float) or ((hasattr(d,'dtype') and 'float' in str(d.dtype))) and not np.isfinite(d):

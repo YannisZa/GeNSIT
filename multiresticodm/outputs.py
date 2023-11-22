@@ -1198,9 +1198,15 @@ class OutputSummary(object):
             outputs = self.get_folder_outputs(output_folder)
 
             # Loop through each member of the data collection
-            for j in range(len(outputs.data)):
-                # Collect metric metadata
-                metric_data = self.get_experiment_metadata(j,outputs)
+            if self.settings.get('n_workers',1) > 1:
+                metric_data_collection = self.get_experiment_metadata_concurrently(outputs)
+            else:
+                metric_data_collection = self.get_experiment_metadata_sequentially(outputs)
+
+            # Convert metric data collection to list
+            metric_data_collection = list(metric_data_collection)
+            
+            for metric_data in metric_data_collection:
                 if len(metric_data) > 0:
                     if output_folder in experiment_metadata:
                         experiment_metadata[output_folder]= np.append(
@@ -1213,18 +1219,76 @@ class OutputSummary(object):
         
         return experiment_metadata
     
-    def get_experiment_metadata(self,index:int,outputs:Outputs):
+    def get_experiment_metadata_sequentially(self,outputs):
+        # Loop through each member of the data collection
+        for j in tqdm(
+            range(len(outputs.data)),
+            total=len(outputs.data),
+            desc='Collecting experiment metadata sequentially',
+            leave=False,
+            miniters=1,
+            position=0
+        ):
+            # Create outputs copy
+            new_outputs = deepcopy(outputs)
+            # Update value of new outputs to the specific element of Data Collection
+            new_outputs.data = outputs.data[j]
+            # Collect metric metadata
+            yield self.get_experiment_metadata(new_outputs)
 
-        self.logger.info(f"Getting data element {index+1}/{len(outputs.data)}")
-        # Create outputs copy
-        new_outputs = deepcopy(outputs)
-        # Update value of new outputs to the specific element of Data Collection
-        new_outputs.data = outputs.data[index]
+    def get_experiment_metadata_concurrently(self,outputs):
+        # Initialise progress bar
+        progress = tqdm(
+            total=len(outputs.data),
+            desc='Collecting experiment metadata concurrently',
+            leave=False,
+            miniters=1,
+            position=0
+        )
+        with concurrency.ProcessPoolExecutor(self.settings.get('n_workers',1)*2) as executor:
+            futures = []
+            # Start the processes and ignore the results
+            for j in range(len(outputs.data)):
+                # Create outputs copy
+                new_outputs = deepcopy(outputs)
+                # Update value of new outputs to the specific element of Data Collection
+                new_outputs.data = outputs.data[j]
+                try:
+                    future = executor.submit(
+                        self.get_experiment_metadata,
+                        outputs = new_outputs,
+                    )
+                    # Update progress
+                    futures.append(future)
+                except:
+                    print(traceback.format_exc())
+                    raise Exception('Getting sweep outputs failed.')
+
+            # Wait for all processes to finish
+            for future in concurrency.as_completed(futures):
+                try:
+                    result = future.result()
+                except:
+                    raise Exception(f"Future {future} failed")
+                progress.update(n=1)
+                yield result
+            
+            # Delete futures and executor
+            safe_delete(futures)
+            executor.shutdown(True)
+            safe_delete(executor)
+        # Delete progress bar
+        progress.close()
+        safe_delete(progress)
+
+    def get_experiment_metadata(self,outputs:Outputs):
+
+        # self.logger.info(f"Getting data element {index+1}/{len(outputs.data)}")
 
         # Apply these metrics to the data 
         metric_data = self.apply_metrics(
             experiment_id = outputs.experiment_id,
-            outputs = new_outputs
+            outputs = outputs
         )
         
         # Extract useful data from config
@@ -1233,7 +1297,7 @@ class OutputSummary(object):
             # Replace iter with N
             key_paths = self.config.path_find(
                 key = key if key != 'iter' else 'N',
-                settings = new_outputs.config.settings,
+                settings = outputs.config.settings,
                 current_key_path = [],
                 all_key_paths = []
             )
@@ -1249,7 +1313,7 @@ class OutputSummary(object):
             # Extract from data collection element
             elif self.config.has_sweep(key_paths[0]):
                 # Grab first dataarray
-                data_arr = list(new_outputs.data.data_vars().values())[0]
+                data_arr = list(outputs.data.data_vars().values())[0]
                 useful_metadata[key] = data_arr.sizes[key]
         
         # Add useful metadata to metric data
@@ -1306,7 +1370,7 @@ class OutputSummary(object):
             coords = xr_data.pop('coordinates')
             # Create slice dictionary
             slice_dict = {
-                k: [stringify_index(parse(elem)) for elem in coords[k]]
+                k: [stringify_coordinate(parse(elem)) for elem in coords[k]]
                 for k in coords.keys()
             }
 
@@ -1318,7 +1382,7 @@ class OutputSummary(object):
                     arr_name = sample_name,
                     experiment_id = experiment_id,
                     **{
-                        k:stringify_index(parse(sweep[k])) for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
+                        k:stringify_coordinate(parse(sweep[k])) for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
                         if k in sweep and k != 'seed' and k not in slice_dict
                     }
                 )
@@ -1446,7 +1510,7 @@ class OutputSummary(object):
         # Load all necessary samples that were not loaded
         if len(samples_not_loaded) > 0:
 
-
+            print(samples_not_loaded)
             # Gather h5 data from multiple files
             # and store them in xarray-type dictionaries
             output_datasets = []

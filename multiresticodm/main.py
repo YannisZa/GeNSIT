@@ -589,9 +589,12 @@ def plot_coordinate_options(func):
 ))
 @output_options
 @common_options
-@click.argument('x', type=click.STRING, required=True)
-@click.argument('y', type=click.STRING, required=True)
-@click.argument('z', type=click.STRING, required=False)
+@click.option('-x', type = click.STRING, required = True, multiple = True, callback=to_list,
+              default = None, help='Sets x coordinate(s) in plot')
+@click.option('-y', type = click.STRING, required = True, multiple = True, callback=to_list,
+                default = None, help='Sets y coordinate(s) in plot')
+@click.option('-z', type = click.STRING, required = False, multiple = True, callback=to_list,
+                default = None, help='Sets z coordinate(s) in plot')
 @click.option('--plots', '-p', type=click.Choice(list(PLOT_HASHMAP.keys())), multiple=True, default = [], required=True,
               help=f'''Sets plotting functions
                     \b

@@ -336,17 +336,29 @@ class Plot(object):
         # print('\n')
         var_values = {}
         for var in vars:
-            if var in PLOT_COORDINATES+PLOT_CORE_FEATURES:
-                # Get value from metadata element
-                if self.settings[var] in meta:
-                    value = meta[self.settings[var]]
-                # Data not found
-                else:
-                    value = None
-                    self.logger.debug(f"Could not find data for {var} var.")
-                # Convert x or y coordinate to list
-                if isinstance(value,Iterable) and not isinstance(value,str):
-                    value = list(value)
+            if var in PLOT_COORDINATES:
+                # Extract variable values
+                subvar_names = self.settings[var]
+                subvar_values = []
+                for subvar in subvar_names:
+                    # Get value from metadata element
+                    if subvar in meta:
+                        try:
+                            value = meta[subvar].item()
+                        except:
+                            value = meta[subvar]
+                    # Data not found
+                    else:
+                        value = None
+                        self.logger.debug(f"Could not find data for {subvar} var.")
+                    # Convert x or y coordinate to list
+                    if isinstance(value,Iterable) and not isinstance(value,str):
+                        value = list(value)
+                    # add to sub-variable values
+                    subvar_values.append(str(value))
+                # Combine all sub-variable values
+                value = "(" + ", ".join(subvar_values) + ")"
+                # value = tuple(subvar_values)
             elif var == 'label':
                 label_str = []
                 # Get label key and value
@@ -356,26 +368,33 @@ class Plot(object):
                         str(meta[label_key]).replace('%','percent').replace(' ','_').replace(':','_').replace(',','_')
                     )
                 value = ', '.join(label_str)
-            elif var in ['marker','hatch']:
+            elif var in PLOT_CORE_FEATURES:
                 # Get label key and value
                 var_key = self.settings[var]
                 # Get value from metadata element
-                if self.settings[var_key] in meta:
-                    if var_key == 'marker':
-                        marker_value = PLOT_MARKERS[meta[self.settings[var_key]]]
-                    elif var_key == 'hatch':
-                        marker_value = PLOT_HATCHES[meta[self.settings[var_key]]]
+                if var_key in meta:
+                    # Extract value
+                    try:
+                        value = meta[var_key].item()
+                    except:
+                        value = meta[var_key]
+                    if var == 'marker':
+                        value = PLOT_MARKERS[var_key][str(parse(value))]
+                    elif var == 'hatch':
+                        value = PLOT_HATCHES[var_key][str(parse(value))]
                 # Data not found
                 else:
-                    marker_value = None
-                    self.logger.debug(f"Could not find data for {var_key} var.")
+                    value = None
+                    self.logger.debug(f"Could not find {var} data for {var_key} var.")
                 # Convert x or y coordinate to list
                 if isinstance(value,Iterable) and not isinstance(value,str):
-                    marker_value = list(value)
-                # Add to dictionary
-                value = marker_value
+                    value = list(value)
+                
             else: 
-                value = meta[var]
+                try:
+                    value = meta[subvar].item()
+                except:
+                    value = meta[subvar]
             # Set variable value
             var_values[var] = value
         return var_values
@@ -388,13 +407,20 @@ class Plot(object):
             # Concatenate values to the merged_dict
             for key, value in d.items():
                 if value is None:
-                    continue
-                if key in ['x','y','z','label','colour','size']:
+                    if key not in merged_settings:
+                        merged_settings[key] = [value]
+                    else:
+                        merged_settings[key].append(value)
+
+                if key in PLOT_COORDINATES+['label','colour','size']:
                     merged_settings.setdefault(key, []).append(value)
+                
                 elif key in ['marker','hatch']:
                     if key not in merged_settings:
                         merged_settings[key] = value
                     else:
+                        print(merged_settings[key],type(merged_settings[key]))
+                        print(value,type(value))
                         merged_settings[key] = deep_merge(
                             merged_settings[key],
                             value
@@ -549,10 +575,11 @@ class Plot(object):
         loaded, plot_settings = self.read_plot_data()
         
         if not loaded:
+
             # Run output handler
             outputs_summary = OutputSummary(
-                settings=self.settings,
-                logger=self.logger
+                settings = self.settings,
+                logger = self.logger
             )
             
             # Loop through output folder
@@ -565,21 +592,29 @@ class Plot(object):
                 outputs = outputs_summary.get_folder_outputs(output_folder)
                 
                 # Create plot settings
-                plot_sett = {
-                    'outputs':outputs
-                }
+                plot_sett = {'outputs':outputs}
+
                 # Loop through each member of the data collection
-                for j in range(len(outputs.data)):
-                    
-                    # Get metadata for this experiment and this element
-                    # of the Data Collection
-                    metadata = outputs_summary.get_experiment_metadata(j,outputs)
+                if self.settings.get('n_workers',1) > 1:
+                    metric_data_collection = outputs_summary.get_experiment_metadata_concurrently(outputs)
+                else:
+                    metric_data_collection = outputs_summary.get_experiment_metadata_sequentially(outputs)
+                
+                # Convert metric data collection to list
+                metric_data_collection = list(metric_data_collection)
+                
+                # Loop through metadata for each data collection member
+                for metadata in tqdm(
+                    metric_data_collection,
+                    desc='Extracting plot settings',
+                    leave=False
+                ):
 
                     # Loop through each entry of metadata
                     for meta in metadata:
                         plot_sett.update(
                             self.extract_plot_settings(
-                                vars = ['x','y','label','colour','size','marker','hatch','visibility'],
+                                vars = PLOT_COORDINATES+PLOT_CORE_FEATURES,
                                 meta = meta,
                             )
                         )
