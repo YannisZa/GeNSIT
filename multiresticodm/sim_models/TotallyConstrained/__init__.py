@@ -1,11 +1,8 @@
 import torch
 import xarray as xr
 
-from copy import deepcopy
+from numpy import arange
 from torch import float32
-from numpy import arange, array
-
-
 
 SDE_POT_ARGS = ['log_destination_attraction','cost_matrix','grand_total','alpha','beta','delta','gamma','kappa','epsilon']
 FLOW_MATRIX_ARGS = ['log_destination_attraction','cost_matrix','grand_total','alpha','beta']
@@ -163,7 +160,8 @@ def log_flow_matrix(**kwargs):
         return xr.DataArray(
             data=log_flow.detach().cpu().numpy(), 
             dims=dims,
-            coords=[coords[k] if len(coords[k].values.tolist()) > 1 else array([coords[k].values]) for k in dims]
+            coords={k:coords[k] for k in dims}
+            # coords=[coords[k] if len(coords[k].values.tolist()) > 1 else array([coords[k].values]) for k in dims]
         ) 
 
 def flow_matrix_expanded(log_destination_attraction,cost_matrix,grand_total,alpha,beta):
