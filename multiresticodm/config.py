@@ -696,7 +696,7 @@ class Config:
             coupled_sweep_sizes = {}
             for target_name, target_name_vals in sweep_params['coupled'].items():
                 # Gather all coupled sweeps for this target name
-                target_sweep_configurations = [sweep_vals['values'] for sweep_vals in target_name_vals.values()]
+                target_sweep_configurations = [sweep_vals['values'] for sweep_vals in target_name_vals]
                 # Gather all unique sweep group values by hashing the data to a string
                 # Hash data to string
                 target_sweep_configurations_str = list(map(lambda x: ' === '.join(list(map(str,x))),zip(*target_sweep_configurations)))
@@ -709,7 +709,7 @@ class Config:
                 # Monitor the sweep size for this target name
                 coupled_sweep_sizes[target_name] = {
                     "length":len(new_coupled_sweeps),
-                    "vars":[sweep_val['var'] for sweep_val in target_name_vals.values()]
+                    "vars":[sweep_val['var'] for sweep_val in target_name_vals]
                 }
             # Cross multiple both sweep configurations
             sweep_configurations = list(product(*(isolated_sweep_configurations+coupled_sweep_configurations)))
@@ -730,7 +730,7 @@ class Config:
         # Print parameter space size
         param_sizes = [f"{v['var']} ({len(v['values'])})" for v in sweep_params['isolated'].values()]
         total_sizes = [len(v['values']) for v in sweep_params['isolated'].values()]
-        if len(sweep_params['coupled'].values()) > 0:
+        if len(sweep_params['coupled']) > 0:
             for k,v in coupled_sweep_sizes.items():
                 param_sizes += [f"{k}: "+','.join([f"{v['vars']}" ])+f" ({v['length']})"]
                 total_sizes += [v['length']]
@@ -759,7 +759,7 @@ class Config:
             # Parse values
             sweep_vals = self.parse_data(sweep_input,(key_path+["sweep","range"]))
 
-            sweep_params['isolated'][">".join(key_path)] = {
+            sweep_params['isolated'][key_path[-1]] = {
                 "var":key_path[-1],
                 "path": key_path,
                 "values": sweep_vals
@@ -771,7 +771,7 @@ class Config:
         for target_name,coupled_paths in self.coupled_sweep_paths.items():
             # Monitor length of sweep values by target name
             coupled_val_lens[target_name] = {}
-            sweep_params['coupled'][target_name] = {}
+            sweep_params['coupled'][target_name] = []
             for key_path in coupled_paths.values():
                 # Get sweep configuration
                 sweep_input,_ = self.path_get(
@@ -780,11 +780,11 @@ class Config:
                 )
                 # Parse values
                 sweep_vals = self.parse_data(sweep_input,(key_path+["sweep","range"]))
-                sweep_params['coupled'][target_name][">".join(key_path)] = {
+                sweep_params['coupled'][target_name].append({
                     "var":key_path[-1],
                     "path": key_path,
                     "values": sweep_vals
-                }
+                })
                 # Target variables should be unique 
                 # as they are used for name output folders
                 if key_path[-1] == target_name:
@@ -835,7 +835,7 @@ class Config:
                 else str(sweep_configuration[i])
             i += 1
         for sweep_group in sweep_params['coupled'].values():
-            for value in sweep_group.values():
+            for value in sweep_group:
                 new_config.path_set(
                     new_config,
                     sweep_configuration[i],
