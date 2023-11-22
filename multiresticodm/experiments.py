@@ -39,6 +39,10 @@ def instantiate_experiment(experiment_type:str,config:Config,**kwargs):
     else:
         raise Exception(f'Experiment class {experiment_type} not found')
 
+def experiment_output_names(experiment_type:str):
+    getattr(sys.modules[__name__], experiment_type)
+
+
 class ExperimentHandler(object):
 
     def __init__(self, config:Config, **kwargs):
@@ -66,7 +70,7 @@ class ExperimentHandler(object):
         self.experiments = {}
         
         # Only run experiments specified in command line
-        for experiment_type,experiment_index in self.config.settings['run_experiments'].items():
+        for experiment_type,experiment_index in self.config.settings['experiment_type'].items():
             # Construct sub-config with only data relevant for experiment
             experiment_config = deepcopy(self.config)
             # experiment_config.logger = self.logger
@@ -244,6 +248,9 @@ class Experiment(object):
             if len(self.outputs.sweep_id) > 0:
                 dir_path = os.path.join("samples",self.outputs.sweep_id)
             
+            # Remove load experiment setting
+            self.config.settings['inputs']['load_experiment'] = ''
+            
             self.outputs.write_metadata(
                 dir_path=dir_path,
                 filename=filename
@@ -350,7 +357,32 @@ class Experiment(object):
                             self.outputs.h5group[loss_name]
                         )
 
-
+            if 'log_target' in self.output_names:
+                # Setup chunked dataset to store the state data in
+                if 'log_target' in self.outputs.h5group and not load_experiment:
+                    # Delete current dataset
+                    safe_delete(getattr(self,'log_target'))
+                if 'log_target' not in self.outputs.h5group:
+                    setattr(
+                        self,
+                        'log_target',
+                        self.outputs.h5group.create_dataset(
+                            'log_target',
+                            (0,),
+                            maxshape=(None,),
+                            chunks=True,
+                            compression=3,
+                        )
+                    )
+                    getattr(self,'log_target').attrs['dim_names'] = XARRAY_SCHEMA['log_target']['coords']
+                    getattr(self,'log_target').attrs['coords_mode__time'] = 'start_and_step'
+                    getattr(self,'log_target').attrs['coords__time'] = [self._write_start, self._write_every]
+                else:
+                    setattr(
+                        self,
+                        'log_target',
+                        self.outputs.h5group['log_target']
+                    )
 
             # Setup sampled/predicted log destination attractions
             if 'log_destination_attraction' in self.output_names:
@@ -897,7 +929,7 @@ class SIM_MCMC(Experiment):
         # Perform experiment-specific validation check
         config.experiment_validate_config()
 
-        self.output_names = ['log_destination_attraction','theta','sign','log_target','computation_time']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES['SIM_MCMC']
 
         # Fix random seed
         set_seed(self.seed)
@@ -1100,7 +1132,7 @@ class JointTableSIM_MCMC(Experiment):
         # Perform experiment-specific validation check
         config.experiment_validate_config()
 
-        self.output_names = ['log_destination_attraction','theta','sign','table','log_target','computation_time']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES['JointTableSIM_MCMC']
 
         # Fix random seed
         rng = set_seed(self.seed)
@@ -1370,7 +1402,7 @@ class Table_MCMC(Experiment):
         # Perform experiment-specific validation check
         config.experiment_validate_config()
 
-        self.output_names = ['table']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES['table']
 
         # Fix random seed
         rng = set_seed(self.seed)
@@ -1532,7 +1564,7 @@ class TableSummaries_MCMCConvergence(Experiment):
         # Perform experiment-specific validation check
         config.experiment_validate_config()
 
-        self.output_names = ['table']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES['TableSummaries_MCMCConvergence']
 
         # Setup table
         self.logger.note("Initializing the contingency table ...")
@@ -1740,7 +1772,7 @@ class SIM_NN(Experiment):
         # Perform experiment-specific validation check
         config.experiment_validate_config()
 
-        self.output_names = ['log_destination_attraction','theta','loss']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES['SIM_NN']
 
         # Fix random seed
         rng = set_seed(self.seed)
@@ -1917,7 +1949,7 @@ class NonJointTableSIM_NN(Experiment):
         # Perform experiment-specific validation check
         config.experiment_validate_config()
 
-        self.output_names = ['log_destination_attraction','theta','loss', 'table']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES['NonJointTableSIM_NN']
 
         # Fix random seed
         rng = set_seed(self.seed)
@@ -2137,7 +2169,7 @@ class JointTableSIM_NN(Experiment):
         # Perform experiment-specific validation check
         config.experiment_validate_config()
 
-        self.output_names = ['log_destination_attraction','theta','loss', 'table']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES['JointTableSIM_NN']
 
         # Fix random seed
         rng = set_seed(self.seed)
@@ -2465,8 +2497,9 @@ class ExperimentSweep():
         # Enable it again
         deep_updates(self.config.settings,{'export_samples':export_samples})
 
-        # # Write metadata
+        # Write metadata
         if self.config.settings['experiments'][0].get('export_metadata',True):
+            # Write to file
             self.outputs.write_metadata(
                 dir_path='',
                 filename=f"config"
