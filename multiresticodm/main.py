@@ -231,10 +231,10 @@ def exec(logger,settings,config_path,**kwargs):
     
     # Read config
     config = Config(
-        path=config_path,
-        settings=None,
+        path = config_path,
+        settings = None,
         console_level = settings.get('logging_mode','info'),
-        logger=logger
+        logger = logger
     )
 
     # Update settings with overwritten values
@@ -248,7 +248,7 @@ def exec(logger,settings,config_path,**kwargs):
 
     # Update root
     config.path_sets_root()
-    
+
     # Get list of experiments to run provided through command line
     experiment_types = list(kwargs.get('experiment_type',[]))
 
@@ -262,7 +262,7 @@ def exec(logger,settings,config_path,**kwargs):
             len(experiment_types) <= 0
             )
     }
-    config.settings.setdefault('experiment_types',experiment_types)
+    config.settings.setdefault('experiment_type',experiment_types)
     
     # Create output folder if it does not exist
     if not os.path.exists(config.out_directory):
