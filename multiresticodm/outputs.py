@@ -117,18 +117,31 @@ class Outputs(object):
         # Get name of intensity model
         self.intensity_model_name = self.config.settings[self.intensity_model_class]['name']
         # If these are sweeped store their range otherwse
-        self.intensity_model_name = self.intensity_model_name['sweep']['range'] if isinstance(self.intensity_model_name,dict) else [self.intensity_model_name]
+        self.intensity_model_name = self.intensity_model_name['sweep']['range'] \
+            if isinstance(self.intensity_model_name,dict) \
+            else [self.intensity_model_name]
         # Store sample data requirements
-        self.output_names = list(
-            flatten([
-                SAMPLE_DATA_REQUIREMENTS[sam] if sam != 'intensity' 
-                else SAMPLE_DATA_REQUIREMENTS[sam][model_name]
-                for sam in set(self.data_names).intersection(set(list(OUTPUT_TYPES.keys())))
-                for model_name in self.intensity_model_name]
-            )
-        )
+        self.output_names = []
+        for sam in set(self.data_names).intersection(set(list(OUTPUT_TYPES.keys()))):
+            if sam == 'intensity':
+                # Add all intensity-related data names
+                for model_name in self.intensity_model_name:
+                    self.output_names.extend(SAMPLE_DATA_REQUIREMENTS[sam][model_name])
+                # Take only unique values
+                self.output_names = list(set(self.output_names))
+            elif sam == 'loss' and 'neural_network' in self.config and 'loss' in EXPERIMENT_OUTPUT_NAMES[self.config['experiment_type']]:
+                # Grab all loss names
+                loss_names = list(flatten(self.config['neural_network']['loss']['loss_name']['sweep']['range'])) \
+                    if isinstance(self.config['neural_network']['loss']['loss_name'],dict) \
+                    else [self.config['neural_network']['loss']['loss_name']]
+                # Add them to output names
+                self.output_names.extend(loss_names)
+            elif sam in EXPERIMENT_OUTPUT_NAMES[self.config['experiment_type']]:
+                self.output_names.append(sam)
+        
         # Keep only unique values
         self.output_names = list(set(self.output_names))
+        # Get input names
         self.input_names = [
             sam for sam in set(self.data_names).intersection(set(list(INPUT_TYPES.keys())))
         ]
@@ -265,12 +278,18 @@ class Outputs(object):
 
     def load_h5_data(self,settings:dict={},slice_samples:bool=True):
         self.logger.note('Loading h5 data into xarrays...')
-        # Get all h5 files
-        h5files = list(Path(os.path.join(self.outputs_path,'samples',f"{self.sweep_id}")).rglob("*.h5"))
-        # Sort them by seed
-        h5files = sorted(h5files, key = lambda x: int(str(x).split('seed_')[1].split('/',1)[0]) if 'seed' in str(x) else str(x))
+        # Get h5 file
+        h5file = os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5")
+        try:
+            assert os.path.exists(h5file) and os.path.isfile(h5file)
+        except:
+            raise Exception(f"H5 file {h5file} not found.")
         # Read h5 data
-        local_coords,global_coords,data_vars = self.read_h5_files(h5files,settings=settings,slice_samples=slice_samples)
+        local_coords,global_coords,data_vars = self.read_h5_file(
+            h5file,
+            settings = settings,
+            slice_samples = slice_samples
+        )
         # Convert set to list
         local_coords = {k:np.array(
                             list(v),
@@ -280,9 +299,7 @@ class Outputs(object):
                             list(v),
                             dtype=TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
                         ) for k,v in global_coords.items()}
-        
         self.logger.progress('Populating data dictionary')
-        
         # Create an xarray dataset for each sample
         xr_dict = {}
 
@@ -316,11 +333,10 @@ class Outputs(object):
             # or 3) the targets of coupled sweeps
             coordinates = {
                 **{k:v for k,v in local_coords.items() \
-                   if k != sample_name and k in self.config.sweep_target_names},
+                   if k != sample_name},# and k in self.config.sweep_target_names},
                 **global_coords,
                 **coordinates
             }
-
             # Populate dictionary 
             xr_dict[sample_name] = {
                 "data": sample_data.reshape(tuple([len(val) for val in coordinates.values()])),
@@ -372,50 +388,14 @@ class Outputs(object):
                     # Append
                     self.logger.debug(f'Appending {sample_name}')
                     data_vars[sample_name] = np.array([sample_data[:]])
-                    # print(h5data[group_id].attrs['sweep_params'])
-                    # print(h5data[group_id].attrs['sweep_values'])
-                    # print(sample_name,sample_data.shape,data_vars[sample_name].shape)
-                self.logger.debug(f'Done with file')
+
         except BlockingIOError:
             self.logger.debug(f"Skipping in-use file: {filename}")
-            return {str(filename):{"local_coords":{},"global_coords":{},"data_vars":{}}}
+            return {},{},{}
         except Exception:
             self.logger.debug(traceback.format_exc())
             raise Exception(f'Cannot read file {filename}')
-        return {str(filename):{"local_coords":local_coords,"global_coords":global_coords,"data_vars":data_vars}}
-    
-    def read_h5_files(self,h5files:list,settings:dict={},**kwargs):
-        # Get each file and add it to the new dataset
-        h5data, local_coords, file_global_coords, data_vars = {},{},{},{}
-        # Do it sequentially
-        for filename in h5files:
-
-            # Read h5 file
-            h5data = self.read_h5_file(filename,settings=settings,**kwargs)
-            file_global_coords = h5data[str(filename)]['global_coords']
-            file_local_coords = h5data[str(filename)]['local_coords']
-            file_data_vars = h5data[str(filename)]['data_vars']
-            
-            # Read coords
-            if len(local_coords) > 0:
-                for k,v in file_local_coords.items():
-                    local_coords[k].update(v)
-            else:
-                local_coords = deepcopy(file_local_coords)
-            
-            # Read data
-            for sample_name,sample_data in file_data_vars.items():
-                if sample_name in list(data_vars.keys()) and len(data_vars) > 0:
-                    data_vars[sample_name] = np.append(
-                        data_vars[sample_name],
-                        sample_data,
-                        axis=0
-                    )
-                else:
-                    data_vars[sample_name] = deepcopy(sample_data)
-        
-        return local_coords,file_global_coords,data_vars
-    
+        return local_coords,global_coords,data_vars
         
     def update_experiment_directory_id(self,sweep_experiment_id:str=None):
 
@@ -541,7 +521,7 @@ class Outputs(object):
 
                 # Store sweep configurations as attributes
                 self.h5group.attrs.create("sweep_params",list(sweep_params.keys()))
-                self.h5group.attrs.create("sweep_values",['' if val is None else str(val) for val in sweep_params.values()])
+                self.h5group.attrs.create("sweep_values",['none' if val is None else str(val) for val in sweep_params.values()])
                 
                 # Update log filename
                 if isinstance(self.logger,DualLogger):
@@ -595,7 +575,7 @@ class Outputs(object):
                 group = f"/{sample_name}/{i}"
             )
 
-    def read_data_collection(self, sample_name:str=None):
+    def read_data_collection(self, group_by:list, sample_name:str=None):
         # Outputs filepath
         output_filepath = os.path.join(self.outputs_path,'sample_collections',"collection_data.nc")
         
@@ -631,6 +611,7 @@ class Outputs(object):
             
             self.data = DataCollection(
                 *data_arrs,
+                group_by = group_by,
                 logger = self.logger
             )
             return samples_not_loaded
@@ -670,27 +651,34 @@ class Outputs(object):
         if sample_name == 'intensity':
             # Get sim model 
             self.logger.debug('getting sim model')
-            sim_model = globals()[self.config.settings['spatial_interaction_model']['name']+'SIM']
+            # Read from config
+            intensity_name = self.config.settings[self.intensity_model_class]['name']
+            # Otherwise read from coords of first dataarray
+            first_da = self.get_sample(self.output_names[0])
+            intensity_name = intensity_name if isinstance(intensity_name,str) else first_da.coords['name'].item()
+
+            # Get intensity model
+            IntensityModelClass = globals()[intensity_name+'SIM']
             # Check that required data is available
             self.logger.debug('checking sim data availability')
             self.check_data_availability(
-                sample_name=sample_name,
-                input_names=sim_model.REQUIRED_INPUTS,
-                output_names=sim_model.REQUIRED_OUTPUTS,
+                sample_name = sample_name,
+                input_names = IntensityModelClass.REQUIRED_INPUTS,
+                output_names = IntensityModelClass.REQUIRED_OUTPUTS,
             )
             # Compute intensities for all samples
             table_total = self.settings.get('table_total') if self.settings.get('table_total',-1.0) > 0 else 1.0
             # Instantiate ct
-            sim = instantiate_sim(
+            IntensityModel = IntensityModelClass(
                 config = self.config,
-                logger=self.logger,
-                **{input:self.get_sample(input) for input in sim_model.REQUIRED_INPUTS}
+                logger = self.logger,
+                **{input:self.get_sample(input) for input in IntensityModelClass.REQUIRED_INPUTS}
             )
             # Compute log intensity
-            samples = sim.log_intensity(
+            samples = IntensityModel.log_intensity(
                 grand_total = torch.tensor(table_total,dtype=int32),
                 torch = False,
-                **{output:self.get_sample(output) for output in sim_model.REQUIRED_OUTPUTS}
+                **{output:self.get_sample(output) for output in IntensityModelClass.REQUIRED_OUTPUTS}
             )
             # Create new dataset
             samples = samples.rename('intensity')
@@ -726,11 +714,18 @@ class Outputs(object):
             )
         
         elif sample_name in list(INPUT_TYPES.keys()):
-            # Get sim model 
-            sim_model = globals()[self.config.settings['spatial_interaction_model']['name']+'SIM']
+            # Read from config
+            intensity_name = self.config.settings[self.intensity_model_class]['name']
+            # Otherwise read from coords of first dataarray
+            first_da = self.get_sample(self.output_names[0])
+            intensity_name = intensity_name if isinstance(intensity_name,str) else first_da.coords['name'].item()
+
+            # Get intensity model
+            IntensityModelClass = globals()[intensity_name+'SIM']
+
             self.check_data_availability(
                 sample_name=sample_name,
-                input_names=sim_model.REQUIRED_INPUTS
+                input_names=IntensityModelClass.REQUIRED_INPUTS
             )
             # Get samples and cast them to appropriate type
             if torch.is_tensor(getattr(self.inputs.data,sample_name)):
@@ -885,7 +880,7 @@ class DataCollection(object):
 
         for datum in data:
             # Update sample data collection
-            self.update_sample(datum)
+            self.update_sample(datum,group_by=kwargs.get('group_by',[]))
         
         # Combine coords for each list element of the Data Collection
         for sample_name in vars(self).keys():
@@ -897,7 +892,7 @@ class DataCollection(object):
                     getattr(
                         self,
                         sample_name
-                    )[i] = xr.combine_by_coords(datum)
+                    )[i] = xr.combine_by_coords(datum,combine_attrs='drop_conflicts')
         
     def data_vars(self):
         return {k:v for k,v in vars(self).items() if k in DATA_TYPES}
@@ -905,7 +900,7 @@ class DataCollection(object):
     def update_sample(self, new_data, group_by:list=[]):
 
         # Get sample name
-        sample_name = new_data.attrs['name']
+        sample_name = new_data.attrs['arr_name']
 
         # Core dimensions for sample must be shared
         sample_shared_dims = XARRAY_SCHEMA[sample_name]['new_shape']
@@ -1158,6 +1153,40 @@ class OutputSummary(object):
                 __self__.logger.info(f"{len(output_dirs)} output folders found.")
         return output_dirs
 
+    def get_data_collection_group_by(self,sweep_dims:list):
+        group_by = []
+        # Get all non-core sweep dims
+        non_core_sweep_dims = [k for k in sweep_dims if k not in CORE_COORDINATES_DTYPES]
+        for gb in list(self.settings.get('group_by',[]))+non_core_sweep_dims:
+            # If this is an isolated sweep parameter
+            # add it to the group by
+            if gb in self.sweep_params['isolated']:
+                group_by.append(gb)
+            # If it is a coupled sweep parameter
+            # add the coupled parameters too
+            if gb in self.sweep_params['coupled']:
+                group_by.append(gb)
+                # If this parameter is the target name
+                # add its coupled parameters to the group by
+                for coupled_param in self.sweep_params['coupled'].get(gb,[]):
+                    # Make sure there are no duplicate group by params
+                    if coupled_param['var'] not in group_by:
+                        group_by.append(coupled_param['var'])
+            # If this parameter is the coupled parameter
+            # of a target name add the target name and 
+            # the rest of the coupled parameters to the group by
+            target_name = self.config.target_names_by_sweep_var.get(gb,'none')
+            if target_name != 'none':
+                for coupled_param in self.sweep_params['coupled'].get(target_name,[]):
+                    # Add target name
+                    if target_name not in group_by:
+                        group_by.append(target_name)
+                    # Add rest of coupled params
+                    if coupled_param['var'] not in group_by:
+                        group_by.append(coupled_param['var'])
+        
+        return group_by
+    
     def collect_experiments_metadata(self):
         
         experiment_metadata = {}
@@ -1280,16 +1309,17 @@ class OutputSummary(object):
                 k: [stringify_index(parse(elem)) for elem in coords[k]]
                 for k in coords.keys()
             }
+
             data_arr[sample_name] = xr.DataArray(
                 data = data,
                 coords = slice_dict,
-                dims = (sweep_dims+sample_dims),
+                # dims = (sweep_dims+sample_dims),
                 attrs = dict(
-                    name = sample_name,
+                    arr_name = sample_name,
                     experiment_id = experiment_id,
                     **{
-                        k:sweep[k] for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
-                        if k in sweep and k != 'seed'
+                        k:stringify_index(parse(sweep[k])) for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
+                        if k in sweep and k != 'seed' and k not in slice_dict
                     }
                 )
             )
@@ -1370,6 +1400,14 @@ class OutputSummary(object):
         outputs.inputs = inputs
         safe_delete(inputs)
 
+        # Gather sweep dimension names
+        sweep_dims = list(self.sweep_params['isolated'].keys())
+        sweep_dims += list(self.sweep_params['coupled'].keys())
+
+        # Additionally group data collection by these attributes
+        group_by = self.get_data_collection_group_by(sweep_dims)
+        # print('group_by',group_by)
+
         # Try to load ground truth table
         self.settings['table_total'] = int(self.settings.get('table_total',1))
         # Read ground truth table
@@ -1390,6 +1428,7 @@ class OutputSummary(object):
             self.settings['table_total'] = int(outputs.inputs.data.ground_truth_table.sum(dim=['origin','destination']).values)
         else:
             raise Exception('Inputs are missing ground truth table.')
+
         
         # If outputs are forced to be reloaded reload them all
         if self.settings.get('force_reload',False):
@@ -1399,14 +1438,14 @@ class OutputSummary(object):
             # Attempt to load all samples
             # Keep track of samples not loaded
             overwrite = False
-            samples_not_loaded = outputs.read_data_collection()
+            samples_not_loaded = outputs.read_data_collection(
+                group_by = group_by, 
+                sample_name = None
+            )
 
         # Load all necessary samples that were not loaded
         if len(samples_not_loaded) > 0:
 
-            # Gather sweep dimension names
-            sweep_dims = list(self.sweep_params['isolated'].keys())
-            sweep_dims += list(self.sweep_params['coupled'].keys())
 
             # Gather h5 data from multiple files
             # and store them in xarray-type dictionaries
@@ -1433,7 +1472,7 @@ class OutputSummary(object):
                                 experiment_id = outputs.experiment_id,
                                 sweep_dims = sweep_dims,
                                 inputs = passed_inputs,
-                                group_by = self.settings.get('group_by',[]),
+                                group_by = group_by,
                                 input_slice = input_slice,
                                 coordinate_slice = coordinate_slice 
                             )
@@ -1475,7 +1514,7 @@ class OutputSummary(object):
                             experiment_id = outputs.experiment_id,
                             sweep_dims = sweep_dims,
                             inputs = passed_inputs,
-                            group_by = self.settings.get('group_by',[]),
+                            group_by = group_by,
                             input_slice = input_slice,
                             coordinate_slice = coordinate_slice 
                         )
@@ -1503,12 +1542,12 @@ class OutputSummary(object):
                                         for k,v in coordinate_slice.items()
                                     }
                                 ),
-                                group_by = self.settings.get('group_by',[])
+                                group_by = group_by
                             )
                         else:
                             outputs.data.update_sample(
                                 dataset.pop(sample_name),
-                                group_by = self.settings.get('group_by',[])
+                                group_by = group_by
                             )
                     
                     # Combine coords for each list element of the Data Collection
@@ -1521,7 +1560,7 @@ class OutputSummary(object):
                             outputs.data,
                             sample_name
                         )[i] = xr.combine_by_coords(datum)
-                    
+
                     # Write sample data collection to file
                     outputs.write_data_collection(
                         sample_name = sample_name,
@@ -1555,9 +1594,9 @@ class OutputSummary(object):
 
             # Make output directory
             output_directory = os.path.join(
-                self.settings['out_directory'],
+                self.config.out_directory,
                 dataset,
-                self.settings['outputs'].get('out_group',''),
+                self.config['outputs'].get('out_group',''),
                 'summaries'
             )
             makedir(output_directory)
@@ -1579,7 +1618,7 @@ class OutputSummary(object):
                 filepath = os.path.join(
                     output_directory,
                     f"{'_'.join(self.settings['experiment_type'])}_"+\
-                    f"{'_'.join(self.settings['experiment_title'])+'_' if len(self.settings['experiment_title']) > 0 else ''}"+\
+                    f"{'_'.join(self.settings['title'])+'_' if len(self.settings['title']) > 0 else ''}"+\
                     f"{date_strings if len(date_strings) < 4 else 'multiple_dates'}_"+\
                     f"burnin{self.settings['burnin']}_"+\
                     f"thinning{self.settings['thinning']}_"+\
@@ -1606,6 +1645,9 @@ class OutputSummary(object):
                 # Unstack id multi-dimensional index
                 samples = samples.unstack('id')
             except Exception:
+                if sample_name == 'intensity':
+                    self.logger.error(traceback.format_exc())
+                self.logger.debug(traceback.format_exc())
                 self.logger.error(f'Experiment {os.path.basename(experiment_id)} does not have sample {sample_name}')
                 continue
             self.logger.progress(f"samples {np.shape(samples)}, {samples.dtype}")
@@ -1715,9 +1757,18 @@ class OutputSummary(object):
                     
                     # Squeeze output
                     metric_summarised = np.squeeze(metric_summarised)
+
                     self.logger.progress(f"Summarised metric is squeezed to {np.shape(metric_summarised)}")
                     # Get metric data in pandas dataframe
-                    metric_summarised = metric_summarised.to_dataframe().reset_index(drop=True)
+                    try:
+                        metric_summarised = metric_summarised.to_dataframe().reset_index(drop=True)
+                    except:
+                        # Create row out of coordinates
+                        row = {k:[np.asarray(v.data)] for k,v in metric_summarised.coords.items()}
+                        # add metric
+                        row[metric_summarised.name] = [np.array(metric_summarised.to_pandas())]
+                        # Convert to dataframe
+                        metric_summarised = pd.DataFrame(row)
 
                     # This loops over remaining sweep configurations
                     for _,sweep in metric_summarised.iterrows():
