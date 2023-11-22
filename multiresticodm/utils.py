@@ -62,6 +62,8 @@ def write_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
 
 
 def write_netcdf(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
+    # Clear file cache
+    xr.backends.file_manager.FILE_CACHE.clear()
     # Writing the DataArray to a NetCDF file inside a with context
     data.to_netcdf(
         path = filepath, 
@@ -69,6 +71,7 @@ def write_netcdf(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
         engine = 'netcdf4',
         group = kwargs.get('group','')
     )
+    data.close()
 
 
 def write_compressed_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
@@ -255,8 +258,8 @@ def parse(value,default=None):
             value = string_to_numeric(value)
         except:
             pass
-    elif hasattr(value,'__len__') and len(value) <= 0:
-        return default
+    elif hasattr(value,'__len__'):
+        return np.array2string(np.array(value))
     elif isinstance(value,float):
         return np.float32(np.round(value,5))
     
