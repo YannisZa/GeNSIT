@@ -233,6 +233,20 @@ SAMPLE_DATA_REQUIREMENTS = {
 }
 SAMPLE_DATA_REQUIREMENTS['intensity'] = INTENSITY_OUTPUTS
 
+EXPERIMENT_OUTPUT_NAMES = {
+    "SIM_MCMC": ['log_destination_attraction','theta','sign',
+                 'log_target','computation_time',
+                 'theta_acc','log_destination_attraction_acc'],
+    "JointTableSIM_MCMC": ['log_destination_attraction','theta','sign','table',
+                           'log_target','computation_time',
+                           'theta_acc','log_destination_attraction_acc','table_acc'],
+    "Table_MCMC": ['table','computation_time'],
+    "TableSummaries_MCMCConvergence": ['table','computation_time'],
+    "SIM_NN": ['log_destination_attraction','theta','loss','computation_time'],
+    "NonJointTableSIM_NN": ['log_destination_attraction','theta','loss', 'table','computation_time'],
+    "JointTableSIM_NN": ['log_destination_attraction','theta','loss', 'table','computation_time']
+}
+
 AUXILIARY_COORDINATES_DTYPES = {
     'N':torch.int32,
     'dataset':str,
@@ -248,7 +262,8 @@ AUXILIARY_COORDINATES_DTYPES = {
     'axes':object,
     'cells':str,
     'loss_name':object,
-    'loss_function':object
+    'loss_function':object,
+    'name':str
 }
 
 CORE_COORDINATES_DTYPES = {
@@ -263,7 +278,6 @@ CORE_COORDINATES_DTYPES = {
 }
 
 COORDINATES_DTYPES = {**CORE_COORDINATES_DTYPES,**AUXILIARY_COORDINATES_DTYPES}
-
 
 NUMPY_TYPE_TO_DAT_TYPE = {
     'float':'%f',
