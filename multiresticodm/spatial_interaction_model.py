@@ -12,8 +12,8 @@ from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
 
 def instantiate_sim(
         config:Config,
-        name:str=None,
-        true_parameters={},
+        name:str = None,
+        true_parameters = {},
         **kwargs
     ):
     if name is None:
@@ -24,8 +24,8 @@ def instantiate_sim(
         raise ValueError(f"Input class '{name}' not found")
     
     return getattr(sys.modules[__name__], name)(
-        config=config,
-        true_parameters=true_parameters,
+        config = config,
+        true_parameters = true_parameters,
         **kwargs
     )
     
@@ -39,8 +39,8 @@ class SpatialInteraction2D():
     REQUIRED_OUTPUTS = []
     def __init__(
             self,
-            config:Config=None,
-            true_parameters: dict = None,
+            config: Config = None,
+            true_parameters: dict = {},
             **kwargs
     ):
         '''  Constructor '''
@@ -279,17 +279,17 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
     REQUIRED_OUTPUTS = INTENSITY_OUTPUTS['ProductionConstrained']
     def __init__(
         self,
-        config:Config=None,
-        true_parameters=None,
-        device=None,
+        config:Config = None,
+        true_parameters:dict = {},
+        device:str = None,
         **kwargs
     ):
         '''  Constructor '''
         # Initialise constructor
         super().__init__(
-            config=config,
-            true_parameters=true_parameters,
-            device=device,
+            config = config,
+            true_parameters = true_parameters,
+            device = device,
             **kwargs
         )
         # Define type of spatial interaction model
@@ -315,17 +315,17 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
     REQUIRED_OUTPUTS = INTENSITY_OUTPUTS['TotallyConstrained']
     def __init__(
         self,
-        config:Config=None,
-        true_parameters=None,
-        device=None,
+        config:Config = None,
+        true_parameters = {},
+        device:str = None,
         **kwargs
     ):
         '''  Constructor '''
         # Initialise constructor
         super().__init__(
-            config=config,
-            true_parameters=true_parameters,
-            device=device,
+            config = config,
+            true_parameters = true_parameters,
+            device = device,
             **kwargs
         )
         # Define type of spatial interaction model
