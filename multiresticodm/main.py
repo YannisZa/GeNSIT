@@ -162,8 +162,8 @@ _create_and_run_options = [
 _common_run_options = [
     click.option('--load_experiment','-le', multiple=False, type=click.Path(exists=True), default=None, 
                    help='Defines path to existing experiment output in order to load it and resume experimentation.'),
-    click.option('--run_experiments','-re', type=click.STRING, multiple=True, callback=to_list,
-               default = None, help = 'Decides which experiments to run'),
+    click.option('--experiment_type','-et', type=click.STRING, multiple=True, callback=to_list,
+               default = None, help = 'Decides which experiment types to run'),
     click.option('--title','-ttl', type=click.STRING,
                default = None, help = 'Title appended to output filename of experiment'),
     click.option('--sweep_mode/--no-sweep_mode', default=None,is_flag=True, show_default=True,
@@ -250,10 +250,10 @@ def exec(logger,settings,config_path,**kwargs):
     config.path_sets_root()
     
     # Get list of experiments to run provided through command line
-    experiment_types = list(kwargs.get('run_experiments',[]))
+    experiment_types = list(kwargs.get('experiment_type',[]))
 
     # Maintain a dictionary of available experiments and their list index
-    run_experiments = {
+    experiment_types = {
         exp.get('type',''):i 
         for i,exp in enumerate(config.settings['experiments']) 
         if len(exp.get('type','')) > 0 and \
@@ -262,7 +262,7 @@ def exec(logger,settings,config_path,**kwargs):
             len(experiment_types) <= 0
             )
     }
-    config.settings.setdefault('run_experiments',run_experiments)
+    config.settings.setdefault('experiment_types',experiment_types)
     
     # Create output folder if it does not exist
     if not os.path.exists(config.out_directory):
@@ -361,12 +361,12 @@ def create(
     deep_updates(config.settings,settings,overwrite=True)
 
     # Maintain a dictionary of available experiments and their list index
-    run_experiments = {
+    experiment_types = {
         exp.get('type',''):i  
         for i,exp in enumerate(config.settings['experiments']) 
         if exp.get('type','') == 'DataGeneration'
     }
-    config.settings.setdefault('run_experiments',run_experiments)
+    config.settings.setdefault('experiment_type',experiment_types)
 
     # Update root
     config.path_sets_root()
@@ -374,8 +374,7 @@ def create(
     logger.info(f"Validating config provided...")
     
     # Validate config
-    config.validate_config(experiment_type=','.join(list(run_experiments.keys())))
-
+    config.validate_config(experiment_type=','.join(list(experiment_types.keys())))
 
     # Intialise experiment handler
     eh = ExperimentHandler(
@@ -456,7 +455,7 @@ def run(
         name,
         origin_demand,
         cost_matrix,
-        run_experiments,
+        experiment_type,
         title,
         sweep_mode,
         overwrite,
@@ -521,9 +520,9 @@ def run(
 
     exec(
         logger,
-        settings=settings,
-        config_path=config_path,
-        run_experiments=run_experiments
+        settings = settings,
+        config_path = config_path,
+        experiment_type = experiment_type
     )
 
 
