@@ -150,6 +150,14 @@ class Outputs(object):
         # to sweep params (if they are provided)
         self.sweep_id = self.config.get_sweep_id(sweep_params = sweep_params)
 
+    def get(self,index:int):
+        self_copy = deepcopy(self)
+        self_copy.data = self_copy.data[index]
+        return self_copy
+    
+    def data_vars(self):
+        return {k:v for k,v in vars(self.data).items() if k in DATA_TYPES}
+
     def trim_sweep_configurations(self,sweep_configurations:list=[],sweep_params:dict={}):
         # Loop through each sweep configuration
         for sweep_conf in sweep_configurations:
@@ -201,13 +209,14 @@ class Outputs(object):
             except:
                 available = False
                 self.logger.error(f"Sample {sample_name} requires input {input} \
-                                  which does not exist in {','.join(self.inputs.data.vars())}")
+                                  which does not exist in {','.join(list(self.inputs.data_vars().keys()))}")
         for output in output_names:
             try:
                 assert hasattr(self.data,output)
             except:
                 available = False
-                self.logger.error(f"Sample {sample_name} requires output {output} which does not exist in {','.join(vars(self.data))}")
+                self.logger.error(f"Sample {sample_name} requires output {output} \
+                                  which does not exist in {','.join(list(self.data_vars().keys()))}")
         return available
 
     def slice_sample_iterations(self,samples,settings:dict={}):
@@ -549,40 +558,43 @@ class Outputs(object):
                                 f"outputs.log"
                             )
 
-    def write_data_collection(self, sample_name, overwrite:bool=False):
+    def write_data_collection(self, sample_names:list = None, overwrite:bool=False):
         # Make output directory
         output_directory = os.path.join(self.outputs_path,'sample_collections')
         makedir(output_directory)
         # Write output to file
         filepath = os.path.join(
             output_directory,
-            f"collection_data.nc"
+            f"data_collection.h5"
         )
         self.logger.info(f'Writing output collection to {filepath}')
-        for i,datum in enumerate(getattr(
-            self.data,
-            sample_name
-        )):
-            # Writing or appending mode
-            if ((not os.path.exists(filepath) or not os.path.isfile(filepath)) or overwrite) and i == 0:
-                mode = 'w'
-            else:
-                mode = 'a'
-            write_netcdf(
-                datum,
-                filepath,
-                mode = mode,
-                group = f"/{sample_name}/{i}"
-            )
+        # Get specific sample names
+        sample_names = sample_names if sample_names is not None else list(self.data_vars().keys())
+        sample_names = set(sample_names).intersection(set(list(self.data_vars().keys())))
+
+        for sam_name in sample_names:
+            for i,datum in enumerate(getattr(self.data,sam_name)):
+                # Writing or appending mode
+                if ((not os.path.exists(filepath) or not os.path.isfile(filepath)) or overwrite) and i == 0:
+                    mode = 'w'
+                else:
+                    mode = 'a'
+                write_xr_data(
+                    datum,
+                    filepath,
+                    mode = mode,
+                    group = f"/{sam_name}/{i}"
+                )
 
     def read_data_collection(self, group_by:list, sample_name:str=None):
         # Outputs filepath
-        output_filepath = os.path.join(self.outputs_path,'sample_collections',"collection_data.nc")
-        
+        output_filepath = os.path.join(self.outputs_path,'sample_collections',"data_collection.h5")
+
         if not os.path.isfile(output_filepath) or not os.path.exists(output_filepath):
             return self.output_names
         else:
-            samples_not_loaded = []
+            # Start with the premise that all available samples should be loaded
+            samples_not_loaded = deepcopy(self.output_names)
             # Get all sample names and collection ids
             sample_collections = {}
             # Read data array
@@ -596,19 +608,24 @@ class Outputs(object):
             
             data_arrs = []
             for sam_name,sample_collection in sample_collections.items():
+                sample_loaded = True
                 for collection_id in sample_collection:
                     try:
                         # Read data array
-                        data_array = read_netcdf_array(
+                        data_array = read_xr_dataarray(
                             filepath = output_filepath,
                             group=f'/{sam_name}/{collection_id}'
                         )
                         # Convert to torch
                         data_arrs.append(data_array)
                     except:
-                        samples_not_loaded.append(sample_name)
+                        sample_loaded = False
                         self.logger.warning(f"Could not load /{sam_name}/{collection_id} from {self.outputs_path} sample collections")
-            
+                # remove loaded sample from consideration
+                # since it has been succesfully loaded
+                if sample_loaded:
+                    samples_not_loaded.remove(sam_name)
+
             self.data = DataCollection(
                 *data_arrs,
                 group_by = group_by,
@@ -893,9 +910,6 @@ class DataCollection(object):
                         self,
                         sample_name
                     )[i] = xr.combine_by_coords(datum,combine_attrs='drop_conflicts')
-        
-    def data_vars(self):
-        return {k:v for k,v in vars(self).items() if k in DATA_TYPES}
     
     def update_sample(self, new_data, group_by:list=[]):
 
@@ -991,6 +1005,9 @@ class DataCollection(object):
             # Delete index element of Data Collection
             del self.data[index]
 
+    def _vars_(self):
+        return {k:v for k,v in vars(self).items() if k in DATA_TYPES}
+    
     def __repr__(self):
         return "\n\n".join([
             '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'+str(sample_name)+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n' + \
@@ -1001,7 +1018,10 @@ class DataCollection(object):
             for sample_name,sample_data in vars(self).items() \
             if sample_name in DATA_TYPES
         ])
-
+    
+    def data_vars(self):
+        return {k:v for k,v in self.data._vars_().items() if k in DATA_TYPES}
+    
     def sizes(self,dim:str=None):
         if dim is None:
             return {
@@ -1229,12 +1249,8 @@ class OutputSummary(object):
             miniters=1,
             position=0
         ):
-            # Create outputs copy
-            new_outputs = deepcopy(outputs)
-            # Update value of new outputs to the specific element of Data Collection
-            new_outputs.data = outputs.data[j]
             # Collect metric metadata
-            yield self.get_experiment_metadata(new_outputs)
+            yield self.get_experiment_metadata(outputs.get(j))
 
     def get_experiment_metadata_concurrently(self,outputs):
         # Initialise progress bar
@@ -1249,14 +1265,10 @@ class OutputSummary(object):
             futures = []
             # Start the processes and ignore the results
             for j in range(len(outputs.data)):
-                # Create outputs copy
-                new_outputs = deepcopy(outputs)
-                # Update value of new outputs to the specific element of Data Collection
-                new_outputs.data = outputs.data[j]
                 try:
                     future = executor.submit(
                         self.get_experiment_metadata,
-                        outputs = new_outputs,
+                        outputs = outputs.get(j),
                     )
                     # Update progress
                     futures.append(future)
@@ -1306,16 +1318,16 @@ class OutputSummary(object):
                 continue
             # Extract directly from config
             has_sweep = self.config.has_sweep(key_paths[0])
-            if len(key_paths) <= 0 and not has_sweep:
+            if len(key_paths) > 0 and not has_sweep:
                 useful_metadata[key],_ = self.config.path_get(
                     key_path = key_paths[0]
                 )
             # Extract from data collection element
             elif self.config.has_sweep(key_paths[0]):
                 # Grab first dataarray
-                data_arr = list(outputs.data.data_vars().values())[0]
+                data_arr = list(outputs.data_vars().values())[0]
                 useful_metadata[key] = data_arr.sizes[key]
-        
+
         # Add useful metadata to metric data
         for m in range(len(metric_data)):
             metric_data[m]['folder'] = os.path.join(self.base_dir)
@@ -1509,8 +1521,7 @@ class OutputSummary(object):
 
         # Load all necessary samples that were not loaded
         if len(samples_not_loaded) > 0:
-
-            print(samples_not_loaded)
+            self.logger.info(f"Collecting samples for {', '.join(samples_not_loaded)}.")
             # Gather h5 data from multiple files
             # and store them in xarray-type dictionaries
             output_datasets = []
@@ -1625,13 +1636,13 @@ class OutputSummary(object):
                             sample_name
                         )[i] = xr.combine_by_coords(datum)
 
-                    # Write sample data collection to file
-                    outputs.write_data_collection(
-                        sample_name = sample_name,
-                        overwrite = overwrite
-                    )
-                    # Do not overwite file
-                    overwrite = False
+                # Write sample data collection to file
+                outputs.write_data_collection(
+                    sample_names = samples_not_loaded,
+                    overwrite = overwrite
+                )
+                # Do not overwite file
+                overwrite = False
             except:
                 print(traceback.format_exc())
                 self.logger.error('Failed creating xarray DataArray')
