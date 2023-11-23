@@ -9,7 +9,8 @@ import psutil
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger
 from multiresticodm.logger_class import *
-from multiresticodm.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS,MARGINAL_SOLVERS, DATA_TYPES, METRICS, PLOT_HASHMAP, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS, PLOT_COORDINATES
+from multiresticodm.plot_variables import PLOT_HASHMAP, PLOT_COORDINATES
+from multiresticodm.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS, MARGINAL_SOLVERS, DATA_TYPES, METRICS, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
 
 
 def set_threads(n_threads):
@@ -28,6 +29,12 @@ AVAILABLE_THREADS = psutil.cpu_count(logical=True)
 
 def to_list(ctx, param, value):
     return list(value)
+
+def split_to_list(ctx, param, value):
+    if value is None:
+        return None
+    else:
+        return [v.split("_") for v in list(value)]
 
 class PythonLiteralOption(click.Option):
 
@@ -110,7 +117,6 @@ class OptionEatAll(click.Option):
                 our_parser.process = parser_process
                 break
         return retval
-
 
 @click.group('multiresticodm')
 def cli():
@@ -565,7 +571,7 @@ def output_options(func):
     return func
 
 _plot_coordinate_options = []
-for var in PLOT_COORDINATES:
+for i,var in enumerate(PLOT_COORDINATES):
     _plot_coordinate_options += [
         click.option(f'--{var}_label', f'-{var}lab', default=None, show_default=False,
               type=click.STRING, help=f'Sets {var} axis label.'),
@@ -573,8 +579,10 @@ for var in PLOT_COORDINATES:
                 is_flag=True, help=f'Flag for whether {var} is discrete or not.'),
         click.option(f'--{var}_limit', f'-{var}lim', default=(None,None), show_default=False,
                 type=(float, float), help=f'Sets {var} limits.'),
-        click.option(f'--{var}_tick_frequency', f'-{var}fq', default=20, show_default=True,
-                type=click.INT, help=f'Sets frequency of {var} ticks font size.')
+        click.option(f'--{var}ticks', f'-{var}t', default=None, show_default=True, callback=split_to_list, multiple = True,
+                type=click.STRING, help=f'Sets variable for determining of {var} tick values.'),
+        click.option(f'--{var}_tick_frequency', f'-{var}fq', default=[(0, 1)], show_default=True, multiple = True,
+                type=(click.INT,click.INT), help=f'Sets starting point and frequency of {var} ticks.')
     ]
 
 
@@ -613,6 +621,10 @@ def plot_coordinate_options(func):
               type=click.STRING, help=f'Sets metadata key(s) to determine figure element marker type by.')
 @click.option('--hatch', '-hch', default=None, show_default=False,
               type=click.STRING, help=f'Sets metadata key(s) to determine figure element marker texture by.')
+@click.option('--zorder', '-or', default=[(None,None)], show_default=False, multiple = True, callback = to_list,
+              type=(click.Choice(['asc','desc']),click.STRING),
+              help=f'''Sets variable to order plot points/lines by in ascending or descending order. 
+              If ascending order is set, smaller values are given priority (go on top) and vice versa''')
 @click.option('--geometry','-g', multiple=False, type=click.File(), default=None, 
                 help='Defines path to geometry geojson for visualising flows on a map.')
 @click.option('--origin_geometry_type', '-ogt', default='lsoa', show_default=True,
@@ -695,6 +707,8 @@ def plot_coordinate_options(func):
               help=f'Flag for taking switching origins with destinations in plots.')
 @click.option('--colourbar/--no-colourbar', default=None, is_flag=True, show_default=True,
               help=f'Flag for plotting colourbars or not.')
+@click.option('--equal_aspect/--no-equal_aspect', default=False, is_flag=True, show_default=True,
+              help=f'Flag for setting aspect ratio to equal or not.')
 @plot_coordinate_options
 @click.pass_context
 def plot(
@@ -736,6 +750,7 @@ def plot(
         visibility,
         marker,
         hatch,
+        zorder,
         geometry,
         origin_geometry_type,
         destination_geometry_type,
@@ -777,6 +792,7 @@ def plot(
         annotate,
         transpose,
         colourbar,
+        equal_aspect,
         x_label,
         y_label,
         z_label,
@@ -786,6 +802,9 @@ def plot(
         x_discrete,
         y_discrete,
         z_discrete,
+        xticks,
+        yticks,
+        zticks,
         x_tick_frequency,
         y_tick_frequency,
         z_tick_frequency
