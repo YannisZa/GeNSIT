@@ -61,15 +61,13 @@ def write_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
     np.save(file=filepath, arr=data)
 
 
-def write_netcdf(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
+def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
     # Clear file cache
     xr.backends.file_manager.FILE_CACHE.clear()
     # Writing the DataArray to a NetCDF file inside a with context
     data.to_netcdf(
-        path = filepath, 
-        mode = kwargs.get('mode','w'), 
-        engine = 'netcdf4',
-        group = kwargs.get('group','')
+        path = filepath,
+        **kwargs
     )
     data.close()
 
@@ -158,7 +156,7 @@ def read_npy(filepath:str,**kwargs:Dict) -> np.ndarray:
     data = np.load(filepath).astype('float32')
     return data
 
-def read_netcdf_array(filepath:str,**kwargs:Dict) -> xr.DataArray:
+def read_xr_dataarray(filepath:str,**kwargs:Dict) -> xr.DataArray:
     if len(kwargs.get('group','')) > 0:
         return xr.open_dataarray(
             filepath,
@@ -918,6 +916,19 @@ def is_null(v):
 def dict_inverse(d:dict):
     return {v:k for k,v in d.items()}
 
+def get_value(d:dict,k:str,default:object = None):
+    try:
+        value = d[k].item()
+    except:
+        try:
+            value = d[k]
+        except:
+            value = default
+    if k == 'sigma':
+        return sigma_to_noise_regime(value)
+    else:
+        return value
+
 def get_keys_in_path(d, target_key, path=[], paths_found = []):
     for key, value in d.items():
         current_path = path + [key]
@@ -971,12 +982,14 @@ def setup_logger(
 
 def sigma_to_noise_regime(sigma=None):
     if sigma:
-        if (2/sigma**2) >= 10000:
+        if (2/float(sigma)**2) >= 10000:
             return 'low'
-        else:
+        elif (2/float(sigma)**2) < 10000 and sigma > 0:
             return 'high'
+        else:
+            return 'learned'
     else:
-        return 'variable'
+        return 'learned'
 
 
 def h5_tree(val, pre=''):
