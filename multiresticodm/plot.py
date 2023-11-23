@@ -21,14 +21,14 @@ from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
 from statsmodels.graphics.tsaplots import plot_acf
 
 from multiresticodm.utils import *
-from multiresticodm.colormaps import *
 from multiresticodm.config import Config
+from multiresticodm.plot_variables import *
 from multiresticodm.global_variables import *
 from multiresticodm.outputs import Outputs,OutputSummary
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.spatial_interaction_model import instantiate_sim
 from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
-from multiresticodm.math_utils import map_distance_name_to_function,coverage_probability
+from multiresticodm.math_utils import map_distance_name_to_function
 
 latex_preamble = r'''
 \usepackage{amsmath}
@@ -37,7 +37,10 @@ latex_preamble = r'''
 '''
 
 mpl.rcParams['text.latex.preamble'] = latex_preamble
-
+mpl.rcParams.update({
+    "text.usetex": True,
+    "font.family": "Times New Roman"
+})
 
 class Plot(object):
 
@@ -168,6 +171,9 @@ class Plot(object):
     '''
 
     def plot_2d_scatter(self,plot_settings,**kwargs):
+        # Figure size 
+        fig = plt.figure(figsize=self.settings['figure_size'])
+
         # Axes limits from settings (read only x limit)
         axes_lims = {}
         for var in ['x','y']:
@@ -185,19 +191,16 @@ class Plot(object):
                 else:
                     max_val = axes_lims[var][1]
                 
-                for plot_setting in plot_settings:
+                for plot_sett in plot_settings:
                     if self.settings.get(f'{var}_discrete',False):
-                        min_val = min([1,min_val])
-                        max_val = max([len(set(len(plot_setting[var])))+1,max_val])
+                        min_val = min([0,min_val])
+                        max_val = max([len(set(plot_sett[var]))+1,max_val])
                     else:
-                        min_val = min([np.min(plot_setting[var]),min_val])
-                        max_val = max([np.max(plot_setting[var]),max_val])
+                        min_val = min([np.min(plot_sett[var]),min_val])
+                        max_val = max([np.max(plot_sett[var]),max_val])
                 # Update axis limits
                 axes_lims[var] = [min_val,max_val]
-        
-        # Figure size 
-        fig = plt.figure(figsize=self.settings['figure_size'])
-        
+
         # Plot benchmark (perfect predictions)
         if self.settings['benchmark']:
             plt.plot(
@@ -222,28 +225,81 @@ class Plot(object):
         # Axis limits
         plt.xlim(left=axes_lims['x'][0], right=axes_lims['x'][1])
         plt.ylim(bottom=axes_lims['y'][0], top=axes_lims['y'][1])
-        print(axes_lims)
+
+        # Grid lines
+        if self.settings.get('x_discrete',False) and self.settings.get('y_discrete',False):
+            plt.grid(axis='both')
+        elif self.settings.get('x_discrete',False):
+            plt.grid(axis='x')
+        elif self.settings.get('y_discrete',False):
+            plt.grid(axis='y')
+
         # Ticks
         if self.settings.get('x_discrete',False):
             # Get sorted unique x values
             unique_x = set(list(flatten([plot_sett['x'] for plot_sett in plot_settings])))
             unique_x = sorted(list(unique_x))
+            # Read x ticks
+            xticks = np.array(plot_sett.get('xticks',[]))
+            xticks_unique = np.unique(['x'.join(xt) for xt in xticks])
+            # For each subtick (up to two subticks - one for major and one for minor ticks)
+            for i,xtick_labels in enumerate(xticks[:,:2].T):
+                # Get unique label values
+                xtick_unique_labels = np.unique(xtick_labels)
+                print(len(xticks_unique))
+                print(len(xtick_unique_labels))
+                print((len(xticks_unique)//len(xtick_unique_labels)))
+                if i == 0:
+                    plt.xticks(
+                        ticks = range(
+                            self.settings['x_tick_frequency'][i][0],
+                            axes_lims['x'][1],
+                            self.settings['x_tick_frequency'][i][1]
+                        ),
+                        labels = list(xtick_unique_labels)*(len(xticks_unique)//len(xtick_unique_labels)),
+                        fontsize = self.settings['tick_font_size'],
+                        which = 'major'
+                    )
+                else:
+                    plt.xticks(
+                        ticks = range(
+                            self.settings['x_tick_frequency'][i][0],
+                            axes_lims['x'][1],
+                            self.settings['x_tick_frequency'][i][1]
+                        ),
+                        labels = list(xtick_unique_labels)*(len(xticks_unique)//len(xtick_unique_labels)),
+                        fontsize = self.settings['tick_font_size'],
+                        which = 'minor'
+                    )
+            
             # Create a discrete hashmap
-            x_hashmap = dict(zip(unique_x,range(1,len(unique_x)+1)))
-            plt.xticks(
-                ticks = list(x_hashmap.values()),
-                labels = list(x_hashmap.keys())
-            )
+            x_hashmap = dict(zip(
+                unique_x,
+                range(1,len(unique_x)+1)
+            ))
+        else:
+            plt.xticks(fontsize = self.settings['tick_font_size'])
+        
         if self.settings.get('y_discrete',False):
             # Get sorted unique x values
             unique_y = set(list(flatten([plot_sett['y'] for plot_sett in plot_settings])))
             unique_y = sorted(list(unique_y))
             # Create a discrete hashmap
-            y_hashmap = dict(zip(unique_y,range(1,len(unique_y)+1)))
+            y_hashmap = dict(zip(
+                unique_y,
+                range(
+                    1,
+                    len(unique_y)*self.settings['y_tick_frequency']+1,
+                    self.settings['y_tick_frequency']
+                )
+            ))
             plt.yticks(
                 ticks = list(y_hashmap.values()),
-                labels = list(y_hashmap.keys())
+                labels = list(y_hashmap.keys()),
+                fontsize = self.settings['tick_font_size']
             )
+        else:
+            plt.yticks(fontsize = self.settings['tick_font_size'])
         
         # 2D scatter plot
         for plot_sett in plot_settings:
@@ -254,24 +310,47 @@ class Plot(object):
             y_range = list(map(lambda v: y_hashmap[v], plot_sett['y'])) \
                     if self.settings.get('y_discrete',False) \
                     else plot_sett['y']
-            sizes = plot_sett.get('size',int(self.settings['marker_size']))
-            colours = plot_sett.get('colour',None)
-            print('colours',colours)
-            alphas = plot_sett.get('visibility',np.array([1.0]))/max(plot_sett.get('visibility',np.array([1.0])))
-            labels = plot_sett.get('label','')
-            marker = plot_sett.get('marker','o')
-            hatch = plot_sett.get('hatch',None)
+            sizes = plot_sett.get('size',float(self.settings['marker_size']))
+            sizes = [float(sizes)] if not isinstance(sizes,Iterable) else sizes
+            colours = plot_sett.get('colour','black')
+            colours = [colours] if isinstance(colours,str) else colours
+            # Convert transparency levels to approapriate data type
+            alphas = plot_sett.get('visibility','1.0')
+            alphas = [float(alphas)] if isinstance(alphas,str) else alphas
+            zorders = plot_sett.get('zorder',[1])
+            zorders = [float(zorders)] if isinstance(zorders,str) else zorders 
+            labels = plot_sett.get('label',[''])
+            labels = [labels] if isinstance(labels,str) else labels
+            markers = plot_sett.get('marker',['o'])
+            markers = [markers] if isinstance(markers,str) else markers
+            hatches = plot_sett.get('hatch','')
+            hatches = [hatches] if isinstance(hatches,str) else hatches
+            
+            print('Sizes')
+            print(sizes)
+            print('Alphas')
+            print(alphas)
+            print('Zorders')
+            print(zorders)
+            print('Labels')
+            print(labels)
+            print('Markers')
+            print(markers)
+            print('Hatches')
+            print(hatches)
+
             # Plot x versus y
             for i in range(len(y_range)):
                 plt.scatter(
                     x = x_range[i],
                     y = y_range[i],
-                    s = sizes[i] if isinstance(sizes,Iterable) else sizes,
-                    c = colours[i] if isinstance(colours,Iterable) else colours,
+                    s = sizes[i] if len(sizes) > 1 else sizes[0],
+                    c = colours[i] if len(colours) > 1 else colours[0],
                     alpha = alphas[i] if len(alphas) > 1 else alphas[0],
-                    label = labels[i] if not isinstance(alphas,str) else labels,
-                    marker = marker,
-                    hatch = hatch
+                    zorder = zorders[i] if len(zorders) > 1 else zorders[0],
+                    label = labels[i] if len(labels) > 1 else labels[0],
+                    marker = markers[i] if len(markers) > 1 else markers[0],
+                    hatch = hatches[i] if len(hatches) > 1 else hatches[0]
                 )
 
             # Annotate data
@@ -281,22 +360,24 @@ class Plot(object):
 
 
         # Aspect ratio equal
-        plt.gca().set_aspect('equal')
+        if self.settings['equal_aspect']:
+            plt.gca().set_aspect('equal')
     
         # Legend
-        try:
-            # Ensure no duplicate entries in legend exist
-            handles, labels = plt.gca().get_legend_handles_labels()
-            by_label = dict(zip(labels, handles))
-            leg = plt.legend(
-                by_label.values(), 
-                by_label.keys(),
-                frameon = False,
-                prop = {'size': self.settings.get('legend_label_size',None)}
-            )
-            leg._ncol = 1
-        except:
-            pass
+        # try:
+        # Ensure no duplicate entries in legend exist
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        print(by_label)
+        leg = plt.legend(
+            by_label.values(), 
+            by_label.keys(),
+            frameon = False,
+            prop = {'size': self.settings.get('legend_label_size',None)}
+        )
+        leg._ncol = 1
+        # except:
+            # pass
 
         
         # Tight layout
@@ -321,7 +402,7 @@ class Plot(object):
             plot_settings,
             filepath=filepath,
             key_type={'x':'float','y':'float'},
-            aux_keys=['label','marker','hatch','size','visibility','outputs'],
+            aux_keys=list(PLOT_CORE_FEATURES.keys())+['outputs'],
             **self.settings
         )
         self.logger.info(f"Figure exported to {dirpath}")
@@ -330,73 +411,137 @@ class Plot(object):
     '''
     Extracting plotting data
     '''
-
-    def extract_plot_settings(self,vars:list,meta:dict):
-        # print_json(meta)
-        # print('\n')
-        var_values = {}
-        for var in vars:
-            if var in PLOT_COORDINATES:
-                # Extract variable values
-                subvar_names = self.settings[var]
-                subvar_values = []
-                for subvar in subvar_names:
-                    # Get value from metadata element
-                    if subvar in meta:
-                        try:
-                            value = meta[subvar].item()
-                        except:
-                            value = meta[subvar]
-                    # Data not found
-                    else:
-                        value = None
-                        self.logger.debug(f"Could not find data for {subvar} var.")
-                    # Convert x or y coordinate to list
-                    if isinstance(value,Iterable) and not isinstance(value,str):
-                        value = list(value)
-                    # add to sub-variable values
-                    subvar_values.append(str(value))
-                # Combine all sub-variable values
-                value = "(" + ", ".join(subvar_values) + ")"
-                # value = tuple(subvar_values)
-            elif var == 'label':
-                label_str = []
-                # Get label key and value
-                for label_key in self.settings['label']:
-                    label_str.append(
-                        str(label_key) + ' = ' + \
-                        str(meta[label_key]).replace('%','percent').replace(' ','_').replace(':','_').replace(',','_')
-                    )
-                value = ', '.join(label_str)
-            elif var in PLOT_CORE_FEATURES:
-                # Get label key and value
-                var_key = self.settings[var]
+    def extract_plot_variable(self,var:str,meta:dict,settings:dict):
+        value = None
+        if var in PLOT_COORDINATES:
+            # Extract variable values
+            subvar_names = settings[var]
+            subvar_values = []
+            for subvar in subvar_names:
                 # Get value from metadata element
-                if var_key in meta:
-                    # Extract value
-                    try:
-                        value = meta[var_key].item()
-                    except:
-                        value = meta[var_key]
-                    if var == 'marker':
-                        value = PLOT_MARKERS[var_key][str(parse(value))]
-                    elif var == 'hatch':
-                        value = PLOT_HATCHES[var_key][str(parse(value))]
+                if subvar in meta:
+                    value = get_value(meta,subvar)
                 # Data not found
                 else:
-                    value = None
-                    self.logger.debug(f"Could not find {var} data for {var_key} var.")
+                    self.logger.debug(f"Could not find data for {subvar} var.")
+                    return None
                 # Convert x or y coordinate to list
                 if isinstance(value,Iterable) and not isinstance(value,str):
                     value = list(value)
+                # add to sub-variable values
+                if len(subvar_names) > 1:
+                    # If more than one variables are provided for this coordinate
+                    # convert all values to string
+                    subvar_values.append(str(value))
+                else:
+                    subvar_values.append(value)
+            
+            # Combine all sub-variable values
+            if len(subvar_names) > 1:
+                # If more than one variables are provided for this coordinate
+                # convert value to string tuple
+                value = "(" + ", ".join(subvar_values) + ")"
+        elif var in PLOT_AUX_FEATURES:
+            # Extract variable values
+            groups = settings[var]
+            value = []
+            for gelem in groups:
+                gvalue = self.extract_plot_variable(
+                    var = 'x',
+                    meta = meta,
+                    settings = {'x':gelem}
+                )
+                if gvalue is None:
+                    return gvalue
+                # Add group values to value
+                value.append(gvalue)
+        elif var == 'label':
+            label_str = []
+            # Get label key and value
+            for label_key in settings['label']:
+                label_str.append(
+                    str(label_key) + ' = ' + \
+                    str(meta[label_key]).replace('%','percent').replace(' ','_').replace(':','_').replace(',','_')
+                )
+            value = ', '.join(label_str)
+        
+        elif var == 'zorder':
+            # Get label key and value
+            order_tuple = []
+            for order_var in settings['zorder']:
+                # get ordering (ascending/descending)
+                order = order_var[0]
+                # get ordering variable
+                var_key = order_var[1]
+                # get order variable value
+                var_val = get_value(meta,var_key,default = 1)
+                # convert to right dtype
+                var_val = PLOT_CORE_FEATURES[var]['dtype'](var_val)
+                # add to ordered tuple depending on order
+                if order == 'asc':
+                    order_tuple.append(-var_val)
+                else:
+                    order_tuple.append(var_val)
+            # Get values
+            value = order_tuple
+
+        elif var in PLOT_CORE_FEATURES:
+            # Get label key and value
+            var_key = settings[var]
+            # Get value from metadata element
+            if var_key in meta:
+                # Extract value
+                value = get_value(meta,var_key)
                 
-            else: 
-                try:
-                    value = meta[subvar].item()
-                except:
-                    value = meta[subvar]
+                # Determine plot features based on global plot settings
+                if var == 'marker':
+                    value = PLOT_MARKERS[var_key][str(parse(value))]
+                elif var == 'hatch':
+                    value = PLOT_HATCHES[var_key][str(parse(value))]
+                elif var == 'colour':
+                    # Try to extract colour from global settings
+                    colour_value = PLOT_COLOURS.get(var_key,{}).get(value,None)
+                    value = colour_value if colour_value is not None else value
+
+            # This is the case where the value is passed to the variable
+            # directly and not though a metric/metadata key
+            elif var_key is not None:
+                # Convert string input to relevant dtype
+                value = PLOT_CORE_FEATURES[var]["dtype"](var_key)
+            # Data not found
+            else:
+                self.logger.debug(f"Could not find {var} data for {var_key} var.")
+                return None
+            # Convert x or y coordinate to list
+            if isinstance(value,Iterable) and not isinstance(value,str):
+                value = list(value)
+        
+        else:
+            value = get_value(settings,var)
+            if value is None:
+                self.logger.debug(f"Could not find {var} data for var in settings.")
+                return None
+        return value
+    
+    def extract_plot_settings(self,vars:list,meta:dict):
+        var_values = {}
+        # print_json(meta)
+        # print('\n')
+        for variable in vars:
+            # Extract variable value
+            value = self.extract_plot_variable(
+                var = variable,
+                meta = meta,
+                settings = self.settings
+            )
+            # If no value found move on
+            if value is None:
+                continue
             # Set variable value
-            var_values[var] = value
+            var_values[variable] = value
+
+        # print(var_values.get('xticks','not_found'))
+
         return var_values
 
     def merge_plot_settings(self,plot_settings:list):
@@ -412,27 +557,36 @@ class Plot(object):
                     else:
                         merged_settings[key].append(value)
 
-                if key in PLOT_COORDINATES+['label','colour','size']:
+                if key in ALL_PLOT_VARIABLES:
                     merged_settings.setdefault(key, []).append(value)
-                
-                elif key in ['marker','hatch']:
-                    if key not in merged_settings:
-                        merged_settings[key] = value
-                    else:
-                        print(merged_settings[key],type(merged_settings[key]))
-                        print(value,type(value))
-                        merged_settings[key] = deep_merge(
-                            merged_settings[key],
-                            value
-                        )
                 else:
                     # Keep only the first value of this key for each
                     # plot setting
                     if key not in merged_settings:
                         merged_settings[key] = value
-        for k,v in merged_settings.items():
-            if isinstance(v,Iterable) and not isinstance(v,str):
-                merged_settings[k] = list(flatten(v))
+        
+        # Create ordering of data points based on provided data
+        if 'zorder' in merged_settings:
+            # get value to order by
+            values = np.array(merged_settings['zorder'])
+            # Number of elements to sort
+            ndims = values.shape[1]
+            # Use lexsort to argsort along each axis successively
+            sorted_indices = np.lexsort([values[:,i].ravel() for i in range(ndims)])
+            # Update merged settings
+            # add 1.0 to avoid zorder = 0
+            merged_settings['zorder'] = list(map(float,sorted_indices+1.0))
+
+        # flatten list of lists
+        for key,value in merged_settings.items():
+            # No need to flatten any of these variables
+            if key in PLOT_AUX_FEATURES:
+                continue
+            elif isinstance(value,Iterable) and not isinstance(value,str):
+                merged_settings[key] = list(flatten(value))
+
+        # print(merged_settings.get('xticks','not_found'))
+
         return [merged_settings]
 
     def create_plot_filename(self,plot_setting,**kwargs):
@@ -511,6 +665,7 @@ class Plot(object):
             # Find data in json format
             # no other format is acceptable
             files = list(glob(f"{self.settings['plot_data_dir']}/*[!settings].json",recursive=False))
+            print(files[0])
 
             # If nothing was found return false
             if len(files) <= 0:
@@ -614,11 +769,11 @@ class Plot(object):
                     for meta in metadata:
                         plot_sett.update(
                             self.extract_plot_settings(
-                                vars = PLOT_COORDINATES+PLOT_CORE_FEATURES,
-                                meta = meta,
+                                vars = ALL_PLOT_VARIABLES,
+                                meta = meta
                             )
                         )
-                        # print_json({k:plot_sett[k] for k in ['x','y','label','colour','size','marker','hatch','visibility']})
+                        # print_json({k:plot_sett[k] for k in ALL_PLOT_VARIABLES if k in plot_sett})
 
                         # Add data
                         plot_settings.append(deepcopy(plot_sett))
