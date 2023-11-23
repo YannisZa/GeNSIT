@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 
 from typing import Any
 from copy import deepcopy
@@ -516,7 +517,13 @@ class CustomList(NonPrimitiveEntry):
         super().__init__(data,schema,key_path)
         self.dtype = Sequence
         # Parse data
-        self.data, self.parsing_success = self.parse(self.data,self.schema)
+        try:
+            self.data, self.parsing_success = self.parse(self.data,self.schema)
+        except:
+            print(self.data)
+            print(self.schema)
+            print(traceback.format_exc())
+            sys.exit()
         # First check that input is indeed a list
         key_path_copy = deepcopy(self.key_path)
         self.key_path = []
@@ -555,7 +562,7 @@ class CustomList(NonPrimitiveEntry):
             results = []
             successes = []
             for datum in data:
-                res = array(self._parse(datum,schema))
+                res = self._parse(datum,schema)
                 results.append(res[0])
                 successes.append(res[1])
             results = list(flatten(results))
