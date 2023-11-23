@@ -64,6 +64,9 @@ class Inputs:
         else:
             self.read_data()
 
+    def data_vars(self):
+        return {k:v for k,v in vars(self).items() if k in INPUT_TYPES}
+    
     def validate_dims(self):
         for attr,schema in self.schema.items():
             if len(schema) > 0:
