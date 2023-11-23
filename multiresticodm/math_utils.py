@@ -7,7 +7,6 @@ import xarray as xr
 from numpy import shape 
 from scipy import optimize
 from torch import int32, float32
-from numba_progress import ProgressBar
 from itertools import chain, combinations
 from multiresticodm.global_variables import DATA_TYPES
 
@@ -48,13 +47,12 @@ def apply_norm(tab:xr.DataArray,tab0:xr.DataArray,name:str,**kwargs:dict):
         norm_function = globals()[name]
     except:
         raise Exception(f'Norm function name {name} not recognized')
-    with ProgressBar(total=int(shape(tab)[0]),leave=False) as progress:
-        norm = norm_function(
-            tab=tab,
-            tab0=tab0,
-            normalisation_constant=kwargs.get('normalisation_constant',None),
-            progress_proxy=progress
-        )
+    norm = norm_function(
+        tab=tab,
+        tab0=tab0,
+        normalisation_constant=kwargs.get('normalisation_constant',None),
+        progress_proxy=None
+    )
     return norm
 
 def l_0(tab:xr.DataArray,tab0:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
@@ -256,13 +254,12 @@ def shannon_entropy(tab:xr.DataArray,tab0:xr.DataArray,**kwargs:dict):
     _tab = np.copy(tab)
     _tab0 = np.copy(tab0)
     # Apply distribution
-    with ProgressBar(total=int(shape(_tab)[0]),leave=False) as progress:
-        res = _shannon_entropy(
-            _tab,
-            _tab0,
-            log_distribution,
-            progress
-        )
+    res = _shannon_entropy(
+        _tab,
+        _tab0,
+        log_distribution,
+        None
+    )
     return res
 
 
