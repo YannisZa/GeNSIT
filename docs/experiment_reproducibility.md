@@ -56,21 +56,14 @@ Set `ulimit -n 50000`
 ```
 clear; multiresticodm plot -y srmse -x iter -x seed \
 -et NonJointTableSIM_NN -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
--s table -ft 'srmse_vs_epoch,seed_smrse_and_coverage_prob_tradeoff' \
+-s table -s intensity -ft 'srmse_vs_epoch,seed_smrse_and_coverage_prob_tradeoff' \
 -stat 'srmse' 'signedmean&' 'iter_seed&' \
 -stat 'coverage_probability' '&mean|*1000|floor' '&origin_destination||' \
--mrkr sample_name -hch sigma -c srmse -sz coverage_probability -k seed -k iter -k type \
--p dss -b 0 -t 1 -lls 8 -xlim -1 7 --x_discrete -xlab '(# Epochs, Ensemble size)' -ylab 'SRMSE'
-
-```
-
-```
-clear; multiresticodm plot seed iter -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
--et NonJointTableSIM_NN -s table -s intensity -ft 'seed_vs_epoch_smrse_and_coverage_prob_tradeoff' \
--stat 'srmse' 'signedmean&' 'iter_seed&' \
--stat 'coverage_probability' '&mean' '&origin_destination' \
--l type -l sample_name -l sigma -k seed -k iter -k type \
--p dss -b 0 -t 1 -nw 20 --force_reload
+-mrkr sample_name -hch sigma -c type -sz coverage_probability -v 0.5 -or asc coverage_probability \
+-k seed -k iter -k type -p dss -b 0 -t 1 \
+-ylim 0.0 2.0 --x_discrete -xlab '(\# Epochs, Ensemble size)' -ylab 'SRMSE' \
+-xt iter_seed -xt sigma -xfq 0 1 -xfq 1 3 \
+-fs 4 4 -lls 8 -afs 8 -tfs 5 -nw 6
 ```
 
 <!-- -fs 5 5 -ms 20 -ff pdf -tfs 14 -afs 14 -lls 18 -als 18 -->
