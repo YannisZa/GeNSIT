@@ -889,9 +889,9 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # Compute -log(\pi(y|x))
         negative_log_data_likelihood, \
         negative_gradient_log_data_likelihood = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
-                log_destination_attraction_data,
-                log_destination_attraction_prev,
-                1./self.physics_model.noise_var
+            log_destination_attraction_ts = log_destination_attraction_data,
+            log_destination_attraction_pred = log_destination_attraction_prev,
+            noise_percentage = 1./self.physics_model.params.noise_percentage
         )
         # Compute log initial potential energy and its derivarive weighted by the likelihood function \pi(y|x)
         # \log(\exp(-\gamma)V_{\theta}(xx)) + \log(\pi(y|x)) + \log(p(T|x,\theta))
@@ -938,10 +938,11 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
             # Update log potential energy and its gradient
             # Compute updated log(\pi(y|x))
-            negative_log_data_likelihood_new, negative_gradient_log_data_likelihood_new = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
-                    log_destination_attraction_data,
-                    log_destination_attraction_new,
-                    1./self.physics_model.noise_var
+            negative_log_data_likelihood_new, \
+            negative_gradient_log_data_likelihood_new = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
+                log_destination_attraction_ts = log_destination_attraction_data,
+                log_destination_attraction_pred = log_destination_attraction_prev,
+                noise_percentage = 1./self.physics_model.params.noise_percentage
             )
             # Compute updated log potential function
             V_new, gradV_new = self.physics_model.sde_potential_and_gradient(
@@ -1030,9 +1031,9 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # Compute -log(\pi(y|x))
         negative_log_data_likelihood, \
         negative_gradient_log_data_likelihood = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
-                log_destination_attraction_data,
-                log_destination_attraction_prev,
-                1./self.physics_model.noise_var
+            log_destination_attraction_ts = log_destination_attraction_data,
+            log_destination_attraction_pred = log_destination_attraction_prev,
+            noise_percentage = 1./self.physics_model.params.noise_percentage
         )
         # # Compute gradient of lambda
         # intensity_gradient = self.physics_model.intensity_model.intensity_gradient(
@@ -1109,9 +1110,9 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             # Compute updated -log(\pi(y|x))
             negative_log_data_likelihood_new, \
             negative_gradient_log_data_likelihood_new = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
-                log_destination_attraction_data,
-                log_destination_attraction_new,
-                1./self.physics_model.noise_var
+                log_destination_attraction_ts = log_destination_attraction_data,
+                log_destination_attraction_pred = log_destination_attraction_prev,
+                noise_percentage = 1./self.physics_model.params.noise_percentage
             )
             # Compute updated log potential function
             V_new, gradV_new = self.physics_model.sde_potential_and_gradient(
