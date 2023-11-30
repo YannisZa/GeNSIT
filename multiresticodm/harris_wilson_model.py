@@ -96,27 +96,6 @@ class HarrisWilson:
         # Time discretisation step size
         self.dt = torch.tensor(dt).float().to(device)
 
-        # Error noise on log destination attraction
-        self.noise_percentage = torch.tensor(
-            self.true_parameters.get('noise_percentage',PARAMETER_DEFAULTS['noise_percentage'])
-            ).to(
-                dtype=float32,
-                device=self.device
-            )
-        self.noise_var = torch.pow(
-            (
-                self.noise_percentage / \
-                torch.tensor(100).float()
-            ) * \
-            torch.log(torch.tensor(self.intensity_model.dims['destination']).float()),
-            2
-        ).to(
-            dtype=float32,
-            device=self.device
-        )
-        if hasattr(self,'config'):
-            self.config.settings['harris_wilson_model']['parameters']['noise_var'] = to_json_format(self.noise_var)
-
         # Update noise regime
         self.noise_regime = self.config['harris_wilson_model']['parameters'].get('sigma',None)
         if 'sigma' in list(self.params_to_learn.keys()) or self.noise_regime is None:
@@ -129,6 +108,18 @@ class HarrisWilson:
             self.noise_regime = 'low'
         self.config.settings['noise_regime'] = self.noise_regime
 
+    def obs_noise_percentage_to_var(self,noise_percentage:float):
+        return torch.pow(
+            (
+                torch.tensor(noise_percentage,dtype=float32,device=self.device) / \
+                torch.tensor(100).float()
+            ) * \
+            torch.log(torch.tensor(self.intensity_model.dims['destination']).float()),
+            2
+        ).to(
+            dtype=float32,
+            device=self.device
+        )
 
     def sde_potential(self,log_destination_attraction,**kwargs):
 
@@ -193,29 +184,74 @@ class HarrisWilson:
         )
         return self.intensity_model.sde_pot_hessian(**updated_kwargs)[0][0]
     
-    def negative_destination_attraction_log_likelihood_and_gradient(self,xx_data,xx,s2_inv:float=100.):
+    def negative_destination_attraction_log_likelihood_and_gradient(self,**kwargs):
         """ Log of potential function of the likelihood =  log(pi(y|x)).
-
-        Parameters
-        ----------
-        xx : torch.tensor
-            Log destination sizes
-        s2_inv : float
-            Inverse sigma^2 where sigma is the noise of the observation model.
-
-        Returns
-        -------
-        float,torch.tensor
-            log Likelihood value and log of its gradient with respect to xx
-
         """
+        # Update input kwargs if required
+        self.intensity_model.check_sample_availability(
+            ['log_destination_attraction_ts','log_destination_attraction_pred','noise_percentage'],
+            kwargs
+        )
+
+        log_destination_attraction_ts = kwargs['log_destination_attraction_ts']
+        log_destination_attraction_pred = kwargs['log_destination_attraction_pred']
+        noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage'])
+
         # Compute difference
-        diff = (xx - xx_data).flatten()
-        # Compute gradient of log likelihood
-        negative_log_likelihood_gradient = -s2_inv*diff
+        diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
+        # Compute log likelihood (without constant factor) and its gradient
+        return 0.5*(1./noise_var)*(diff.dot(diff)), (1./noise_var)*diff
+    
+    
+    def negative_destination_attraction_log_likelihood(self,**kwargs):
+        """ Log of potential function of the likelihood =  log(pi(y|x)).
+        """
+        # Update input kwargs if required
+        self.intensity_model.check_sample_availability(
+            ['log_destination_attraction_ts','log_destination_attraction_pred','noise_percentage'],
+            kwargs
+        )
+
+        log_destination_attraction_ts = kwargs['log_destination_attraction_ts']
+        log_destination_attraction_pred = kwargs['log_destination_attraction_pred']
+        noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage'])
+
+        # Compute difference
+        diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
         # Compute log likelihood (without constant factor)
-        negative_log_likelihood = -0.5*s2_inv*(diff.dot(diff))
-        return -negative_log_likelihood, -negative_log_likelihood_gradient
+        return 0.5*(1./noise_var)*(diff.dot(diff))
+
+
+    def negative_destination_attraction_log_likelihood_gradient(self,**kwargs):
+        """ Log of potential function of the likelihood =  log(pi(y|x)).
+        """
+        # Update input kwargs if required
+        self.intensity_model.check_sample_availability(
+            ['log_destination_attraction_ts','log_destination_attraction_pred','noise_percentage'],
+            kwargs
+        )
+
+        log_destination_attraction_ts = kwargs['log_destination_attraction_ts']
+        log_destination_attraction_pred = kwargs['log_destination_attraction_pred']
+        noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage'])
+
+        # Compute difference
+        diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
+        # Compute gradient of log likelihood
+        return (1./noise_var)*diff
+    
+    def dest_attraction_likelihood_loss(
+            self,
+            *args,
+            **kwargs
+        ):
+            return self.negative_destination_attraction_log_likelihood(
+                **dict(
+                    log_destination_attraction_pred = torch.log(args[0]),
+                    log_destination_attraction_ts = torch.log(args[1])
+                ),
+                **kwargs
+            )
     
     def sde_ais_potential_and_jacobian(self,**kwargs):
         
@@ -299,7 +335,21 @@ class HarrisWilson:
             log_destination_attraction = torch.log(new_sizes),
             grand_total = torch.tensor(1.)
         )
+        # print('new_sizes',new_sizes)
+        # print('demand',demand)
+        # print('delta',delta)
+        # print('kappa',kappa)
+        # print('epsilon',epsilon)
+        # print('epsilon * (demand - kappa * curr_destination_attractions + delta)',epsilon * (demand - kappa * curr_destination_attractions + delta))
+        # print('noise',sigma
+        #         * 1
+        #         / torch.sqrt(torch.tensor(2, dtype=torch.float) * torch.pi * dt).to(
+        #             self.device
+        #         ))
         # Update the current values
+        # temp = torch.normal(0, 1, size=(1, self.intensity_model.dims['destination'])).to(self.device)
+        # print('temp',temp)
+        # print('dt',dt)
         new_sizes = (
             new_sizes + \
             +torch.mul(
@@ -383,12 +433,12 @@ class HarrisWilson:
 
 
     def __repr__(self):
-        return f"HarrisWilson( {self.intensity_model.sim_type}(SpatialInteraction2D) )"
+        return f"HarrisWilson({self.intensity_model.__repr__()})"
 
     def __str__(self):
 
         return f"""
-            {'x'.join([str(d.cpu().detach().numpy()) for d in self.intensity_model.dims])} Harris Wilson model using {self.intensity_model.sim_type} Constrained Spatial Interaction Model
+            {'x'.join([str(d) for d in self.intensity_model.dims.values()])} Harris Wilson model using {self.intensity_model}
             Learned parameters: {', '.join(self.params_to_learn.keys())}
             Epsilon: {self.main_params.epsilon}
             Kappa: {self.main_params.kappa}
