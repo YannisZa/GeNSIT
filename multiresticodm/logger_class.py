@@ -10,16 +10,20 @@ import coloredlogs
 # Define the additional log levels
 TRACE = 5
 REMARK = 12
-NOTE = 18
+NOTE = 17
+ITERATION = 18
 PROGRESS = 19
 CAUTION = 23
 HILIGHT = 25
 SUCCESS = 35
 EMPTY = 60
 
+LOG_LEVELS = ['trace','remark','note','iteration','progress','caution','hilight','success','empty']
+
 logging.addLevelName(TRACE, "TRACE")
 logging.addLevelName(REMARK, "REMARK")
 logging.addLevelName(NOTE, "NOTE")
+logging.addLevelName(ITERATION, "ITERATION")
 logging.addLevelName(PROGRESS, "PROGRESS")
 logging.addLevelName(CAUTION, "CAUTION")
 logging.addLevelName(HILIGHT, "HILIGHT")
@@ -27,7 +31,6 @@ logging.addLevelName(SUCCESS, "SUCCESS")
 logging.addLevelName(EMPTY, "EMPTY")
 
 
-LOG_LEVELS = ['trace','remark','note','progress','caution','hilight','success','empty']
 
 def random_string(N:int=10):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=N))
@@ -77,6 +80,10 @@ class CustomLogger(logging.Logger):
     def note(self, msg, *args, **kwargs):
         if self.isEnabledFor(NOTE):
             self._log(NOTE, msg, args, **kwargs)
+
+    def iteration(self, msg, *args, **kwargs):
+        if self.isEnabledFor(ITERATION):
+            self._log(ITERATION, msg, args, **kwargs)
 
     def progress(self, msg, *args, **kwargs):
         if self.isEnabledFor(PROGRESS):
@@ -135,7 +142,6 @@ class DualLogger():
         
         for handler in self.file.handlers:
             handler.setLevel(logging.DEBUG)
-        
         
 
     def getLevels(self,numeric:bool=False):
@@ -230,6 +236,14 @@ class DualLogger():
             self.console.note(msg, extra = dict(modulename=module))
         if self.file.isEnabledFor(NOTE):
             self.file.note(msg, extra = dict(modulename=module))
+    
+    def iteration(self, msg):
+        frame = inspect.stack()[1]
+        module = frame.filename.split('.py')[0].split('/')[-1]
+        if self.console.isEnabledFor(ITERATION):
+            self.console.iteration(msg, extra = dict(modulename=module))
+        if self.file.isEnabledFor(ITERATION):
+            self.file.iteration(msg, extra = dict(modulename=module))
     
     def progress(self, msg):
         frame = inspect.stack()[1]
