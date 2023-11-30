@@ -12,7 +12,7 @@ from torch import nn, float32
 from typing import Any, List, Union
 
 from multiresticodm.config import Config
-from multiresticodm.utils import setup_logger
+from multiresticodm.utils import setup_logger, print_json
 import multiresticodm.probability_utils as ProbabilityUtils
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS
@@ -211,7 +211,6 @@ class HarrisWilson_NN:
     def __init__(
         self,
         *,
-        rng: np.random.Generator,
         neural_net: NeuralNet,
         loss: dict,
         physics_model: HarrisWilson,
@@ -239,8 +238,6 @@ class HarrisWilson_NN:
         self.logger.setLevels(
             console_level = level
         )
-        # Store random number generator
-        self._rng = rng
 
         # The numeric    solver
         self.physics_model = physics_model
@@ -254,13 +251,44 @@ class HarrisWilson_NN:
 
         # Store loss function parameters
         self.loss_functions = {}
+        self.loss_kwargs = {}
         # Parse loss functions
-        for name,function in zip(loss['loss_name'],loss['loss_function']):
-            # Get loss function
+        for name,function,kwarg_keys in zip(loss['loss_name'],loss['loss_function'],loss['loss_kwarg_keys']):
+            # Construct kwargs from key names
+            fn_kwargs = {}
+            for key in kwarg_keys:
+                # Find path to key
+                key_path = list(self.config.path_find(key))
+                key_path = key_path[0] if len(key_path) > 0 else []
+                # Get value of key
+                key_val,key_found = self.config.path_get(
+                    key_path = key_path
+                )
+                # Try to find kwargs in config
+                if not key_found:
+                    loss = loss.get(key,'not-found')
+                    key_found = loss != 'not-found'
+                
+                try:
+                    assert key_found
+                except:
+                    raise Exception(f"""
+                        Could not find {name} keyword argument {key} 
+                        for {function} in settings or as a loss argument ({list(loss.keys())}).
+                    """)
+                # Add value to function arguments
+                fn_kwargs[key] = key_val
+            # Get loss function from global variables (standard torch loss functions)
             loss_func = LOSS_FUNCTIONS.get(function.lower(),None)
-            loss_func = loss.get(name,loss_func) if loss_func is None else loss_func()
+            # if failed get loss function from loss dictionary provided
+            loss_func = loss.get(function,loss_func) if loss_func is None else loss_func(**fn_kwargs)
+            # if failed get loss function from physics model defined functions
+            loss_func = getattr(self.physics_model,function,loss_func) if loss_func is None else loss_func
+            
+            # Add kwargs
             if loss_func is not None:
                 self.loss_functions[name] = loss_func
+                self.loss_kwargs[name] = fn_kwargs
             else:
                 raise Exception(f"Loss {name} is missing loss function {function}.")
 
@@ -283,7 +311,6 @@ class HarrisWilson_NN:
         # Get subset of loss function names
         loss_function_names = loss_function_names if loss_function_names is not None else list(self.loss_functions.keys())
         loss_function_names = list(set(loss_function_names).intersection(set(list(self.loss_functions.keys()))))
-
         for name in loss_function_names:
             # Make sure you have the necessary data
             for pred_dataset in LOSS_DATA_REQUIREMENTS[name]['prediction_data']:
@@ -311,7 +338,8 @@ class HarrisWilson_NN:
                 # Add to total loss
                 res = self.loss_functions[name](
                     normalised_total_cost_predicted,
-                    validation_data['total_cost_by_origin']
+                    validation_data['total_cost_by_origin'],
+                    **self.loss_kwargs.get(name,{})
                 )
             else:
                 # Add to total loss
@@ -319,18 +347,20 @@ class HarrisWilson_NN:
                 validation_dataset = LOSS_DATA_REQUIREMENTS[name]['validation_data'][0]
                 res = self.loss_functions[name](
                     prediction_data[pred_dataset].to(dtype=float32),
-                    validation_data[validation_dataset].to(dtype=float32)
+                    validation_data[validation_dataset].to(dtype=float32),
+                    **self.loss_kwargs.get(name,{})
                 )
-            # Add to existing loss or initialise new loss
-            if name in previous_loss:
-                previous_loss[name] = previous_loss[name] + res
-            else:
-                previous_loss[name] = torch.tensor(res,requires_grad=True)
+            # print(name)
+            # print('before',previous_loss[name])
+            # print(res,res.requires_grad)
+            previous_loss[name] = previous_loss[name] + res
+            # print('after',previous_loss[name])
+            
             # Keep track number of loss samples per loss function
-            if name in n_processed_steps:
-                n_processed_steps[name] += 1
-            else:
-                n_processed_steps[name] = 1
+            n_processed_steps[name] += 1
+
+            # print(n_processed_steps)
+            # print('\n')
 
         return previous_loss,n_processed_steps
 
