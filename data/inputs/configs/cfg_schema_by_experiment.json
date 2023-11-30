@@ -5,7 +5,8 @@
     "inputs>to_learn>sweep>is-any-of>range>default-value": [["alpha", "beta"]],
     "inputs>to_learn>sweep>is-any-of>range>is-any-of": ["alpha", "beta"],
     "harris_wilson_model>parameters>sigma>sweep>default>allow-nan": false,
-    "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false
+    "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false,
+    "neural_network>exclude": true
   },
   "JointTableSIM_MCMC": {
     "inputs>to_learn>sweep>is-any-of>default>default-value": ["alpha", "beta"],
@@ -13,37 +14,29 @@
     "inputs>to_learn>sweep>is-any-of>range>default-value": [["alpha", "beta"]],
     "inputs>to_learn>sweep>is-any-of>range>is-any-of": ["alpha", "beta"],
     "harris_wilson_model>parameters>sigma>sweep>default>allow-nan": false,
-    "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false
+    "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false,
+    "neural_network>exclude": true
   },
   "NonJointTableSIM_NN": {
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
-      "dest_attraction_ts"
+      "dest_attraction_ts_loss"
     ],
-    "neural_network>loss>loss_name>sweep>default>default-value": [
-      "dest_attraction_ts"
-    ],
+    "neural_network>loss>loss_name>sweep>default>default-value": "dest_attraction_ts_loss",
     "neural_network>loss>loss_name>sweep>range>is-any-of": [
-      "dest_attraction_ts"
+      "dest_attraction_ts_loss"
     ],
-    "neural_network>loss>loss_name>sweep>range>default-value": [
-      "dest_attraction_ts"
-    ]
+    "neural_network>loss>loss_name>sweep>range>default-value": "dest_attraction_ts_loss"
   },
   "SIM_NN": {
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
-      "dest_attraction_ts"
+      "dest_attraction_ts_loss"
     ],
-    "neural_network>loss>loss_name>sweep>default>default-value": [
-      "dest_attraction_ts"
-    ],
+    "neural_network>loss>loss_name>sweep>default>default-value": "dest_attraction_ts_loss",
     "neural_network>loss>loss_name>sweep>range>is-any-of": [
-      "dest_attraction_ts"
+      "dest_attraction_ts_loss"
     ],
-    "neural_network>loss>loss_name>sweep>range>default-value": [
-      "dest_attraction_ts"
-    ],
-    "contingency_table>axes>exclude": true,
-    "contingency_table>constraints>cells>exclude": true,
-    "outputs>title>exclude": true
+    "neural_network>loss>loss_name>sweep>range>default-value": "dest_attraction_ts_loss",
+    "contingency_table>exclude": true,
+    "mcmc>exclude": true
   }
 }

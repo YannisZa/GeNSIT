@@ -95,14 +95,28 @@
           "dtype": "list",
           "list-dtype": "str",
           "default-value": ["alpha", "beta", "sigma"],
-          "is-any-of": ["alpha", "beta", "kappa", "delta", "sigma"]
+          "is-any-of": [
+            "alpha",
+            "beta",
+            "kappa",
+            "delta",
+            "sigma",
+            "noise_percentage"
+          ]
         },
         "range": {
           "dtype": "list",
           "list-dtype": "list",
           "list-list-dtype": "str",
           "default-value": ["alpha", "beta", "sigma"],
-          "is-any-of": ["alpha", "beta", "kappa", "delta", "sigma"],
+          "is-any-of": [
+            "alpha",
+            "beta",
+            "kappa",
+            "delta",
+            "sigma",
+            "noise_percentage"
+          ],
           "unique-vals": true
         }
       }
@@ -1132,6 +1146,28 @@
             "unique-vals": true
           }
         }
+      },
+      "noise_percentage": {
+        "sweepable": true,
+        "optional": false,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 3.0,
+            "valid-range": [0.0, null],
+            "inclusive": true
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "float",
+            "default-value": 3.0,
+            "valid-range": [0.0, null],
+            "inclusive": true,
+            "unique-vals": true
+          }
+        }
       }
     }
   },
@@ -1536,11 +1572,11 @@
             "dtype": "list",
             "list-dtype": "str",
             "list-length": [1, null],
-            "default-value": "dest_attraction_ts",
+            "default-value": "dest_attraction_ts_loss",
             "is-any-of": [
-              "dest_attraction_ts",
-              "table_likelihood",
-              "total_distance"
+              "dest_attraction_ts_loss",
+              "table_loss",
+              "total_distance_loss"
             ],
             "unique-vals": true
           },
@@ -1548,13 +1584,12 @@
             "dtype": "list",
             "list-dtype": "list",
             "list-length": [1, null],
-            "list-list-dtype": "int",
-            "list-list-length": [1, null],
-            "default-value": "destination_attraction_ts_loss",
+            "list-list-dtype": "str",
+            "default-value": "dest_attraction_ts_loss",
             "is-any-of": [
-              "destination_attraction_ts_loss",
-              "table_likelihood_loss",
-              "total_distance_travelled_loss"
+              "dest_attraction_ts_loss",
+              "table_loss",
+              "total_distance_loss"
             ],
             "unique-vals": true
           }
@@ -1571,64 +1606,41 @@
             "list-dtype": "str",
             "list-length": [1, null],
             "default-value": "mseloss",
-            "is-any-of": [
-              "l1loss",
-              "mseloss",
-              "crossentropyloss",
-              "ctcloss",
-              "nllloss",
-              "poissonnllloss",
-              "gaussiannllloss",
-              "kldivloss",
-              "bceloss",
-              "bcewithlogitsloss",
-              "marginrankingloss",
-              "hingeembeddingloss",
-              "multilabelmarginloss",
-              "huberloss",
-              "smoothl1loss",
-              "softmarginloss",
-              "multilabelsoftmarginloss",
-              "cosineembeddingloss",
-              "multimarginloss",
-              "tripletmarginloss",
-              "tripletmarginwithdistanceloss",
-              "custom"
-            ],
             "unique-vals": false
           },
           "range": {
             "dtype": "list",
             "list-dtype": "list",
             "list-length": [1, null],
-            "list-list-dtype": "int",
-            "list-list-length": [1, null],
+            "list-list-dtype": "str",
             "default-value": "mseloss",
-            "is-any-of": [
-              "l1loss",
-              "mseloss",
-              "crossentropyloss",
-              "ctcloss",
-              "nllloss",
-              "poissonnllloss",
-              "gaussiannllloss",
-              "kldivloss",
-              "bceloss",
-              "bcewithlogitsloss",
-              "marginrankingloss",
-              "hingeembeddingloss",
-              "multilabelmarginloss",
-              "huberloss",
-              "smoothl1loss",
-              "softmarginloss",
-              "multilabelsoftmarginloss",
-              "cosineembeddingloss",
-              "multimarginloss",
-              "tripletmarginloss",
-              "tripletmarginwithdistanceloss",
-              "custom"
-            ],
             "unique-vals": true
+          }
+        }
+      },
+      "loss_kwarg_keys": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "list",
+            "list-dtype": "list",
+            "list-length": [0, null],
+            "list-list-dtype": "str",
+            "default-value": [],
+            "list-list-unique-vals": true
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "list",
+            "list-list-dtype": "list",
+            "list-list-list-dtype": "str",
+            "list-length": [0, null],
+            "list-list-length": [0, null],
+            "default-value": [],
+            "list-list-list-unique-vals": true
           }
         }
       }

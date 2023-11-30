@@ -230,6 +230,12 @@
           "default": true,
           "range": true
         }
+      },
+      "noise_percentage": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
       }
     }
   },
@@ -342,6 +348,12 @@
         }
       },
       "loss_function": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "loss_kwarg_keys": {
         "sweep": {
           "default": true,
           "range": true
