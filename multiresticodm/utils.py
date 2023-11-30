@@ -63,7 +63,14 @@ def write_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
 
 def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
     # Clear file cache
-    xr.backends.file_manager.FILE_CACHE.clear()
+    # xr.backends.file_manager.FILE_CACHE.clear()
+    
+    # If overwritting is instructed
+    if kwargs.get('mode','a') == 'w':
+        # Delete any existing file
+        if os.path.exists(filepath) and os.path.isfile(filepath):
+            os.remove(filepath)
+
     # Writing the DataArray to a NetCDF file inside a with context
     data.to_netcdf(
         path = filepath,
@@ -89,7 +96,11 @@ def write_figure(figure,filepath,**settings):
         # tikzplotlib.clean_figure(fig=figure)
         tikzplotlib.save(filepath,figure=figure)
     else:
-        figure.savefig(filepath,format=settings['figure_format'])
+        figure.savefig(
+            filepath,
+            format=settings['figure_format'],
+            bbox_inches='tight'
+        )
     
     plt.close(figure)
 
@@ -100,6 +111,14 @@ def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_ty
         # Keys must be included in figure data
         assert set(key_type.keys()).issubset(set(list(plot_sett.keys())))
 
+        print_json({k:np.shape(plot_sett.get(k)) for k in (list(key_type.keys())+aux_keys) if k != 'outputs'},newline=True)
+        # print('\n\n')
+        # print_json({k:(
+        #     plot_sett.get(k,np.array([])).tolist() 
+        #     if isinstance(plot_sett.get(k),np.ndarray)
+        #     else plot_sett.get(k,None)
+        # ) for k in (list(key_type.keys())+aux_keys) if k != 'outputs'})
+        
         if settings.get('data_format','dat') == 'dat':
             # Write dat file
             write_tex_data(
@@ -110,13 +129,11 @@ def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_ty
             )
         elif settings.get('data_format','dat') == 'json':
             write_json(
-                {k:(
-                    plot_sett.get(k,np.array([])).tolist() 
+                {k: plot_sett.get(k,np.array([])).tolist() 
                     if isinstance(plot_sett.get(k),np.ndarray)
                     else plot_sett.get(k,None)
                     if k != 'outputs'
                     else plot_sett.get(k,None).config.settings
-                )
                 for k in list(key_type.keys())+aux_keys},
                 filepath
             )
@@ -539,7 +556,7 @@ def safe_delete(variable,instance=None):
     try:
         del variable
     except:
-        None
+        pass
 
 
 def unpack_statistics(settings):
@@ -576,7 +593,7 @@ def unpack_statistics(settings):
                 substat_unpacked = [_s for _s in substat.split('|')] if '|' in substat else [substat]
                 subdim_unpacked = [_dim for _dim in subdim.split('|')] if '|' in subdim else [subdim]
                 # Unpack individual axes
-                subdim_unpacked = [[str(_subdim) for _subdim in _dim.split("_")] \
+                subdim_unpacked = [[str(_subdim) for _subdim in _dim.split("+")] \
                             if (_dim is not None and len(_dim) > 0) \
                             else None
                             for _dim in subdim_unpacked]
@@ -929,6 +946,24 @@ def get_value(d:dict,k:str,default:object = None):
     else:
         return value
 
+def hash_vars(d:dict,v:list):
+    if len(v) == 1:
+        return d.get(v[0],None) 
+    else:
+        key = '('
+        for k in v:
+            if isinstance(k,str):
+                for subk in k.strip('()').split(", "):
+                    key += (subk+', ')
+            else:
+                key += (str(k)+', ')
+        # Remove last comma and space
+        key = key[:-2]
+        # Close parenthesis
+        key += ')'
+
+        return d.get(key,None)
+
 def get_keys_in_path(d, target_key, path=[], paths_found = []):
     for key, value in d.items():
         current_path = path + [key]
@@ -982,7 +1017,9 @@ def setup_logger(
 
 def sigma_to_noise_regime(sigma=None):
     if sigma:
-        if (2/float(sigma)**2) >= 10000:
+        if sigma == 'none':
+            return 'learned'
+        elif (2/float(sigma)**2) >= 10000:
             return 'low'
         elif (2/float(sigma)**2) < 10000 and sigma > 0:
             return 'high'
@@ -990,7 +1027,6 @@ def sigma_to_noise_regime(sigma=None):
             return 'learned'
     else:
         return 'learned'
-
 
 def h5_tree(val, pre=''):
     items = len(val)
@@ -1122,3 +1158,8 @@ def sizeof_fmt(num, suffix='B'):
             return "%3.1f %s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f %s%s" % (num, 'Yi', suffix)
+
+# def dummy_callback(f):
+#     temp = f.result()
+#     print(f'callback {f}')
+    
