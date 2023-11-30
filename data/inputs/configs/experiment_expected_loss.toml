@@ -36,12 +36,12 @@ load_experiment = ''
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
     default = [[+0,+1]]
-    range = [[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
+    range = [[],[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'
   [contingency_table.constraints.cells.sweep]
     default = ''
-    range = ['','','',
+    range = ['','','','',
       'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
       'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
     ]
@@ -61,6 +61,7 @@ load_experiment = ''
   dt = +0.001
   [harris_wilson_model.parameters]
     epsilon = 1.0
+    delta = 0.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = nan
       # range = [0.0141421356, 0.1414213562, nan]
@@ -85,8 +86,8 @@ load_experiment = ''
 [neural_network]
   disable_tqdm = true
   [neural_network.loss.loss_name.sweep]
-    default = ['table_likelihood']
-    range = [['table_likelihood'],['dest_attraction_ts','table_likelihood']]
+    default = ['table_likelihood_loss']
+    range = [['table_likelihood_loss'],['dest_attraction_ts_loss','table_likelihood_loss']]
   [neural_network.loss.loss_function.sweep]
     default = ['custom']
     range = [
@@ -128,4 +129,4 @@ load_experiment = ''
     out_group = 'exp5_expected_loss'
     [outputs.title.sweep]
       default = '_uncostrained'
-      range = ['_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      range = ['_uncostrained','_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']

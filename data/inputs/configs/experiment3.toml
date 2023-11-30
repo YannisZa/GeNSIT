@@ -61,6 +61,7 @@ load_experiment = ''
   dt = +0.001
   [harris_wilson_model.parameters]
     epsilon = 1.0
+    delta = 0.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356
       range = [0.0141421356, 0.1414213562, nan]

@@ -6,11 +6,11 @@ n_workers = +1
 n_threads = [+6,+6]
 device = 'cpu'
 in_directory = './data/inputs/'
-dataset = 'cambridge_work_commuter_lsoas_to_msoas/exp1'
+dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
   default = 1
-  range = ["1:100:1"]
+  range = ["1:10:1"]
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta'] 
   range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
@@ -49,8 +49,12 @@ load_experiment = ''
     target_name = 'title'
 
 [spatial_interaction_model]
-  # name = 'ProductionConstrained','TotallyConstrained'
-  name = 'TotallyConstrained'
+  [spatial_interaction_model.name.sweep]
+    default = 'TotallyConstrained'
+    range = ['TotallyConstrained','ProductionConstrained']
+    coupled = true
+    target_name = 'title'
+    
   grand_total = +33704
   [spatial_interaction_model.parameters]
     bmax = +1.0
@@ -60,7 +64,9 @@ load_experiment = ''
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
+    noise_percentage = 3.0
     epsilon = 1.0
+    delta = 0.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356
       range = [0.0141421356, 0.1414213562, nan]
@@ -68,9 +74,8 @@ load_experiment = ''
 [training]
   num_steps = +1
   batch_size = +1
-  N = 10000
-#   [training.N.sweep]
-#     default = 10
+  [training.N.sweep]
+    default = 10000
 #     range = ["repeat(10,10000)","repeat(100,1000)","repeat(1000,100)","repeat(10000,10)","repeat(100000,1)",]
 #     coupled = true
 #     target_name = 'seed'
@@ -80,7 +85,7 @@ load_experiment = ''
     mcmc_workers = +1
     
     [mcmc.contingency_table]
-      table_steps = +100
+      table_steps = +1
       proposal = 'direct_sampling'
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
@@ -109,10 +114,10 @@ load_experiment = ''
 
 [neural_network]
   disable_tqdm = true
-  [neural_network.loss.loss_name.sweep]
-    default = ['dest_attraction_ts']
-  [neural_network.loss.loss_function.sweep]
-    default = ['mseloss']
+  [[neural_network.loss]]
+    loss_name = ['dest_attraction_ts_loss']
+    loss_function = ['mseloss']
+    loss_kwarg_keys = ['noise_percentage']
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
@@ -131,7 +136,7 @@ load_experiment = ''
 [[experiments]]
   type = 'SIM_NN'
   comment = 'Spatial Interaction Model parameter learning using Neural Networks'
-  disable_tqdm = true
+  disable_tqdm = false
   export_samples = true
   export_metadata = true
   overwrite = true
@@ -175,5 +180,6 @@ load_experiment = ''
     out_directory = './data/outputs/'
     out_group = 'exp1'
     [outputs.title.sweep]
-      default = '_uncostrained'
-      range = ['_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      default = '_total_constrained'
+      range = ['_total_constrained','_row_constrained']
+      # ,'_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
