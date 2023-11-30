@@ -13,19 +13,28 @@ def cmap_exists(name):
 PLOT_COORDINATES = ['x','y','z']
 PLOT_CORE_FEATURES = {
     'marker': {'dtype': str},
+    'label': {'dtype': str},
     'hatch': {'dtype': str},
     'visibility': {'dtype': float},
     'colour': {'dtype': str},
     'size': {'dtype': float},
     'zorder': {'dtype': float},
 }
-PLOT_AUX_FEATURES = {
-    'xticks':{},
-    'yticks':{},
-    'zticks':{}
-}
+PLOT_AUX_FEATURES = {}
 
-ALL_PLOT_VARIABLES = PLOT_COORDINATES+list(PLOT_CORE_FEATURES.keys())+list(PLOT_AUX_FEATURES.keys())
+DERIVATIVES = ['_id']
+
+PLOT_DERIVATIVES = []
+
+for var in PLOT_COORDINATES:
+    for derivative in DERIVATIVES:
+        PLOT_DERIVATIVES.append(var+derivative)
+
+PLOT_VARIABLES = PLOT_COORDINATES +\
+    list(PLOT_CORE_FEATURES.keys()) +\
+    list(PLOT_AUX_FEATURES.keys())
+    
+PLOT_VARIABLES_AND_DERIVATIVES = PLOT_VARIABLES + PLOT_DERIVATIVES
 
 # Type of plots
 PLOT_HASHMAP = {
@@ -52,6 +61,10 @@ PLOT_MARKERS = {
     "sample_name": {
         "table": "s",
         "intensity":"^" 
+    },
+    "loss": {
+        "table": "s",
+        "intensity":"^" 
     }
 }
 
@@ -75,12 +88,21 @@ PLOT_COLOURS = {
         "JointTableSIM_MCMC":COLOR_NAMES["darkblue"],
         "NonJointTableSIM_NN":COLOR_NAMES["green"],
         "JointTableSIM_NN":COLOR_NAMES["darkgreen"],
+    },
+    "title": {
+        "_unconstrained":COLOR_NAMES["yellow"],
+        "_total_constrained":COLOR_NAMES["lightbrown"],
+        "_row_constrained":COLOR_NAMES["orange"],
+        "_doubly_constrained":COLOR_NAMES["red"],
+        "_doubly_10%_cell_constrained":COLOR_NAMES["darkgreen"],
+        "_doubly_20%_cell_constrained":COLOR_NAMES["darkblue"],
     }
 }
 
 PLOT_HATCHES = {
     "sigma": {
         "learned": "***",
+        "variable": "***",
         "high": "+++",
         "low": "OOO"
     }
