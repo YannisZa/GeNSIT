@@ -1,7 +1,6 @@
 import sys
 import time
 import warnings
-import concurrent.futures as concurrency
 
 from tqdm import tqdm
 from copy import deepcopy
@@ -19,6 +18,7 @@ from multiresticodm.math_utils import apply_norm
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.spatial_interaction_model import instantiate_sim
+from multiresticodm.multiprocessor import BoundedQueueProcessPoolExecutor
 from multiresticodm.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
 from multiresticodm.harris_wilson_model_mcmc import instantiate_harris_wilson_mcmc
 from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
@@ -80,6 +80,12 @@ class ExperimentHandler(object):
             ]
             # Update id, seed and logging detail
             experiment_config.settings['experiment_type'] = experiment_type
+
+            # Reset config variables
+            experiment_config.reset()
+            # Validate experiment-specific config
+            experiment_config.experiment_validate_config()
+
             if self.config.settings['inputs'].get('dataset',None) is None:
                 raise Exception(f'No dataset found for experiment type {experiment_type}')
             # Instatiate new experiment
@@ -127,6 +133,9 @@ class Experiment(object):
 
         # Store config
         self.config = config
+
+        # Flag for appending experiment outputs
+        self.config.settings['load_data'] = False
         
         # Update config with current timestamp ( but do not overwrite)
         datetime_results = list(deep_get(key='datetime',value=self.config.settings))
@@ -330,7 +339,7 @@ class Experiment(object):
             
             # Setup neural net loss
             if 'loss' in self.output_names:
-                for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total']:
+                for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total_loss']:
                     # Setup chunked dataset to store the state data in
                     if loss_name in self.outputs.h5group and not load_experiment:
                         # Delete current dataset
@@ -586,11 +595,13 @@ class Experiment(object):
 
                 # Compute average losses here
                 n_processed_steps = kwargs.pop('n_processed_steps',None)
+
                 if n_processed_steps is not None:
                     for name in loss.keys():
                         loss[name] = loss[name] / n_processed_steps[name]
-                # Store total loss too
-                loss['total'] = sum([val for val in loss.values()])
+                # Store total loss
+                loss['total_loss'] = loss_values
+
             # Write to file
             self.write_data(
                 **kwargs,
@@ -598,8 +609,16 @@ class Experiment(object):
             )
             # Delete loss
             del loss
+
         
-        return {},{}
+        # Reset loss
+        loss = {
+            nm:torch.tensor(0.0,requires_grad=True) \
+            for nm in self.harris_wilson_nn.loss_functions.keys()    
+        }
+        # Reset number of epoch steps for loss calculation
+        n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
+        return loss,n_processed_steps
 
     def write_data(self,**kwargs):
         '''Write the current state into the state dataset.
@@ -611,7 +630,7 @@ class Experiment(object):
         self.logger.debug('Writing data')
         if self._time >= self._write_start and self._time % self._write_every == 0:
             if 'loss' in self.output_names:
-                for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total']:
+                for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total_loss']:
                     # Store samples
                     _loss_sample = kwargs.get(loss_name,None)
                     _loss_sample = _loss_sample.clone().detach().cpu().numpy().item() if _loss_sample is not None else None
@@ -692,18 +711,18 @@ class Experiment(object):
             self.config['table_acceptance'] = int(100*self.table_acc[:].mean(axis=0))
             self.logger.progress(f"Table acceptance: {self.config['table_acceptance']}")
         if hasattr(self,'harris_wilson_nn'):
-            for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total']:
-                self.logger.progress(f'{loss_name} loss: {getattr(self,loss_name)[:].mean(axis=0)}')
-
+            loss_names = list(self.harris_wilson_nn.loss_functions.keys())
+            loss_names = loss_names if len(loss_names) <= 1 else loss_names+['total_loss']
+            for loss_name in loss_names:
+                self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:].mean(axis=0)}')
+        if self.logger.console.isEnabledFor(PROGRESS):
+            print('\n')
 
 class DataGeneration(Experiment):
 
     def __init__(self, config:Config, **kwargs):
         # Initalise superclass
         super().__init__(config,**kwargs)
-
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
         
         self.config = config
         self.instance = int(kwargs['instance'])
@@ -723,8 +742,6 @@ class RSquaredAnalysis(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
         
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
 
         # Build spatial interaction model
         self.sim = instantiate_sim(self.config)
@@ -829,9 +846,6 @@ class LogTargetAnalysis(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
-
         # Build spatial interaction model
         sim = instantiate_sim(self.config)
 
@@ -925,9 +939,6 @@ class SIM_MCMC(Experiment):
 
         # Initalise superclass
         super().__init__(config,**kwargs)
-
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
 
         self.output_names = EXPERIMENT_OUTPUT_NAMES['SIM_MCMC']
 
@@ -1040,7 +1051,7 @@ class SIM_MCMC(Experiment):
 
         for i in tqdm(
             range(N),
-            disable=self.config.settings['mcmc']['disable_tqdm'],
+            disable=self.tqdm_disabled,
             leave=False,
             position=(self.device_id+1),
             desc = f"SIM_MCMC device id: {self.device_id}"
@@ -1108,7 +1119,7 @@ class SIM_MCMC(Experiment):
                     log_destination_attraction_acc = log_dest_attract_acc,
                 )
 
-                self.logger.progress(f"Completed epoch {i+1} / {N}.")
+                self.logger.iteration(f"Completed epoch {i+1} / {N}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -1129,13 +1140,10 @@ class JointTableSIM_MCMC(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
-
         self.output_names = EXPERIMENT_OUTPUT_NAMES['JointTableSIM_MCMC']
 
         # Fix random seed
-        rng = set_seed(self.seed)
+        set_seed(self.seed)
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -1195,7 +1203,6 @@ class JointTableSIM_MCMC(Experiment):
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
-            rng = rng,
             log_to_console = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -1272,7 +1279,7 @@ class JointTableSIM_MCMC(Experiment):
 
         for i in tqdm(
             range(N),
-            disable=self.config.settings['mcmc']['disable_tqdm'],
+            disable=self.tqdm_disabled,
             leave=False,
             position=(self.device_id+1),
             desc = f"JointTableSIM_MCMC device id: {self.device_id}"
@@ -1346,7 +1353,7 @@ class JointTableSIM_MCMC(Experiment):
                     log_destination_attraction_acc = log_dest_attract_acc,
                 )
 
-                self.logger.progress(f"Completed epoch {i+1} / {N}.")
+                self.logger.iteration(f"Completed epoch {i+1} / {N}.")
 
             # Compute new intensity
             log_intensity_sample = self.harris_wilson_mcmc.physics_model.intensity_model.log_intensity(
@@ -1399,13 +1406,10 @@ class Table_MCMC(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
-
         self.output_names = EXPERIMENT_OUTPUT_NAMES['table']
 
         # Fix random seed
-        rng = set_seed(self.seed)
+        set_seed(self.seed)
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -1431,7 +1435,6 @@ class Table_MCMC(Experiment):
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
-            rng = rng,
             log_to_console = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -1540,7 +1543,7 @@ class Table_MCMC(Experiment):
                 **self.config['training']
             )
 
-            self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
+            self.logger.iteration(f"Completed epoch {e+1} / {num_epochs}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -1560,9 +1563,6 @@ class TableSummaries_MCMCConvergence(Experiment):
 
         # Initalise superclass
         super().__init__(config,**kwargs)
-
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
 
         self.output_names = EXPERIMENT_OUTPUT_NAMES['TableSummaries_MCMCConvergence']
 
@@ -1692,7 +1692,7 @@ class TableSummaries_MCMCConvergence(Experiment):
         self.logger.info('Running MCMC')
         for i in tqdm(
             range(1,N),
-            disable=self.config['disable_tqdm'],
+            disable=self.tqdm_disabled,
             leave=False,
             position=(self.device_id+1),
             desc = f"TableSummaries_MCMCConvergence device id: {self.device_id}"
@@ -1768,14 +1768,11 @@ class SIM_NN(Experiment):
         
         # Initalise superclass
         super().__init__(config,**kwargs)
-        
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
-
+    
         self.output_names = EXPERIMENT_OUTPUT_NAMES['SIM_NN']
 
         # Fix random seed
-        rng = set_seed(self.seed)
+        set_seed(self.seed)
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -1827,7 +1824,6 @@ class SIM_NN(Experiment):
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
         self.harris_wilson_nn = HarrisWilson_NN(
-            rng = rng,
             config = config,
             neural_net = neural_network,
             loss = config['neural_network'].pop('loss'),
@@ -1870,6 +1866,15 @@ class SIM_NN(Experiment):
         # Store number of samples
         num_epochs = self.config['training']['N']
 
+        # Track the training loss
+        loss_sample = {
+            nm:torch.tensor(0.0,requires_grad=True) \
+            for nm in self.harris_wilson_nn.loss_functions.keys()    
+        }
+
+        # Track number of elements in each loss function
+        n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
+
         # For each epoch
         for e in tqdm(
             range(num_epochs),
@@ -1881,14 +1886,9 @@ class SIM_NN(Experiment):
 
             # Track the epoch training time
             start_time = time.time()
-
-            # Track the training loss
-            loss_sample = {}
-            # Track number of elements in each loss function
-            n_processed_steps = {}
             
             # Process the training set elementwise, updating the loss after batch_size steps
-            for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
+            for t, training_data in enumerate(torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)):
                 
                 # Perform neural net training
                 theta_sample, \
@@ -1900,7 +1900,7 @@ class SIM_NN(Experiment):
                     dt = self.config['harris_wilson_model'].get('dt',0.001)
                 )
                 log_destination_attraction_sample = torch.log(destination_attraction_sample)
-                
+
                 # Update losses
                 loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
                     previous_loss = loss_sample,
@@ -1911,8 +1911,8 @@ class SIM_NN(Experiment):
                     prediction_data = dict(
                         destination_attraction_ts = torch.flatten(destination_attraction_sample)
                     )
-                )
-
+                ) 
+                
                 # Clean and write to file
                 loss_sample,n_processed_steps = self.update_and_export(
                     loss = loss_sample,
@@ -1924,13 +1924,12 @@ class SIM_NN(Experiment):
                     data_size = len(training_data),
                     **self.config['training']
                 )
+            self.logger.iteration(f"Completed epoch {e+1} / {num_epochs}.\n")
 
-                self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
-
-                # Write the epoch training time (wall clock time)
-                if hasattr(self,'compute_time'):
-                    self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
-                    self.compute_time[-1] = time.time() - start_time
+            # Write the epoch training time (wall clock time)
+            if hasattr(self,'compute_time'):
+                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
+                self.compute_time[-1] = time.time() - start_time
         
         # Write metadata
         self.write_metadata()
@@ -1946,13 +1945,10 @@ class NonJointTableSIM_NN(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
-
         self.output_names = EXPERIMENT_OUTPUT_NAMES['NonJointTableSIM_NN']
 
         # Fix random seed
-        rng = set_seed(self.seed)
+        set_seed(self.seed)
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -2002,13 +1998,12 @@ class NonJointTableSIM_NN(Experiment):
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
-            rng = rng,
             log_to_console = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
         # Get config
-        config = getattr(self.ct_mcmc.cxt,'config') if isinstance(self.ct_mcmc.ct,Config) else config
+        config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else config
 
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
@@ -2022,11 +2017,12 @@ class NonJointTableSIM_NN(Experiment):
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
         self.harris_wilson_nn = HarrisWilson_NN(
-            rng = rng,
             config = config,
             neural_net = neural_network,
             loss = config['neural_network'].pop('loss'),
             physics_model = harris_wilson_model,
+            write_every = self._write_every,
+            write_start = self._write_start,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
@@ -2051,7 +2047,6 @@ class NonJointTableSIM_NN(Experiment):
         
         self.logger.note(f"{self.harris_wilson_nn}")
         self.logger.note(f"{self.ct_mcmc}")
-        
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
         
     def run(self,**kwargs) -> None:
@@ -2070,6 +2065,15 @@ class NonJointTableSIM_NN(Experiment):
         # Store number of samples
         num_epochs = self.config['training']['N']
 
+        # Track the training loss
+        loss_sample = {
+            nm:torch.tensor(0.0,requires_grad=True) \
+            for nm in self.harris_wilson_nn.loss_functions.keys()    
+        }
+
+        # Track number of elements in each loss function
+        n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
+
         # For each epoch
         for e in tqdm(
             range(num_epochs),
@@ -2082,13 +2086,8 @@ class NonJointTableSIM_NN(Experiment):
             # Track the epoch training time
             start_time = time.time()
             
-            # Track the training loss
-            loss_sample = {}
-            # Track number of elements in each loss function
-            n_processed_steps = {}
-            
             # Process the training set elementwise, updating the loss after batch_size steps
-            for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
+            for t, training_data in enumerate(torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)):
 
                 # Perform neural net training
                 theta_sample, \
@@ -2100,6 +2099,18 @@ class NonJointTableSIM_NN(Experiment):
                     dt = self.config['harris_wilson_model'].get('dt',0.001)
                 )
                 log_destination_attraction_sample = torch.log(destination_attraction_sample)
+
+                # Update losses
+                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
+                    previous_loss = loss_sample,
+                    n_processed_steps = n_processed_steps,
+                    validation_data = dict(
+                        destination_attraction_ts = training_data
+                    ),
+                    prediction_data = dict(
+                        destination_attraction_ts = torch.flatten(destination_attraction_sample)
+                    )
+                )
             
                 # Add axis to every sample to ensure compatibility 
                 # with the functions used below
@@ -2113,21 +2124,12 @@ class NonJointTableSIM_NN(Experiment):
                     **dict(zip(self.harris_wilson_nn.physics_model.params_to_learn,theta_sample_expanded.split(1,dim=1)))
                 ).squeeze()
 
+                self.logger.progress(log_intensity_sample.sum())
+
                 # Sample table
                 table_sample,accepted = self.ct_mcmc.table_gibbs_step(
                     table_prev = table_sample,
                     log_intensity = log_intensity_sample
-                )
-
-                # Update losses
-                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
-                    previous_loss = loss_sample,
-                    validation_data = dict(
-                        destination_attraction_ts = training_data
-                    ),
-                    prediction_data = dict(
-                        destination_attraction_ts = torch.flatten(destination_attraction_sample)
-                    )
                 )
 
                 # Clean and write to file
@@ -2144,7 +2146,7 @@ class NonJointTableSIM_NN(Experiment):
                     **self.config['training']
                 )
             
-            self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
+            self.logger.iteration(f"Completed epoch {e+1} / {num_epochs}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -2166,17 +2168,14 @@ class JointTableSIM_NN(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        # Perform experiment-specific validation check
-        config.experiment_validate_config()
-
         self.output_names = EXPERIMENT_OUTPUT_NAMES['JointTableSIM_NN']
 
         # Fix random seed
-        rng = set_seed(self.seed)
+        set_seed(self.seed)
 
         # Prepare inputs
         self.inputs = Inputs(
-            config=config,
+            config = config,
             synthetic_data = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -2222,19 +2221,18 @@ class JointTableSIM_NN(Experiment):
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
-            rng = rng,
             log_to_console = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
         # Get config
-        config = getattr(self.ct_mcmc.cxt,'config') if isinstance(self.ct_mcmc.ct,Config) else config
+        config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else config
         
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
-            input_size=self.inputs.data.destination_attraction_ts.shape[-1],
-            output_size=len(config['inputs']['to_learn']),
+            input_size = self.inputs.data.destination_attraction_ts.shape[-1],
+            output_size = len(config['inputs']['to_learn']),
             **config['neural_network']['hyperparameters'],
             logger = self.logger
         ).to(self.device)
@@ -2242,14 +2240,15 @@ class JointTableSIM_NN(Experiment):
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
         self.harris_wilson_nn = HarrisWilson_NN(
-            rng = rng,
             config = config,
             neural_net = neural_network,
             loss = dict(
                 **config['neural_network'].pop('loss'),
-                table_likelihood = self.ct_mcmc.table_loss_function
+                table_likelihood_loss = self.ct_mcmc.table_loss_function
             ),
             physics_model = harris_wilson_model,
+            write_every = self._write_every,
+            write_start = self._write_start,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
@@ -2259,22 +2258,21 @@ class JointTableSIM_NN(Experiment):
         # Create outputs
         self.outputs = Outputs(
             self.config,
-            module=__name__+kwargs.get('instance',''),
-            sweep_params=kwargs.get('sweep_params',{}),
-            base_dir=self.outputs_base_dir,
-            experiment_id=self.sweep_experiment_id,
+            module = __name__+kwargs.get('instance',''),
+            sweep_params = kwargs.get('sweep_params',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep_params = kwargs.get('sweep_params',{}))
 
         # Write metadata
         self.write_metadata()
         
         self.logger.note(f"{self.harris_wilson_nn}")
         self.logger.info(f"{self.ct_mcmc}")
-        
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
 
     def run(self,**kwargs) -> None:
@@ -2292,6 +2290,16 @@ class JointTableSIM_NN(Experiment):
         
         # Store number of samples
         num_epochs = self.config['training']['N']
+
+        # Track the training loss
+        loss_sample = {
+            nm:torch.tensor(0.0,requires_grad=True) \
+            for nm in self.harris_wilson_nn.loss_functions.keys()    
+        }
+
+        # Track number of elements in each loss function
+        n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
+    
         # For each epoch
         for e in tqdm(
             range(num_epochs),
@@ -2303,13 +2311,9 @@ class JointTableSIM_NN(Experiment):
 
             # Track the epoch training time
             start_time = time.time()
-            # Track the training loss
-            loss_sample = {}
-            # Track number of elements in each loss function
-            n_processed_steps = {}
 
             # Process the training set elementwise, updating the loss after batch_size steps
-            for t, training_data in enumerate(self.inputs.data.destination_attraction_ts):
+            for t, training_data in enumerate(torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)):
 
                 # Perform neural net training
                 theta_sample, \
@@ -2344,7 +2348,7 @@ class JointTableSIM_NN(Experiment):
                     prediction_data = dict(
                         destination_attraction_ts = torch.flatten(destination_attraction_sample)
                     ),
-                    loss_function_names = ['dest_attraction_ts'],
+                    loss_function_names = ['dest_attraction_ts_loss'],
                     aux_inputs = vars(self.inputs.data)
                 )
                 
@@ -2362,12 +2366,12 @@ class JointTableSIM_NN(Experiment):
                         previous_loss = loss_sample,
                         n_processed_steps = n_processed_steps,
                         validation_data = dict(
-                            log_intensity = log_intensity_sample
+                            log_intensity = log_intensity_sample#/log_intensity_sample.sum()
                         ),
                         prediction_data = dict(
-                            table = table_sample,
+                            table = table_sample#/table_sample.sum(),
                         ),
-                        loss_function_names = [lf for lf in self.harris_wilson_nn.loss_functions.keys() if lf != 'dest_attraction_ts'],
+                        loss_function_names = [lf for lf in self.harris_wilson_nn.loss_functions.keys() if lf != 'dest_attraction_ts_loss'],
                         aux_inputs = vars(self.inputs.data)
                     )
 
@@ -2385,7 +2389,7 @@ class JointTableSIM_NN(Experiment):
                     data_size = len(training_data),
                     **self.config['training']
                 )
-            self.logger.progress(f"Completed epoch {e+1} / {num_epochs}.")
+            self.logger.iteration(f"Completed epoch {e+1} / {num_epochs}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -2417,7 +2421,7 @@ class ExperimentSweep():
     
         # Try to pre load config from previous unfinished experiment
         self.config = config
-        preloaded_config = self.load()
+        preloaded_config = self.load_config()
         # Flag for appending experiment outputs
         self.config.settings['load_data'] = False
         if preloaded_config is not None:
@@ -2436,13 +2440,10 @@ class ExperimentSweep():
             self.config.settings['load_data'] = True
         del preloaded_config
 
-        # Load schema
-        self.config.load_schemas()
-
         # Store number of workers
         self.n_workers = self.config.settings['inputs'].get("n_workers",1)
-
-        self.logger.info(f"Performing parameter sweep")
+        
+        self.logger.info(f"Performing parameter sweep for {self.config.settings['experiment_type']}")
 
         # Parse sweep configurations
         self.sweep_params = self.config.parse_sweep_params()
@@ -2451,7 +2452,7 @@ class ExperimentSweep():
         sweep_configurations, \
         self.param_sizes_str, \
         self.total_size_str = self.config.prepare_sweep_configurations(self.sweep_params)
-        
+
         # If outputs should be loaded and appended
         if not self.config.settings['load_data']:
             # Store one datetime
@@ -2519,7 +2520,7 @@ class ExperimentSweep():
             Sweep key paths: {self.sweep_key_paths}
         """
 
-    def load(self):
+    def load_config(self):
         if self.config['inputs'].get('load_experiment',''):
             try:
                 # Load config
@@ -2603,15 +2604,6 @@ class ExperimentSweep():
             raise Exception(f'failed running instance {instance_num}')
 
     def run_sequential(self,sweep_configurations):
-        sweep_configurations = [
-            (100, '_row_constrained', [[1]], '', ['dest_attraction_ts', 'table_likelihood'], ['mseloss', 'custom']),
-            (100, '_doubly_constrained', [[0], [1]], '', ['table_likelihood'], ['custom']),
-            (100, '_doubly_constrained', [[0], [1]], '', ['dest_attraction_ts', 'table_likelihood'], ['mseloss', 'custom']),
-            (100, '_doubly_10%_cell_constrained', [[0], [1]], 'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt', ['table_likelihood'], ['custom']),
-            (100, '_doubly_10%_cell_constrained', [[0], [1]], 'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt', ['dest_attraction_ts', 'table_likelihood'], ['mseloss', 'custom']),
-            (100, '_doubly_20%_cell_constrained', [[0], [1]], 'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt', ['table_likelihood'], ['custom']),
-            (100, '_doubly_20%_cell_constrained', [[0], [1]], 'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt', ['dest_attraction_ts', 'table_likelihood'], ['mseloss', 'custom'])
-        ]
         for instance,sweep_config in tqdm(
             enumerate(sweep_configurations),
             total=len(sweep_configurations),
@@ -2637,29 +2629,27 @@ class ExperimentSweep():
         
         for chunk_id, sweep_config_chunk in enumerate(sweep_config_chunks):
             # Initialise progress bar
-            pbar = tqdm(
+            progress = tqdm(
                 total=len(sweep_config_chunk), 
                 desc=f'Running sweeps concurrently: Batch {chunk_id+1}/{len(sweep_config_chunks)}',
-                leave=False,
+                leave=True,
                 position=0
             )
-            with concurrency.ProcessPoolExecutor(self.n_workers*2) as executor:
+            def my_callback(fut):
+                progress.update()
+            
+            with BoundedQueueProcessPoolExecutor(self.n_workers) as executor:
                 # Start the processes and ignore the results
-                futures = [executor.submit(
-                    self.prepare_instantiate_and_run,
-                    instance_num = instance,
-                    sweep_configuration = sweep_config
-                ) for instance,sweep_config in enumerate(sweep_config_chunk)]
+                for instance,sweep_config in enumerate(sweep_config_chunk):
+                    future = executor.submit(
+                        self.prepare_instantiate_and_run,
+                        instance_num = instance,
+                        sweep_configuration = sweep_config
+                    ) 
+                    future.add_done_callback(my_callback)
 
-                # Wait for all processes to finish
-                for index,fut in enumerate(concurrency.as_completed(futures)):
-                    try:
-                        fut.result()
-                    except:
-                        self.logger.error(f""" Sweep config 
-                            {sweep_config_chunk[index]}
-                        """)
-                        raise Exception(f"Future {index} failed")
-                    pbar.update(1)
-            # Close progress bar
-            pbar.close()
+            # Delete executor and progress bar
+            progress.close()
+            safe_delete(progress)
+            executor.shutdown(wait=True)
+            safe_delete(executor)
