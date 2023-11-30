@@ -10,7 +10,7 @@ from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger
 from multiresticodm.logger_class import *
 from multiresticodm.plot_variables import PLOT_HASHMAP, PLOT_COORDINATES
-from multiresticodm.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS, MARGINAL_SOLVERS, DATA_TYPES, METRICS, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
+from multiresticodm.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS, MARGINAL_SOLVERS, DATA_SCHEMA, METRICS, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
 
 
 def set_threads(n_threads):
@@ -34,7 +34,7 @@ def split_to_list(ctx, param, value):
     if value is None:
         return None
     else:
-        return [v.split("_") for v in list(value)]
+        return [list(v.split("&")) for v in list(value)]
 
 class PythonLiteralOption(click.Option):
 
@@ -135,9 +135,9 @@ _common_options = [
             If many are provided first is set as the numpy threads and the second as the numba threads'''),
     click.option('--logging_mode','-log', type=click.Choice(['debug', 'info', 'warning', 'critical']+LOG_LEVELS), default='info', 
             help=f'Type of logging mode used.'),
-    click.option('--n','-n', type=click.IntRange(min=1), help = 'Overwrites number of MCMC samples'),
+    click.option('--n', '-n', type=click.IntRange(min=1), help = 'Overwrites number of iterations of the selected the algorithm'),
     click.option('--table','-tab', type=click.STRING,default=None, help = 'Overwrites input table filename in config'),
-    click.option('--device','-dev', type=click.Choice(['cpu', 'cuda', 'mps']), default='cpu', 
+    click.option('--device','-dev', type=click.Choice(['cpu', 'cuda', 'mps']), default='cpu',
             help=f'Type of device used for torch operations.')
 ]
 
@@ -465,6 +465,7 @@ def run(
         title,
         sweep_mode,
         overwrite,
+        n,
         table,
         device,
         table0,
@@ -489,8 +490,7 @@ def run(
         logging_mode,
         n_workers,
         n_threads,
-        norm,
-        n
+        norm
     ):
     """
     Run Multiresolution Table Inference based on Physics-Driven Intensity Models.
@@ -540,22 +540,22 @@ _output_options = [
     click.option('--title','-en', multiple=True, type=click.STRING, default = None, cls=NotRequiredIf, not_required_if='directories'),
     click.option('--exclude','-exc', type=click.STRING, default = [], multiple = True, cls=NotRequiredIf, not_required_if='directories'),
     click.option('--filename_ending', '-fe', default = '', type=click.STRING),
-    click.option('--burnin', '-b', default=0, show_default=True,
-                type=click.IntRange(min=0), help=f'Sets number of initial samples to discard.'),
-    click.option('--thinning', '-t', default=1, show_default=True,
-                type=click.IntRange(min=1), help=f'Sets number of samples to skip.'),
+    click.option('--burnin_thinning_trimming', '-btt', default=[], show_default=True, multiple = True, callback = to_list,
+                 type=(click.STRING,click.IntRange(min=0),click.IntRange(min=1),click.IntRange(min=1)), 
+                 help=f'Sets number of initial samples to discard (burnin), number of samples to skip (thinning) and number of samples to keep (trimming).'),
     click.option('--sample', '-s', multiple = True, required = False,
-                type=click.Choice(DATA_TYPES.keys()), help=f'Sets type of samples to compute metrics over.'),
-    click.option('--statistic','-stat', multiple=True, default=None, type = (click.Choice(METRICS.keys()),click.STRING,click.STRING),required=False,
+                type=click.Choice(DATA_SCHEMA.keys()), help=f'Sets type of samples to compute metrics over.'),
+    click.option('--statistic','-stat', multiple=True, default=None, type = (click.STRING,click.STRING,click.STRING),required=False,
             help='Every argument corresponds to a list of metrics, statistics and their corresponding axes e.g. passing  ("SRMSE", \"mean|sum\",  \"iter|sweep\") corresponds to applying mean across the iter dimension and then sum across sweep dimension before applying SRMSE metric'),
-    click.option('--slice_by','-sb', multiple=True, default=None, type = (click.Choice(SWEEPABLE_PARAMS),click.STRING),required=False,
+    click.option('--coordinate_slice','-cs', multiple=True, default=None, type = (click.Choice(SWEEPABLE_PARAMS),click.STRING),required=False,
             help='Every argument corresponds to a list of keys and values by which the output sweeped parameters will be sliced.'),
+    click.option('--input_slice','-is', multiple=True, default=None, type = (click.Choice(SWEEPABLE_PARAMS),click.STRING),required=False,
+            help='Every argument corresponds to a list of keys and values by which the input sweeped parameters will be sliced.'),
     click.option('--group_by','-gb', multiple=True, default=None, type = click.Choice(SWEEPABLE_PARAMS),required=False,
             help='Every argument corresponds to a list of sweeped parameters that the outputs will be grouped by.'),
     click.option('--metric','-m', multiple=True, type=click.Choice(METRICS.keys()), required=False, default=None,
                 help=f'Sets list of metrics to compute over samples.'),
     click.option('--dates','-date', type=click.STRING, default=None, multiple=True, required=False),
-                #  type=click.DateTime(formats=DATE_FORMATS), multiple=True, required=False),
     click.option('--epsilon_threshold', '-eps', default=0.001, show_default=True,
         type=click.FLOAT, help=f'Sets error norm threshold below which convergence is achieved. Used only in convergence plots.'),
     click.option('--metadata_keys','-k', multiple=True, type=click.STRING, required=False),
@@ -574,15 +574,17 @@ _plot_coordinate_options = []
 for i,var in enumerate(PLOT_COORDINATES):
     _plot_coordinate_options += [
         click.option(f'--{var}_label', f'-{var}lab', default=None, show_default=False,
-              type=click.STRING, help=f'Sets {var} axis label.'),
+            type=click.STRING, help=f'Sets {var} axis label.'),
         click.option(f'--{var}_discrete/--no-{var}_discrete', default=False, show_default=True,
-                is_flag=True, help=f'Flag for whether {var} is discrete or not.'),
+            is_flag=True, help=f'Flag for whether {var} is discrete or not.'),
         click.option(f'--{var}_limit', f'-{var}lim', default=(None,None), show_default=False,
-                type=(float, float), help=f'Sets {var} limits.'),
-        click.option(f'--{var}ticks', f'-{var}t', default=None, show_default=True, callback=split_to_list, multiple = True,
-                type=click.STRING, help=f'Sets variable for determining of {var} tick values.'),
+            type=(float, float), help=f'Sets {var} limits.'),
         click.option(f'--{var}_tick_frequency', f'-{var}fq', default=[(0, 1)], show_default=True, multiple = True,
-                type=(click.INT,click.INT), help=f'Sets starting point and frequency of {var} ticks.')
+            type=(click.INT,click.INT), help=f'Sets starting point and frequency of minor and major {var} ticks.'),
+        click.option(f'--{var}_tick_pad', f'-{var}tp', default=(2,10), show_default=True, multiple = False, callback = to_list,
+            type=(click.INT,click.INT), help=f'Sets tick label padding for minor and major {var} ticks.'),
+        click.option(f'--{var}_tick_rotation', f'-{var}tr', default=(0,45), show_default=True, multiple = False, callback = to_list,
+            type=(click.INT,click.INT), help=f'Sets tick label rotation for minor and major {var} ticks.')
     ]
 
 
@@ -597,11 +599,11 @@ def plot_coordinate_options(func):
 ))
 @output_options
 @common_options
-@click.option('-x', type = click.STRING, required = True, multiple = True, callback=to_list,
+@click.option('-x', type = click.STRING, required = True, multiple = True, callback=split_to_list,
               default = None, help='Sets x coordinate(s) in plot')
-@click.option('-y', type = click.STRING, required = True, multiple = True, callback=to_list,
+@click.option('-y', type = click.STRING, required = True, multiple = True, callback=split_to_list,
                 default = None, help='Sets y coordinate(s) in plot')
-@click.option('-z', type = click.STRING, required = False, multiple = True, callback=to_list,
+@click.option('-z', type = click.STRING, required = False, multiple = True, callback=split_to_list,
                 default = None, help='Sets z coordinate(s) in plot')
 @click.option('--plots', '-p', type=click.Choice(list(PLOT_HASHMAP.keys())), multiple=True, default = [], required=True,
               help=f'''Sets plotting functions
@@ -720,11 +722,11 @@ def plot(
         title,
         exclude,
         filename_ending,
-        burnin,
-        thinning,
+        burnin_thinning_trimming,
         sample,
         statistic,
-        slice_by,
+        coordinate_slice,
+        input_slice,
         group_by,
         metric,
         dates,
@@ -802,12 +804,15 @@ def plot(
         x_discrete,
         y_discrete,
         z_discrete,
-        xticks,
-        yticks,
-        zticks,
         x_tick_frequency,
         y_tick_frequency,
-        z_tick_frequency
+        z_tick_frequency,
+        x_tick_pad,
+        y_tick_pad,
+        z_tick_pad,
+        x_tick_rotation,
+        y_tick_rotation,
+        z_tick_rotation
     ):
     """
     Plot experimental outputs.
@@ -869,11 +874,11 @@ def summarise(
         title,
         exclude,
         filename_ending,
-        burnin,
-        thinning,
+        burnin_thinning_trimming,
         sample,
         statistic,
-        slice_by,
+        coordinate_slice,
+        input_slice,
         group_by,
         metric,
         dates,
