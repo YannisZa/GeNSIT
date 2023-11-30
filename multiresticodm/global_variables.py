@@ -39,93 +39,6 @@ with open(os.path.join(ROOT,'data/inputs/configs/cfg_parameters.json'), 'r') as 
             visited.add(k)
 SWEEPABLE_LENGTH_METADATA = ['seed','iter','origin','destination','time',]
 
-XARRAY_SCHEMA = {
-    'alpha': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    }, 
-    'beta': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    }, 
-    'kappa': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    }, 
-    'delta': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    }, 
-    'sigma': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    }, 
-    'log_destination_attraction': {
-        "coords":["time","destination"],
-        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
-        "args_dtype":["int32","int32"],
-        "new_shape":["iter","time","destination"]
-    },
-    'table': {
-        "coords":["origin","destination"],
-        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
-        "args_dtype":["int32","int32"],
-        "new_shape":["iter","origin","destination"]
-    },
-    'loss': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    },
-    'log_target': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    },
-    'sign': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    },
-    'theta_acc': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    },
-    'log_destination_attraction_acc': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    },
-    'table_acc': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    },
-    'computation_time': {
-        "coords":[],
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
-    },
-}
-
 SIM_TYPE_CONSTRAINTS = {
     'TotallyConstrained':'grand_total',
     'ProductionConstrained':'row_margin'
@@ -173,12 +86,59 @@ NUMPY_TO_TORCH_DTYPE = {
 
 TORCH_TO_NUMPY_DTYPE = {v:k for k,v in NUMPY_TO_TORCH_DTYPE.items()}
 
+
+def sigmoid(beta=torch.tensor(1.0)):
+    '''Extends the torch.nn.sigmoid activation function by allowing for a slope parameter.'''
+    return lambda x: torch.sigmoid(beta * x)
+
+
+LOSS_DATA_REQUIREMENTS = {
+    'dest_attraction_ts_loss': {
+        "prediction_data": ['destination_attraction_ts'],
+        "validation_data": ['destination_attraction_ts'],
+    },
+    'table_loss': {
+        "prediction_data": ['table'],
+        "validation_data": ['log_intensity']
+    },
+    'total_distance_loss': {
+        "prediction_data": ['table'],
+        "validation_data": ['cost_matrix','total_cost_by_origin']
+    },
+    'total_loss': {},
+}
+
+# Pytorch loss functions
+LOSS_FUNCTIONS = {
+    'l1loss': torch.nn.L1Loss,
+    'mseloss': torch.nn.MSELoss,
+    'crossentropyloss': torch.nn.CrossEntropyLoss,
+    'ctcloss': torch.nn.CTCLoss,
+    'nllloss': torch.nn.NLLLoss,
+    'poissonnllloss': torch.nn.PoissonNLLLoss,
+    'gaussiannllloss': torch.nn.GaussianNLLLoss,
+    'kldivloss': torch.nn.KLDivLoss,
+    'bceloss': torch.nn.BCELoss,
+    'bcewithlogitsloss': torch.nn.BCEWithLogitsLoss,
+    'marginrankingloss': torch.nn.MarginRankingLoss,
+    'hingeembeddingloss': torch.nn.HingeEmbeddingLoss,
+    'multilabelmarginloss': torch.nn.MultiLabelMarginLoss,
+    'huberloss': torch.nn.HuberLoss,
+    'smoothl1loss': torch.nn.SmoothL1Loss,
+    'softmarginloss': torch.nn.SoftMarginLoss,
+    'multilabelsoftmarginloss': torch.nn.MultiLabelSoftMarginLoss,
+    'cosineembeddingloss': torch.nn.CosineEmbeddingLoss,
+    'multimarginloss': torch.nn.MultiMarginLoss,
+    'tripletmarginloss': torch.nn.TripletMarginLoss,
+    'tripletmarginwithdistanceloss': torch.nn.TripletMarginWithDistanceLoss,
+    'custom':None
+}
+
 INPUT_SCHEMA = {
     "origin_demand":{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":1},
     "destination_demand":{"dims":['destination'],"axes":[1],"dtype":"float32", "ndmin":1},
     "origin_attraction_ts":{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":2},
     "destination_attraction_ts":{"dims":['time','destination'],"axes":[0,1],"dtype":"float32", "ndmin":2},
-    "log_destination_attraction":{"dims":['destination'],"axes":[0],"dtype":"float32", "ndmin":1},
     "cost_matrix":{"dims":['origin','destination'],"axes":[0,1],"dtype":"float32", "ndmin":2},
     "total_cost_by_origin":{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":1},
     "ground_truth_table":{"dims":['origin','destination'],"axes":[0,1],"dtype":"int32", "ndmin":2},
@@ -189,49 +149,43 @@ INPUT_SCHEMA = {
     "dataset":{}
 }
 
-TABLE_INFERENCE_EXPERIMENTS = ['nonjointtablesim_nn','jointtablesim_nn','jointtablesim_mcmc','table_mcmc','table_mcmc','tablesummaries_mcmcconvergence']
-
-INPUT_TYPES = {
-    'cost_matrix':torch.float32,
-    'total_cost_by_origin':torch.float32,
-    'origin_demand':torch.float32,
-    'destination_demand':torch.float32,
-    'origin_attraction_ts':torch.float32,
-    'destination_attraction_ts':torch.float32,
-    'ground_truth_table':torch.int32
+TABLE_SCHEMA = {
+    'table':{"dims":['origin','destination'],"axes":[0,1],"dtype":"int32", "ndmin":2},
 }
 
-TABLE_TYPES = {
-    'table':torch.int32,
-}
-    
-INTENSITY_TYPES = {
-    'intensity':torch.float32,
-    'log_destination_attraction':torch.float32,
-    'log_origin_attraction':torch.float32,
-    'alpha':torch.float32,
-    'beta':torch.float32,
-    'delta':torch.float32,
-    'kappa':torch.float32,
-    'sigma':torch.float32,
-    'gamma':torch.float32,
+INTENSITY_SCHEMA = {
+    'intensity':{"dims":['origin','destination'],"axes":[0,1],"dtype":"int32", "ndmin":2},
+    'log_destination_attraction':{"dims":['destination'],"axes":[0],"dtype":"float32", "ndmin":1},
+    'log_origin_attraction':{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":1},
+    'alpha':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
+    'beta':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
+    'delta':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
+    'kappa':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
+    'sigma':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
+    'gamma':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
+    'noise_percentage':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0}
 }
 
 
-OUTPUT_TYPES = {
-    'loss':torch.float32,
-    'log_target':torch.float32,
-    'sign':torch.int8,
-    **INTENSITY_TYPES,
-    **TABLE_TYPES
+OUTPUT_SCHEMA = {
+    'loss':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
+    'total_loss':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
+    'log_target':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
+    'sign':{"dims":[],"axes":[],"dtype":"int8", "ndmin":0},
+    **INTENSITY_SCHEMA,
+    **TABLE_SCHEMA
 }
+for loss in LOSS_DATA_REQUIREMENTS.keys():
+    OUTPUT_SCHEMA[loss] = {"dims":[],"axes":[],"dtype":"float32", "ndmin":0}
 
-DATA_TYPES = {**INPUT_TYPES,**OUTPUT_TYPES}
+DATA_SCHEMA = {**INPUT_SCHEMA,**OUTPUT_SCHEMA}
 
 SAMPLE_DATA_REQUIREMENTS = {
-    **dict(zip(list(OUTPUT_TYPES.keys()),list(OUTPUT_TYPES.keys())))
+    **dict(zip(list(OUTPUT_SCHEMA.keys()),list(OUTPUT_SCHEMA.keys())))
 }
 SAMPLE_DATA_REQUIREMENTS['intensity'] = INTENSITY_OUTPUTS
+
+TABLE_INFERENCE_EXPERIMENTS = ['nonjointtablesim_nn','jointtablesim_nn','jointtablesim_mcmc','table_mcmc','table_mcmc','tablesummaries_mcmcconvergence']
 
 EXPERIMENT_OUTPUT_NAMES = {
     "SIM_MCMC": ['log_destination_attraction','theta','sign',
@@ -243,7 +197,7 @@ EXPERIMENT_OUTPUT_NAMES = {
     "Table_MCMC": ['table','computation_time'],
     "TableSummaries_MCMCConvergence": ['table','computation_time'],
     "SIM_NN": ['log_destination_attraction','theta','loss','computation_time'],
-    "NonJointTableSIM_NN": ['log_destination_attraction','theta','loss', 'table','computation_time'],
+    "NonJointTableSIM_NN": ['log_destination_attraction','theta', 'loss', 'table','computation_time'],
     "JointTableSIM_NN": ['log_destination_attraction','theta','loss', 'table','computation_time']
 }
 
@@ -255,6 +209,7 @@ AUXILIARY_COORDINATES_DTYPES = {
     'to_learn':object,
     'alpha':torch.float32,
     'beta':torch.float32,
+    'noise_percentage':torch.float32,
     'delta':torch.float32,
     'kappa':torch.float32,
     'sigma':object,
@@ -263,7 +218,8 @@ AUXILIARY_COORDINATES_DTYPES = {
     'cells':str,
     'loss_name':object,
     'loss_function':object,
-    'name':str
+    'name':str,
+    'table_steps': torch.int32
 }
 
 CORE_COORDINATES_DTYPES = {
@@ -330,53 +286,6 @@ INTENSITY_MODELS = ['spatial_interaction_model']
 
 DATE_FORMATS = ['start,stop,step-%m-%Y','start,stop,step_%m_%Y','start,stop,step_%m', 'start,stop,step-%m']
 
-
-def sigmoid(beta=torch.tensor(1.0)):
-    '''Extends the torch.nn.sigmoid activation function by allowing for a slope parameter.'''
-    return lambda x: torch.sigmoid(beta * x)
-
-
-LOSS_DATA_REQUIREMENTS = {
-    'dest_attraction_ts': {
-        "prediction_data": ['destination_attraction_ts'],
-        "validation_data": ['destination_attraction_ts'],
-    },
-    'table_likelihood': {
-        "prediction_data": ['table'],
-        "validation_data": ['log_intensity']
-    },
-    'total_distance': {
-        "prediction_data": ['table'],
-        "validation_data": ['cost_matrix','total_cost_by_origin']
-    }
-}
-
-# Pytorch loss functions
-LOSS_FUNCTIONS = {
-    'l1loss': torch.nn.L1Loss,
-    'mseloss': torch.nn.MSELoss,
-    'crossentropyloss': torch.nn.CrossEntropyLoss,
-    'ctcloss': torch.nn.CTCLoss,
-    'nllloss': torch.nn.NLLLoss,
-    'poissonnllloss': torch.nn.PoissonNLLLoss,
-    'gaussiannllloss': torch.nn.GaussianNLLLoss,
-    'kldivloss': torch.nn.KLDivLoss,
-    'bceloss': torch.nn.BCELoss,
-    'bcewithlogitsloss': torch.nn.BCEWithLogitsLoss,
-    'marginrankingloss': torch.nn.MarginRankingLoss,
-    'hingeembeddingloss': torch.nn.HingeEmbeddingLoss,
-    'multilabelmarginloss': torch.nn.MultiLabelMarginLoss,
-    'huberloss': torch.nn.HuberLoss,
-    'smoothl1loss': torch.nn.SmoothL1Loss,
-    'softmarginloss': torch.nn.SoftMarginLoss,
-    'multilabelsoftmarginloss': torch.nn.MultiLabelSoftMarginLoss,
-    'cosineembeddingloss': torch.nn.CosineEmbeddingLoss,
-    'multimarginloss': torch.nn.MultiMarginLoss,
-    'tripletmarginloss': torch.nn.TripletMarginLoss,
-    'tripletmarginwithdistanceloss': torch.nn.TripletMarginWithDistanceLoss,
-    'custom':None
-}
-
 # Pytorch activation functions.
 # Pairs of activation functions and whether they are part of the torch.nn module, in which case they must be called
 # via func(*args, **kwargs)(x).
@@ -426,6 +335,109 @@ OPTIMIZERS = {
     'Rprop': torch.optim.Rprop,
     'SGD': torch.optim.SGD,
 }
+
+
+XARRAY_SCHEMA = {
+    'alpha': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    }, 
+    'beta': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    }, 
+    'kappa': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    }, 
+    'delta': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    }, 
+    'sigma': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    }, 
+    'noise_percentage': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    }, 
+    'log_destination_attraction': {
+        "coords":["time","destination"],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "new_shape":["iter","time","destination"]
+    },
+    'table': {
+        "coords":["origin","destination"],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "new_shape":["iter","origin","destination"]
+    },
+    'loss': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    },
+    'log_target': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    },
+    'sign': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    },
+    'theta_acc': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    },
+    'log_destination_attraction_acc': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    },
+    'table_acc': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    },
+    'computation_time': {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    },
+}
+for loss in LOSS_DATA_REQUIREMENTS.keys():
+    XARRAY_SCHEMA[loss] = {
+        "coords":[],
+        "funcs":[],
+        "args_dtype":[],
+        "new_shape":["iter"]
+    }
+
+
 
 class Dataset(object):
     pass
