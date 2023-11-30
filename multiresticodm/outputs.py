@@ -10,7 +10,6 @@ import xarray as xr
 import pandas as pd
 import netCDF4 as nc
 import geopandas as gpd
-import concurrent.futures as concurrency
 
 from tqdm import tqdm
 from torch import int32
@@ -29,6 +28,7 @@ from multiresticodm.inputs import Inputs
 from multiresticodm.global_variables import *
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.spatial_interaction_model import *
+from multiresticodm.multiprocessor import BoundedQueueProcessPoolExecutor
 
 OUTPUTS_MODULE = sys.modules[__name__]
 
@@ -51,14 +51,28 @@ class Outputs(object):
             console_level = level
         )
         # Store output names
-        self.data_names = data_names
+        self.data_names = list(data_names)
+        
+        # Issue error if no sample names are provided
+        if len(self.data_names) <= 0:
+            self.logger.error(f"No sample names provided.")
 
         # Store settings
         self.settings = settings
 
+        # Convert burnin, thinning, trimming to dictionary
+        if isinstance(self.settings['burnin_thinning_trimming'],list):
+            if len(self.settings['burnin_thinning_trimming']) > 0:
+                self.settings['burnin_thinning_trimming'] = {
+                    v[0]:{"burnin":v[1],"thinning":v[2],"trimming":v[3]}
+                    for v in self.settings['burnin_thinning_trimming']
+                }
+            else:
+                self.settings['burnin_thinning_trimming'] = {}
+
         # Sample names must be a subset of all data names
         try:
-            assert set(self.data_names).issubset(set(DATA_TYPES.keys()))
+            assert set(self.data_names).issubset(set(DATA_SCHEMA.keys()))
         except Exception:
             self.logger.error('Some sample names provided are not recognized')
             self.logger.error(','.join(self.data_names))
@@ -122,28 +136,34 @@ class Outputs(object):
             else [self.intensity_model_name]
         # Store sample data requirements
         self.output_names = []
-        for sam in set(self.data_names).intersection(set(list(OUTPUT_TYPES.keys()))):
+        for sam in set(self.data_names).intersection(set(list(OUTPUT_SCHEMA.keys()))):
             if sam == 'intensity':
                 # Add all intensity-related data names
                 for model_name in self.intensity_model_name:
                     self.output_names.extend(SAMPLE_DATA_REQUIREMENTS[sam][model_name])
                 # Take only unique values
                 self.output_names = list(set(self.output_names))
-            elif sam == 'loss' and 'neural_network' in self.config and 'loss' in EXPERIMENT_OUTPUT_NAMES[self.config['experiment_type']]:
+            elif sam in LOSS_DATA_REQUIREMENTS \
+                and 'neural_network' in self.config.settings \
+                and 'loss' in EXPERIMENT_OUTPUT_NAMES[self.config['experiment_type']]:
                 # Grab all loss names
                 loss_names = list(flatten(self.config['neural_network']['loss']['loss_name']['sweep']['range'])) \
                     if isinstance(self.config['neural_network']['loss']['loss_name'],dict) \
                     else [self.config['neural_network']['loss']['loss_name']]
+                loss_names = set(list(flatten(loss_names))+['total'])
                 # Add them to output names
-                self.output_names.extend(loss_names)
+                if sam in loss_names:
+                    self.output_names.append(sam)
             elif sam in EXPERIMENT_OUTPUT_NAMES[self.config['experiment_type']]:
                 self.output_names.append(sam)
         
         # Keep only unique values
+        self.output_names = list(flatten(self.output_names))
         self.output_names = list(set(self.output_names))
+        # print(self.output_names)
         # Get input names
         self.input_names = [
-            sam for sam in set(self.data_names).intersection(set(list(INPUT_TYPES.keys())))
+            sam for sam in set(self.data_names).intersection(set(list(INPUT_SCHEMA.keys())))
         ]
         
         # Name output sample directory according 
@@ -156,7 +176,7 @@ class Outputs(object):
         return self_copy
     
     def data_vars(self):
-        return {k:v for k,v in vars(self.data).items() if k in DATA_TYPES}
+        return {k:v for k,v in self.data._vars_().items() if k in DATA_SCHEMA}
 
     def trim_sweep_configurations(self,sweep_configurations:list=[],sweep_params:dict={}):
         # Loop through each sweep configuration
@@ -219,35 +239,54 @@ class Outputs(object):
                                   which does not exist in {','.join(list(self.data_vars().keys()))}")
         return available
 
-    def slice_sample_iterations(self,samples,settings:dict={}):
-        # Get burnin parameter
-        burnin = min(settings.get('burnin',1),samples.shape[0])
+    def slice_sample_iterations(self,samples):
 
-        # Get thinning parameter
-        thinning = list(deep_get(key='thinning',value=settings))
-        thinning = thinning[0] if len(thinning) > 0 else 1
-        
-        # Get iterations
-        iters = np.arange(start=1,stop=samples.shape[0]+1,step=1,dtype='int32')
+        for dim_names, slice_setts in self.settings['burnin_thinning_trimming'].items():
+            
+            # Gather dim names
+            dim_names = dim_names.split('+')
+            # Get the intersection between available dims and specified dims
+            dim_names = list(set(samples.dims).intersection(dim_names))
 
-        # Apply burnin and thinning
-        samples = samples[burnin:None:thinning]
-        iters = iters[burnin:None:thinning]
+            # if samples do not have these dimensions, carry on
+            if len(dim_names) <= 0:
+                continue
 
-        # Get total number of samples
-        N = settings.get('N',samples.shape[0])
-        if N is None:
-            N = samples.shape[0]
-        else:
-            N = min(N,samples.shape[0])
-        
-        # Apply stop
-        samples = samples[:N]
-        iters = iters[:N]
+            # Stack all dims together
+            samples = samples.stack(temp_dim=dim_names)
 
-        return samples,iters
+            # Get total number of iterations
+            total_samples = samples.sizes['temp_dim']
+
+            # Get burnin parameter
+            burnin = min(slice_setts.get('burnin',0),total_samples)
+
+            # Get thinning parameter
+            thinning = min(slice_setts.get('thinning',1),total_samples)
+
+            # Get iterations
+            iters = np.arange(start=burnin,stop=total_samples,step=thinning,dtype='int32')
+            
+            # Get number of samples to keep
+            trimming = min(slice_setts.get('trimming',None),len(iters))
+            
+            # Trim iterations
+            iters = iters[:trimming]
+
+            # print(dim_names)
+            # print(samples.coords['temp_dim'].values)
+
+            # Apply burnin, thinning and trimming to samples
+            samples = samples.isel(temp_dim = iters)
+
+            # print(samples.coords['temp_dim'].values)
+            # print('\n')
+            # Unstack temp dim
+            samples = samples.unstack('temp_dim')
+
+        return samples
     
-    def load_experiment_data(self,inputs=None,settings:dict={},input_slice:dict={},slice_samples:bool=True):
+    def load_experiment_data(self,inputs=None,input_slice:dict={}):
 
         # Update config based on slice of NON-coordinate-like sweeped params
         # affecting only the inputs of the model
@@ -271,10 +310,7 @@ class Outputs(object):
             self.inputs.pass_to_device()
 
         # Load output h5 file to dictionary
-        output_dict_data = self.load_h5_data(
-            settings = settings,
-            slice_samples = slice_samples
-        )
+        output_dict_data = self.load_h5_data()
         return output_dict_data
     
     def load_geometry(self,geometry_filename,default_crs:str='epsg:27700'):
@@ -285,7 +321,7 @@ class Outputs(object):
         return geometry
 
 
-    def load_h5_data(self,settings:dict={},slice_samples:bool=True):
+    def load_h5_data(self):
         self.logger.note('Loading h5 data into xarrays...')
         # Get h5 file
         h5file = os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5")
@@ -294,11 +330,7 @@ class Outputs(object):
         except:
             raise Exception(f"H5 file {h5file} not found.")
         # Read h5 data
-        local_coords,global_coords,data_vars = self.read_h5_file(
-            h5file,
-            settings = settings,
-            slice_samples = slice_samples
-        )
+        local_coords,global_coords,data_vars = self.read_h5_file(h5file)
         # Convert set to list
         local_coords = {k:np.array(
                             list(v),
@@ -357,7 +389,7 @@ class Outputs(object):
 
         return xr_dict
     
-    def read_h5_file(self,filename,settings:dict={},**kwargs):
+    def read_h5_file(self,filename,**kwargs):
         local_coords = {}
         global_coords = {}
         data_vars = {}
@@ -379,21 +411,14 @@ class Outputs(object):
                     # If this data is not required, skip storing it
                     if sample_name not in self.output_names:
                         continue
-                    # Apply burning, thinning and trimming
-                    self.logger.debug(f'Data {sample_name} {np.shape(sample_data)}')
-                    if kwargs.get('slice_samples',True):
-                        # self.logger.debug(f'Before slicing {sample_name}: {np.shape(sample_data)}')
-                        sample_data,iters = self.slice_sample_iterations(sample_data,settings=settings)
-                        # self.logger.debug(f'After slicing {sample_name}: {np.shape(sample_data)}')
-                    else:
-                        # Get iterations
-                        iters = np.arange(
-                            start=1,
-                            stop=sample_data.shape[0]+1,
-                            step=1,
-                            dtype='int32'
-                        )
-                    global_coords['iter'] = iters
+                    
+                    # Get iterations
+                    global_coords['iter'] = np.arange(
+                        start=1,
+                        stop=sample_data.shape[0]+1,
+                        step=1,
+                        dtype='int32'
+                    )
                     # Append
                     self.logger.debug(f'Appending {sample_name}')
                     data_vars[sample_name] = np.array([sample_data[:]])
@@ -577,8 +602,10 @@ class Outputs(object):
                 # Writing or appending mode
                 if ((not os.path.exists(filepath) or not os.path.isfile(filepath)) or overwrite) and i == 0:
                     mode = 'w'
+                    overwrite = False
                 else:
                     mode = 'a'
+                # print(mode,f"/{sam_name}/{i}")
                 write_xr_data(
                     datum,
                     filepath,
@@ -623,7 +650,7 @@ class Outputs(object):
                         self.logger.warning(f"Could not load /{sam_name}/{collection_id} from {self.outputs_path} sample collections")
                 # remove loaded sample from consideration
                 # since it has been succesfully loaded
-                if sample_loaded:
+                if sample_loaded and sam_name in samples_not_loaded:
                     samples_not_loaded.remove(sam_name)
 
             self.data = DataCollection(
@@ -639,28 +666,26 @@ class Outputs(object):
             filename = f"{','.join(self.settings['sample'])}"
         else:
             filename = f"{sample}"
-        if 'statistic' in list(self.settings.keys()):
+        if 'statistic' in self.settings:
             arr = []
             for metric,statistic in self.settings['statistic'].items():
                 arr.append(str(metric.lower()) + ','.join([str(stat) for stat in list(flatten(statistic[0]))]))
             filename += f"{'_'.join(arr)}"
-        if 'table_dim' in list(self.config.keys()):
+        if 'table_dim' in self.config:
             filename += f"_{self.config['table_dim']}"
-        if 'table_total' in list(self.config.keys()):
+        if 'table_total' in self.config:
             filename += f"_{self.config['table_total']}"
-        if 'type' in list(self.config.keys()) and len(self.config['type']) > 0:
+        if 'type' in self.config and len(self.config['type']) > 0:
             filename += f"_{self.config['type']}"
-        if 'experiment_title' in list(self.settings.keys()) and len(self.settings['experiment_title']) > 0:
+        if 'experiment_title' in self.settings and len(self.settings['experiment_title']) > 0:
             filename += f"_{self.settings['experiment_title']}"
-        if 'viz_type' in list(self.settings.keys()):
+        if 'viz_type' in self.settings:
             filename += f"_{self.settings['viz_type']}"
-        if 'burnin' in list(self.settings.keys()):
-            filename += f"_burnin{self.settings['burnin']}" 
-        if 'thinning' in list(self.settings.keys()):
-            filename += f"_thinning{self.settings['thinning']}"
-        if 'N' in list(self.settings.keys()):
-            filename += f"_N{self.settings['N']}"
-        # filename += f"_N{self.config['mcmc']['N']}"
+        if 'burnin_thinning_trimming' in self.settings:
+            filename += '_'+'_'.join([
+                        f"({var},burnin{setts['burnin']},thinning{setts['thinning']},trimming{setts['trimming']})"
+                        for var,setts in self.settings['burnin_thinning_trimming'].items()
+                    ])
         return filename
 
     def get_sample(self,sample_name:str):
@@ -697,10 +722,15 @@ class Outputs(object):
                 torch = False,
                 **{output:self.get_sample(output) for output in IntensityModelClass.REQUIRED_OUTPUTS}
             )
+
             # Create new dataset
             samples = samples.rename('intensity')
             # Exponentiate
             samples = np.exp(samples)
+            # print('table total',torch.tensor(table_total,dtype=int32))
+            # print(samples.coords.values)
+            # print(samples.sum(dim=['origin','destination']).values)
+            # print('\n')
 
         elif sample_name.endswith("__error"):
             # Load all samples
@@ -730,7 +760,7 @@ class Outputs(object):
                 )
             )
         
-        elif sample_name in list(INPUT_TYPES.keys()):
+        elif sample_name in list(INPUT_SCHEMA.keys()):
             # Read from config
             intensity_name = self.config.settings[self.intensity_model_class]['name']
             # Otherwise read from coords of first dataarray
@@ -748,18 +778,18 @@ class Outputs(object):
             if torch.is_tensor(getattr(self.inputs.data,sample_name)):
                 samples = torch.clone(
                     getattr(self.inputs.data,sample_name).to(
-                        INPUT_TYPES[sample_name]
+                        NUMPY_TO_TORCH_DTYPE[INPUT_SCHEMA[sample_name]['dtype']]
                     )
                 )
             else:
                 samples = torch.tensor(
                     getattr(self.inputs.data,sample_name), 
-                    dtype=INPUT_TYPES[sample_name]
+                    dtype=NUMPY_TO_TORCH_DTYPE[INPUT_SCHEMA[sample_name]['dtype']]
                 )
 
         else:
             if not hasattr(self.data,sample_name):
-                raise Exception(f"{sample_name} not found in data.")
+                raise Exception(f"{sample_name} not found in data {', '.join(list(self.data._vars_().keys()))}.")
             elif self.data.sizes(dim = sample_name) > 1:
                 raise Exception(f"Cannot process {sample_name} Data Collection of size {self.data.sizes(dim = sample_name)} > 1.")
             else:
@@ -772,11 +802,21 @@ class Outputs(object):
             # Find sweep dimensions that are not core coordinates
             sweep_dims = [d for d in samples.dims if d not in (list(CORE_COORDINATES_DTYPES.keys()))]
 
+            # Apply burning, thinning and trimming
+            self.logger.debug(f'Before slicing {sample_name}: {dict(samples.sizes)}')
+            samples = self.slice_sample_iterations(samples)
+            self.logger.debug(f'After slicing {sample_name}: {dict(samples.sizes)}')
+
             if len(sweep_dims) > 0:
                 # Stack all non-core coordinates into new coordinate
-                samples = samples.stack(id=tuplize(iter_dims),sweep=tuplize(sweep_dims))
+                samples = samples.stack(
+                    id = tuplize(iter_dims),
+                    sweep = tuplize(sweep_dims)
+                )
             else:
-                samples = samples.stack(id=tuplize(iter_dims))
+                samples = samples.stack(
+                    id = tuplize(iter_dims)
+                )
 
             # If parameter is beta, scale it by bmax
             if sample_name == 'beta' and self.intensity_model_class == 'spatial_interaction_model':
@@ -791,8 +831,8 @@ class Outputs(object):
             return data
         
         elif statistic.lower() == 'signedmean' and \
-            sample_name in list(OUTPUT_TYPES.keys()):
-            if sample_name in list(INTENSITY_TYPES.keys())+['intensity'] and hasattr(self.data,'sign'):
+            sample_name in list(OUTPUT_SCHEMA.keys()):
+            if sample_name in list(INTENSITY_SCHEMA.keys())+['intensity'] and hasattr(self.data,'sign'):
                 signs = self.get_sample('sign')
                 print(signs)
                 # Compute moments
@@ -801,9 +841,9 @@ class Outputs(object):
                 return self.compute_statistic(data,sample_name,'mean',dim=kwargs['dim'])
 
         elif (statistic.lower() == 'signedvariance' or statistic.lower() == 'signedvar') and \
-            sample_name in list(OUTPUT_TYPES.keys()):
+            sample_name in list(OUTPUT_SCHEMA.keys()):
 
-            if sample_name in list(INTENSITY_TYPES.keys())+['intensity']:
+            if sample_name in list(INTENSITY_SCHEMA.keys())+['intensity']:
                 # Compute mean
                 samples_mean = self.compute_statistic(data,sample_name,'signedmean',**kwargs)
                 # Compute squared mean
@@ -821,7 +861,7 @@ class Outputs(object):
                 # return self.compute_statistic(data,sample_name,'var',**kwargs)
         
         elif statistic.lower() == 'error' and \
-            sample_name in [param for param in list(OUTPUT_TYPES.keys()) if 'error' not in param]:
+            sample_name in [param for param in list(OUTPUT_SCHEMA.keys()) if 'error' not in param]:
             # Apply error norm
             return apply_norm(
                 tab=data,
@@ -875,6 +915,7 @@ class Outputs(object):
                                 )
 
         return sample_statistic
+            
     
 class DataCollection(object):
 
@@ -895,13 +936,17 @@ class DataCollection(object):
         # All items must be of type xarray data array
         assert all([isinstance(datum,xr.DataArray) for datum in data])
 
+        # Update sample data collection
         for datum in data:
-            # Update sample data collection
-            self.update_sample(datum,group_by=kwargs.get('group_by',[]))
+            self.update_sample(
+                datum,
+                group_by = kwargs.get('group_by',[]),
+                coordinate_slice = kwargs.get('coordinate_slice',[])
+            )
         
         # Combine coords for each list element of the Data Collection
         for sample_name in vars(self).keys():
-            if sample_name in DATA_TYPES:
+            if sample_name in DATA_SCHEMA:
                 for i,datum in enumerate(getattr(
                     self,
                     sample_name
@@ -911,8 +956,18 @@ class DataCollection(object):
                         sample_name
                     )[i] = xr.combine_by_coords(datum,combine_attrs='drop_conflicts')
     
-    def update_sample(self, new_data, group_by:list=[]):
-
+    def update_sample(self, new_data, group_by:list=[], coordinate_slice:dict={}):
+        # Slice according to coordinate slice
+        if len(coordinate_slice) > 0:
+            new_data = new_data.sel( 
+                **{
+                    k:(v['values'] \
+                        if len(v['values']) > 1 \
+                        else v['values'][0]) \
+                    for k,v in coordinate_slice.items()
+                }
+            )
+    
         # Get sample name
         sample_name = new_data.attrs['arr_name']
 
@@ -925,8 +980,8 @@ class DataCollection(object):
 
         # Flag for whether update has completed
         complete = False
-        
-        if not sample_name in vars(self):
+
+        if sample_name not in list(self._vars_().keys()):
             setattr(
                 self,
                 sample_name,
@@ -963,6 +1018,98 @@ class DataCollection(object):
                     sample_name
                 ).append([new_data])
 
+        return self
+    
+    def update_sample_sequentially(self,output_datasets,group_by:list=[],coordinate_slice:dict={}):
+        for datasets in tqdm(
+            output_datasets,
+            leave=False,
+            miniters=1,
+            position=0              
+        ):
+            self.update_sample(
+                new_data = datasets,
+                group_by = group_by,
+                coordinate_slice = coordinate_slice
+            )
+
+    def combine_by_coords_sequentially(self,sample_name:str,combined_dims:list):
+        for i,datasets in enumerate(
+            getattr(
+                self,
+                sample_name
+            )
+        ):
+            getattr(
+                self,
+                sample_name
+            )[i] = self.combine_by_coords(
+                i = i,
+                combined_dims = combined_dims,
+                datasets = datasets
+            )[1]
+
+    def combine_by_coords_concurrently(self,sample_data,indx:int,combined_dims:list,n_workers:int=1):
+        # Every result corresponds to a unique pair of 
+        # sweep id and sample name
+        # Initialise progress bar
+        progress = tqdm(
+            total=len(sample_data),
+            leave=False,
+            miniters=1,
+            position=0
+        )
+        combined_coords = []
+        # Create callback function for this index
+        # The index is required because the following
+        # function is created within a loop
+        def make_callback(idx):
+            def _callback_(fut):
+                progress.update()
+                combined_coords.append(fut.result())
+            return _callback_
+        my_callback = make_callback(indx)
+
+        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = n_workers) as executor:
+            # Gather all group and group elements that need to be combined
+            for i,datasets in enumerate(sample_data):
+                try:
+                    future = executor.submit(
+                        self.combine_by_coords,
+                        i = i,
+                        combined_dims = combined_dims,
+                        datasets = datasets
+                    )
+                    future.add_done_callback(my_callback)
+                except:
+                    print(traceback.format_exc())
+                    raise Exception('Getting sweep outputs failed.')
+
+        # Delete executor and progress bar
+        progress.close()
+        safe_delete(progress)
+        executor.shutdown(wait=True)
+        safe_delete(executor)
+        return combined_coords
+            
+
+    def combine_by_coords(self,i:int,combined_dims:list,datasets:list):
+        # Sort datasets by seed
+        datasets = sorted(
+            datasets, 
+            key = lambda x: tuple([x.coords[var].item() for var in combined_dims if var not in ['N','iter']])
+        )
+        result = None
+        for j,datum in enumerate(datasets):
+            if j == 0:
+                result = datum
+            else:
+                result = xr.combine_by_coords([
+                    result,
+                    datum
+                ])
+        return (i,result)
+
     def del_sample(self,sample_name):
         delattr(
             self,
@@ -974,8 +1121,8 @@ class DataCollection(object):
             raise KeyError(f"Index {index} out of bounds for length {len(self)}.")
         else:
             new_data = deepcopy(self)
-            for sample_name, sample_data in vars(self).items():
-                if sample_name in DATA_TYPES:
+            for sample_name, sample_data in self._vars_().items():
+                if sample_name in DATA_SCHEMA:
                     setattr(
                         new_data,
                         sample_name,
@@ -989,7 +1136,7 @@ class DataCollection(object):
             raise KeyError(f"Index {index} out of bounds for length {len(self)}.")
         else:
             for sample_name in vars(new_data).keys():
-                if sample_name in DATA_TYPES and sample_name in vars(self):
+                if sample_name in DATA_SCHEMA and sample_name in self._vars_():
                     getattr(
                         self,
                         sample_name
@@ -997,16 +1144,16 @@ class DataCollection(object):
                         new_data,
                         sample_name
                     )
-
-    def __delitem__(self,index):
-        if index >= len(self):
-            raise KeyError(f"Index {index} out of bounds for length {len(self)}.")
-        else:
-            # Delete index element of Data Collection
-            del self.data[index]
+    
+    # def __delitem__(self,index):
+    #     if index >= len(self):
+    #         raise KeyError(f"Index {index} out of bounds for length {len(self)}.")
+    #     else:
+    #         # Delete index element of Data Collection
+    #         del self[index]
 
     def _vars_(self):
-        return {k:v for k,v in vars(self).items() if k in DATA_TYPES}
+        return {k:v for k,v in vars(self).items() if k in DATA_SCHEMA}
     
     def __repr__(self):
         return "\n\n".join([
@@ -1015,12 +1162,9 @@ class DataCollection(object):
             if isinstance(sample_data,list) \
             else str(dict(sample_data.sizes))) + \
             '\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n'
-            for sample_name,sample_data in vars(self).items() \
-            if sample_name in DATA_TYPES
+            for sample_name,sample_data in self._vars_().items()
         ])
     
-    def data_vars(self):
-        return {k:v for k,v in self.data._vars_().items() if k in DATA_TYPES}
     
     def sizes(self,dim:str=None):
         if dim is None:
@@ -1031,7 +1175,7 @@ class DataCollection(object):
                     else 1
                 )
                 for sample_name,sample_data in vars(self).items() 
-                if sample_name in DATA_TYPES
+                if sample_name in DATA_SCHEMA
             }
         else:
             elem = getattr(
@@ -1042,12 +1186,17 @@ class DataCollection(object):
 
 
     def __len__(self):
+        length = 0
         try:
-            assert len(set([size for size in self.sizes().values()])) == 1
+            assert len(set([size for size in self.sizes().values()])) <= 1
+            length = len(set([size for size in self.sizes().values()]))
         except:
             raise Exception(f"Irregular DataCollection with sizes {str(self.sizes())}")
         
-        return list(self.sizes().values())[0]
+        if length <= 0:
+            return 0
+        else:
+            return list(self.sizes().values())[0]
 
 
 class OutputSummary(object):
@@ -1096,7 +1245,6 @@ class OutputSummary(object):
                     path_dir = os.path.join(
                         __self__.settings['out_directory'],
                         dataset_name,
-                        __self__.settings['outputs'].get('out_group',''),
                         _dir
                     )
                     if os.path.exists(path_dir):
@@ -1165,16 +1313,17 @@ class OutputSummary(object):
                     )
                 )
             )
-            # If no directories found terminate
-            if len(output_dirs) == 0 :
-                __self__.logger.error(f'No directories found in {os.path.join(output_directory,"*")}')
-                raise Exception('Cannot read outputs.')
-            else:
-                __self__.logger.info(f"{len(output_dirs)} output folders found.")
+        # If no directories found terminate
+        if len(output_dirs) == 0 :
+            __self__.logger.error(f'No directories found in {os.path.join(output_directory,"*")}')
+            raise Exception('Cannot read outputs.')
+        else:
+            __self__.logger.info(f"{len(output_dirs)} output folders found.")
         return output_dirs
 
     def get_data_collection_group_by(self,sweep_dims:list):
         group_by = []
+        combined_dims = []
         # Get all non-core sweep dims
         non_core_sweep_dims = [k for k in sweep_dims if k not in CORE_COORDINATES_DTYPES]
         for gb in list(self.settings.get('group_by',[]))+non_core_sweep_dims:
@@ -1205,24 +1354,37 @@ class OutputSummary(object):
                     if coupled_param['var'] not in group_by:
                         group_by.append(coupled_param['var'])
         
-        return group_by
+        for dim in self.sweep_params['isolated'].keys():
+            if dim not in group_by:
+                combined_dims.append(dim)
+        for vals in self.sweep_params['coupled'].values():
+            for coupled_dims in vals :
+                if coupled_dims['var'] not in group_by:
+                    combined_dims.append(coupled_dims['var'])
+        return group_by,combined_dims
     
     def collect_experiments_metadata(self):
         
         experiment_metadata = {}
-        for i,output_folder in enumerate(self.output_folders):
+        for indx,output_folder in enumerate(self.output_folders):
             
-            self.logger.info(f"Scanning folder {i+1}/{len(self.output_folders)}")
+            self.logger.info(f"Scanning folder {indx+1}/{len(self.output_folders)}")
 
             # Collect outputs from folder
-            outputs = self.get_folder_outputs(output_folder)
+            outputs = self.get_folder_outputs(indx,output_folder)
 
             # Loop through each member of the data collection
             if self.settings.get('n_workers',1) > 1:
                 metric_data_collection = self.get_experiment_metadata_concurrently(outputs)
             else:
                 metric_data_collection = self.get_experiment_metadata_sequentially(outputs)
+            # Convert generator to list
+            metric_data_collection = list(metric_data_collection)
 
+            if len(metric_data_collection) <= 0:
+                self.logger.error(f"Empty output dataset in {output_folder}")
+                raise Exception("Failed collecting experiments metadata")
+            
             # Convert metric data collection to list
             metric_data_collection = list(metric_data_collection)
             
@@ -1240,6 +1402,8 @@ class OutputSummary(object):
         return experiment_metadata
     
     def get_experiment_metadata_sequentially(self,outputs):
+        # Every result corresponds to a unique pair of 
+        # sweep id and sample name
         # Loop through each member of the data collection
         for j in tqdm(
             range(len(outputs.data)),
@@ -1253,6 +1417,8 @@ class OutputSummary(object):
             yield self.get_experiment_metadata(outputs.get(j))
 
     def get_experiment_metadata_concurrently(self,outputs):
+        # Every result corresponds to a unique pair of 
+        # sweep id and sample name
         # Initialise progress bar
         progress = tqdm(
             total=len(outputs.data),
@@ -1261,8 +1427,12 @@ class OutputSummary(object):
             miniters=1,
             position=0
         )
-        with concurrency.ProcessPoolExecutor(self.settings.get('n_workers',1)*2) as executor:
-            futures = []
+        results = []
+        def my_callback(fut):
+            progress.update()
+            results.append(fut.result())
+
+        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = self.settings.get('n_workers',1)) as executor:
             # Start the processes and ignore the results
             for j in range(len(outputs.data)):
                 try:
@@ -1270,38 +1440,19 @@ class OutputSummary(object):
                         self.get_experiment_metadata,
                         outputs = outputs.get(j),
                     )
-                    # Update progress
-                    futures.append(future)
+                    future.add_done_callback(my_callback)
                 except:
                     print(traceback.format_exc())
                     raise Exception('Getting sweep outputs failed.')
 
-            # Wait for all processes to finish
-            for future in concurrency.as_completed(futures):
-                try:
-                    result = future.result()
-                except:
-                    raise Exception(f"Future {future} failed")
-                progress.update(n=1)
-                yield result
-            
-            # Delete futures and executor
-            safe_delete(futures)
-            executor.shutdown(True)
-            safe_delete(executor)
-        # Delete progress bar
+        # Delete executor and progress bar
         progress.close()
         safe_delete(progress)
+        executor.shutdown(wait=True)
+        safe_delete(executor)
+        return results
 
     def get_experiment_metadata(self,outputs:Outputs):
-
-        # self.logger.info(f"Getting data element {index+1}/{len(outputs.data)}")
-
-        # Apply these metrics to the data 
-        metric_data = self.apply_metrics(
-            experiment_id = outputs.experiment_id,
-            outputs = outputs
-        )
         
         # Extract useful data from config
         useful_metadata = {}
@@ -1322,11 +1473,15 @@ class OutputSummary(object):
                 useful_metadata[key],_ = self.config.path_get(
                     key_path = key_paths[0]
                 )
-            # Extract from data collection element
-            elif self.config.has_sweep(key_paths[0]):
-                # Grab first dataarray
-                data_arr = list(outputs.data_vars().values())[0]
-                useful_metadata[key] = data_arr.sizes[key]
+            # NOTE: If metadata key is sweeped
+            # it will be read directly from 
+            # the sweep dimensions of the xarray data
+
+        # Apply these metrics to the data 
+        metric_data = self.apply_metrics(
+            experiment_id = outputs.experiment_id,
+            outputs = outputs
+        )
 
         # Add useful metadata to metric data
         for m in range(len(metric_data)):
@@ -1334,14 +1489,14 @@ class OutputSummary(object):
             for k,v in useful_metadata.items():
                 metric_data[m][k] = v
 
-        # Return metrix data
+        # Return metric data
         return metric_data
+
 
     def get_sweep_outputs(
         self,
         sweep_configuration,
         experiment_id:str,
-        sweep_dims:list,
         inputs:Inputs=None,
         group_by:list=[],
         input_slice:dict={},
@@ -1367,10 +1522,8 @@ class OutputSummary(object):
         
         # Get dictionary output data to be passed into xarray
         xr_dict_data = outputs.load_experiment_data(
-            inputs=inputs,
-            settings=self.settings,
-            input_slice=input_slice,
-            slice_samples=True
+            inputs = inputs,
+            input_slice = input_slice
         )
         data_arr,slice_dict = {},{}
         for sample_name,xr_data in xr_dict_data.items():
@@ -1401,7 +1554,7 @@ class OutputSummary(object):
             )
         return data_arr
 
-    def get_folder_outputs(self,output_folder):
+    def get_folder_outputs(self,indx:str,output_folder):
             
         # Read metadata config
         self.config = Config(
@@ -1481,8 +1634,7 @@ class OutputSummary(object):
         sweep_dims += list(self.sweep_params['coupled'].keys())
 
         # Additionally group data collection by these attributes
-        group_by = self.get_data_collection_group_by(sweep_dims)
-        # print('group_by',group_by)
+        group_by,combined_dims = self.get_data_collection_group_by(sweep_dims)
 
         # Try to load ground truth table
         self.settings['table_total'] = int(self.settings.get('table_total',1))
@@ -1527,57 +1679,47 @@ class OutputSummary(object):
             output_datasets = []
             # Do it concurrently
             stop = None
+            step = 1
             if self.settings.get('n_workers',1) > 1:
                 # Initialise progress bar
                 progress = tqdm(
-                    total=len(sweep_configurations[:stop]),
+                    total=len(sweep_configurations[::step][:stop]),
                     desc='Collecting h5 data',
                     leave=False,
                     miniters=1,
                     position=0
                 )
-                with concurrency.ProcessPoolExecutor(self.settings.get('n_workers',1)*2) as executor:
-                    futures = []
+                def my_callback(fut):
+                    progress.update()
+                    output_datasets.append(fut.result())
+                with BoundedQueueProcessPoolExecutor(max_waiting_tasks = self.settings.get('n_workers',1)) as executor:
                     # Start the processes and ignore the results
-                    for sweep_configuration in sweep_configurations[:stop]:
+                    for sweep_configuration in sweep_configurations[::step][:stop]:
                         try:
                             future = executor.submit(
                                 self.get_sweep_outputs,
                                 sweep_configuration = sweep_configuration,
                                 experiment_id = outputs.experiment_id,
-                                sweep_dims = sweep_dims,
                                 inputs = passed_inputs,
                                 group_by = group_by,
                                 input_slice = input_slice,
-                                coordinate_slice = coordinate_slice 
+                                coordinate_slice = coordinate_slice
                             )
-                            # Update progress
-                            futures.append(future)
+                            future.add_done_callback(my_callback)
                         except:
                             print(traceback.format_exc())
                             raise Exception('Getting sweep outputs failed.')
 
-                    # Wait for all processes to finish
-                    for future in concurrency.as_completed(futures):
-                        try:
-                            result = future.result()
-                        except:
-                            raise Exception(f"Future {future} failed")
-                        progress.update(n=1)
-                        output_datasets.append(result)
-                    
-                    # Delete futures and executor
-                    safe_delete(futures)
-                    executor.shutdown(True)
-                    safe_delete(executor)
-                # Delete progress bar
+                # Delete executor and progress bar
                 progress.close()
                 safe_delete(progress)
+                executor.shutdown(wait=True)
+                safe_delete(executor)
 
             # Do it sequentially
             else:
                 for sweep_configuration in tqdm(
-                    sweep_configurations[:stop],
+                    sweep_configurations[::step][:stop],
                     desc='Collecting metadata',
                     leave=False,
                     position=0
@@ -1587,7 +1729,6 @@ class OutputSummary(object):
                         self.get_sweep_outputs(
                             sweep_configuration = sweep_configuration,
                             experiment_id = outputs.experiment_id,
-                            sweep_dims = sweep_dims,
                             inputs = passed_inputs,
                             group_by = group_by,
                             input_slice = input_slice,
@@ -1597,45 +1738,41 @@ class OutputSummary(object):
 
             # Create xarray dataset
             try:
-                self.logger.info(f"Attempting to load {', '.join(sorted(samples_not_loaded))}.")
+                self.logger.info(f"Attempting to create xarray(s) for {', '.join(sorted(samples_not_loaded))}.")
                 
                 for sample_name in sorted(samples_not_loaded):
                     
-                    self.logger.info(f"Combining {sample_name} homogeneous DataArray(s)")
+                    self.logger.info(f"Combining {sample_name} homogeneous DataArray(s) sequentially")
                     # Homogeneous data arrays are the ones that have common coordinates
                     # along all core dimensions and group_by dimensions
-
-                    for dataset in output_datasets:
-                        # Slice according to coordinate slice
-                        if len(coordinate_slice) > 0:
-                            outputs.data.update_sample(
-                                dataset.pop(sample_name).sel( 
-                                    **{
-                                        k:(v['values'] \
-                                            if len(v['values']) > 1 \
-                                            else v['values'][0]) \
-                                        for k,v in coordinate_slice.items()
-                                    }
-                                ),
-                                group_by = group_by
-                            )
-                        else:
-                            outputs.data.update_sample(
-                                dataset.pop(sample_name),
-                                group_by = group_by
-                            )
+                    outputs.data.update_sample_sequentially(
+                        output_datasets = [ds.pop(sample_name,None) for ds in output_datasets],
+                        group_by = group_by,
+                        coordinate_slice = coordinate_slice
+                    )
                     
                     # Combine coords for each list element of the Data Collection
-                    self.logger.info(f'Combining {sample_name} by coords')
-                    for i,datum in enumerate(getattr(
-                        outputs.data,
-                        sample_name
-                    )):
-                        getattr(
-                            outputs.data,
-                            sample_name
-                        )[i] = xr.combine_by_coords(datum)
-
+                    parallel = self.settings.get('n_workers',1) > 1
+                    self.logger.info(f"Combining {sample_name} by coords {'concurrently' if parallel else 'sequentially'}.")
+                    if parallel:
+                        combined_coords = outputs.data.combine_by_coords_concurrently(
+                            sample_data = getattr(outputs.data,sample_name),
+                            indx = indx,
+                            combined_dims = combined_dims,
+                            n_workers = self.settings.get('n_workers',1)
+                        )
+                        # Add results to self
+                        for cc in combined_coords:
+                            getattr(
+                                outputs.data,
+                                sample_name
+                            )[cc[0]] = cc[1]
+                    else:
+                        outputs.data.combine_by_coords_sequentially(
+                            sample_name = sample_name,
+                            combined_dims = combined_dims
+                        )
+                        
                 # Write sample data collection to file
                 outputs.write_data_collection(
                     sample_names = samples_not_loaded,
@@ -1646,6 +1783,7 @@ class OutputSummary(object):
             except:
                 print(traceback.format_exc())
                 self.logger.error('Failed creating xarray DataArray')
+                sys.exit()
             
 
         return outputs
@@ -1669,9 +1807,8 @@ class OutputSummary(object):
 
             # Make output directory
             output_directory = os.path.join(
-                self.config.out_directory,
+                self.config['outputs']['out_directory'],
                 dataset,
-                self.config['outputs'].get('out_group',''),
                 'summaries'
             )
             makedir(output_directory)
@@ -1692,13 +1829,14 @@ class OutputSummary(object):
             else:
                 filepath = os.path.join(
                     output_directory,
-                    f"{'_'.join(self.settings['experiment_type'])}_"+\
-                    f"{'_'.join(self.settings['title'])+'_' if len(self.settings['title']) > 0 else ''}"+\
-                    f"{date_strings if len(date_strings) < 4 else 'multiple_dates'}_"+\
-                    f"burnin{self.settings['burnin']}_"+\
-                    f"thinning{self.settings['thinning']}_"+\
-                    f"N{self.settings.get('N',None)}_"+\
-                    f"{self.settings['filename_ending']}.csv"
+                    f"{'_'.join(list(self.settings['experiment_type']))}"+\
+                    f"{'_'+'_'.join(self.settings['title']) if len(self.settings['title']) > 0 else ''}"+\
+                    f"{'_multiple_dates' if len(date_strings) > 4 else '_'+date_strings if len(date_strings) > 0 else ''}"+\
+                    '_'+'_'.join([
+                        f"({var},burnin{setts['burnin']},thinning{setts['thinning']},trimming{setts['trimming']})"
+                        for var,setts in self.settings['burnin_thinning_trimming'].items()
+                    ])+\
+                    f"{'_'+self.settings['filename_ending'] if len(self.settings['filename_ending']) else 'summaries'}.csv"
                 )
             # Write experiment summaries to file
             self.logger.info(f"Writing summaries to {filepath}")
@@ -1706,7 +1844,7 @@ class OutputSummary(object):
             print('\n')
     
     
-    def apply_metrics(self,experiment_id,outputs):
+    def apply_metrics(self,experiment_id:str,outputs:Outputs):
         # Get outputs and unpack its statistics
         self.logger.progress('Applying metrics...')
         
@@ -1724,9 +1862,12 @@ class OutputSummary(object):
                     self.logger.error(traceback.format_exc())
                 self.logger.debug(traceback.format_exc())
                 self.logger.error(f'Experiment {os.path.basename(experiment_id)} does not have sample {sample_name}')
+                # sys.exit()
                 continue
             self.logger.progress(f"samples {np.shape(samples)}, {samples.dtype}")
 
+            # Unstack sweep dims
+            # samples = samples.unstack(dim='sweep')
             sample_data = {}
             for metric,statistics in self.settings['statistic'].items():
                 # Issue warning if three set of statistics are provided
@@ -1738,6 +1879,10 @@ class OutputSummary(object):
                 sample_statistics_axes = statistics[0]
                 metric_statistics_axes = statistics[1]
                 
+                # Rename metric if required
+                if metric == '' or metric == 'none':
+                    metric = deepcopy(sample_name)
+                
                 self.logger.progress(f"{metric.lower()} {sample_statistics_axes} {metric_statistics_axes}")
                 
                 # Compute statistic before applying metric
@@ -1747,17 +1892,19 @@ class OutputSummary(object):
                         sample_name = sample_name,
                         statistic_dims = sample_statistics_axes
                     )
+                    samples_summarised.rename(sample_name)
                 except Exception:
                     self.logger.debug(traceback.format_exc())
                     self.logger.error(f"samples {np.shape(samples)}, {samples.dtype}")
-                    self.logger.error(f"Applying statistic {' over axes '.join([str(s) for s in sample_statistics_axes])} \
+                    self.logger.error(f"Applying statistic(s) {' over axes '.join([str(s) for s in sample_statistics_axes])} \
                                     for sample {sample_name} for metric {metric.lower()} of experiment {experiment_id} failed")
+                    print(samples.dims)
                     print('\n')
                     continue
                 self.logger.progress(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
 
                 # Get all attributes and their values
-                attribute_keys = METRICS[metric.lower()]['loop_over']
+                attribute_keys = METRICS.get(metric.lower(),{}).get('loop_over',[])
 
                 # Get all combinations of metric attribute values
                 attribute_values = list(product(*[self.settings.get(attr,['none']) for attr in attribute_keys]))
@@ -1791,8 +1938,11 @@ class OutputSummary(object):
                         self.logger.error(f'Arguments for metric {metric} cannot be updated')
                         print('\n')
                         continue
+                    
+                    print(sample_name,metric,dict(samples_summarised.sizes))
+
                     try:
-                        if metric.lower() != 'none' and metric.lower() != '' and metric.lower() in METRICS:
+                        if metric.lower() not in ['none',''] and metric.lower() in METRICS:
                             samples_metric = globals()[metric.lower()](
                                 tab=samples_summarised,
                                 **metric_kwargs
@@ -1800,12 +1950,12 @@ class OutputSummary(object):
                             # Rename metric xr data array
                             samples_metric = samples_metric.rename(metric.lower())
                         else:
-                            samples_metric = deepcopy(samples_summarised)
+                            samples_metric = deepcopy(samples_summarised).rename(metric.lower())
                     except Exception:
                         self.logger.debug(traceback.format_exc())
-                        self.logger.error(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
-                        self.logger.error(f"tab0 {np.shape(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}")
-                        self.logger.error(f'Applying metric {metric.lower()} for {attribute_settings_string} \
+                        self.logger.info(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
+                        self.logger.info(f"tab0 {np.shape(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}")
+                        self.logger.info(f'Applying metric {metric.lower()} for {attribute_settings_string} \
                                             over sample {sample_name} \
                                             for experiment {experiment_id} failed')
                         print('\n')
@@ -1813,14 +1963,19 @@ class OutputSummary(object):
 
                     # print(sample_name,metric,samples_metric)
                     self.logger.progress(f"Samples metric is {np.shape(samples_metric)}")
+                    # Unstack sweep dimensions
+                    samples_metric = samples_metric.unstack(dim='sweep')
                     # Apply statistics after metric
                     try:
-                        self.settings['axis'] = METRICS[metric.lower()]['apply_axis']
-                        metric_summarised = outputs.apply_sample_statistics(
-                            samples = samples_metric,
-                            sample_name = metric.lower(),
-                            statistic_dims = metric_statistics_axes
-                        )
+                        if metric.lower() not in ['none',''] and metric.lower() in METRICS:
+                            self.settings['axis'] = METRICS[metric.lower()]['apply_axis']
+                            metric_summarised = outputs.apply_sample_statistics(
+                                samples = samples_metric,
+                                sample_name = metric.lower(),
+                                statistic_dims = metric_statistics_axes
+                            )
+                        else:
+                            metric_summarised = deepcopy(samples_metric).rename(metric.lower())
                     except Exception:
                         self.logger.debug(traceback.format_exc())
                         self.logger.error(f"samples_metric {np.shape(samples_metric)}, {samples_metric.dtype}")
@@ -1847,12 +2002,16 @@ class OutputSummary(object):
 
                     # This loops over remaining sweep configurations
                     for _,sweep in metric_summarised.iterrows():
+                        # remove sweep key
+                        sweep = sweep.to_dict()
+                        sweep = {k:get_value(sweep,k) for k in sweep.keys()}
                         # Get sweep id
-                        sweep_id = '& '.join([str(k)+'_'+str(v) for k,v in sweep.to_dict().items() if k != metric])
+                        sweep_id = ' & '.join([str(k)+'_'+str(v) for k,v in sweep.items() if k not in [metric,'sweep']])
                         # Gather all key-value pairs from every row (corresponding to a single sweep setting)
                         # this is corresponds to variable 'row'
                         # Add every sweep configuration to this metric data
                         if sweep_id not in sample_data:
+                            metric_value = sweep.pop(metric,None)
                             sample_data[sweep_id] = [{
                                 **{
                                    "sample_name" : sample_name,
@@ -1863,9 +2022,10 @@ class OutputSummary(object):
                                     f"{metric}_metric_statistic" : '|'.join(
                                         [stringify_statistic(_stat_dim) 
                                          for _stat_dim in metric_statistics_axes]
-                                    )
+                                    ),
+                                    metric:parse(metric_value)
                                 },
-                                **sweep.to_dict(),
+                                **sweep,
                                 **attribute_settings
                             }]*len(attribute_values)
                             
@@ -1881,14 +2041,20 @@ class OutputSummary(object):
                                     [stringify_statistic(_stat_dim) 
                                         for _stat_dim in metric_statistics_axes]
                                 ),
-                                metric:sweep[metric],
+                                metric:parse(sweep[metric]),
                                 **attribute_settings
                             })
+                        # print(sample_data[sweep_id])
+                        # print('\n')
                 
-                # Add sample data to metric data
-                for sweep_metric_list in sample_data.values():
-                    metric_data += list(sweep_metric_list)
-            
+            # Add sample data to metric data
+            for sweep_metric_list in sample_data.values():
+                # for sml in sweep_metric_list:
+                    # print(sml)
+                    # print('\n')
+                metric_data += list(sweep_metric_list)
+            safe_delete(sample_data)
+        
         return metric_data
     
     def update_metric_arguments(self,metric,outputs,settings):        
