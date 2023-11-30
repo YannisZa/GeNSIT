@@ -8,7 +8,7 @@ from numpy import shape
 from scipy import optimize
 from torch import int32, float32
 from itertools import chain, combinations
-from multiresticodm.global_variables import DATA_TYPES
+from multiresticodm.global_variables import DATA_SCHEMA
 
 from multiresticodm.utils import flatten
 
