@@ -23,7 +23,12 @@ class ContingencyTableMarkovChainMonteCarlo(object):
     Work Station for holding and running Monte Carlo methods on table space.
     """
 
-    def __init__(self, ct: ContingencyTable, rng: np.random.Generator, table_mb:MarkovBasis=None, **kwargs):
+    def __init__(
+        self, 
+        ct: ContingencyTable, 
+        table_mb:MarkovBasis=None, 
+        **kwargs
+    ):
         # Setup logger
         level = kwargs.get('level',None)
         self.logger = setup_logger(
@@ -52,9 +57,6 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
         else:
             raise Exception(f'ContingencyTableMarkovChainMonteCarlo did not recognise input of type {ct.__class__.__name__}')
-
-        # Store random number generator
-        self._rng = rng
         
         # Get number of cores/threads to use in (pseudo) parallelisation
         self.n_workers = int(self.ct.config.settings['inputs'].get('n_workers',1))
