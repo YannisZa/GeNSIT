@@ -138,15 +138,15 @@ class SpatialInteraction2D():
     def __str__(self):
 
         return f"""
-            {'x'.join([str(d.cpu().detach().numpy()) for d in self.dims])} {self.name} Constrained Spatial Interaction Model
-            Origin demand sum: {torch.sum(self.origin_demand) if self.origin_demand is not None else None}
-            Destination demand sum: {torch.sum(self.destination_demand) if self.destination_demand is not None  else None}
-            Origin attraction sum: {torch.sum(torch.exp(self.log_origin_attraction)) if self.log_origin_attraction is not None  else None}
-            Destination attraction sum: {torch.sum(torch.exp(self.log_destination_attraction)) if self.log_destination_attraction is not None  else None}
-            Cost matrix sum: {torch.sum(torch.ravel(self.cost_matrix)) if self.cost_matrix is not None else None}
-            Alpha: {self.alpha}
-            Beta: {self.beta}
-            Beta scaling: {self.bmax}
+            {'x'.join([str(d) for d in self.dims.values()])} {self.name} Spatial Interaction Model
+            Origin demand sum: {torch.sum(self.origin_demand) if getattr(self,'origin_demand',None) is not None else None}
+            Destination demand sum: {torch.sum(self.destination_demand) if getattr(self,'destination_demand',None) is not None  else None}
+            Origin attraction sum: {torch.sum(torch.exp(self.log_origin_attraction)) if getattr(self,'log_origin_attraction',None) is not None  else None}
+            Destination attraction sum: {torch.sum(self.destination_attraction_ts) if getattr(self,'destination_attraction_ts',None) is not None  else None}
+            Cost matrix sum: {torch.sum(torch.ravel(self.cost_matrix)) if getattr(self,'cost_matrix',None) is not None else None}
+            Alpha: {self.alpha if getattr(self,'alpha',None) is not None else None}
+            Beta: {self.beta if getattr(self,'beta',None) is not None else None}
+            Beta scaling: {self.bmax if getattr(self,'bmax',None) is not None else None}
         """
 
     def get_input_kwargs(self,passed_kwargs):
