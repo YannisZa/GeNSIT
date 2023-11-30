@@ -17,7 +17,7 @@ from multiresticodm.math_utils import torch_optimize
 from multiresticodm.probability_utils import random_vector
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.spatial_interaction_model import instantiate_sim
-from multiresticodm.global_variables import INPUT_TYPES, NUMPY_TO_TORCH_DTYPE, PARAMETER_DEFAULTS,INPUT_SCHEMA,Dataset
+from multiresticodm.global_variables import INPUT_SCHEMA, NUMPY_TO_TORCH_DTYPE, PARAMETER_DEFAULTS,INPUT_SCHEMA,Dataset
 from multiresticodm.utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt
 
 class Inputs:
@@ -65,7 +65,7 @@ class Inputs:
             self.read_data()
 
     def data_vars(self):
-        return {k:v for k,v in vars(self).items() if k in INPUT_TYPES}
+        return {k:v for k,v in vars(self).items() if k in INPUT_SCHEMA}
     
     def validate_dims(self):
         for attr,schema in self.schema.items():
@@ -106,7 +106,7 @@ class Inputs:
                         data = np.loadtxt(filepath,dtype=schema['dtype'], ndmin=schema['ndmin'])
                         setattr(self.data,attr,data)
                         # Check to see see that they are all positive
-                        if (getattr(self.data,attr) < 0).any():
+                        if schema.get('positive',True) and (getattr(self.data,attr) < 0).any():
                             raise Exception(f"{attr.replace('_',' ').capitalize()} {getattr(self.data,attr)} are NOT positive")
                         # Update dims
                         for ax,dim in zip(schema['axes'],schema['dims']):
@@ -125,8 +125,8 @@ class Inputs:
         
         # Update log destination attraction if
         # destination attraction time series was provided
-        if hasattr(self.data,'destination_attraction_ts'):
-            self.data.log_destination_attraction = np.log(self.data.destination_attraction_ts[-1:,:]).astype('float32')
+        # if hasattr(self.data,'destination_attraction_ts'):
+        #     self.data.log_destination_attraction = np.log(self.data.destination_attraction_ts[-1:,:]).astype('float32')
 
         # Update grand total if it is not specified
         if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:
@@ -156,9 +156,9 @@ class Inputs:
 
     def update_delta_and_kappa(self):
         self.true_parameters['delta'] = self.config.settings['harris_wilson_model']['parameters'].get('delta',-1.0)
-        self.true_parameters['delta'] = self.true_parameters['delta'] if self.true_parameters['delta'] > 0 else None
+        self.true_parameters['delta'] = self.true_parameters['delta'] if self.true_parameters['delta'] >= 0 else None
         self.true_parameters['kappa'] = self.config.settings['harris_wilson_model']['parameters'].get('kappa',-1.0)
-        self.true_parameters['kappa'] = self.true_parameters['kappa'] if self.true_parameters['kappa'] > 0 else None
+        self.true_parameters['kappa'] = self.true_parameters['kappa'] if self.true_parameters['kappa'] >= 0 else None
         
         if hasattr(self.data,'destination_attraction_ts'):
             smallest_zone_size = np.min(self.data.destination_attraction_ts)
@@ -182,6 +182,7 @@ class Inputs:
             self.true_parameters['kappa'] = (total_flow + self.true_parameters['delta']*self.data.dims['destination'])/total_zone_sizes
         elif self.true_parameters['kappa'] is not None and self.true_parameters['delta'] is None:
             self.true_parameters['delta'] = self.true_parameters['kappa'] * smallest_zone_size
+        
 
     def pass_to_device(self):
         # Define device to set 
@@ -446,7 +447,7 @@ class Inputs:
         
         # Generate the initial origin sizes
         for key,value in self.config.settings['inputs']['data'].items():
-            if key in list(INPUT_TYPES.keys()) and not (key in ['cost_matrix']):
+            if key in list(INPUT_SCHEMA.keys()) and not (key in ['cost_matrix']):
                 # Randomly generate data
                 data = np.abs(
                     random_vector(
@@ -522,7 +523,7 @@ class Inputs:
         data_time_steps = self.config.settings['inputs']['dims'].get('time',destination_attraction_ts.shape[0])
         # Extract the training data from the time series data
         self.data.destination_attraction_ts = destination_attraction_ts[-data_time_steps:]
-        self.data.log_destination_attraction = torch.log(destination_attraction_ts[-1:])
+        # self.data.log_destination_attraction = torch.log(destination_attraction_ts[-1:])
 
         # Receive all data from device
         self.receive_from_device()
