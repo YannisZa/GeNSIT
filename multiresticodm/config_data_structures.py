@@ -387,18 +387,18 @@ class List(NonPrimitiveEntry):
         super().__init__(data,schema,key_path)
         self.dtype = list
         
-        key_path_copy = deepcopy(self.key_path)
-        self.key_path = []
         # First check that input is indeed a list
+        # key_path_copy = deepcopy(self.key_path)
+        # self.key_path = []
         self.check_type()
-        self.key_path = key_path_copy
+        # self.key_path = key_path_copy
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
         # Remove 'dtype' key
         self.schema = {} 
         for k,v in schema.items():
-            if k in ['dtype','sweepable','target_name','optional']:
+            if k in ["dtype","sweepable","target_name","optional"]:
                 continue
             # Remove all non-primitive entry names from preffix
             stored = False
@@ -410,7 +410,6 @@ class List(NonPrimitiveEntry):
             # If not done so already, store schema setting
             if not stored:
                 self.schema[k] = v
-                
         # Get all value entries
         self.data = [instantiate_data_type(val,self.schema,key_path) for val in data]
 
@@ -434,10 +433,10 @@ class List2D(NonPrimitiveEntry):
         self.dtype = list
 
         # First check that input is indeed a list
-        key_path_copy = deepcopy(self.key_path)
-        self.key_path = []
+        # key_path_copy = deepcopy(self.key_path)
+        # self.key_path = []
         self.check_type()
-        self.key_path = key_path_copy
+        # self.key_path = key_path_copy
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
@@ -524,11 +523,12 @@ class CustomList(NonPrimitiveEntry):
             print(self.schema)
             print(traceback.format_exc())
             sys.exit()
+        
         # First check that input is indeed a list
-        key_path_copy = deepcopy(self.key_path)
-        self.key_path = []
+        # key_path_copy = deepcopy(self.key_path)
+        # self.key_path = []
         self.check_type()
-        self.key_path = key_path_copy
+        # self.key_path = key_path_copy
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
@@ -631,10 +631,10 @@ class Dict(NonPrimitiveEntry):
         self.dtype = dict
 
         # First check that input is indeed a dict
-        key_path_copy = deepcopy(self.key_path)
-        self.key_path = []
+        # key_path_copy = deepcopy(self.key_path)
+        # self.key_path = []
         self.check_type()
-        self.key_path = key_path_copy
+        # self.key_path = key_path_copy
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
@@ -682,10 +682,10 @@ class CustomDict(NonPrimitiveEntry):
         self.dtype = dict
 
         # First check that input is indeed a dict
-        key_path_copy = deepcopy(self.key_path)
-        self.key_path = []
+        # key_path_copy = deepcopy(self.key_path)
+        # self.key_path = []
         self.check_type()
-        self.key_path = key_path_copy
+        # self.key_path = key_path_copy
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
