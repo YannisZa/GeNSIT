@@ -9,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, flatten, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk, sigma_to_noise_regime, stringify
+from multiresticodm.utils import deep_apply, flatten, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk, sigma_to_noise_regime, stringify, print_json
 
 class Config:
 
@@ -25,15 +25,9 @@ class Config:
             console_level = self.level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         
-        # Sweep mode activated is set to false
-        self.sweep_active = False
+        # Initialise global vars
+        self.reset()
 
-        # Gather all isolated sweeps
-        self.isolated_sweep_paths = {}
-        # Gather all coupled sweeps
-        self.coupled_sweep_paths = {}
-        # Gather all excluded settings
-        self.excluded_key_paths = []
         # Load config
         if path:
 
@@ -57,6 +51,16 @@ class Config:
             self.settings = None
             raise Exception(f'Config not found in {path}')
 
+
+    def reset(self):
+        # Sweep mode activated is set to false
+        self.sweep_active = False
+        # Gather all isolated sweeps
+        self.isolated_sweep_paths = {}
+        # Gather all coupled sweeps
+        self.coupled_sweep_paths = {}
+        # Keep track of the target name for each sweeped variable
+        self.target_names_by_sweep_var = {}
 
     def __str__(self,settings=None):
         if settings is not None:
@@ -126,8 +130,7 @@ class Config:
         else:
             self.out_directory = os.path.join(
                 ROOT,
-                self.settings['outputs']['out_directory'].replace('./',''),
-                self.settings['outputs'].get('out_group','')
+                self.settings['outputs']['out_directory'].replace('./','')
             )
 
 
@@ -144,7 +147,10 @@ class Config:
 
     def parse_data(self,settings,key_path):
         # Get schema given the path
-        schema,_ = self.path_get(settings=self.schema,key_path=key_path)
+        schema,_ = self.path_get(
+            key_path = key_path,
+            settings = self.schema
+        )
         # Instantiate data type
         data = instantiate_data_type(settings,schema,key_path)
         # return parsed data
@@ -157,7 +163,10 @@ class Config:
         if 'sweep' in list(key_path):
             return True
         else:
-            value,_ = self.path_get(settings = settings, key_path = key_path)
+            value,_ = self.path_get(
+                key_path = key_path, 
+                settings = settings
+            )
             # Return whether sweep is later down the path
             return isinstance(value,dict) and value.get('sweep',None) is not None
     
@@ -171,9 +180,13 @@ class Config:
         
         return found
 
-    def path_find(self, key, settings, current_key_path:list=[],all_key_paths:list=[]):
-        for k, v in (settings.items() if isinstance(settings, dict) else
-            enumerate(settings) if isinstance(settings, list) else []):
+    def path_find(self, key, settings:dict=None, current_key_path:list=[], all_key_paths:list=[]):
+        if settings is None:
+            settings = self.settings
+        settings_copy = deepcopy(settings)
+        
+        for k, v in (settings_copy.items() if isinstance(settings_copy, dict) else
+            enumerate(settings_copy) if isinstance(settings_copy, list) else []):
             
             current_key_path.append(k)
             if k == key:
@@ -190,7 +203,7 @@ class Config:
         return all_key_paths
 
 
-    def path_get(self,settings=None,key_path=[]):
+    def path_get(self,key_path=[],settings=None):
         if len(key_path) <= 0:
             return None,False
         if settings is None:
@@ -216,15 +229,15 @@ class Config:
 
     def path_delete(self,settings,key_path:list,deleted:bool=False):
         if len(key_path) <= 0:
-            return False
+            return deleted,settings
         deleted = False
         if len(key_path) == 1:
-            safe_delete(settings[key_path[0]])
+            del settings[key_path[0]]
+            # safe_delete(settings[key_path[0]])
             deleted = True
         else:
-            deleted = self.path_delete(settings[key_path[0]],key_path[1:],deleted)
-        
-        return deleted
+            deleted,settings = self.path_delete(settings[key_path[0]],key_path[1:],deleted)
+        return deleted,settings
 
     def path_set(self,settings,value,key_path=[],overwrite:bool=False):
         if len(key_path) <= 0:
@@ -271,7 +284,6 @@ class Config:
         experiment_schema = self.experiment_schemas.get(experiment_type,None)
         if experiment_schema is not None:
             # Update base schema based on experiment-specific requirements
-            base_schema = deepcopy(self.schema)
             for key_path_str in deepcopy(list(experiment_schema.keys())):
                 # Convert keys to key path lists
                 key_path = key_path_str.split('>')
@@ -279,27 +291,33 @@ class Config:
                 # Do not update dtypes!
                 if "dtype" in key_path:
                     continue 
-                
-                # Modify the base schema
-                if not self.path_modify(
-                    base_schema,
-                    experiment_schema[key_path_str],
-                    key_path
-                ):
-                    raise Exception(f"Could not update base schema at {'>'.join(key_path)}")
+
+                # Delete excluded key paths
+                if key_path[-1] == 'exclude' and experiment_schema[key_path_str]:
+                    self.logger.warning(f"Excluding key path {' > '.join(key_path[:-1])}")
+                    # Update settings
+                    _,self.settings = self.path_delete(self.settings,key_path[:-1])
+                    # Update base schema
+                    _,self.schema = self.path_delete(self.schema,key_path[:-1])
+                    # Update base parameters
+                    _,self.parameters = self.path_delete(self.parameters,key_path[:-1])
+                # Modify the base schema only
+                else:
+                    if not self.path_modify(
+                        self.schema,
+                        experiment_schema[key_path_str],
+                        key_path
+                    ):
+                        raise Exception(f"Could not update base schema at {'>'.join(key_path)}")
 
             # Validate config
             self.validate_config(
-                parameters=None,
-                settings=None,
-                base_schema=base_schema,
-                key_path=[],
-                experiment_type=experiment_type
+                parameters = self.parameters,
+                settings = self.settings,
+                base_schema = self.schema,
+                key_path = [],
+                experiment_type = experiment_type
             )
-        # Delete excluded key paths
-        for key_path in self.excluded_key_paths:
-            self.logger.warning(f"Excluding key path {' > '.join(key_path)}")
-            self.path_delete(self.settings,key_path)
 
     def sweep_mode(self,settings:dict = None):
         # Check if sweep mode is active
@@ -338,7 +356,10 @@ class Config:
         if len(variable_key_paths) <= 0 or len(variable_key_paths[0]) <= 0:
             raise Exception(f"{variable} not found in config schema.")
         # Return sweepable flag for first instance of variable
-        return self.path_get(self.schema,variable_key_paths[0]).get('sweepable',False)
+        return self.path_get(
+            key_path = variable_key_paths[0],
+            settings = self.schema
+        ).get('sweepable',False)
 
     def get_sweep_id(self,sweep_params:dict={}):
         sweep_id = ''
@@ -371,7 +392,10 @@ class Config:
                 # Index location of sweep in key value path
                 indx = key_val_path.index('sweep')
                 # Get sweep settings
-                sweep_settings,_ = self.path_get(self.settings,key_val_path[:(indx+1)])
+                sweep_settings,_ = self.path_get(
+                    key_path = key_val_path[:(indx+1)],
+                    settings = self.settings
+                )
                 # If the sweep setting is coupled add to coupled sweep paths
                 if sweep_settings.get('coupled',False) and len(sweep_settings.get('target_name','')) > 0:
                     target_name = sweep_settings.get('target_name','')
@@ -428,12 +452,18 @@ class Config:
                 key_path.append(k)
                 # print('>'.join(key_path))
                 # Get schema for key path
-                schema,_ = self.path_get(base_schema,key_path)
+                schema,_ = self.path_get(
+                    key_path = key_path, 
+                    settings = base_schema
+                )
                 # Create dummy schema so that it can be found recursively
                 dummy_schema = {}
                 self.path_set(dummy_schema,schema,[k],overwrite=True)
                 # Check if key was found in settings and schema
-                settings_val, settings_found = self.path_get(settings,key_path)
+                settings_val, settings_found = self.path_get(
+                    key_path = key_path, 
+                    settings = settings
+                )
 
                 if settings_found:
                     # For every entry in settings, 
@@ -479,8 +509,14 @@ class Config:
                 # print('>'.join(key_path))
                 
                 # Check if key was found in settings and schema
-                settings_val, settings_found = self.path_get(settings,key_path)
-                schema_val, schema_found = self.path_get(base_schema,key_path)
+                settings_val, settings_found = self.path_get(
+                    key_path = key_path, 
+                    settings = settings
+                )
+                schema_val, schema_found = self.path_get(
+                    key_path = key_path, 
+                    settings = base_schema
+                )
                 
                 # key must exist in schema
                 try: 
@@ -490,8 +526,8 @@ class Config:
                 
                 # 0: Check if argument needs to be excluded
                 # and add it to excluded key paths if that is the case
-                if isinstance(schema_val,dict) and schema_val.get('exclude',False):
-                    self.excluded_key_paths.append(key_path)
+                # if isinstance(schema_val,dict) and schema_val.get('exclude',False):
+                #     self.excluded_key_paths.append(key_path)
 
                 # 1: Check if argument is optional in case it is not included in settings
                 # and it is not part of a sweep
@@ -505,7 +541,10 @@ class Config:
                     # 2: Check if argument is not sweepable but contains 
                     # a sweep parameter in settings
                     # Get schema of parameter configured for a sweep
-                    schema_parent_val, _ = self.path_get(base_schema,key_path[:-1])
+                    schema_parent_val, _ = self.path_get(
+                        key_path = key_path[:-1], 
+                        settings = base_schema
+                    )
                     if not schema_parent_val["sweepable"]:
                         raise Exception(f"""
                             Key {'>'.join(key_path)} is not sweepable 
@@ -526,7 +565,10 @@ class Config:
                     # otherwise replace sweep key-value pair with sweep default
                     if "range" not in list(settings_val.keys()):
                         # Get child key settings
-                        settings_child_val, settings_child_found = self.path_get(settings,(key_path+['default']))
+                        settings_child_val, settings_child_found = self.path_get(
+                            key_path = (key_path+['default']), 
+                            settings = settings
+                        )
                         # Update settings with sweep default
                         try:
                             assert self.path_set(settings,settings_child_val,key_path[:-1])
@@ -602,8 +644,25 @@ class Config:
                     # read the default values
                     if settings_found:
                         # Get child key settings
-                        settings_child_val, settings_child_found = self.path_get(settings,(key_path+['default']))
+                        settings_child_val, settings_child_found = self.path_get(
+                            key_path = (key_path+['default']),
+                            settings = settings
+                        )
+                        if not settings_child_found:
+                            # Try to read without sweep
+                            settings_child_val, settings_child_found = self.path_get(
+                                key_path = (key_path[:-1]),
+                                settings = settings
+                            )
 
+                        # Make sure you can read the default value or the non-sweep value
+                        try:
+                            assert settings_child_found
+                        except:
+                            raise Exception(f"""
+                                    Key {'>'.join(key_path)} could not be found \
+                                    with sweep default or without sweep
+                                """)
                         # Update settings with sweep default
                         try:
                             assert self.path_set(settings,settings_child_val,key_path[:-1])
@@ -612,14 +671,21 @@ class Config:
                                 Key {'>'.join(key_path)} could not be updated \
                                 with sweep default
                             """)
+
                     # Else maybe value have been provided
                     # without specifying a sweep configuration
                     else:
-                        settings_child_val, settings_child_found = self.path_get(settings,key_path[:-1])
+                        settings_child_val, settings_child_found = self.path_get(
+                            key_path = key_path[:-1],
+                            settings = settings
+                        )
 
                         # If still no values have been provided
                         # Check if this setting is even compulsory
-                        parent_schema_val, _ = self.path_get(base_schema,key_path[:-1])
+                        parent_schema_val, _ = self.path_get(
+                            key_path = key_path[:-1],
+                            settings = base_schema
+                        )
                         if not settings_child_found and isinstance(parent_schema_val,dict) and not parent_schema_val['optional']:
                             raise Exception(f"""
                                 Key {'>'.join(key_path[:-1])} is compulsory but not included
@@ -628,11 +694,20 @@ class Config:
                     # If this is the case we have modified the config
                     # Parse settings value into approapriate data structure
                     if settings_child_found:
-                        entry = instantiate_data_type(
-                            data = settings_child_val,
-                            schema = schema_val['default'],
-                            key_path = key_path[:-1]
-                        )
+                        try:
+                            entry = instantiate_data_type(
+                                data = settings_child_val,
+                                schema = schema_val['default'],
+                                key_path = key_path[:-1]
+                            )
+                        except:
+                            print(settings_child_val)
+                            print(schema_val)
+                            print(key_path)
+                            # traceback.print_exc()
+                            self.logger.error(f"Config for experiment(s) {kwargs.get('experiment_type','UNKNOWN')} failed.")
+                            sys.exit()
+
                         # Check that entry is valid
                         try:
                             entry.check()
@@ -648,7 +723,10 @@ class Config:
                     # does not contain a sweep configuration
                     if self.has_sweep(key_path) and not isinstance(settings_val,dict):
                         # Read schema
-                        schema_val, _ = self.path_get(base_schema,key_path)
+                        schema_val, _ = self.path_get(
+                            key_path = key_path,
+                            settings = base_schema
+                        )
                         # Parse settings value into approapriate data structure
                         entry = instantiate_data_type(
                             data=settings_val,
@@ -749,14 +827,14 @@ class Config:
             del self.isolated_sweep_paths[k]
         sweep_params = {"coupled":{},"isolated":{}}
         # Keep track of the target name for each sweeped variable
-        self.target_names_by_sweep_var = {}
         for key_path in self.isolated_sweep_paths.values():
             # Get sweep configuration
             sweep_input,_ = self.path_get(
-                settings=self.settings,
-                key_path=(key_path+["sweep","range"])
+                key_path = (key_path+["sweep","range"]),
+                settings = self.settings
             )
             # Parse values
+            # print('isolated',key_path)
             sweep_vals = self.parse_data(sweep_input,(key_path+["sweep","range"]))
 
             sweep_params['isolated'][key_path[-1]] = {
@@ -773,10 +851,11 @@ class Config:
             coupled_val_lens[target_name] = {}
             sweep_params['coupled'][target_name] = []
             for key_path in coupled_paths.values():
+                # print('coupled',key_path)
                 # Get sweep configuration
                 sweep_input,_ = self.path_get(
-                    settings=self.settings,
-                    key_path=(key_path+["sweep","range"])
+                    key_path = (key_path+["sweep","range"]),
+                    settings = self.settings
                 )
                 # Parse values
                 sweep_vals = self.parse_data(sweep_input,(key_path+["sweep","range"]))
