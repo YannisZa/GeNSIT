@@ -62,15 +62,6 @@ def write_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
 
 
 def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
-    # Clear file cache
-    # xr.backends.file_manager.FILE_CACHE.clear()
-    
-    # If overwritting is instructed
-    if kwargs.get('mode','a') == 'w':
-        # Delete any existing file
-        if os.path.exists(filepath) and os.path.isfile(filepath):
-            os.remove(filepath)
-
     # Writing the DataArray to a NetCDF file inside a with context
     data.to_netcdf(
         path = filepath,
@@ -559,55 +550,6 @@ def safe_delete(variable,instance=None):
         pass
 
 
-def unpack_statistics(settings):
-    # Unpack statistics if they exist
-    if 'statistic' in list(settings.keys()) and len(settings['statistic']) > 0:
-        statistics = {}
-        for metric,stat,dim in settings['statistic']:
-            # print('stat',stat)
-            # print('dim',dim)
-            if isinstance(stat,str):
-                if '&' in stat:
-                    stat_unpacked = stat.split('&')
-                else:
-                    stat_unpacked = [stat]
-            elif hasattr(stat,'__len__'):
-                stat_unpacked = deepcopy(stat)
-            else:
-                raise Exception(f'Statistic name {stat} of type {type(stat)} not recognized')
-            if isinstance(dim,str): 
-                if '&' in dim:
-                    dim_unpacked = dim.split('&')
-                else:
-                    dim_unpacked = [str(dim)]
-            elif hasattr(dim,'__len__'):
-                dim_unpacked = list(map(str,dim))
-            else:
-                raise Exception(f'Statistic dim {dim_unpacked} of type {type(dim_unpacked)} not recognized')
-            # Make sure number of statistics and axes provided is the same
-            assert len(stat_unpacked) == len(dim_unpacked)
-            substatistics = []
-            for substat,subdim in list(zip(stat_unpacked,dim_unpacked)):
-                # print('substat',substat)
-                # print('subdim',subdim)
-                substat_unpacked = [_s for _s in substat.split('|')] if '|' in substat else [substat]
-                subdim_unpacked = [_dim for _dim in subdim.split('|')] if '|' in subdim else [subdim]
-                # Unpack individual axes
-                subdim_unpacked = [[str(_subdim) for _subdim in _dim.split("+")] \
-                            if (_dim is not None and len(_dim) > 0) \
-                            else None
-                            for _dim in subdim_unpacked]
-                # print('substat_unpacked',substat_unpacked)
-                # print('subdim_unpacked',subdim_unpacked)
-                # Add statistic name and axes pair to list
-                substatistics.append(list(zip(substat_unpacked,subdim_unpacked)))
-            
-            # Add statistic name and axes pair to list
-            if metric in statistics:
-                statistics[metric].append(substatistics)
-            else:
-                statistics[metric] = substatistics
-        return {'statistic': statistics}
 
 def parse_slice_by(slice_by:list):
     if len(slice_by) <= 0:
@@ -1019,6 +961,8 @@ def sigma_to_noise_regime(sigma=None):
     if sigma:
         if sigma == 'none':
             return 'learned'
+        elif isinstance(sigma,str):
+            return sigma
         elif (2/float(sigma)**2) >= 10000:
             return 'low'
         elif (2/float(sigma)**2) < 10000 and sigma > 0:
@@ -1060,22 +1004,6 @@ def h5_deep_get(name,group,prefix=''):
             elif isinstance(val, h5py.Dataset):
                 if name == key:
                     yield path
-
-def deep_walk(indict, pre=None):
-    pre = pre[:] if pre else []
-    if isinstance(indict, dict):
-        for key, value in indict.items():
-            if isinstance(value, dict):
-                for d in deep_walk(value, pre + [key]):
-                    yield d
-            elif isinstance(value, list) or isinstance(value, tuple):
-                for v in value:
-                    for d in deep_walk(v, pre + [key]):
-                        yield d
-            else:
-                yield pre + [key, value]
-    else:
-        yield pre + [indict]
 
 def broadcast(arr,shape):
     # Squeeze array
@@ -1163,3 +1091,8 @@ def sizeof_fmt(num, suffix='B'):
 #     temp = f.result()
 #     print(f'callback {f}')
     
+def unstack_dims(data:xr.DataArray,dims:list):
+    for d in dims:
+        if d in data.dims:
+            data = data.unstack(d)
+    return data
