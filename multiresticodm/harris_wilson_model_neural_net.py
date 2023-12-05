@@ -351,7 +351,8 @@ class HarrisWilson_NN:
                     validation_data[validation_dataset].to(dtype=float32),
                     **self.loss_kwargs.get(name,{})
                 )
-            
+            # Update loss
+            previous_loss[name] = previous_loss[name] + res
             # Keep track number of loss samples per loss function
             n_processed_steps[name] += 1
 
