@@ -685,9 +685,6 @@ class Experiment(object):
                 self.table_acc.resize(self.table_acc.shape[0] + 1, axis=0)
                 self.table_acc[-1] = _table_acc
 
-            # Update metadata
-            self.update_metadata()
-
     
     def print_initialisations(self,parameter_inits,print_lengths:bool=True,print_values:bool=False):
         for p,v in parameter_inits.items():
@@ -719,7 +716,7 @@ class Experiment(object):
             loss_names = list(self.harris_wilson_nn.loss_functions.keys())
             loss_names = loss_names if len(loss_names) <= 1 else loss_names+['total_loss']
             for loss_name in loss_names:
-                self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:].mean(axis=0)}')
+                self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:][-1]}')
         if self.logger.console.isEnabledFor(PROGRESS):
             print('\n')
 
@@ -1009,6 +1006,7 @@ class SIM_MCMC(Experiment):
 
         # Prepare writing to file
         self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+
         # Write metadata
         self.write_metadata()
         
@@ -1131,6 +1129,9 @@ class SIM_MCMC(Experiment):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - start_time
         
+        # Update metadata
+        self.update_metadata()
+
         # Write metadata
         self.write_metadata()
 
@@ -1397,6 +1398,9 @@ class JointTableSIM_MCMC(Experiment):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - start_time
             
+        # Update metadata
+        self.update_metadata()
+
         # Write metadata
         self.write_metadata()
 
@@ -1554,6 +1558,9 @@ class Table_MCMC(Experiment):
             if hasattr(self,'compute_time'):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - self.start_time
+
+        # Update metadata
+        self.update_metadata()
 
         # Write metadata
         self.write_metadata()
@@ -1916,7 +1923,10 @@ class SIM_NN(Experiment):
                     prediction_data = dict(
                         destination_attraction_ts = torch.flatten(destination_attraction_sample)
                     )
-                ) 
+                )
+
+                # print('theta',theta_sample)
+                # print('destination_attraction_sample',destination_attraction_sample)
                 
                 # Clean and write to file
                 loss_sample,n_processed_steps = self.update_and_export(
@@ -1929,6 +1939,13 @@ class SIM_NN(Experiment):
                     data_size = len(training_data),
                     **self.config['training']
                 )
+            
+            # if hasattr(self,'harris_wilson_nn'):
+            #     loss_names = list(self.harris_wilson_nn.loss_functions.keys())
+            #     loss_names = loss_names if len(loss_names) <= 1 else loss_names+['total_loss']
+            #     for loss_name in loss_names:
+            #         self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:][-1]}')
+            # print('\n')
             self.logger.iteration(f"Completed epoch {e+1} / {num_epochs}.\n")
 
             # Write the epoch training time (wall clock time)
@@ -1936,6 +1953,9 @@ class SIM_NN(Experiment):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - start_time
         
+        # Update metadata
+        self.update_metadata()
+
         # Write metadata
         self.write_metadata()
 
@@ -2157,6 +2177,9 @@ class NonJointTableSIM_NN(Experiment):
             if hasattr(self,'compute_time'):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - start_time
+
+        # Update metadata
+        self.update_metadata()
 
         # Write metadata
         self.write_metadata()
@@ -2401,6 +2424,9 @@ class JointTableSIM_NN(Experiment):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - start_time
                 
+        # Update metadata
+        self.update_metadata()
+
         # Write metadata
         self.write_metadata()
 
