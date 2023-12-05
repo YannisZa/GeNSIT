@@ -1994,7 +1994,7 @@ class OutputSummary(object):
             except CoordinateSliceMismatch as exc:
                 self.logger.debug(exc)
                 continue
-            except MissingData:
+            except MissingData as exc:
                 self.logger.debug(exc)
                 continue
             except Exception as exc:
