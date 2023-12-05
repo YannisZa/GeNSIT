@@ -116,6 +116,7 @@ LOSS_DATA_REQUIREMENTS = {
         "validation_data": ['cost_matrix','total_cost_by_origin']
     },
     'total_loss': {},
+    'loss': {}
 }
 
 # Pytorch loss functions

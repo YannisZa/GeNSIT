@@ -145,7 +145,7 @@ class Outputs(object):
                 loss_names = list(flatten(self.config['neural_network']['loss']['loss_name']['sweep']['range'])) \
                     if isinstance(self.config['neural_network']['loss']['loss_name'],dict) \
                     else [self.config['neural_network']['loss']['loss_name']]
-                loss_names = set(list(flatten(loss_names))+['total'])
+                loss_names = set(list(flatten(loss_names))+['total_loss'])
                 # Add them to output names
                 if sam in loss_names:
                     self.output_names.append(sam)
@@ -333,7 +333,6 @@ class Outputs(object):
         self.logger.progress('Populating data dictionary')
         # Create an xarray dataset for each sample
         xr_dict = {}
-
         for sample_name,sample_data in data_vars.items():
             
             coordinates = {}
