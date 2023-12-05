@@ -9,8 +9,8 @@ in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
-  default = 1
-  range = ["1:100:1"]
+  default = 0
+  range = ["0:99:1"]
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta'] 
   range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
@@ -26,7 +26,7 @@ load_experiment = ''
       file = """cost_matrices/clustered_facilities_sample_20x20_20_01_2023_\
       sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_\
       prob_origin_destination_adjusted_normalised_boundary_only_\
-      edge_corrected_cost_matrix_max_normalised.txt"""
+      edge_corrected_cost_matrix_sum_normalised.txt"""
     [inputs.data.ground_truth_table]
       file = 'table_lsoas_to_msoas.txt'
     [inputs.data.total_cost_by_origin]
@@ -66,6 +66,7 @@ load_experiment = ''
   [harris_wilson_model.parameters]
     noise_percentage = +0.000_1
     epsilon = +1.0
+    kappa = +1.0000000596046483
     delta = 0.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356
@@ -101,8 +102,8 @@ load_experiment = ''
         target_name = 'sigma'
     [mcmc.destination_attraction]
       log_destination_attraction_steps = 1
-      leapfrog_steps = 3#10
-      leapfrog_step_size = 0.01 #0.02
+      leapfrog_steps = 10
+      leapfrog_step_size = 0.1 #0.02
       ais_leapfrog_steps = 3#10
       ais_leapfrog_step_size = 0.2#0.1
       ais_samples = 10
