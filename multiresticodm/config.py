@@ -8,8 +8,9 @@ from copy import deepcopy
 from itertools import product
 
 from multiresticodm import ROOT
+from multiresticodm.global_variables import deep_walk
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, flatten, safe_delete, setup_logger, read_json, expand_tuple, unique, deep_walk, sigma_to_noise_regime, stringify, print_json
+from multiresticodm.utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify
 
 class Config:
 
@@ -356,10 +357,11 @@ class Config:
         if len(variable_key_paths) <= 0 or len(variable_key_paths[0]) <= 0:
             raise Exception(f"{variable} not found in config schema.")
         # Return sweepable flag for first instance of variable
-        return self.path_get(
+        value,_ = self.path_get(
             key_path = variable_key_paths[0],
             settings = self.schema
-        ).get('sweepable',False)
+        )
+        return value.get('sweepable',False)
 
     def get_sweep_id(self,sweep_params:dict={}):
         sweep_id = ''
