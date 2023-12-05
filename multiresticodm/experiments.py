@@ -140,7 +140,12 @@ class Experiment(object):
         # Update config with current timestamp ( but do not overwrite)
         datetime_results = list(deep_get(key='datetime',value=self.config.settings))
         if len(datetime_results) > 0:
-            deep_update(self.config.settings, key='datetime', val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), overwrite=False)
+            deep_update(
+                self.config.settings, 
+                key='datetime', 
+                val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), 
+                overwrite=False
+            )
         else:
             self.config['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
 
@@ -401,8 +406,8 @@ class Experiment(object):
                 if 'log_destination_attraction' not in self.outputs.h5group:
                     self.log_destination_attractions = self.outputs.h5group.create_dataset(
                         "log_destination_attraction",
-                        (0,self.inputs.data.destination_attraction_ts.shape[0],dims['destination']),
-                        maxshape=(None,self.inputs.data.destination_attraction_ts.shape[0],dims['destination']),
+                        (0,dims['time'],dims['destination']),
+                        maxshape=(None,dims['time'],dims['destination']),
                         chunks=True,
                         compression=3,
                     )
@@ -1895,9 +1900,9 @@ class SIM_NN(Experiment):
                 destination_attraction_sample = self.harris_wilson_nn.epoch_time_step(
                     experiment = self,
                     validation_data = dict(
-                        destination_attraction_ts = training_data,
+                        destination_attraction_ts = training_data
                     ),
-                    dt = self.config['harris_wilson_model'].get('dt',0.001)
+                    dt = self.config['harris_wilson_model']['dt']
                 )
                 log_destination_attraction_sample = torch.log(destination_attraction_sample)
 
@@ -2096,7 +2101,7 @@ class NonJointTableSIM_NN(Experiment):
                     validation_data = dict(
                         destination_attraction_ts = training_data
                     ),
-                    dt = self.config['harris_wilson_model'].get('dt',0.001)
+                    dt = self.config['harris_wilson_model']['dt']
                 )
                 log_destination_attraction_sample = torch.log(destination_attraction_sample)
 
@@ -2322,7 +2327,7 @@ class JointTableSIM_NN(Experiment):
                     validation_data = dict(
                         destination_attraction_ts = training_data
                     ),
-                    dt = self.config['harris_wilson_model'].get('dt',0.001)
+                    dt = self.config['harris_wilson_model']['dt']
                 )
                 log_destination_attraction_sample = torch.log(destination_attraction_sample)
 
@@ -2472,11 +2477,10 @@ class ExperimentSweep():
             self.config['inputs']['dataset'] = dir_range[0]
         
         self.outputs = Outputs(
-            self.config,
-            sweep_params=kwargs.get('sweep_params',{}),
+            config = self.config,
+            sweep_params = kwargs.get('sweep_params',{}),
             logger = self.logger
         )
-
         # Make output home directory
         self.outputs_base_dir = self.outputs.outputs_path
         self.outputs_experiment_id = self.outputs.experiment_id
@@ -2573,6 +2577,7 @@ class ExperimentSweep():
             
             # Prepare experiment
             config,sweep = self.prepare_experiment(sweep_configuration)
+
             
             self.logger.info(f'Instance = {str(instance_num)} START')
 
@@ -2588,6 +2593,7 @@ class ExperimentSweep():
                 logger=self.logger,
             )
             self.logger.debug('New experiment set up')
+
             # Running experiment
             new_experiment.run()
             if counter is not None and pbar is not None:
