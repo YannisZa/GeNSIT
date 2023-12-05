@@ -335,21 +335,7 @@ class HarrisWilson:
             log_destination_attraction = torch.log(new_sizes),
             grand_total = torch.tensor(1.)
         )
-        # print('new_sizes',new_sizes)
-        # print('demand',demand)
-        # print('delta',delta)
-        # print('kappa',kappa)
-        # print('epsilon',epsilon)
-        # print('epsilon * (demand - kappa * curr_destination_attractions + delta)',epsilon * (demand - kappa * curr_destination_attractions + delta))
-        # print('noise',sigma
-        #         * 1
-        #         / torch.sqrt(torch.tensor(2, dtype=torch.float) * torch.pi * dt).to(
-        #             self.device
-        #         ))
-        # Update the current values
-        # temp = torch.normal(0, 1, size=(1, self.intensity_model.dims['destination'])).to(self.device)
-        # print('temp',temp)
-        # print('dt',dt)
+        
         new_sizes = (
             new_sizes + \
             +torch.mul(
