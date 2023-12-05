@@ -65,7 +65,7 @@ class Inputs:
             self.read_data()
 
     def data_vars(self):
-        return {k:v for k,v in vars(self).items() if k in INPUT_SCHEMA}
+        return {k:v for k,v in vars(self.data).items() if k in INPUT_SCHEMA}
     
     def validate_dims(self):
         for attr,schema in self.schema.items():
@@ -123,11 +123,6 @@ class Inputs:
         # Validate dimensions
         self.validate_dims()
         
-        # Update log destination attraction if
-        # destination attraction time series was provided
-        # if hasattr(self.data,'destination_attraction_ts'):
-        #     self.data.log_destination_attraction = np.log(self.data.destination_attraction_ts[-1:,:]).astype('float32')
-
         # Update grand total if it is not specified
         if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:
             # Compute grand total
@@ -174,7 +169,7 @@ class Inputs:
         else:
             total_flow = 1.0
 
-        # Delta and kappa 
+        # Delta and kappa
         if self.true_parameters['delta'] is None and self.true_parameters['kappa'] is None:
             self.true_parameters['kappa'] = total_flow / (total_zone_sizes-smallest_zone_size*self.data.dims['destination'])
             self.true_parameters['delta'] = smallest_zone_size * self.true_parameters['kappa']
@@ -182,6 +177,7 @@ class Inputs:
             self.true_parameters['kappa'] = (total_flow + self.true_parameters['delta']*self.data.dims['destination'])/total_zone_sizes
         elif self.true_parameters['kappa'] is not None and self.true_parameters['delta'] is None:
             self.true_parameters['delta'] = self.true_parameters['kappa'] * smallest_zone_size
+
         
 
     def pass_to_device(self):
