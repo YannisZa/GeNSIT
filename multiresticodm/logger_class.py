@@ -1,11 +1,13 @@
 """Configures the CustomLogger 
 obtained from https://gitlab.com/utopia-project/dantro/-/blob/main/dantro/logging.py
 """
+import os
 import inspect
 import string
 import random
 import logging
 import coloredlogs
+from pathlib import Path
 
 # Define the additional log levels
 TRACE = 5
@@ -38,12 +40,17 @@ def random_string(N:int=10):
 
 class CustomFileHandler(logging.FileHandler):
     def __init__(self, filename, mode='a', delay=True, **kwargs):
+        dirpath = Path(filename).absolute().parent
+        if not os.path.exists(dirpath) or not os.path.isdir(dirpath):
+            os.makedirs(dirpath)
+        
         super().__init__(filename=filename,mode=mode)
         self.filename = filename
         self.mode = mode
         self.delay = delay
         self.logger_name = kwargs.get('name','')
         self.buffer = []
+
 
     def emit(self, record):
         self.buffer.append(self.format(record))
