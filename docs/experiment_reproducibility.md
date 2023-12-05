@@ -7,11 +7,10 @@ Set `ulimit -n 50000`
 ## Experiment 1
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 10 -sm -et SIM_NN
+clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 6 -nt 7 -sm -et SIM_NN
 ```
 
 ```
-clear; multiresticodm run ./data/inputs/configs/debug.toml -nw 6 -nt 7 -et SIM_NN
 clear; multiresticodm run ./data/inputs/configs/debug.toml -nw 1 -nt 12 -et SIM_NN
 ```
 
@@ -50,7 +49,7 @@ Set `ulimit -n 50000`
 
 ### Dependent (joint) Table and SIM
 
-clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml -et JointTableSIM_NN -nw 10 -sm
+clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml -et JointTableSIM_NN -nw 10 -nt 4 -sm
 
 # Plots
 
@@ -84,24 +83,20 @@ clear; multiresticodm plot -y srmse -x 'iter&seed' -x sigma \
 -et NonJointTableSIM_NN -et JointTableSIM_NN -et SIM_MCMC -et JointTableSIM_MCMC \
 
 ```
-clear; multiresticodm summarise -s intensity \
+clear; multiresticodm summarise -s table -s intensity \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-et SIM_NN \
 -stat 'srmse' 'mean&' 'iter+seed&' \
--stat 'coverage_probability' '&mean|*100|floor' '&origin+destination||' \
 -k sigma -k name -btt 'iter' 0 100 100 -nw 6 --region_mass 0.99
 ```
 
 ```
-
--d exp1/SIM_NN_SweepedNoise_16_05_2023_20_09_04 \
--d exp1/SIM_MCMC_SweepedNoise_16_05_2023_20_09_04 \
-
 clear; multiresticodm summarise -s intensity -s table \
--d exp1/JointTableSIM_MCMC_SweepedNoise_16_05_2023_20_09_04 \
+-d exp1/SIM_NN_SweepedNoise_05_12_2023_21_18_16 \
 -dn cambridge_work_commuter_lsoas_to_msoas \
--stat 'srmse' 'mean&' 'iter&' \
--k sigma -k name -k type --region_mass 0.99 \
--btt 'iter' 10000 80 1000 -fe JointTableSIM_MCMC_SMRSEs --force_reload -nw 1
+-stat 'srmse' 'mean&' 'iter+seed&' \
+-k sigma -k name -k type \
+-btt 'iter' 100 90 1000 -fe SIM_NN_SMRSEs --force_reload -nw 1
 ```
 
 ```
