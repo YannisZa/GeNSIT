@@ -304,7 +304,8 @@ class HarrisWilson_NN:
             prediction_data:dict,
             validation_data:dict,
             loss_function_names:list=None,
-            aux_inputs:dict={}
+            aux_inputs:dict={},
+            **kwargs
         ):
         self.logger.debug('Loss function update')
         
@@ -350,17 +351,10 @@ class HarrisWilson_NN:
                     validation_data[validation_dataset].to(dtype=float32),
                     **self.loss_kwargs.get(name,{})
                 )
-            # print(name)
-            # print('before',previous_loss[name])
-            # print(res,res.requires_grad)
-            previous_loss[name] = previous_loss[name] + res
-            # print('after',previous_loss[name])
             
             # Keep track number of loss samples per loss function
             n_processed_steps[name] += 1
 
-            # print(n_processed_steps)
-            # print('\n')
 
         return previous_loss,n_processed_steps
 
@@ -466,11 +460,12 @@ class HarrisWilson_NN:
         self.logger.debug('Running neural net')
         predicted_theta = self._neural_net(torch.flatten(validation_data['destination_attraction_ts']))
         self.logger.debug('Forward pass on SDE')
+
         predicted_dest_attraction = self.physics_model.run_single(
-            curr_destination_attractions=validation_data['destination_attraction_ts'],
-            free_parameters=predicted_theta,
-            dt=dt,
-            requires_grad=True,
+            curr_destination_attractions = validation_data['destination_attraction_ts'],
+            free_parameters = predicted_theta,
+            dt = dt,
+            requires_grad = True
         )
         return predicted_theta, predicted_dest_attraction
 
