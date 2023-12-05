@@ -24,13 +24,15 @@
         "default": {
           "dtype": "int",
           "default-value": 1234,
-          "valid-range": [1, null]
+          "valid-range": [0, null],
+          "inclusive": true
         },
         "range": {
           "dtype": "customList",
           "list-dtype": "int",
-          "default-value": "1:100:1",
-          "valid-range": [1, null],
+          "default-value": "0:100:1",
+          "valid-range": [0, null],
+          "inclusive": true,
           "unique-vals": true
         }
       }
