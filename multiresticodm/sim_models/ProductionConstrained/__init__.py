@@ -104,21 +104,17 @@ def log_flow_matrix(**kwargs):
     if tensor:
         if log_destination_attraction.ndim > 2:
             N = log_destination_attraction.size(dim=0)
-            time = log_destination_attraction.size(dim=1)
             sweep = log_destination_attraction.size(dim=2)
         elif log_destination_attraction.ndim > 1:
             N = 1
             sweep = 1
-            time = log_destination_attraction.size(dim=0)
         else:
             N = 1
             sweep = 1
-            time = 1
     # If input is xarray use the following code
     else:
         # Extract dimensions
         N = log_destination_attraction['id'].shape[0]
-        time = log_destination_attraction['time'].shape[0]
         sweep = len(log_destination_attraction.coords['sweep'].values.tolist())
         dims = ['id','origin','destination','sweep']
         # Merge all coordinates
@@ -126,11 +122,12 @@ def log_flow_matrix(**kwargs):
         coords = coords.assign(origin = arange(1,origin+1,dtype='int32'))
 
         # Use the .sel() method to select the dimensions you want to convert
-        log_destination_attraction = log_destination_attraction.sel(
-            **{dim: slice(None) for dim in ['id','time','destination','sweep']}
-        )
-        alpha = alpha.sel(iter=slice(None),sweep=slice(None))
-        beta = beta.sel(iter=slice(None),sweep=slice(None))
+        # Get the last time dimension
+        log_destination_attraction = log_destination_attraction.isel(time = -1).sel(
+            **{dim: slice(None) for dim in ['id','destination','sweep']}
+        ).transpose('id','sweep','destination')
+        alpha = alpha.sel(id=slice(None),sweep=slice(None))
+        beta = beta.sel(id=slice(None),sweep=slice(None))
         
         # Convert the selected_data to torch tensor
         log_destination_attraction = torch.tensor(
@@ -144,8 +141,9 @@ def log_flow_matrix(**kwargs):
         ).to(dtype=float32,device=device)
 
     log_flow = torch.zeros((N,origin,destination,sweep)).to(dtype=float64,device=device)
+    
     # Reshape tensors to ensure operations are possible
-    log_destination_attraction = torch.reshape(log_destination_attraction,(N,time,destination,sweep))
+    log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,destination,sweep))
     origin_demand = torch.reshape(origin_demand,(1,origin,1,sweep))
     cost_matrix = torch.reshape(cost_matrix.unsqueeze(1).repeat(1, 1, 1, sweep),(1,origin,destination,sweep))
     alpha = torch.reshape(alpha,(N,1,1,sweep))
