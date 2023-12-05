@@ -6,6 +6,23 @@ import operator
 from torch import int32, float32, uint8, int8, float64, int64, int16
 from torch import bool as tbool
 
+def deep_walk(indict, pre=None):
+    pre = pre[:] if pre else []
+    if isinstance(indict, dict):
+        for key, value in indict.items():
+            if isinstance(value, dict):
+                for d in deep_walk(value, pre + [key]):
+                    yield d
+            elif isinstance(value, list) or isinstance(value, tuple):
+                for v in value:
+                    for d in deep_walk(v, pre + [key]):
+                        yield d
+            else:
+                yield pre + [key, value]
+    else:
+        yield pre + [indict]
+
+
 PARAMETER_DEFAULTS = {
     'alpha': 1, 
     'beta': 0, 
@@ -17,27 +34,20 @@ PARAMETER_DEFAULTS = {
     'sigma': 3,
 }
 
-SWEEPABLE_PARAMS = ['iter']
+SWEEPABLE_PARAMS = {'iter'}
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 with open(os.path.join(ROOT,'data/inputs/configs/cfg_parameters.json'), 'r') as f:
     config_params = json.load(f)
     # Find all sweepable parameters
-    stack = list(config_params.items()) 
-    visited = set()
-    while stack: 
-        k, v = stack.pop() 
-        
-        # Add to sweepable params
-        if isinstance(v, dict):
-            if v.get('sweep',None) is not None and k != 'file':
-                SWEEPABLE_PARAMS.append(k)
-            if v.get('file',None) is not None and v['file'].get('sweep',None) is not None:
-                SWEEPABLE_PARAMS.append(k)
+    for key_value_path in deep_walk(config_params):
+        if 'sweep' in key_value_path:
+            sweep_index = key_value_path.index('sweep')
+            if key_value_path[sweep_index-1] != 'file':
+                SWEEPABLE_PARAMS.add(key_value_path[sweep_index-1])
+            elif key_value_path[sweep_index-2] == 'file':
+                SWEEPABLE_PARAMS.add(key_value_path[sweep_index-2])
 
-            if k not in visited: 
-                stack.extend(v.items()) 
-            visited.add(k)
-SWEEPABLE_LENGTH_METADATA = ['seed','iter','origin','destination','time',]
+SWEEPABLE_LENGTH_METADATA = ['seed','iter','origin','destination','time']
 
 SIM_TYPE_CONSTRAINTS = {
     'TotallyConstrained':'grand_total',
@@ -155,8 +165,8 @@ TABLE_SCHEMA = {
 
 INTENSITY_SCHEMA = {
     'intensity':{"dims":['origin','destination'],"axes":[0,1],"dtype":"int32", "ndmin":2},
-    'log_destination_attraction':{"dims":['destination'],"axes":[0],"dtype":"float32", "ndmin":1},
-    'log_origin_attraction':{"dims":['origin'],"axes":[0],"dtype":"float32", "ndmin":1},
+    'log_destination_attraction':{"dims":['destination','time'],"axes":[0],"dtype":"float32", "ndmin":1},
+    'log_origin_attraction':{"dims":['origin','time'],"axes":[0],"dtype":"float32", "ndmin":1},
     'alpha':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
     'beta':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
     'delta':{"dims":[],"axes":[],"dtype":"float32", "ndmin":0},
