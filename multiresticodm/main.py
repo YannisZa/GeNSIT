@@ -5,9 +5,10 @@ import json
 import click
 import torch
 import psutil
+from copy import deepcopy
 
 from multiresticodm.config import Config
-from multiresticodm.utils import setup_logger
+from multiresticodm.utils import setup_logger, print_json
 from multiresticodm.logger_class import *
 from multiresticodm.plot_variables import PLOT_HASHMAP, PLOT_COORDINATES
 from multiresticodm.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS, MARGINAL_SOLVERS, DATA_SCHEMA, METRICS, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
@@ -35,6 +36,61 @@ def split_to_list(ctx, param, value):
         return None
     else:
         return [list(v.split("&")) for v in list(value)]
+
+def coordinate_slice_callback(ctx, param, value):
+    result = []
+    for v in value:
+        result.append([v[0],v[1].split(',')])
+    return result
+
+def unpack_statistics(ctx, param, value):
+    # Unpack statistics if they exist
+    statistics = {}
+    for metric,stat,dim in value:
+        # print('stat',stat)
+        # print('dim',dim)
+        if isinstance(stat,str):
+            if '&' in stat:
+                stat_unpacked = stat.split('&')
+            else:
+                stat_unpacked = [stat]
+        elif hasattr(stat,'__len__'):
+            stat_unpacked = deepcopy(stat)
+        else:
+            raise Exception(f'Statistic name {stat} of type {type(stat)} not recognized')
+        if isinstance(dim,str): 
+            if '&' in dim:
+                dim_unpacked = dim.split('&')
+            else:
+                dim_unpacked = [str(dim)]
+        elif hasattr(dim,'__len__'):
+            dim_unpacked = list(map(str,dim))
+        else:
+            raise Exception(f'Statistic dim {dim_unpacked} of type {type(dim_unpacked)} not recognized')
+        # Make sure number of statistics and axes provided is the same
+        assert len(stat_unpacked) == len(dim_unpacked)
+        substatistics = []
+        for substat,subdim in list(zip(stat_unpacked,dim_unpacked)):
+            # print('substat',substat)
+            # print('subdim',subdim)
+            substat_unpacked = [_s for _s in substat.split('|')] if '|' in substat else [substat]
+            subdim_unpacked = [_dim for _dim in subdim.split('|')] if '|' in subdim else [subdim]
+            # Unpack individual axes
+            subdim_unpacked = [[str(_subdim) for _subdim in _dim.split("+")] \
+                        if (_dim is not None and len(_dim) > 0) \
+                        else None
+                        for _dim in subdim_unpacked]
+            # print('substat_unpacked',substat_unpacked)
+            # print('subdim_unpacked',subdim_unpacked)
+            # Add statistic name and axes pair to list
+            substatistics.append(list(zip(substat_unpacked,subdim_unpacked)))
+        
+        # Add statistic name and axes pair to list
+        if metric in statistics:
+            statistics[metric].append(substatistics)
+        else:
+            statistics[metric] = substatistics
+    return statistics
 
 class PythonLiteralOption(click.Option):
 
@@ -545,9 +601,10 @@ _output_options = [
                  help=f'Sets number of initial samples to discard (burnin), number of samples to skip (thinning) and number of samples to keep (trimming).'),
     click.option('--sample', '-s', multiple = True, required = False,
                 type=click.Choice(DATA_SCHEMA.keys()), help=f'Sets type of samples to compute metrics over.'),
-    click.option('--statistic','-stat', multiple=True, default=None, type = (click.STRING,click.STRING,click.STRING),required=False,
+    click.option('--statistic','-stat', multiple=True, default=None, 
+            type = (click.STRING,click.STRING,click.STRING), required=False, callback = unpack_statistics, 
             help='Every argument corresponds to a list of metrics, statistics and their corresponding axes e.g. passing  ("SRMSE", \"mean|sum\",  \"iter|sweep\") corresponds to applying mean across the iter dimension and then sum across sweep dimension before applying SRMSE metric'),
-    click.option('--coordinate_slice','-cs', multiple=True, default=None, type = (click.Choice(SWEEPABLE_PARAMS),click.STRING),required=False,
+    click.option('--coordinate_slice','-cs', multiple=True, default=None, type = (click.Choice(SWEEPABLE_PARAMS),click.STRING),required=False, callback = coordinate_slice_callback,
             help='Every argument corresponds to a list of keys and values by which the output sweeped parameters will be sliced.'),
     click.option('--input_slice','-is', multiple=True, default=None, type = (click.Choice(SWEEPABLE_PARAMS),click.STRING),required=False,
             help='Every argument corresponds to a list of keys and values by which the input sweeped parameters will be sliced.'),
@@ -828,6 +885,17 @@ def plot(
     settings['n_threads'] = int(settings.get('n_threads',1))
     settings['n_workers'] = settings.get('n_workers',1)
 
+    # Convert burnin, thinning, trimming to dictionary
+    if isinstance(burnin_thinning_trimming,list):
+        if len(burnin_thinning_trimming) > 0:
+            settings['burnin_thinning_trimming'] = {
+                v[0]:{"burnin":v[1],"thinning":v[2],"trimming":v[3]}
+                for v in burnin_thinning_trimming
+            }
+        else:
+            settings['burnin_thinning_trimming'] = {}
+
+
     # Add undefined settings to settings
     settings = {**settings, **undefined_settings}
 
@@ -910,6 +978,16 @@ def summarise(
     # Convert strings to ints
     settings['n_threads'] = int(settings.get('n_threads',1))
     settings['n_workers'] = settings.get('n_workers',1)
+
+    # Convert burnin, thinning, trimming to dictionary
+    if isinstance(burnin_thinning_trimming,list):
+        if len(burnin_thinning_trimming) > 0:
+            settings['burnin_thinning_trimming'] = {
+                v[0]:{"burnin":v[1],"thinning":v[2],"trimming":v[3]}
+                for v in burnin_thinning_trimming
+            }
+        else:
+            settings['burnin_thinning_trimming'] = {}
 
     # Add undefined settings to settings
     settings = {**settings, **undefined_settings}
