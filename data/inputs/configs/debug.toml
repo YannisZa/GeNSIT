@@ -26,7 +26,7 @@ load_experiment = ''
       file = """cost_matrices/clustered_facilities_sample_20x20_20_01_2023_\
       sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_\
       prob_origin_destination_adjusted_normalised_boundary_only_\
-      edge_corrected_cost_matrix_sum_normalised.txt"""
+      edge_corrected_cost_matrix_max_normalised.txt"""
     [inputs.data.ground_truth_table]
       file = 'table_lsoas_to_msoas.txt'
     [inputs.data.total_cost_by_origin]

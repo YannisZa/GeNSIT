@@ -9,8 +9,8 @@ in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
-  default = 1
-  # range = ["1:100:1"]
+  default = 0
+  range = ["0:99:1"]
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta', 'sigma']
   # range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
@@ -35,7 +35,7 @@ load_experiment = ''
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
-    default = [[+0,+1]]
+    default = [[]]
     range = [[],[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'
@@ -49,8 +49,15 @@ load_experiment = ''
     target_name = 'title'
 
 [spatial_interaction_model]
-  # name = 'ProductionConstrained','TotallyConstrained'
-  name = 'TotallyConstrained'
+  [spatial_interaction_model.name.sweep]
+    default = 'TotallyConstrained'
+    range = [
+      'TotallyConstrained','TotallyConstrained','ProductionConstrained',
+      'TotallyConstrained','TotallyConstrained','TotallyConstrained'
+    ]
+    coupled = true
+    target_name = 'title'
+  
   grand_total = +33704
   [spatial_interaction_model.parameters]
     bmax = +1.0
@@ -60,8 +67,10 @@ load_experiment = ''
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
-    epsilon = 1.0
-    delta = 0.0
+    noise_percentage = +0.000_1
+    epsilon = +1.0
+    delta = +0.0
+    kappa = +1.0000000596046483
     [harris_wilson_model.parameters.sigma.sweep]
       default = nan
       # range = [0.0141421356, 0.1414213562, nan]
@@ -87,15 +96,23 @@ load_experiment = ''
   disable_tqdm = true
   [neural_network.loss.loss_name.sweep]
     default = ['table_likelihood_loss']
-    range = [['table_likelihood_loss'],['dest_attraction_ts_loss','table_likelihood_loss']]
+    range = [['table_likelihood_loss'],['dest_attraction_likelihood_loss'],['dest_attraction_likelihood_loss','table_likelihood_loss']]
   [neural_network.loss.loss_function.sweep]
     default = ['custom']
     range = [
+      ['custom'],
       ['custom'],
       ['mseloss','custom'],
     ]
     coupled = true
     target_name = 'loss_name'
+  [neural_network.loss.loss_kwarg_keys.sweep]
+    default = [[]]
+    range = [
+      [],
+      ['noise_percentage'],
+      ['noise_percentage']
+    ]
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
