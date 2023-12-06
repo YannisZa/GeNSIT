@@ -8,7 +8,7 @@
     "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false,
     "neural_network>exclude": true,
     "mcmc>contingency_table>exclude": true,
-    "experiments>grid_ranges>exclude": true
+    "experiments>0>grid_ranges>exclude": true
   },
   "JointTableSIM_MCMC": {
     "inputs>to_learn>sweep>is-any-of>default>default-value": ["alpha", "beta"],
@@ -18,7 +18,7 @@
     "harris_wilson_model>parameters>sigma>sweep>default>allow-nan": false,
     "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false,
     "neural_network>exclude": true,
-    "experiments>grid_ranges>exclude": true
+    "experiments>0>grid_ranges>exclude": true
   },
   "NonJointTableSIM_NN": {
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
@@ -29,7 +29,7 @@
       "dest_attraction_ts_loss"
     ],
     "neural_network>loss>loss_name>sweep>range>default-value": "dest_attraction_ts_loss",
-    "experiments>grid_ranges>exclude": true
+    "experiments>0>grid_ranges>exclude": true
   },
   "SIM_NN": {
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
@@ -41,13 +41,13 @@
     ],
     "neural_network>loss>loss_name>sweep>range>default-value": "dest_attraction_ts_loss",
     "contingency_table>exclude": true,
-    "experiments>grid_ranges>exclude": true,
+    "experiments>0>grid_ranges>exclude": false,
     "mcmc>exclude": true
   },
   "RSquared_Analysis": {
     "neural_network>exclude": true,
     "contingency_table>exclude": true,
     "mcmc>exclude": true,
-    "experiments>grid_ranges>exclude": false
+    "experiments>0>grid_ranges>exclude": false
   }
 }
