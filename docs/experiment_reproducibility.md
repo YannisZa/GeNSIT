@@ -12,6 +12,7 @@ clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 6 -nt 7 -sm
 
 ```
 clear; multiresticodm run ./data/inputs/configs/debug.toml -nw 1 -nt 12 -et SIM_NN
+clear; multiresticodm run ./data/inputs/configs/debug.toml -nw 1 -nt 12 -et RSquared_Analysis
 ```
 
 ## Experiment 2
@@ -91,23 +92,25 @@ clear; multiresticodm summarise -s table -s intensity \
 ```
 
 ```
-clear; multiresticodm summarise -s intensity -s table \
--d exp1/SIM_NN_SweepedNoise_05_12_2023_21_18_16 \
+-d exp1/SIM_MCMC_SweepedNoise_16_05_2023_20_09_04 \
+-d exp1/JointTableSIM_MCMC_SweepedNoise_16_05_2023_20_09_04 \
+
+clear; multiresticodm summarise -s intensity \
+-d exp1/SIM_NN_SweepedNoise_05_12_2023_21_23_00 \
+-d exp1/SIM_NN_SweepedNoise_16_05_2023_20_09_04 \
 -dn cambridge_work_commuter_lsoas_to_msoas \
 -stat 'srmse' 'mean&' 'iter+seed&' \
 -k sigma -k name -k type \
--btt 'iter' 100 90 1000 -fe SIM_NN_SMRSEs --force_reload -nw 1
+-btt 'iter' 100 100 1000 -fe all_SIM_NN_SMRSEs -nw 1 --force_reload
 ```
 
 ```
-clear; multiresticodm summarise -s intensity -s table \
+clear; multiresticodm summarise -s intensity \
 -d exp1/SIM_NN_SweepedNoise_16_05_2023_20_09_04 \
--d exp1/SIM_MCMC_SweepedNoise_16_05_2023_20_09_04 \
--d exp1/JointTableSIM_MCMC_SweepedNoise_16_05_2023_20_09_04 \
 -dn cambridge_work_commuter_lsoas_to_msoas \
 -stat 'coverage_probability' '&mean|*100|floor' '&origin+destination||' \
 -k sigma -k name -k type --region_mass 0.99 \
---force_reload -nw 1 -fe CoverageProbabilities
+-fe CoverageProbabilities -nw 1 --force_reload
 ```
 
 ## Experiment 5 (Expected loss)
