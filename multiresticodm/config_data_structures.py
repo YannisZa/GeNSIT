@@ -284,7 +284,7 @@ class Path(Str):
         return True
 
     def value(self):
-        return self.schema['default-value'] if len(self.data) <=0 else os.path.basename(self.data)
+        return self.schema['default-value'] if len(self.data) <=0 else self.data
 
 
 class File(Path):

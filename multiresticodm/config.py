@@ -840,7 +840,7 @@ class Config:
             sweep_vals = self.parse_data(sweep_input,(key_path+["sweep","range"]))
 
             sweep_params['isolated'][key_path[-1]] = {
-                "var":key_path[-1],
+                "var":key_path[-1] if key_path[-1] != 'file' else key_path[-2],
                 "path": key_path,
                 "values": sweep_vals
             }
@@ -862,7 +862,7 @@ class Config:
                 # Parse values
                 sweep_vals = self.parse_data(sweep_input,(key_path+["sweep","range"]))
                 sweep_params['coupled'][target_name].append({
-                    "var":key_path[-1],
+                    "var":key_path[-1] if key_path[-1] != 'file' else key_path[-2],
                     "path": key_path,
                     "values": sweep_vals
                 })
