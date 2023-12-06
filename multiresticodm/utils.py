@@ -14,6 +14,7 @@ import tikzplotlib
 import numpy as np
 import pandas as pd
 import xarray as xr
+import netCDF4 as nc
 import matplotlib.pyplot as plt
 
 
@@ -63,11 +64,45 @@ def write_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
 
 def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
     # Writing the DataArray to a NetCDF file inside a with context
-    data.to_netcdf(
-        path = filepath,
-        **kwargs
-    )
-    data.close()
+    if not os.path.exists(filepath) and not os.path.isfile(filepath):
+        print('file exists')
+        data.to_netcdf(
+            path = filepath,
+            **kwargs
+        )
+        # close file
+        data.close()
+    else:
+        # Group id of interest
+        group_id = kwargs.pop('group','')
+        # Find all existing data groups
+        existing_data_groups = read_xr_groups(filepath)
+        existing_data_groups = [
+            f"/{sam_name}/{cid}" 
+            for sam_name,collection_ids in existing_data_groups.items()
+            for cid in collection_ids
+        ]
+
+        # Try loading existing data
+        if group_id in existing_data_groups and len(group_id) > 0:
+            existing_data = read_xr_data(
+                filepath = filepath,
+                group = group_id
+            )
+            # overwrite data
+            existing_data[:] = data
+            # close file
+            existing_data.close()
+        else:
+            data.to_netcdf(
+                path = filepath,
+                group = group_id,
+                **kwargs
+            )
+            # close file
+            data.close()
+
+
 
 
 def write_compressed_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
@@ -164,14 +199,26 @@ def read_npy(filepath:str,**kwargs:Dict) -> np.ndarray:
     data = np.load(filepath).astype('float32')
     return data
 
-def read_xr_dataarray(filepath:str,**kwargs:Dict) -> xr.DataArray:
+def read_xr_data(filepath:str,**kwargs:Dict) -> xr.DataArray:
     if len(kwargs.get('group','')) > 0:
         return xr.open_dataarray(
             filepath,
-            group = kwargs['group']
+            group = kwargs['group'],
+            cache = kwargs.get('cache',None)
         )
     else:
-        return xr.open_dataarray(filepath)
+        return xr.open_dataset(
+            filepath,
+            cache = kwargs.get('cache',None)
+        )
+
+def read_xr_groups(filepath:str):
+    existing_data_ids = {}
+    with nc.Dataset(filepath, 'r') as nc_file:
+        for sam_name, sample_collection in nc_file.groups.items():
+            existing_data_ids[sam_name] = sorted(list(sample_collection.groups.keys()))
+    return existing_data_ids
+    
 
 def read_compressed_npy(filepath:str,**kwargs:Dict) -> np.ndarray:
     # Write array to npy format
