@@ -33,7 +33,6 @@ def sde_pot_expanded(log_destination_attraction,origin_demand,cost_matrix,grand_
 def sde_pot(**kwargs):
     
     # Get parameters
-    grand_total = kwargs['grand_total']
     origin_demand = kwargs['origin_demand']
     cost_matrix = kwargs['cost_matrix']
     alpha = kwargs['alpha']
@@ -44,8 +43,6 @@ def sde_pot(**kwargs):
     epsilon = kwargs['epsilon']
     log_destination_attraction = kwargs['log_destination_attraction']
     
-    # Compute log intensity total
-    log_total = torch.log(grand_total.sum())
     # Compute log unnormalised expected flow
     log_utility = alpha*log_destination_attraction - beta*cost_matrix
     # Compute log normalisation factor
@@ -85,14 +82,14 @@ def sde_pot_hessian(**kwargs):
 
 def log_flow_matrix(**kwargs):
     
-    # Get parameters
+    # Get data structure params
     device = kwargs.get('device','cpu')
     tensor = kwargs.get('torch',True)
-    
+    # Required inputs
     origin_demand = kwargs['origin_demand']
     grand_total = kwargs.get('grand_total',None)
     cost_matrix = kwargs['cost_matrix']
-    
+    # Required outputs
     log_destination_attraction = kwargs['log_destination_attraction']
     alpha = kwargs['alpha']
     beta = kwargs['beta']

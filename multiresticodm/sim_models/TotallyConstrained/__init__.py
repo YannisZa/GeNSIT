@@ -32,7 +32,6 @@ def sde_pot_expanded(log_destination_attraction,cost_matrix,grand_total,alpha,be
 def sde_pot(**kwargs):
     
     # Get parameters
-    grand_total = kwargs['grand_total']
     cost_matrix = kwargs['cost_matrix']
     alpha = kwargs['alpha']
     beta = kwargs['beta']
@@ -41,9 +40,7 @@ def sde_pot(**kwargs):
     gamma = kwargs['gamma']
     epsilon = kwargs['epsilon']
     log_destination_attraction = kwargs['log_destination_attraction']
-    
-    # Compute log intensity total
-    log_total = torch.log(grand_total.sum())
+
     # Compute log unnormalised expected flow
     log_utility = alpha*log_destination_attraction - beta*cost_matrix
     # Compute log normalisation factor
@@ -53,7 +50,7 @@ def sde_pot(**kwargs):
     if alpha == 0:
         potential = -float('inf')
     else:
-        potential = -(1./alpha)*torch.exp(log_total)*log_normalisation
+        potential = -(1./alpha)*log_normalisation
         potential += kappa*(torch.exp(log_destination_attraction)).sum() - delta*torch.sum(log_destination_attraction)
         potential *= gamma*epsilon
     
@@ -78,13 +75,13 @@ def sde_pot_hessian(**kwargs):
 
 
 def log_flow_matrix(**kwargs):
-    # Get parameters
+    # Get data structure params
     device = kwargs.get('device','cpu')
     tensor = kwargs.get('torch',True)
-    
+    # Required inputs
     grand_total = kwargs.get('grand_total',None)
     cost_matrix = kwargs['cost_matrix']
-    
+    # Required outputs
     log_destination_attraction = kwargs['log_destination_attraction']
     alpha = kwargs['alpha']
     beta = kwargs['beta']
