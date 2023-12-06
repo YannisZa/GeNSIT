@@ -20,7 +20,7 @@ def set_threads(n_threads):
     os.environ['NUMEXPR_NUM_THREADS'] = str(n_threads)
     os.environ['OPENBLAS_NUM_THREADS'] = str(n_threads)
     os.environ['VECLIB_MAXIMUM_THREADS'] = str(n_threads)
-    torch.set_num_threads(int(os.environ["OMP_NUM_THREADS"]))
+    torch.set_num_threads(n_threads)
 
 
 
