@@ -400,7 +400,11 @@
       "disable_tqdm": true,
       "export_samples": true,
       "export_metadata": true,
-      "overwrite": true
+      "overwrite": true,
+      "grid_ranges": {
+        "alpha": true,
+        "beta": true
+      }
     }
   ],
   "outputs": {

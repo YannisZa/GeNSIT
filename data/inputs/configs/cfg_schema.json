@@ -23,7 +23,7 @@
       "sweep": {
         "default": {
           "dtype": "int",
-          "default-value": 1234,
+          "default-value": null,
           "valid-range": [0, null],
           "inclusive": true
         },
@@ -1895,10 +1895,11 @@
         "dtype": "str",
         "default-value": "SIM_NN",
         "is-any-of": [
+          "RSquared_Analysis",
+          "DataGeneration",
           "SIM_NN",
           "SIM_MCMC",
           "Table_MCMC",
-          "DataGeneration",
           "NonJointTableSIM_NN",
           "JointTableSIM_NN",
           "JointTableSIM_MCMC"
@@ -1938,6 +1939,72 @@
         "exclude": false,
         "dtype": "bool",
         "default-value": true
+      },
+      "grid_ranges": {
+        "sweepable": false,
+        "optional": true,
+        "exclude": true,
+
+        "alpha": {
+          "sweepable": false,
+          "optional": true,
+          "exclude": false,
+
+          "min": {
+            "sweepable": false,
+            "optional": true,
+            "exclude": false,
+
+            "dtype": "float",
+            "default": 0.0
+          },
+          "max": {
+            "sweepable": false,
+            "optional": true,
+            "exclude": false,
+
+            "dtype": "float",
+            "default": 2.0
+          },
+          "n": {
+            "sweepable": false,
+            "optional": true,
+            "exclude": false,
+
+            "dtype": "int",
+            "default": 100
+          }
+        },
+        "beta": {
+          "sweepable": false,
+          "optional": true,
+          "exclude": false,
+
+          "min": {
+            "sweepable": false,
+            "optional": true,
+            "exclude": false,
+
+            "dtype": "float",
+            "default": 0.0
+          },
+          "max": {
+            "sweepable": false,
+            "optional": true,
+            "exclude": false,
+
+            "dtype": "float",
+            "default": 2.0
+          },
+          "n": {
+            "sweepable": false,
+            "optional": true,
+            "exclude": false,
+
+            "dtype": "int",
+            "default": 100
+          }
+        }
       }
     }
   },
