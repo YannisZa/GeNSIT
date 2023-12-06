@@ -5,8 +5,7 @@ import warnings
 from tqdm import tqdm
 from copy import deepcopy
 from datetime import datetime
-from torch import float32, uint8
-from scipy.optimize import minimize
+from torch import float32, uint8, float16
 from joblib import Parallel, delayed
 
 from multiresticodm.utils import *
@@ -14,7 +13,7 @@ from multiresticodm.config import Config
 from multiresticodm.inputs import Inputs
 from multiresticodm.outputs import Outputs
 from multiresticodm.global_variables import *
-from multiresticodm.math_utils import apply_norm
+from multiresticodm.math_utils import apply_norm,torch_optimize
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.spatial_interaction_model import instantiate_sim
@@ -288,27 +287,27 @@ class Experiment(object):
             if param == 'table':
                 # Get initial margins
                 # try:
-                initialisations['table_sample'] = deep_call(self,'.ct_mcmc.initialise_table()',None)
+                initialisations['table'] = deep_call(self,'.ct_mcmc.initialise_table()',None)
                 # except:
                     # self.logger.warning("Table could not be initialised.")
             
             elif param == 'theta':
                 try:
-                    theta_sample = self.harris_wilson_model.params_to_learn
+                    theta = self.physics_model.params_to_learn
                 except:
                     try:
-                        theta_sample = self.harris_wilson_mcmc.physics_model.params_to_learn
+                        theta = self.harris_wilson_mcmc.physics_model.params_to_learn
                     except:
                         try:
-                            theta_sample = self.harris_wilson_nn.physics_model.params_to_learn
+                            theta = self.harris_wilson_nn.physics_model.params_to_learn
                         except:
                             self.logger.warning("Theta could not be initialised.")
-                self.params_to_learn = list(theta_sample.keys())
-                initialisations['theta_sample'] = torch.tensor(list(theta_sample.values()),dtype=float32,device=self.device)
+                self.params_to_learn = list(theta.keys())
+                initialisations['theta'] = torch.tensor(list(theta.values()),dtype=float32,device=self.device)
                 
             elif param == 'log_destination_attraction':
                 # Arbitrarily initialise destination attraction
-                initialisations['log_destination_attraction_sample'] = torch.log(
+                initialisations['log_destination_attraction'] = torch.log(
                     torch.repeat_interleave(
                         torch.tensor(1./dims['destination']),
                         dims['destination']
@@ -317,19 +316,19 @@ class Experiment(object):
                     dtype=float32,
                     device=self.device
                 )
-                initialisations['log_destination_attraction_sample'].requires_grad = True
+                initialisations['log_destination_attraction'].requires_grad = True
 
             elif param == 'sign':
-                initialisations['sign_sample'] = torch.tensor(1,dtype=uint8,device=self.device)
+                initialisations['sign'] = torch.tensor(1,dtype=uint8,device=self.device)
             
             elif param == 'loss':
-                initialisations['loss_sample'] = torch.tensor(0.0,dtype=float32,device=self.device,requires_grad=True)
+                initialisations['loss'] = {
+                    nm:torch.tensor(0.0,dtype=float32,device=self.device,requires_grad=True) \
+                    for nm in self.harris_wilson_nn.loss_functions.keys()
+                }
             
             elif param == 'log_target':
-                initialisations['log_target_sample'] = torch.tensor(0.0,dtype=float32,device=self.device)
-
-            elif param == 'computation_time':
-                initialisations['computation_time'] = 0
+                initialisations['log_target'] = torch.tensor(0.0,dtype=float32,device=self.device)
 
         return initialisations
         
@@ -361,87 +360,16 @@ class Experiment(object):
                                 compression=3,
                             )
                         )
-                        getattr(self,loss_name).attrs['dim_names'] = XARRAY_SCHEMA['loss']['coords']
-                        getattr(self,loss_name).attrs['coords_mode__time'] = 'start_and_step'
-                        getattr(self,loss_name).attrs['coords__time'] = [self._write_start, self._write_every]
+                        getattr(self,loss_name).attrs['dim_names'] = DATA_SCHEMA['loss']['dims']
+                        getattr(self,loss_name).attrs['dims_mode__time'] = 'start_and_step'
+                        getattr(self,loss_name).attrs['dims__time'] = [self._write_start, self._write_every]
                     else:
                         setattr(
                             self,
                             loss_name,
                             self.outputs.h5group[loss_name]
                         )
-
-            if 'log_target' in self.output_names:
-                # Setup chunked dataset to store the state data in
-                if 'log_target' in self.outputs.h5group and not load_experiment:
-                    # Delete current dataset
-                    safe_delete(getattr(self,'log_target'))
-                if 'log_target' not in self.outputs.h5group:
-                    setattr(
-                        self,
-                        'log_target',
-                        self.outputs.h5group.create_dataset(
-                            'log_target',
-                            (0,),
-                            maxshape=(None,),
-                            chunks=True,
-                            compression=3,
-                        )
-                    )
-                    getattr(self,'log_target').attrs['dim_names'] = XARRAY_SCHEMA['log_target']['coords']
-                    getattr(self,'log_target').attrs['coords_mode__time'] = 'start_and_step'
-                    getattr(self,'log_target').attrs['coords__time'] = [self._write_start, self._write_every]
-                else:
-                    setattr(
-                        self,
-                        'log_target',
-                        self.outputs.h5group['log_target']
-                    )
-
-            # Setup sampled/predicted log destination attractions
-            if 'log_destination_attraction' in self.output_names:
-                if 'log_destination_attraction' in self.outputs.h5group and not load_experiment:
-                    # Delete current dataset
-                    safe_delete(getattr(self,'log_destination_attraction'))
-                if 'log_destination_attraction' not in self.outputs.h5group:
-                    self.log_destination_attractions = self.outputs.h5group.create_dataset(
-                        "log_destination_attraction",
-                        (0,dims['time'],dims['destination']),
-                        maxshape=(None,dims['time'],dims['destination']),
-                        chunks=True,
-                        compression=3,
-                    )
-                    self.log_destination_attractions.attrs["dim_names"] = XARRAY_SCHEMA['log_destination_attraction']['coords']
-                    self.log_destination_attractions.attrs["coords_mode__time"] = "start_and_step"
-                    self.log_destination_attractions.attrs["coords__time"] = [self._write_start, self._write_every]
-                else:
-                    setattr(
-                        self,
-                        'log_destination_attraction',
-                        self.outputs.h5group['log_destination_attraction']
-                    )
-            # Setup computation time
-            if 'computation_time' in self.output_names:
-                if 'compute_time' in self.outputs.h5group and not load_experiment:
-                    # Delete current dataset
-                    safe_delete(getattr(self,'compute_time'))
-                if 'compute_time' not in self.outputs.h5group:
-                    self.compute_time = self.outputs.h5group.create_dataset(
-                        'computation_time',
-                        (0,),
-                        maxshape=(None,),
-                        chunks=True,
-                        compression=3,
-                    )
-                    self.compute_time.attrs['dim_names'] = XARRAY_SCHEMA['computation_time']['coords']
-                    self.compute_time.attrs['coords_mode__epoch'] = 'trivial'
-                else:
-                    setattr(
-                        self,
-                        'computation_time',
-                        self.outputs.h5group['computation_time']
-                    )
-
+            
             # Setup sampled/predicted theta
             if 'theta' in self.output_names:
                 self.thetas = []
@@ -453,128 +381,76 @@ class Experiment(object):
                         dset = self.outputs.h5group.create_dataset(
                             p_name, 
                             (0,), 
-                            maxshape=(None,), 
+                            maxshape=(None,),
                             chunks=True, 
                             compression=3
                         )
-                        dset.attrs['dim_names'] = XARRAY_SCHEMA[p_name]['coords']
-                        dset.attrs['coords_mode__time'] = 'start_and_step'
-                        dset.attrs['coords__time'] = [self._write_start, self._write_every]
+                        dset.attrs['dim_names'] = DATA_SCHEMA[p_name]['dims']
+                        dset.attrs['dims_mode__time'] = 'start_and_step'
+                        dset.attrs['dims__time'] = [self._write_start, self._write_every]
                     else:
                         dset = self.outputs.h5group[p_name]
                     # Append to thetas
                     self.thetas.append(dset)
+
+            # Setup chunked dataset to store the state data in
+            if 'r2' in self.output_names:
+                if 'r2' in self.outputs.h5group and not load_experiment:
+                    # Delete current dataset
+                    safe_delete(getattr(self,'r2'))
+                if 'r2' not in self.outputs.h5group:
+                    setattr(
+                        self,
+                        'r2',
+                        self.outputs.h5group.create_dataset(
+                            'r2',
+                            tuple([grange['n'] for grange in self.config['experiments'][0]['grid_ranges'].values()],),
+                            chunks=True,
+                            compression=3,
+                        )
+                    )
+                    getattr(self,'r2').attrs['r2'] = DATA_SCHEMA['r2']['dims']
+                    getattr(self,'r2').attrs['dims_mode__time'] = 'start_and_step'
+                    getattr(self,'r2').attrs['dims__time'] = [self._write_start, self._write_every]
+                else:
+                    setattr(
+                        self,
+                        'r2',
+                        self.outputs.h5group['r2']
+                    )
+
+            for sample in [
+                'log_destination_attraction','table','log_target','compute_time',
+                'sign','theta_acc','log_destination_attraction_acc','table_acc'
+            ]:
+                if sample in self.output_names:
+                    # Setup chunked dataset to store the state data in
+                    if sample in self.outputs.h5group and not load_experiment:
+                        # Delete current dataset
+                        safe_delete(getattr(self,sample))
+                    if sample not in self.outputs.h5group:
+                        setattr(
+                            self,
+                            sample,
+                            self.outputs.h5group.create_dataset(
+                                sample,
+                                (0,*[dims[d] for d in DATA_SCHEMA[sample]["dims"]]),
+                                maxshape=(None,*[dims[d] for d in DATA_SCHEMA[sample]["dims"]]),
+                                chunks=True,
+                                compression=3,
+                            )
+                        )
+                        getattr(self,sample).attrs[sample] = DATA_SCHEMA[sample]['dims']
+                        getattr(self,sample).attrs['dims_mode__time'] = 'start_and_step'
+                        getattr(self,sample).attrs['dims__time'] = [self._write_start, self._write_every]
+                    else:
+                        setattr(
+                            self,
+                            sample,
+                            self.outputs.h5group[sample]
+                        )
             
-            # Setup sampled signs
-            if 'sign' in self.output_names:
-                if 'sign' in self.outputs.h5group and not load_experiment:
-                    # Delete current dataset
-                    safe_delete(getattr(self,'sign'))
-                if 'sign' not in self.outputs.h5group:
-                    self.signs = self.outputs.h5group.create_dataset(
-                        "sign",
-                        (0,),
-                        maxshape=(None,),
-                        chunks=True,
-                        compression=3,
-                    )
-                    self.signs.attrs["dim_names"] = XARRAY_SCHEMA['sign']['coords']
-                    self.signs.attrs["coords_mode__time"] = "start_and_step"
-                    self.signs.attrs["coords__time"] = [self._write_start, self._write_every]
-                else:
-                    setattr(
-                        self,
-                        'sign',
-                        self.outputs.h5group['sign']
-                    )
-            # Setup sampled tables
-            if 'table' in self.output_names:
-                if 'table' in self.outputs.h5group and not load_experiment:
-                    # Delete current dataset
-                    safe_delete(getattr(self,'table'))
-                if 'table' not in self.outputs.h5group:
-                    self.tables = self.outputs.h5group.create_dataset(
-                        "table",
-                        (0,*unpack_dims(dims,time_dims=False)),
-                        maxshape=(None,*unpack_dims(dims,time_dims=False)),
-                        chunks=True,
-                        compression=3,
-                    )
-                    self.tables.attrs["dim_names"] = ["origin","destination","N"]
-                    self.tables.attrs["coords_mode__time"] = "start_and_step"
-                else:
-                    setattr(
-                        self,
-                        'table',
-                        self.outputs.h5group['table']
-                    )
-            # Setup acceptances
-            if 'theta_acc' in self.output_names:
-                if 'theta_acc' in self.outputs.h5group and not load_experiment:
-                    # Delete current dataset
-                    safe_delete(getattr(self,'theta_acc'))
-                if 'theta_acc' not in self.outputs.h5group:
-                    # Setup chunked dataset to store the state data in
-                    self.theta_acc = self.outputs.h5group.create_dataset(
-                        'theta_acc',
-                        (0,),
-                        maxshape=(None,),
-                        chunks=True,
-                        compression=3,
-                    )
-                    self.theta_acc.attrs['dim_names'] = XARRAY_SCHEMA['theta_acc']['coords']
-                    self.theta_acc.attrs['coords_mode__time'] = 'start_and_step'
-                    self.theta_acc.attrs['coords__time'] = [self._write_start, self._write_every]
-                else:
-                    setattr(
-                        self,
-                        'theta_acc',
-                        self.outputs.h5group['theta_acc']
-                    )
-            if 'log_destination_attraction_acc' in self.output_names:
-                if 'log_destination_attraction_acc' in self.outputs.h5group and not load_experiment:
-                    # Delete current dataset
-                    safe_delete(getattr(self,'log_destination_attraction_acc'))
-                if 'log_destination_attraction_acc' not in self.outputs.h5group:
-                    # Setup chunked dataset to store the state data in
-                    self.log_destination_attraction_acc = self.outputs.h5group.create_dataset(
-                        'log_destination_attraction_acc',
-                        (0,),
-                        maxshape=(None,),
-                        chunks=True,
-                        compression=3,
-                    )
-                    self.log_destination_attraction_acc.attrs['dim_names'] = XARRAY_SCHEMA['log_destination_attraction_acc']['coords']
-                    self.log_destination_attraction_acc.attrs['coords_mode__time'] = 'start_and_step'
-                    self.log_destination_attraction_acc.attrs['coords__time'] = [self._write_start, self._write_every]
-                else:
-                    setattr(
-                        self,
-                        'log_destination_attraction_acc',
-                        self.outputs.h5group['log_destination_attraction_acc']
-                    )
-            if 'table_acc' in self.output_names:
-                if 'table_acc' in self.outputs.h5group and not load_experiment:
-                    # Delete current dataset
-                    safe_delete(getattr(self,'table_acc'))
-                if 'table_acc' not in self.outputs.h5group:
-                    # Setup chunked dataset to store the state data in
-                    self.table_acc = self.outputs.h5group.create_dataset(
-                        'table_acceptance',
-                        (0,),
-                        maxshape=(None,),
-                        chunks=True,
-                        compression=3,
-                    )
-                    self.table_acc.attrs['dim_names'] = XARRAY_SCHEMA['table_acc']['coords']
-                    self.table_acc.attrs['coords_mode__time'] = 'start_and_step'
-                    self.table_acc.attrs['coords__time'] = [self._write_start, self._write_every]
-                else:
-                    setattr(
-                        self,
-                        'table_acc',
-                        self.outputs.h5group['table_acc']
-                    )
+            
     def update_and_export(
             self,
             batch_size: int,
@@ -642,48 +518,35 @@ class Experiment(object):
                     getattr(self,loss_name).resize(getattr(self,loss_name).shape[0] + 1, axis=0)
                     getattr(self,loss_name)[-1] = _loss_sample
 
-            if 'table' in self.output_names:
-                _table_sample = kwargs.get('table',None)
-                _table_sample = _table_sample.clone().detach().cpu() if _table_sample is not None else None
-                self.tables.resize(self.tables.shape[0] + 1, axis=0)
-                self.tables[-1,...] = _table_sample
-
             if 'theta' in self.output_names:
                 _theta_sample = kwargs.get('theta',[None]*len(self.thetas))
                 _theta_sample = _theta_sample.clone().detach().cpu() if _theta_sample is not None else None
                 for idx, dset in enumerate(self.thetas):
                     dset.resize(dset.shape[0] + 1, axis=0)
                     dset[-1] = _theta_sample[idx]
-            
-            if 'sign' in self.output_names:
-                _sign_sample = kwargs.get('sign',None)
-                _sign_sample = _sign_sample.clone().detach().cpu() if _sign_sample is not None else None
-                self.signs.resize(self.signs.shape[0] + 1, axis=0)
-                self.signs[-1] = _sign_sample
-            
-            if 'log_destination_attraction' in self.output_names:
-                _log_destination_attraction_sample = kwargs.get('log_destination_attraction',np.array([None]))
-                _log_destination_attraction_sample = _log_destination_attraction_sample.clone().detach().cpu() if _log_destination_attraction_sample is not None else None
-                self.log_destination_attractions.resize(self.log_destination_attractions.shape[0] + 1, axis=0)
-                self.log_destination_attractions[-1,...] = _log_destination_attraction_sample
 
-            if 'theta_acc' in self.output_names:
-                _theta_acc = kwargs.get('theta_acc',None)
-                _theta_acc = _theta_acc if _theta_acc is not None else None
-                self.theta_acc.resize(self.theta_acc.shape[0] + 1, axis=0)
-                self.theta_acc[-1] = _theta_acc
+            if 'r2' in self.output_names:
+                _r2_sample = kwargs.get('r2',None)
+                _r2_sample = _r2_sample.clone().detach().cpu() if _r2_sample is not None else None
+                getattr(self,'r2')[np.array(kwargs['index'])] = _r2_sample
 
-            if 'log_destination_attraction_acc' in self.output_names:
-                _log_dest_attract_acc = kwargs.get('log_destination_attraction_acc',None)
-                _log_dest_attract_acc = _log_dest_attract_acc if _log_dest_attract_acc is not None else None
-                self.log_destination_attraction_acc.resize(self.log_destination_attraction_acc.shape[0] + 1, axis=0)
-                self.log_destination_attraction_acc[-1] = _log_dest_attract_acc
-
-            if 'table_acc' in self.output_names:
-                _table_acc = kwargs.get('table_acc',None)
-                _table_acc = _table_acc if _table_acc is not None else None
-                self.table_acc.resize(self.table_acc.shape[0] + 1, axis=0)
-                self.table_acc[-1] = _table_acc
+            for sample in [
+                'log_destination_attraction','sign','table'
+                'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time'
+            ]:
+                if sample in self.output_names:
+                    sample_value = kwargs.get(sample,None)
+                    if sample is not None:
+                        sample_value = sample_value.clone().detach().cpu() if torch.is_tensor(sample_value) else sample_value
+                    else:
+                        sample_value = np.ones(DATA_SCHEMA[sample]["dims"]) if DATA_SCHEMA[sample]["dims"] else None
+                        if sample_value is not None:
+                            sample_value[:] = None
+                    getattr(self,sample).resize(getattr(self,sample).shape[0] + 1, axis=0)
+                    if len(DATA_SCHEMA[sample]["dims"]):
+                        getattr(self,sample)[-1,...] = sample_value
+                    else:
+                        getattr(self,sample)[-1] = sample_value
 
     
     def print_initialisations(self,parameter_inits,print_lengths:bool=True,print_values:bool=False):
@@ -738,101 +601,208 @@ class DataGeneration(Experiment):
             instance = self.instance
         )
 
-class RSquaredAnalysis(Experiment):
+class RSquared_Analysis(Experiment):
 
     def __init__(self, config:Config, **kwargs):
         # Initalise superclass
         super().__init__(config,**kwargs)
+    
+        self.output_names = EXPERIMENT_OUTPUT_NAMES['RSquared_Analysis']
+
+        # Fix random seed
+        set_seed(self.seed)
+
+        # Get config parameters
+        self.grid_ranges = self.config.settings['experiments'][0]['grid_ranges']
+
+        # Prepare inputs
+        self.inputs = Inputs(
+            config=config,
+            synthetic_data = False,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+
+        # Pass inputs to device
+        self.inputs.pass_to_device()
+
+        # Instantiate Spatial Interaction Model
+        self.logger.note("Initializing the spatial interaction model ...")
+
+        sim = instantiate_sim(
+            name = config['spatial_interaction_model']['name'],
+            config = config,
+            true_parameters = config['spatial_interaction_model']['parameters'],
+            instance = kwargs.get('instance',''),
+            **vars(self.inputs.data),
+            logger=self.logger
+        )
+
+        # Get and remove config
+        config = pop_variable(sim,'config')
+
+        # Build Harris Wilson model
+        self.logger.note("Initializing the Harris Wilson physics model ...")
+        self.physics_model = HarrisWilson(
+            intensity_model = sim,
+            config = config,
+            dt = config['harris_wilson_model'].get('dt',0.001),
+            true_parameters = self.inputs.true_parameters,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+        # Get and remove config
+        self.config = pop_variable(self.physics_model,'config')
+
+        # Create outputs
+        self.outputs = Outputs(
+            self.config,
+            module=__name__+kwargs.get('instance',''),
+            sweep_params=kwargs.get('sweep_params',{}),
+            base_dir=self.outputs_base_dir,
+            experiment_id=self.sweep_experiment_id,
+            logger = self.logger
+        )
+
+        # Prepare writing to file
+        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+
+        # Write metadata
+        self.write_metadata()
         
-
-        # Build spatial interaction model
-        self.sim = instantiate_sim(self.config)
-
-        self.grid_size = config['grid_size']
-        self.amin,self.amax = config['a_range']
-        self.bmin,self.bmax = config['b_range']
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+    
 
     def run(self,**kwargs) -> None:
         
         # Initialize search grid
-        alpha_values = np.linspace(self.amin, self.amax, self.grid_size,endpoint=True)
-        beta_values = np.linspace(self.bmin, self.bmax, self.grid_size,endpoint=True)
-        r2_values = np.zeros((self.grid_size, self.grid_size),dtype='float16')
+        alpha_values = torch.linspace(
+            *[self.grid_ranges['alpha'][k] for k in ['min','max','n']],
+            dtype=float32,
+            device=self.device
+        )
+        beta_values = torch.linspace(
+            *[self.grid_ranges['beta'][k] for k in ['min','max','n']],
+            dtype=float32,
+            device=self.device
+        )
 
-        # Define theta parameters
-        theta = np.array([
-                        0.0, 
-                        0.0,
-                        self.sim.delta,
-                        self.sim.gamma,
-                        self.sim.kappa,
-                        self.sim.epsilon
-                ],dtype='float64')
+        self.logger.info(f"Running MCMC inference of {self.physics_model.noise_regime} noise SpatialInteraction.")
+
+        # Fix random seed
+        set_seed(self.seed)
+
+        # Initialise parameters
+        initial_params = self.initialise_parameters(['theta'])
+        theta_sample = initial_params['theta']
+        
+        # Print initialisations
+        # self.print_initialisations(parameter_inits,print_lengths=False,print_values=True)
 
         # Search values
         max_r2 = 0 
-        max_w_prediction = np.exp(np.ones(self.sim.dims['destination'])*(1/self.sim.dims['destination']))
+        max_w_prediction = torch.exp(
+            torch.ones(
+                self.inputs.data.dims['destination'],dtype=float32,device=self.device
+            ) * torch.tensor(
+                1./self.inputs.data.dims['destination'],dtype=float32,device=self.device
+            )
+        )
+        # Get destination attraction for last time dimension
+        time_index = DATA_SCHEMA['destination_attraction_ts']['dims'].index('time')
+        time_axis = DATA_SCHEMA['destination_attraction_ts']['axes'][time_index]
+        w_data = deepcopy(self.inputs.data.destination_attraction_ts)
+        w_data = w_data.select(dim = time_axis,index = -1)
 
+        x_data = torch.log(w_data)
         # Total sum squares
-        w_data = np.exp(self.sim.log_destination_attraction)
-        w_data_centred = w_data - np.mean(w_data)
-        ss_tot = np.dot(w_data_centred, w_data_centred)
+        w_data_centred = w_data - torch.mean(w_data)
+        ss_tot = torch.dot(w_data_centred, w_data_centred)
+        
+        # Progress bar
+        progress = tqdm(
+            total = len(alpha_values)*len(beta_values),
+            disable = self.tqdm_disabled,
+            position=(self.device_id+1),
+            desc = f"RSquaredAnalysis device id: {self.device_id}",
+            leave = False
+        )
 
         # Perform grid evaluations
-        for i in tqdm(range(self.grid_size)):
-            for j in range(self.grid_size):
+        for i,alpha_val in enumerate(alpha_values):
+            for j,beta_val in enumerate(beta_values):
                 try:
-                    theta[0] = alpha_values[j]
-                    theta[1] = beta_values[i]*self.sim.bmax
+                    theta_sample[0] = alpha_val
+                    theta_sample[1] = beta_val*self.physics_model.params.bmax
                     
-                    # Minimise potential function
-                    potential_func = minimize(
-                        self.sim.sde_potential_and_gradient,
-                        self.sim.log_destination_attraction,
-                        method='L-BFGS-B',
-                        jac=True,
-                        args=(theta),
-                        options={'disp': False}
+                    # Get minimum
+                    x_pred = torch_optimize(
+                        x_data.clone().detach().cpu().numpy(),
+                        function = self.physics_model.sde_potential_and_gradient,
+                        method = 'L-BFGS-B',
+                        **dict(zip(self.params_to_learn,theta_sample)),
+                        device = self.device
                     )
-                    w_pred = np.exp(potential_func.x,dtype='float32')
+                    # If predictions are null 
+                    # it means that optimisation failed
+                    if x_pred is None:
+                        # Write data
+                        self.write_data(
+                            r2 = None,
+                            index = (i,j)
+                        )
+                        continue
+                    
+                    # Get predictions
+                    w_pred = torch.tensor(
+                        np.exp(x_pred),
+                        dtype = float32,
+                        device = self.device
+                    )
                     # Residiual sum squares
                     res = w_pred - w_data
-                    ss_res = np.dot(res, res)
+                    ss_res = torch.dot(res, res)
 
                     # Regression sum squares
-                    r2_values[i, j] = 1. - ss_res/ss_tot
-                    if r2_values[i, j] > max_r2:
+                    r2 = 1. - ss_res/ss_tot
+
+                    # Write data
+                    self.write_data(
+                        r2 = r2,
+                        index = (i,j)
+                    )
+
+                    if r2 > max_r2:
                         max_w_prediction = deepcopy(w_pred)
-                        max_r2 = r2_values[i, j]
-                    last_r2 = r2_values[i, j]
+                        max_r2 = r2
                 except:
-                    r2_values[i, j] = last_r2
+                    pass
+                progress.update(1)
 
         # Output results
-        idx = np.unravel_index(r2_values.argmax(), r2_values.shape)
+        idx = np.unravel_index(self.r2.argmax(), np.shape(self.r2))
 
         print("Fitted alpha, beta and scaled beta values:")
-        print(alpha_values[idx[1]],beta_values[idx[0]], beta_values[idx[0]]*self.sim.bmax)
+        print(alpha_values[idx[1]],beta_values[idx[0]], beta_values[idx[0]]*self.physics_model.params.bmax)
         print("R^2 value:")
-        print(r2_values[idx],np.max(r2_values.ravel()))
+        print(self.r2[idx],torch.max(self.r2.ravel()))
         print('Destination attraction prediction')
         print(max_w_prediction)
         print('True destination attraction')
-        print(np.exp(self.sim.log_destination_attraction))
+        print(self.inputs.data.destination_attraction_ts)
         if self.sim.ground_truth_known:
             print('True theta')
-            print(self.sim.alpha_true,self.sim.beta_true)
+            print(self.sim.alpha,self.sim.beta)
 
         # Save fitted values to parameters
-        self.config['noise_regime'] = self.sim.noise_regime
-        self.config['fitted_alpha'] = alpha_values[idx[1]]
-        self.config['fitted_beta'] = beta_values[idx[0]]
-        self.config['fitted_scaled_beta'] = beta_values[idx[0]]*self.sim.bmax
-        self.config['R^2'] = float(r2_values[idx])
-        self.config['predicted_w'] = max_w_prediction.tolist()
+        self.config['fitted_alpha'] = to_json_format(alpha_values[idx[1]])
+        self.config['fitted_beta'] = to_json_format(beta_values[idx[0]])
+        self.config['fitted_scaled_beta'] = to_json_format(beta_values[idx[0]]*self.physics_model.params.bmax)
+        self.config['R^2'] = to_json_format(float(self.r2[idx]))
+        self.config['predicted_w'] = to_json_format(max_w_prediction)
 
-        # Append to result array
-        self.results = [{"samples":{"r2":r2_values}}]
+        # Update metadata
+        self.update_metadata()
 
         # Write metadata
         self.write_metadata()
@@ -840,7 +810,7 @@ class RSquaredAnalysis(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Simulation run finished.")
+        self.logger.note("Experiment finished.")
 
 class LogTargetAnalysis(Experiment):
 
@@ -934,7 +904,7 @@ class LogTargetAnalysis(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Simulation run finished.")
+        self.logger.note("Experiment finished.")
 
 class SIM_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -984,6 +954,7 @@ class SIM_MCMC(Experiment):
         )
 
         # Spatial interaction model MCMC
+        self.logger.note("Initializing the Harris Wilson model MCMC")
         self.harris_wilson_mcmc = instantiate_harris_wilson_mcmc(
             config = config,
             physics_model = harris_wilson_model,
@@ -1024,8 +995,8 @@ class SIM_MCMC(Experiment):
 
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
-        theta_sample = initial_params['theta_sample']
-        log_destination_attraction_sample = initial_params['log_destination_attraction_sample']
+        theta_sample = initial_params['theta']
+        log_destination_attraction_sample = initial_params['log_destination_attraction']
         
         # Print initialisations
         # self.print_initialisations(parameter_inits,print_lengths=False,print_values=True)
@@ -1091,9 +1062,9 @@ class SIM_MCMC(Experiment):
 
                 # Write to file
                 self.write_data(
-                    theta_sample = theta_sample,
+                    theta = theta_sample,
                     theta_acc = theta_acc,
-                    sign_sample = sign_sample
+                    sign = sign_sample
                 )
             
             # Run x sampling
@@ -1118,8 +1089,8 @@ class SIM_MCMC(Experiment):
                 )
                 # Write to data
                 self.write_data(
-                    log_destination_attraction_sample = log_destination_attraction_sample,
-                    log_destination_attraction_acc = log_dest_attract_acc,
+                    log_destination_attraction = log_destination_attraction_sample,
+                    log_destination_attraction_acc = log_dest_attract_acc
                 )
 
                 self.logger.iteration(f"Completed epoch {i+1} / {N}.")
@@ -1138,7 +1109,7 @@ class SIM_MCMC(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Simulation run finished.")
+        self.logger.note("Experiment finished.")
 
 class JointTableSIM_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -1188,6 +1159,7 @@ class JointTableSIM_MCMC(Experiment):
         )
         
         # Spatial interaction model MCMC
+        self.logger.note("Initializing the Harris Wilson model MCMC")
         self.harris_wilson_mcmc = instantiate_harris_wilson_mcmc(
             config = config,
             physics_model = harris_wilson_model,
@@ -1245,9 +1217,9 @@ class JointTableSIM_MCMC(Experiment):
 
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
-        theta_sample = initial_params['theta_sample']
-        log_destination_attraction_sample = initial_params['log_destination_attraction_sample']
-        table_sample = initial_params['table_sample']
+        theta_sample = initial_params['theta']
+        log_destination_attraction_sample = initial_params['log_destination_attraction']
+        table_sample = initial_params['table']
         
         # Print initialisations
         # self.print_initialisations(parameter_inits,print_lengths=False,print_values=True)
@@ -1325,9 +1297,9 @@ class JointTableSIM_MCMC(Experiment):
 
                 # Write to file
                 self.write_data(
-                    theta_sample = theta_sample,
+                    theta = theta_sample,
                     theta_acc = theta_acc,
-                    sign_sample = sign_sample
+                    sign = sign_sample
                 )
             
             # Run x sampling
@@ -1355,7 +1327,7 @@ class JointTableSIM_MCMC(Experiment):
                 )
                 # Write to data
                 self.write_data(
-                    log_destination_attraction_sample = log_destination_attraction_sample,
+                    log_destination_attraction = log_destination_attraction_sample,
                     log_destination_attraction_acc = log_dest_attract_acc,
                 )
 
@@ -1382,7 +1354,7 @@ class JointTableSIM_MCMC(Experiment):
 
                 # Write to file
                 self.write_data(
-                    table_sample = table_sample,
+                    table = table_sample,
                     table_acc = table_accepted
                 )
             
@@ -1407,7 +1379,7 @@ class JointTableSIM_MCMC(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Simulation run finished.")
+        self.logger.note("Experiment finished.")
 
 class Table_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -1519,7 +1491,7 @@ class Table_MCMC(Experiment):
 
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
-        table_sample = initial_params['table_sample']
+        table_sample = initial_params['table']
 
         # Store number of samples
         num_epochs = self.config['training']['N']
@@ -1568,7 +1540,7 @@ class Table_MCMC(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Simulation run finished.")
+        self.logger.note("Experiment finished.")
 
 class TableSummaries_MCMCConvergence(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -1962,7 +1934,7 @@ class SIM_NN(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Simulation run finished.")
+        self.logger.note("Experiment finished.")
 
 class NonJointTableSIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -2083,9 +2055,9 @@ class NonJointTableSIM_NN(Experiment):
 
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
-        theta_sample = initial_params['theta_sample']
-        log_destination_attraction_sample = initial_params['log_destination_attraction_sample']
-        table_sample = initial_params['table_sample']
+        theta_sample = initial_params['theta']
+        log_destination_attraction_sample = initial_params['log_destination_attraction']
+        table_sample = initial_params['table']
         
         # Store number of samples
         num_epochs = self.config['training']['N']
@@ -2187,7 +2159,7 @@ class NonJointTableSIM_NN(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Simulation run finished.")
+        self.logger.note("Experiment finished.")
 
 class JointTableSIM_NN(Experiment):
     
@@ -2312,9 +2284,9 @@ class JointTableSIM_NN(Experiment):
 
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
-        theta_sample = initial_params['theta_sample']
-        log_destination_attraction_sample = initial_params['log_destination_attraction_sample']
-        table_sample = initial_params['table_sample']
+        theta_sample = initial_params['theta']
+        log_destination_attraction_sample = initial_params['log_destination_attraction']
+        table_sample = initial_params['table']
         
         # Store number of samples
         num_epochs = self.config['training']['N']
@@ -2433,7 +2405,7 @@ class JointTableSIM_NN(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Simulation run finished.")
+        self.logger.note("Experiment finished.")
 
 class ExperimentSweep():
 
