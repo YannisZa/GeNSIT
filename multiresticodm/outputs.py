@@ -273,10 +273,10 @@ class Outputs(object):
             
             # Get number of samples to keep
             trimming = min(slice_setts.get('trimming',None),len(iters))
-            
+
             # Trim iterations
             iters = iters[:trimming]
-
+            
             # Apply burnin, thinning and trimming to samples
             samples = samples.isel(temp_dim = iters)
 
@@ -344,16 +344,16 @@ class Outputs(object):
                 dims = np.shape(sample_data)[2:]
                 # For each dim create coordinate
                 for i,d in enumerate(dims):
-                    obj,func = XARRAY_SCHEMA[sample_name]['funcs'][i]
+                    obj,func = DATA_SCHEMA[sample_name]['funcs'][i]
                     # Create coordinate ranges based on schema
-                    coordinates[XARRAY_SCHEMA[sample_name]['coords'][i]] = deep_call(
+                    coordinates[DATA_SCHEMA[sample_name]['coords'][i]] = deep_call(
                         globals()[obj],
                         func,
                         None,
                         start=1,
                         stop=d+1,
                         step=1
-                    ).astype(XARRAY_SCHEMA[sample_name]['args_dtype'][i])
+                    ).astype(DATA_SCHEMA[sample_name]['args_dtype'][i])
             
             # Update coordinates to include schema and sweep coordinates
             # Keep only coordinates that are 1) core
@@ -439,7 +439,7 @@ class Outputs(object):
         title = title if isinstance(title,str) else None
         
         proposal = self.config['mcmc']['contingency_table']['proposal'] \
-            if 'mcmc' in self.config.settings \
+            if 'mcmc' in self.config.settings and 'contingency_table' in self.config.settings['mcmc'] \
             else None
         proposal = proposal if isinstance(proposal,str) else None
 
@@ -573,7 +573,7 @@ class Outputs(object):
                                 f"outputs.log"
                             )
 
-    def write_data_collection(self, sample_names:list = None, overwrite:bool=False):
+    def write_data_collection(self, sample_names:list = None):
         # Make output directory
         output_directory = os.path.join(self.outputs_path,'sample_collections')
         makedir(output_directory)
@@ -586,20 +586,16 @@ class Outputs(object):
         # Get specific sample names
         sample_names = sample_names if sample_names is not None else list(self.data_vars().keys())
         sample_names = set(sample_names).intersection(set(list(self.data_vars().keys())))
+        
+        # Writing or appending mode
+        if (not os.path.exists(filepath) and not os.path.isfile(filepath)):
+            mode = 'w'
+        else:
+            mode = 'a'
 
-        # Delete any existing file
-        if overwrite and os.path.exists(filepath) and os.path.isfile(filepath):
-            os.remove(filepath)
-            
         for sam_name in sample_names:
+            print(sam_name,len(getattr(self.data,sam_name)))
             for i,datum in enumerate(getattr(self.data,sam_name)):
-                # Writing or appending mode
-                if ((not os.path.exists(filepath) or not os.path.isfile(filepath)) or overwrite) and i == 0:
-                    mode = 'w'
-                    overwrite = False
-                else:
-                    mode = 'a'
-                
                 write_xr_data(
                     datum,
                     filepath,
@@ -607,41 +603,44 @@ class Outputs(object):
                     group = f"/{sam_name}/{i}"
                 )
 
-    def read_data_collection(self, group_by:list, sample_name:str=None):
+    def read_data_collection(self, group_by:list):
         # Outputs filepath
         output_filepath = os.path.join(self.outputs_path,'sample_collections',"data_collection.h5")
 
-        if not os.path.isfile(output_filepath) or not os.path.exists(output_filepath):
+        if not os.path.isfile(output_filepath) or \
+            not os.path.exists(output_filepath) or \
+            self.settings.get('force_reload',False):
             return self.output_names
         else:
             # Start with the premise that all available samples should be loaded
             samples_not_loaded = deepcopy(self.output_names)
-            # Get all sample names and collection ids
-            sample_collections = {}
-            # Read data array
-            if sample_name is not None:
-                with nc.Dataset(output_filepath, 'r') as nc_file:
-                    sample_collections[sample_name] = list(nc_file.groups[sample_name].groups.keys())
-            else:
-                with nc.Dataset(output_filepath, 'r') as nc_file:
-                    for sam_name, sample_collection in nc_file.groups.items():
-                        sample_collections[sam_name] = list(sample_collection.groups.keys())
+            # Get all sample names and collection ids (all of that constitutes the group ids)
+            sample_groups = read_xr_groups(output_filepath)
             
+            # If this throws an exception it means that some 
+            # elements corresponding to some sample names 
+            # are missing from the data collection
+            try:
+                sample_ids = {
+                    s: ','.join(ids) \
+                    for s,ids in sample_groups.items()
+                }
+                assert len(set([sid for sid in sample_ids.values()])) == 1
+            except Exception as exc:
+                self.logger.debug(exc)
+                # Force reload all data
+                return self.output_names
+
             data_arrs = []
-            for sam_name,sample_collection in sample_collections.items():
+            for sam_name,sample_collection in sample_groups.items():
                 sample_loaded = True
                 for collection_id in sample_collection:
-                    try:
-                        # Read data array
-                        data_array = read_xr_dataarray(
-                            filepath = output_filepath,
-                            group=f'/{sam_name}/{collection_id}'
-                        )
-                        # Convert to torch
-                        data_arrs.append(data_array)
-                    except:
-                        sample_loaded = False
-                        self.logger.warning(f"Could not load /{sam_name}/{collection_id} from {self.outputs_path} sample collections")
+                    # Read data array
+                    data_array = read_xr_data(
+                        filepath = output_filepath,
+                        group = f'/{sam_name}/{collection_id}'
+                    )
+                    data_arrs.append(data_array)
                 # remove loaded sample from consideration
                 # since it has been succesfully loaded
                 if sample_loaded and sam_name in samples_not_loaded:
@@ -705,11 +704,14 @@ class Outputs(object):
             # Compute intensities for all samples
             table_total = self.settings.get('table_total') if self.settings.get('table_total',-1.0) > 0 else 1.0
             
+            temp = {input:self.get_sample(input) for input in IntensityModelClass.REQUIRED_INPUTS}
+            # print(temp['cost_matrix'].max())
+
             # Instantiate ct
             IntensityModel = IntensityModelClass(
                 config = self.config,
                 logger = self.logger,
-                **{input:self.get_sample(input) for input in IntensityModelClass.REQUIRED_INPUTS}
+                **temp
             )
 
             # Compute log intensity
@@ -753,8 +755,8 @@ class Outputs(object):
             IntensityModelClass = globals()[intensity_name+'SIM']
 
             self.check_data_availability(
-                sample_name=sample_name,
-                input_names=IntensityModelClass.REQUIRED_INPUTS
+                sample_name = sample_name,
+                input_names = IntensityModelClass.REQUIRED_INPUTS
             )
             # Get samples and cast them to appropriate type
             if torch.is_tensor(getattr(self.inputs.data,sample_name)):
@@ -1091,7 +1093,7 @@ class DataCollection(object):
         sample_name = new_data.attrs['arr_name']
 
         # Core dimensions for sample must be shared
-        sample_shared_dims = XARRAY_SCHEMA[sample_name]['new_shape']
+        sample_shared_dims = DATA_SCHEMA[sample_name]['new_shape']
         # Grouped by sweep params that will be shared
         sample_shared_dims = set(sample_shared_dims).union(set(group_by))
         # All input-related sweep params that will be shared
@@ -1489,6 +1491,7 @@ class OutputSummary(object):
                 metric_data_collection = self.get_experiment_metadata_concurrently(outputs)
             else:
                 metric_data_collection = self.get_experiment_metadata_sequentially(outputs)
+            
             # Convert generator to list
             metric_data_collection = list(metric_data_collection)
 
@@ -1834,19 +1837,11 @@ class OutputSummary(object):
                 location = 'Inputs'
             )
 
-        
-        # If outputs are forced to be reloaded reload them all
-        if self.settings.get('force_reload',False):
-            overwrite = True
-            samples_not_loaded = outputs.output_names
-        else:
-            # Attempt to load all samples
-            # Keep track of samples not loaded
-            overwrite = False
-            samples_not_loaded = outputs.read_data_collection(
-                group_by = group_by, 
-                sample_name = None
-            )
+        # Attempt to load all samples
+        # Keep track of samples not loaded
+        samples_not_loaded = outputs.read_data_collection(
+            group_by = group_by
+        )
 
         # Load all necessary samples that were not loaded
         if len(samples_not_loaded) > 0:
@@ -1907,11 +1902,10 @@ class OutputSummary(object):
                 
                 # Write sample data collection to file
                 outputs.write_data_collection(
-                    sample_names = samples_not_loaded,
-                    overwrite = overwrite
+                    sample_names = samples_not_loaded
                 )
                 # Do not overwite file
-                overwrite = False
+                # overwrite = False
             except:
                 print(traceback.format_exc())
                 self.logger.error('Failed creating xarray DataArray')
@@ -2000,7 +1994,7 @@ class OutputSummary(object):
                 print(traceback.format_exc())
                 self.logger.error(exc)
                 sys.exit()
-            self.logger.progress(f"samples {np.shape(samples)}, {samples.dtype}")
+            self.logger.progress(f"samples {dict(samples.sizes)}, {samples.dtype}")
 
             # Unstack sweep dims
             # samples = samples.unstack(dim='sweep')
@@ -2031,13 +2025,13 @@ class OutputSummary(object):
                     samples_summarised.rename(sample_name)
                 except Exception:
                     self.logger.debug(traceback.format_exc())
-                    self.logger.error(f"samples {np.shape(samples)}, {samples.dtype}")
+                    self.logger.error(f"samples {dict(samples.sizes)}, {samples.dtype}")
                     self.logger.error(f"Applying statistic(s) {' over axes '.join([str(s) for s in sample_statistics_axes])} \
                                     for sample {sample_name} for metric {metric.lower()} of experiment {experiment_id} failed")
                     print(samples.dims)
                     sys.exit()
                     # continue
-                self.logger.progress(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
+                self.logger.progress(f"samples_summarised {dict(samples.sizes)}, {samples_summarised.dtype}")
 
                 # Get all attributes and their values
                 attribute_keys = METRICS.get(metric.lower(),{}).get('loop_over',[])
@@ -2070,11 +2064,11 @@ class OutputSummary(object):
                         )
                     except Exception:
                         self.logger.debug(traceback.format_exc())
-                        self.logger.error(f"metric {np.shape(metric)}, {metric.dtype}")
+                        self.logger.error(f"metric {dict(metric.sizes)}, {metric.dtype}")
                         self.logger.error(f'Arguments for metric {metric} cannot be updated')
                         print('\n')
                         continue
-
+                    
                     try:
                         if metric.lower() not in ['none',''] and metric.lower() in METRICS:
                             samples_metric = globals()[metric.lower()](
@@ -2087,15 +2081,15 @@ class OutputSummary(object):
                             samples_metric = deepcopy(samples_summarised).rename(metric.lower())
                     except Exception:
                         self.logger.debug(traceback.format_exc())
-                        self.logger.info(f"samples_summarised {np.shape(samples_summarised)}, {samples_summarised.dtype}")
-                        self.logger.info(f"tab0 {np.shape(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}")
+                        self.logger.info(f"samples_summarised {dict(samples_summarised.sizes)}, {samples_summarised.dtype}")
+                        self.logger.info(f"tab0 {dict(metric_kwargs['tab0'])}, {metric_kwargs['tab0'].dtype}")
                         self.logger.info(f'Applying metric {metric.lower()} for {attribute_settings_string} \
                                             over sample {sample_name} \
                                             for experiment {experiment_id} failed')
                         print('\n')
                         continue
 
-                    self.logger.progress(f"Samples metric is {np.shape(samples_metric)}")
+                    self.logger.progress(f"Samples metric is {dict(samples_metric.sizes)}")
                     # Unstack sweep dimensions
                     samples_metric = samples_metric.unstack(dim='sweep')
                     # Apply statistics after metric
@@ -2111,17 +2105,17 @@ class OutputSummary(object):
                             metric_summarised = deepcopy(samples_metric).rename(metric.lower())
                     except Exception:
                         self.logger.debug(traceback.format_exc())
-                        self.logger.error(f"samples_metric {np.shape(samples_metric)}, {samples_metric.dtype}")
+                        self.logger.error(f"samples_metric {dict(samples_metric.sizes)}, {samples_metric.dtype}")
                         self.logger.error(f"Applying statistic(s) {'>'.join([str(m) for m in metric_statistics_axes])} \
                                             over metric {metric.lower()} and sample {sample_name} for experiment {experiment_id} failed")
                         print('\n')
                         continue
-                    self.logger.debug(f"Summarised metric is {np.shape(metric_summarised)}")
+                    self.logger.debug(f"Summarised metric is {dict(metric_summarised.sizes)}")
                     
                     # Squeeze output
                     metric_summarised = np.squeeze(metric_summarised)
 
-                    self.logger.progress(f"Summarised metric is squeezed to {np.shape(metric_summarised)}")
+                    self.logger.progress(f"Summarised metric is squeezed to {dict(metric_summarised.sizes)}")
                     # Get metric data in pandas dataframe
                     try:
                         metric_summarised = metric_summarised.to_dataframe().reset_index(drop=True)
