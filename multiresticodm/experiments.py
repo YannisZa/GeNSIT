@@ -404,9 +404,7 @@ class Experiment(object):
                         'r2',
                         self.outputs.h5group.create_dataset(
                             'r2',
-                            tuple([grange['n'] for grange in self.config['experiments'][0]['grid_ranges'].values()],),
-                            chunks=True,
-                            compression=3,
+                            shape = tuple([grange['n'] for grange in self.config['experiments'][0]['grid_ranges'].values()]),
                         )
                     )
                     getattr(self,'r2').attrs['r2'] = DATA_SCHEMA['r2']['dims']
@@ -528,7 +526,7 @@ class Experiment(object):
             if 'r2' in self.output_names:
                 _r2_sample = kwargs.get('r2',None)
                 _r2_sample = _r2_sample.clone().detach().cpu() if _r2_sample is not None else None
-                getattr(self,'r2')[np.array(kwargs['index'])] = _r2_sample
+                getattr(self,'r2')[kwargs['index']] = _r2_sample
 
             for sample in [
                 'log_destination_attraction','sign','table'
@@ -675,6 +673,19 @@ class RSquared_Analysis(Experiment):
 
     def run(self,**kwargs) -> None:
         
+        self.logger.info(f"Running RSquared Analysis of {self.physics_model.noise_regime} noise SpatialInteraction.")
+        
+        # Initialise data structures
+        self.initialise_data_structures()
+
+        # Initialise parameters
+        initial_params = self.initialise_parameters(['theta'])
+        theta_sample = initial_params['theta']
+
+        # reset these values so that outputs can be written to file
+        self._write_start = 0
+        self._write_every = 1
+        
         # Initialize search grid
         alpha_values = torch.linspace(
             *[self.grid_ranges['alpha'][k] for k in ['min','max','n']],
@@ -687,15 +698,6 @@ class RSquared_Analysis(Experiment):
             device=self.device
         )
 
-        self.logger.info(f"Running MCMC inference of {self.physics_model.noise_regime} noise SpatialInteraction.")
-
-        # Fix random seed
-        set_seed(self.seed)
-
-        # Initialise parameters
-        initial_params = self.initialise_parameters(['theta'])
-        theta_sample = initial_params['theta']
-        
         # Print initialisations
         # self.print_initialisations(parameter_inits,print_lengths=False,print_values=True)
 
@@ -765,7 +767,7 @@ class RSquared_Analysis(Experiment):
 
                     # Regression sum squares
                     r2 = 1. - ss_res/ss_tot
-
+                    
                     # Write data
                     self.write_data(
                         r2 = r2,
@@ -780,26 +782,29 @@ class RSquared_Analysis(Experiment):
                 progress.update(1)
 
         # Output results
-        idx = np.unravel_index(self.r2.argmax(), np.shape(self.r2))
-
-        print("Fitted alpha, beta and scaled beta values:")
-        print(alpha_values[idx[1]],beta_values[idx[0]], beta_values[idx[0]]*self.physics_model.params.bmax)
-        print("R^2 value:")
-        print(self.r2[idx],torch.max(self.r2.ravel()))
-        print('Destination attraction prediction')
-        print(max_w_prediction)
-        print('True destination attraction')
-        print(self.inputs.data.destination_attraction_ts)
-        if self.sim.ground_truth_known:
-            print('True theta')
-            print(self.sim.alpha,self.sim.beta)
+        r2 = self.r2[:]
+        idx = np.unravel_index(r2.argmax(), np.shape(r2))
+        self.logger.info(f"R^2: {r2[idx]}")
+        self.logger.info(f"""
+        alpha = {alpha_values[idx[1]]},
+        beta = {beta_values[idx[0]]}, 
+        beta_scaled = {beta_values[idx[0]]*self.physics_model.params.bmax}
+        """)
+        self.logger.note('Destination attraction prediction')
+        self.logger.note(max_w_prediction)
+        self.logger.note('True destination attraction')
+        self.logger.note(w_data)
+        if self.physics_model.intensity_model.ground_truth_known:
+            self.logger.debug('True theta')
+            self.logger.debug(f"alpha = {self.physics_model.intensity_model.alpha}, \
+                              beta = {self.physics_model.intensity_model.beta}")
 
         # Save fitted values to parameters
-        self.config['fitted_alpha'] = to_json_format(alpha_values[idx[1]])
-        self.config['fitted_beta'] = to_json_format(beta_values[idx[0]])
-        self.config['fitted_scaled_beta'] = to_json_format(beta_values[idx[0]]*self.physics_model.params.bmax)
-        self.config['R^2'] = to_json_format(float(self.r2[idx]))
-        self.config['predicted_w'] = to_json_format(max_w_prediction)
+        self.config.settings['fitted_alpha'] = to_json_format(alpha_values[idx[1]])
+        self.config.settings['fitted_beta'] = to_json_format(beta_values[idx[0]])
+        self.config.settings['fitted_scaled_beta'] = to_json_format(beta_values[idx[0]]*self.physics_model.params.bmax)
+        self.config.settings['R^2'] = to_json_format(float(r2[idx]))
+        self.config.settings['predicted_w'] = to_json_format(max_w_prediction)
 
         # Update metadata
         self.update_metadata()
