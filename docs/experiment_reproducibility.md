@@ -78,6 +78,16 @@ clear; multiresticodm plot -y srmse -x 'iter&seed' -x sigma \
 
 # Summaries and Metrics
 
+## Cost matrix signal
+
+```
+clear; multiresticodm summarise -s r2 \
+-dn cambridge_work_commuter_lsoas_to_msoas/cm_signal \
+-et RSquared_Analysis \
+-stat 'r2' 'max&' '&' \
+-k sigma -k bmax -k name -nw 1
+```
+
 ## Experiment 1
 
 -s table
