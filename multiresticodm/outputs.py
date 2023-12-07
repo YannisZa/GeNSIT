@@ -292,12 +292,12 @@ class Outputs(object):
             self.inputs = Inputs(
                 config = self.config,
                 synthetic_data = False,
-                logger = self.logger,
+                logger = self.logger
             )
         else:
             self.inputs = inputs
-            # Convert all inputs to tensors
-            self.inputs.pass_to_device()
+        # Convert all inputs to tensors
+        self.inputs.pass_to_device()
 
         # Load output h5 file to dictionary
         output_dict_data = self.load_h5_data()
@@ -1770,14 +1770,6 @@ class OutputSummary(object):
         self.logger.info(f"Total = {total_size_str}.")
         self.logger.info("----------------------------------------------------------------------------------")
         
-        # If inputs are not sweeped pre-load them
-        
-        # Import all input data
-        inputs = Inputs(
-            config = self.config,
-            synthetic_data = False,
-            logger = self.logger,
-        )
         
         # If sweep is over input data
         if self.config.sweep_param_names and (
@@ -1787,7 +1779,12 @@ class OutputSummary(object):
             # Load inputs for every single output
             passed_inputs = None
         else:
-            passed_inputs = deepcopy(inputs)
+            # Import all input data
+            passed_inputs = deepcopy(Inputs(
+                config = self.config,
+                synthetic_data = False,
+                logger = self.logger,
+            ))
         
         
         # Reload global outputs
@@ -1801,8 +1798,8 @@ class OutputSummary(object):
         )
         
         # Attach inputs to outputs object
-        outputs.inputs = inputs
-        safe_delete(inputs)
+        outputs.inputs = passed_inputs
+        safe_delete(passed_inputs)
         
 
         # Gather sweep dimension names
@@ -1814,28 +1811,30 @@ class OutputSummary(object):
 
         # Try to load ground truth table
         self.settings['table_total'] = int(self.settings.get('table_total',1))
-        # Read ground truth table
-        if hasattr(inputs.data,'ground_truth_table'):
-            # Gather dims from ground truth table
-            # which is guaranteed to NOT be sweepable
-            origin,destination = np.shape(outputs.inputs.data.ground_truth_table)
-            outputs.inputs.data.ground_truth_table = xr.DataArray(
-                data=torch.tensor(outputs.inputs.data.ground_truth_table,dtype=int32,device=self.device),
-                name='ground_truth_table',
-                dims=['origin','destination'],
-                coords=dict(
-                    origin=np.arange(1,origin+1,1,dtype='int16'),
-                    destination=np.arange(1,destination+1,1,dtype='int16')
+        
+        if outputs.inputs is not None:
+            # Try to read ground truth table
+            if hasattr(outputs.inputs.data,'ground_truth_table'):
+                # Gather dims from ground truth table
+                # which is guaranteed to NOT be sweepable
+                origin,destination = np.shape(outputs.inputs.data.ground_truth_table)
+                outputs.inputs.data.ground_truth_table = xr.DataArray(
+                    data=torch.tensor(outputs.inputs.data.ground_truth_table,dtype=int32,device=self.device),
+                    name='ground_truth_table',
+                    dims=['origin','destination'],
+                    coords=dict(
+                        origin=np.arange(1,origin+1,1,dtype='int16'),
+                        destination=np.arange(1,destination+1,1,dtype='int16')
+                    )
                 )
-            )
-            # Try to update metadata on table samples
-            self.settings['table_total'] = int(outputs.inputs.data.ground_truth_table.sum(dim=['origin','destination']).values)
-        else:
-            raise MissingData(
-                missing_data = 'ground truth table',
-                data_names = ', '.join([k for k in outputs.inputs.data_vars().keys()]),
-                location = 'Inputs'
-            )
+                # Try to update metadata on table samples
+                self.settings['table_total'] = int(outputs.inputs.data.ground_truth_table.sum(dim=['origin','destination']).values)
+            else:
+                raise MissingData(
+                    missing_data = 'ground truth table',
+                    data_names = ', '.join([k for k in outputs.inputs.data_vars().keys()]),
+                    location = 'Inputs'
+                )
 
         # Attempt to load all samples
         # Keep track of samples not loaded
