@@ -19,13 +19,13 @@ import matplotlib.pyplot as plt
 
 
 from pathlib import Path
-from copy import deepcopy
 from itertools import chain, count
 from difflib import SequenceMatcher
 from typing import Dict, List, Union, Tuple
 from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
 
+from multiresticodm.exceptions import *
 from multiresticodm.logger_class import *
 from multiresticodm.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS
 
@@ -63,44 +63,38 @@ def write_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
 
 
 def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
-    # Writing the DataArray to a NetCDF file inside a with context
-    if not os.path.exists(filepath) and not os.path.isfile(filepath):
-        print('file exists')
-        data.to_netcdf(
-            path = filepath,
-            **kwargs
-        )
-        # close file
-        data.close()
-    else:
-        # Group id of interest
-        group_id = kwargs.pop('group','')
-        # Find all existing data groups
-        existing_data_groups = read_xr_groups(filepath)
-        existing_data_groups = [
-            f"/{sam_name}/{cid}" 
-            for sam_name,collection_ids in existing_data_groups.items()
-            for cid in collection_ids
-        ]
-
-        # Try loading existing data
-        if group_id in existing_data_groups and len(group_id) > 0:
-            existing_data = read_xr_data(
-                filepath = filepath,
-                group = group_id
-            )
-            # overwrite data
-            existing_data[:] = data
-            # close file
-            existing_data.close()
-        else:
+    try: 
+        # Writing the DataArray to a NetCDF file inside a with context
+        if not os.path.exists(filepath) or not os.path.isfile(filepath):
             data.to_netcdf(
                 path = filepath,
-                group = group_id,
+                mode = 'w',
                 **kwargs
             )
             # close file
             data.close()
+        else:
+            # Group id of interest
+            group_id = kwargs.pop('group','')
+            # Find all existing data groups
+            # with nc.Dataset(filepath, mode='r') as nc_file:
+            #     # Get groups
+            #     data_group_ids = read_xr_group_ids(nc_file,list_format=True)
+            #     # Read existing data
+            #     if group_id in data_group_ids:
+            #         del nc_file[group_id]
+            #     else:
+            #         nc_file.createGroup(group_id)
+            # existing_data = read_xr_data(filepath=filepath)
+                
+            data.to_netcdf(
+                path = filepath,
+                group = group_id,
+                mode = 'a',
+                **kwargs
+            )
+    except Exception as exc:
+        raise H5DataWritingFailed(message=str(exc))
 
 
 
@@ -203,21 +197,48 @@ def read_xr_data(filepath:str,**kwargs:Dict) -> xr.DataArray:
     if len(kwargs.get('group','')) > 0:
         return xr.open_dataarray(
             filepath,
-            group = kwargs['group'],
-            cache = kwargs.get('cache',None)
+            group = kwargs['group']
         )
     else:
         return xr.open_dataset(
             filepath,
-            cache = kwargs.get('cache',None)
+            engine = 'h5netcdf'
         )
 
-def read_xr_groups(filepath:str):
-    existing_data_ids = {}
-    with nc.Dataset(filepath, 'r') as nc_file:
-        for sam_name, sample_collection in nc_file.groups.items():
-            existing_data_ids[sam_name] = sorted(list(sample_collection.groups.keys()))
-    return existing_data_ids
+def read_netcdf_group_ids(nc_data:str,key_path=[]):
+    for k in nc_data.groups.keys():
+        yield key_path+[k]
+    for key,value in nc_data.groups.items():
+        yield from read_netcdf_group_ids(value,key_path+[key])
+
+def read_xr_group_ids(nc_data,list_format:bool=True):
+    # Get all key paths
+    key_paths = list(read_netcdf_group_ids(
+        nc_data = nc_data,
+        key_path = []
+    ))
+    # If not paths found return empty list
+    if len(key_paths) <= 0:
+        return key_paths
+    
+    # Return the longest paths
+    max_len = max([len(kp) for kp in key_paths])
+    longest_key_paths = [kp for kp in key_paths if len(kp) == max_len]
+    if list_format:
+        return ['/'+'/'.join(kp) for kp in longest_key_paths]
+    else:
+        longest_key_paths_dict = {}
+        for keypath in longest_key_paths:
+            if keypath[0] in longest_key_paths_dict:
+                # Update key paths
+                longest_key_paths_dict[keypath[0]].append(
+                    ','.join(keypath[1:])
+                )
+            else:
+                longest_key_paths_dict[keypath[0]] = [','.join(keypath[1:])]
+
+        return longest_key_paths_dict
+    
     
 
 def read_compressed_npy(filepath:str,**kwargs:Dict) -> np.ndarray:
@@ -456,8 +477,9 @@ def get_all_subdirectories(out_path,stop_at:str='config.json',level:int=2):
         # If this is a dir that matches the stopping condition
         # or has a file that matches the stopping condition
         if any([stop_at in file for file in files]):
-            entry_path = Path(root)
-            directories.append(str(entry_path.absolute()))
+            # entry_path = Path(root)
+            # directories.append(str(entry_path.absolute()))
+            directories.append(root)
 
     return directories
 
@@ -882,7 +904,7 @@ def create_dynamic_data_label(__self__,data,**kwargs):
     label_by_key,label_by_value = [],[]
     for k in list(__self__.settings['label_by']):
         v = list(deep_get(key=k,value=data))[0]
-        if k == 'dims':
+        if k == "dims":
             v = 'x'.join(list(map(str,list(unpack_dims(v,kwargs.get('time_dims',False))))))
         # If label not included in metadata ignore it
         if len(v) > 0 and v[0] is not None:
@@ -1079,7 +1101,7 @@ def unpack_dims(self,time_dims:bool=True):
         dims = tuple([v for k,v in self.dims.items() if (k != 'time' or time_dims)])
     except:
         try:
-            dims = tuple([v for k,v in self['dims'].items() if (k != 'time' or time_dims)])
+            dims = tuple([v for k,v in self["dims"].items() if (k != 'time' or time_dims)])
         except:
             try:
                 dims = tuple([v for k,v in self.items() if (k != 'time' or time_dims)])
@@ -1143,3 +1165,6 @@ def unstack_dims(data:xr.DataArray,dims:list):
         if d in data.dims:
             data = data.unstack(d)
     return data
+
+def is_sorted(x):
+    return np.all(x[:-1] <= x[1:])
