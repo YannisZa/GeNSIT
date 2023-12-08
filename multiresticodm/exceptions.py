@@ -1,16 +1,33 @@
-class MissingData(Exception):
-    def __init__(self,missing_data:str,data_names:str,location:str,**kwargs):
+class DataException(Exception):
+    def __init__(self,message,**kwargs):
+        super().__init__(message,**kwargs)
+
+class CastingException(DataException):
+    def __init__(self,data_name:str,from_type:str,to_type:str,**kwargs):
         super().__init__('',**kwargs)
-        self.missing_data = missing_data
+        self.data_name = data_name
+        self.from_type = from_type
+        self.to_type = to_type
+        
+
+    def __str__(self):
+        return f"""
+            Casting {self.data_name} from {self.from_type} to {self.to_type} failed!
+        """
+
+class MissingData(DataException):
+    def __init__(self,missing_data_name:str,data_names:str,location:str,**kwargs):
+        super().__init__('',**kwargs)
+        self.missing_data_name = missing_data_name
         self.data_names = data_names
         self.location = location
 
     def __str__(self):
         return f"""
-            Missing data {self.missing_data} in {self.location} ({self.data_names})!
+            Missing data {self.missing_data_name} in {self.location} ({self.data_names})!
         """
 
-class EmptyData(Exception):
+class EmptyData(DataException):
     def __init__(self,message:str,data_names:str,**kwargs):
         super().__init__('',**kwargs)
         self.message = message
@@ -21,8 +38,12 @@ class EmptyData(Exception):
             Empty data {self.data_names} after {self.message}!
         """
 
+class H5DataWritingFailed(DataException):
+    def __init__(self,message:str,**kwargs):
+        super().__init__(message,**kwargs)
+        self.message = message
 
-class DataCollectionException(Exception):
+class DataCollectionException(DataException):
     def __init__(self,message,**kwargs):
         super().__init__(message,**kwargs)
 
@@ -45,31 +66,27 @@ class MultiprocessorFailed(Exception):
 
 # --
 
-class OutputsException(Exception):
+class InvalidDataNames(DataException):
     def __init__(self,message,**kwargs):
         super().__init__(message,**kwargs)
 
-class InvalidDataNames(OutputsException):
+class MissingFiles(DataException):
     def __init__(self,message,**kwargs):
         super().__init__(message,**kwargs)
 
-class MissingFiles(OutputsException):
+class CorruptedFileRead(DataException):
     def __init__(self,message,**kwargs):
         super().__init__(message,**kwargs)
 
-class CorruptedFileRead(OutputsException):
+class InvalidMetadataType(DataException):
     def __init__(self,message,**kwargs):
         super().__init__(message,**kwargs)
 
-class InvalidMetadataType(OutputsException):
+class MissingMetadata(DataException):
     def __init__(self,message,**kwargs):
         super().__init__(message,**kwargs)
 
-class MissingMetadata(OutputsException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class CoordinateSliceMismatch(OutputsException):
+class CoordinateSliceMismatch(DataException):
     def __init__(self,message,**kwargs):
         super().__init__(message,**kwargs)
 
