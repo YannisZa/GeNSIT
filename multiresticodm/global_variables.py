@@ -147,54 +147,76 @@ LOSS_FUNCTIONS = {
 
 INPUT_SCHEMA = {
     "origin_demand":{
-        "dims":["origin"],
         "axes":[0],
         "dtype":"float32", 
-        "ndmin":1
+        "ndmin":1,
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "dims":["origin"],
+        "cast_to_xarray":False
     },
     "destination_demand":{
-        "dims":["destination"],
         "axes":[1],
         "dtype":"float32", 
-        "ndmin":1
+        "ndmin":1,
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "dims":["destination"],
+        "cast_to_xarray":False
     },
     "origin_attraction_ts":{
-        "dims":["origin"],
         "axes":[0],
         "dtype":"float32", 
-        "ndmin":2
+        "ndmin":2,
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "dims":["origin"],
+        "cast_to_xarray":False
     },
     "destination_attraction_ts":{
-        "dims":["destination","time"],
         "axes":[0,1],
         "dtype":"float32", 
-        "ndmin":2
+        "ndmin":2,
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["destination","time"],
+        "cast_to_xarray":False
     },
     "cost_matrix":{
-        "dims":["origin","destination"],
         "axes":[0,1],
         "dtype":"float32", 
-        "ndmin":2
+        "ndmin":2,
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["origin","destination"],
+        "cast_to_xarray":False
     },
     "total_cost_by_origin":{
-        "dims":["origin"],
         "axes":[0],
         "dtype":"float32",
-        "ndmin":1
+        "ndmin":1,
+        "funcs":[("np",".arange(start,stop,step)")],
+        "args_dtype":["int32"],
+        "dims":["origin"],
+        "cast_to_xarray":False
     },
     "ground_truth_table":{
-        "dims":["origin","destination"],
         "axes":[0,1],
         "dtype":"int32", 
         "ndmin":2,
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["origin","destination"],
+        "cast_to_xarray":True
     },
     "grand_total":{
-        "dims":[],
+        "axes":[],
         "dtype":"float32",
-        "axes":[None]
+        "ndmin":0,
+        "funcs":[],
+        "args_dtype":[],
+        "dims":[],
+        "cast_to_xarray":False
     },
     "dims":{},
     "to_learn":{},
@@ -204,157 +226,135 @@ INPUT_SCHEMA = {
 
 TABLE_SCHEMA = {
     "table":{
-        "dims":["origin","destination"],
         "axes":[0,1],
         "dtype":"int32", 
         "ndmin":2,
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "new_shape":["iter","origin","destination"]
+        "dims":["iter","origin","destination"]
     }
 }
 INTENSITY_SCHEMA = {
     "intensity":{
-        "dims":["origin","destination"],
         "axes":[0,1],
         "dtype":"int32",
-        "ndmin":2,
         "funcs":[],
         "args_dtype":[],
-        "new_shape":["iter"]
+        "is_iterable": True,
+        "dims":["origin","destination"]
     },
     "log_destination_attraction":{
-        "dims":["destination","time"],
-        "axes":[0],
+        "axes":[0,1],
         "dtype":"float32",
-        "ndmin":1,
-        "funcs":[],
-        "args_dtype":[],
-        "new_shape":["iter"]
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "is_iterable": True,
+        "dims":["destination","time"]
     },
     "log_origin_attraction":{
-        "dims":["origin","time"],
         "axes":[0],
         "dtype":"float32", 
-        "ndmin":1
     },
     "alpha":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0,
-        "new_shape":["iter"]
+        "is_iterable": True,
+        "dims":[]
     },
     "beta":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0,
-        "new_shape":["iter"]
+        "is_iterable": True,
+        "dims":[]
     },
     "delta":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "kappa":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "sigma":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "gamma":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "noise_percentage":{
-        "dims":[],
         "axes":[],
         "dtype":"float32",
-        "ndmin":0
+        "is_iterable": True,
     }
 }
 
 
 OUTPUT_SCHEMA = {
     "loss":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "total_loss":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "log_target":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "theta_acc":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "log_destination_attraction_acc":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "table_acc":{
-        "dims":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0
+        "is_iterable": True,
     },
     "sign":{
-        "dims":[],
         "axes":[],
         "dtype":"int8",
-        "ndmin":0
+        "is_iterable": True,
     },
     "r2":{
-        "dims":["alpha","beta"],
         "axes":[0,1],
         "dtype":"float32",
-        "ndmin":2,
+        "is_iterable": False,
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "new_shape":["iter","alpha","beta"]
+        "dims":["alpha_range","beta_range"]
     },
     "compute_time":{
-        "dims":[],
         "axes":[],
         "dtype":"float32",
-        "ndmin":0
+        "is_iterable": False,
     },
     **INTENSITY_SCHEMA,
     **TABLE_SCHEMA
 }
 for loss in LOSS_DATA_REQUIREMENTS.keys():
     OUTPUT_SCHEMA[loss] = {
-        "dims":[],
         "funcs":[],
         "axes":[],
         "dtype":"float32", 
-        "ndmin":0,
         "args_dtype":[],
-        "new_shape":["iter"]
+        "is_iterable": True,
+        "dims":[]
     }
 
 DATA_SCHEMA = {**INPUT_SCHEMA,**OUTPUT_SCHEMA}
@@ -399,7 +399,9 @@ AUXILIARY_COORDINATES_DTYPES = {
     "loss_name":object,
     "loss_function":object,
     "name":str,
-    "table_steps": torch.int32
+    "table_steps": torch.int32,
+    "bmax":torch.float32,
+    "cost_matrix":str,
 }
 
 CORE_COORDINATES_DTYPES = {
@@ -408,6 +410,8 @@ CORE_COORDINATES_DTYPES = {
  "origin":torch.int16,
  "destination":torch.int16,
  "seed":torch.int32,
+ "alpha_range":torch.int32,
+ "beta_range":torch.int32
 #  "table_steps":torch.int32,
 #  "theta_steps":torch.int32,
 #  "destination_attraction_steps":torch.int32,
@@ -422,17 +426,81 @@ NUMPY_TYPE_TO_DAT_TYPE = {
 
 
 METRICS = {
-    "srmse":{"shape":"(N,1)","loop_over":["none"],"apply_axis":(0,1),"dtype":"float32"},
-    "p_distance":{"shape":"(N,dims)","loop_over":["none"],"apply_axis":(1,2),"dtype":"float32"},
-    "ssi":{"shape":"(N,1)","loop_over":["none"],"apply_axis":(0,1),"dtype":"float32"},
-    "sparsity":{"shape":"(N,1)","loop_over":["none"],"apply_axis":(0,1),"dtype":"float32"},
-    "shannon_entropy":{"shape":"(1,1)","loop_over":["none"],"apply_axis":(0,1),"dtype":"float32"},
-    "von_neumann_entropy":{"shape":"(N,1)","loop_over":["none"],"apply_axis":(0,1),"dtype":"float32"},
-    "coverage_probability":{"shape":"(1,dims)","loop_over":["region_mass"],"apply_axis":(1,2),"dtype":"int32"},
-    "edit_degree_higher_error":{"shape":"(N,1)","loop_over":["none"],"apply_axis":(0,1),"dtype":"float32"},
-    "edit_degree_one_error":{"shape":"(N,1)","loop_over":["none"],"apply_axis":(0,1),"dtype":"float32"},
-    "none":{"shape":"(N,dims)","loop_over":["none"],"apply_axis":(0,1,2),"dtype":""},
-    "":{"shape":"(N,dims)","loop_over":["none"],"apply_axis":(0,1,2),"dtype":""},
+    "srmse":{
+        "shape":"(N,1)",
+        "loop_over":["none"],
+        "apply_axis":(0,1),
+        "dtype":"float32",
+        "ground_truth":".inputs.data.ground_truth_table"
+    },
+    "p_distance":{
+        "shape":"(N,dims)",
+        "loop_over":["none"],
+        "apply_axis":(1,2),
+        "dtype":"float32",
+        "ground_truth":".inputs.data.ground_truth_table"
+    },
+    "ssi":{
+        "shape":"(N,1)",
+        "loop_over":["none"],
+        "apply_axis":(0,1),
+        "dtype":"float32",
+        "ground_truth":".inputs.data.ground_truth_table"
+    },
+    "sparsity":{
+        "shape":"(N,1)",
+        "loop_over":["none"],
+        "apply_axis":(0,1),
+        "dtype":"float32"
+    },
+    "shannon_entropy":{
+        "shape":"(1,1)",
+        "loop_over":["none"],
+        "apply_axis":(0,1),
+        "dtype":"float32",
+        "ground_truth":".inputs.data.ground_truth_table"
+    },
+    "von_neumann_entropy":{
+        "shape":"(N,1)",
+        "loop_over":["none"],
+        "apply_axis":(0,1),
+        "dtype":"float32"
+    },
+    "coverage_probability":{
+        "shape":"(1,dims)",
+        "loop_over":["region_mass"],
+        "apply_axis":(1,2),
+        "dtype":"int32",
+        "ground_truth":".inputs.data.ground_truth_table"
+    },
+    "edit_degree_higher_error":{
+        "shape":"(N,1)",
+        "loop_over":["none"],
+        "apply_axis":(0,1),
+        "dtype":"float32",
+        "ground_truth":".inputs.data.ground_truth_table"
+    },
+    "edit_degree_one_error":{
+        "shape":"(N,1)",
+        "loop_over":["none"],
+        "apply_axis":(0,1),
+        "dtype":"float32",
+        "ground_truth":".inputs.data.ground_truth_table"
+    },
+    "none":{
+        "shape":"(N,dims)",
+        "loop_over":["none"],
+        "apply_axis":(0,1,2),
+        "dtype":"",
+        "ground_truth":".inputs.data.ground_truth_table"
+    },
+    "":{
+        "shape":"(N,dims)",
+        "loop_over":["none"],
+        "apply_axis":(0,1,2),
+        "dtype":"",
+        "ground_truth":".inputs.data.ground_truth_table"
+    },
 }
 
 OPERATORS = {
