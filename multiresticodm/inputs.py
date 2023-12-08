@@ -3,6 +3,7 @@ import sys
 import torch
 import h5py as h5
 import numpy as np
+import xarray as xr
 
 from tqdm import tqdm
 from pathlib import Path
@@ -12,13 +13,15 @@ from torch import float32,int32
 import torch.multiprocessing as mp
 
 from copy import deepcopy
+
+from multiresticodm.exceptions import *
 from multiresticodm.config import Config
 from multiresticodm.math_utils import torch_optimize
 from multiresticodm.probability_utils import random_vector
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.spatial_interaction_model import instantiate_sim
 from multiresticodm.global_variables import INPUT_SCHEMA, NUMPY_TO_TORCH_DTYPE, PARAMETER_DEFAULTS,INPUT_SCHEMA,Dataset
-from multiresticodm.utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt
+from multiresticodm.utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call
 
 class Inputs:
     def __init__(
@@ -70,7 +73,7 @@ class Inputs:
     def validate_dims(self):
         for attr,schema in self.schema.items():
             if len(schema) > 0:
-                for ax,dim in zip(schema['axes'],schema['dims']):
+                for ax,dim in zip(schema["axes"],schema["dims"]):
                     if hasattr(self.data,attr) and getattr(self.data,attr) is not None:
                         try:
                             assert list(getattr(self.data,attr).shape)[ax] == self.data.dims[dim]
@@ -88,7 +91,7 @@ class Inputs:
             # setattr(self.data,attr,None)
 
         # Import dims
-        setattr(self.data,'dims',self.config.settings['inputs'].get('dims',{"origin":None,"destination":None,"time":None}))
+        setattr(self.data,"dims",self.config.settings['inputs'].get("dims",{"origin":None,"destination":None,"time":None}))
 
         # Import all data
         for attr,schema in self.schema.items():
@@ -109,7 +112,7 @@ class Inputs:
                         if schema.get('positive',True) and (getattr(self.data,attr) < 0).any():
                             raise Exception(f"{attr.replace('_',' ').capitalize()} {getattr(self.data,attr)} are NOT positive")
                         # Update dims
-                        for ax,dim in zip(schema['axes'],schema['dims']):
+                        for ax,dim in zip(schema["axes"],schema["dims"]):
                             if getattr(self.data,attr) is not None:
                                 self.data.dims[dim] = int(np.shape(getattr(self.data,attr))[ax])
                     else:
@@ -128,8 +131,8 @@ class Inputs:
             # Compute grand total
             self.data.grand_total = np.sum(self.data.ground_truth_table,dtype='float32')
             self.config.settings['spatial_interaction_model']['grand_total'] = float(self.data.grand_total)
-        if hasattr(self.data,'dims') and self.data.dims is not None and len(self.data.dims) > 0:
-            self.config.settings['inputs']['dims'] = self.data.dims
+        if hasattr(self.data,"dims") and self.data.dims is not None and len(self.data.dims) > 0:
+            self.config.settings['inputs']["dims"] = self.data.dims
 
         # Extract parameters to learn
         if 'to_learn' in list(self.config.settings['inputs'].keys()):
@@ -178,7 +181,109 @@ class Inputs:
         elif self.true_parameters['kappa'] is not None and self.true_parameters['delta'] is None:
             self.true_parameters['delta'] = self.true_parameters['kappa'] * smallest_zone_size
 
-        
+
+    def cast_from_xarray(self):
+
+        # Try to cast all data to tensor from xarray
+        keys_of_interest = [
+            sam_name for sam_name,sam_schema in INPUT_SCHEMA.items() \
+            if sam_schema.get('cast_to_xarray',False)
+        ]
+        for sample_name in keys_of_interest:
+            if getattr(self.data,sample_name,None) is not None:
+
+                # if data is already a tensor do not convert
+                if torch.is_tensor(getattr(self.data,sample_name)):
+                    continue
+
+                # Data must be of torch type and in cpu
+                try:
+                    assert isinstance(getattr(self.data,sample_name),xr.DataArray)
+                except:
+                    raise CastingException(
+                        data_name = sample_name,
+                        from_type = type(getattr(self.data,sample_name,None)),
+                        to_type = str(torch.tensor)
+                    )
+
+                setattr(
+                    self.data,
+                    sample_name,
+                    torch.tensor(
+                        getattr(self.data,sample_name).values,
+                        dtype = int32,
+                        device = self.config.settings['inputs']['device']
+                    )
+                )
+            else:
+                raise MissingData(
+                    missing_data_name = sample_name,
+                    data_names = ', '.join([k for k in self.data_vars().keys()]),
+                    location = 'Inputs'
+                )  
+
+    def cast_to_xarray(self):
+
+        # Try to cast all data to xarray from numpy/tensor
+        keys_of_interest = [
+            sam_name for sam_name,sam_schema in INPUT_SCHEMA.items() \
+            if sam_schema.get('cast_to_xarray',False)
+        ]
+        for sample_name in keys_of_interest:
+            if getattr(self.data,sample_name,None) is not None:
+
+                # Get input schema
+                schema = INPUT_SCHEMA[sample_name]
+
+                # if data is already a tensor do not convert
+                if isinstance(getattr(self.data,sample_name),xr.DataArray):
+                    continue
+
+                # Data must be of torch type and in cpu
+                try:
+                    assert (torch.is_tensor(getattr(self.data,sample_name)) and \
+                        getattr(self.data,sample_name).device == 'cpu') or \
+                        isinstance(getattr(self.data,sample_name),np.ndarray)
+                except:
+                    raise CastingException(
+                        data_name = sample_name,
+                        from_type = type(getattr(self.data,sample_name,None)),
+                        to_type = str(xr.DataArray)
+                    )
+
+                # Get data dims
+                dims = [self.data.dims[dim_name] for dim_name in schema["dims"]]
+                coordinates = {}
+                # For each dim create coordinate
+                for i,d in enumerate(dims):
+                    obj,func = schema['funcs'][i]
+                    # Create coordinate ranges based on schema
+                    coordinates[schema["dims"][i]] = deep_call(
+                        globals()[obj],
+                        func,
+                        None,
+                        start=1,
+                        stop=d+1,
+                        step=1
+                    ).astype(schema['args_dtype'][i])
+
+                setattr(
+                    self.data,
+                    sample_name,
+                    xr.DataArray(
+                        data = getattr(self.data,sample_name),
+                        name = sample_name,
+                        dims = schema["dims"],
+                        coords = coordinates
+                    )
+                )
+
+            else:
+                raise MissingData(
+                    missing_data_name = sample_name,
+                    data_names = ', '.join([k for k in self.data_vars().keys()]),
+                    location = 'Inputs'
+                )    
 
     def pass_to_device(self):
         # Define device to set 
@@ -186,14 +291,14 @@ class Inputs:
 
         if not self.data_in_device:
             for input,schema in INPUT_SCHEMA.items():
-                if input not in ['dims','grand_total','margins','true_parameters'] and \
-                    hasattr(self.data,input) and getattr(self.data,input) is not None:
+                if input not in ["dims",'grand_total','margins','true_parameters'] and \
+                    getattr(self.data,input,None) is not None:
                         setattr(
                             self.data,
                             input, 
                             torch.reshape(
                                 torch.from_numpy(getattr(self.data,input)).to(dtype=NUMPY_TO_TORCH_DTYPE[schema['dtype']]),
-                                tuple([self.data.dims[name] for name in schema['dims']])
+                                tuple([self.data.dims[name] for name in schema["dims"]])
                             ).to(device)
                         )
             if hasattr(self.data,'log_destination_attraction') and getattr(self.data,'log_destination_attraction') is not None:
@@ -436,7 +541,7 @@ class Inputs:
         set_seed(self.seed)
 
         # Get run configuration properties
-        self.data.dims = self.config.settings['inputs']['data']['dims']
+        self.data.dims = self.config.settings['inputs']['data']["dims"]
         synthetis_method = self.config.settings['inputs']['data']['synthesis_method']
         num_samples = self.config['inputs']['data']['synthesis_n_samples']
         num_steps = self.config.settings['training']['num_steps']
@@ -447,7 +552,7 @@ class Inputs:
                 # Randomly generate data
                 data = np.abs(
                     random_vector(
-                        **value, size=tuple([self.data.dims[name] for name in INPUT_SCHEMA[key]['dims']])
+                        **value, size=tuple([self.data.dims[name] for name in INPUT_SCHEMA[key]["dims"]])
                     )
                 ).astype('float32')
                 # Normalise to sum to one
@@ -516,7 +621,7 @@ class Inputs:
             raise Exception(f'Cannot synthetise data using method {synthetis_method}')
 
         # Get training data size from dimensions
-        data_time_steps = self.config.settings['inputs']['dims'].get('time',destination_attraction_ts.shape[0])
+        data_time_steps = self.config.settings['inputs']["dims"].get('time',destination_attraction_ts.shape[0])
         # Extract the training data from the time series data
         self.data.destination_attraction_ts = destination_attraction_ts[-data_time_steps:]
         # self.data.log_destination_attraction = torch.log(destination_attraction_ts[-1:])
@@ -542,7 +647,7 @@ class Inputs:
         
         # Write data to inputs folder
         for key in vars(self.data):
-            if key != 'dims':
+            if key != "dims":
                 self.logger.note(f"Dataset {os.path.join(dataset_name,f'{key}.txt')} created")
                 write_txt(
                     getattr(self.data,key),
@@ -662,12 +767,6 @@ class Inputs:
         # Update log destination attraction
         destination_attraction_ts = torch.exp(torch.tensor(minimum,dtype=float32,device=self.config['inputs']['device']))
         
-        # print({k:v.sum() for k,v in vars(self.data).items() if k != 'dims'})
-        # print('\n')
-        # print(self.true_parameters)
-        # print('\n')
-        # print(destination_attraction_ts)
-        # print(destination_attraction_ts.sum())
         return destination_attraction_ts
 
     def __str__(self):
