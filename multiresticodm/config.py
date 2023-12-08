@@ -400,10 +400,15 @@ class Config:
                 )
                 # If the sweep setting is coupled add to coupled sweep paths
                 if sweep_settings.get('coupled',False) and len(sweep_settings.get('target_name','')) > 0:
+                    # Get target name
                     target_name = sweep_settings.get('target_name','')
+                    # Get coupled name and value
+                    coupled_name = key_val_path[indx-1] if key_val_path[indx-1] != 'file' else key_val_path[indx-2]
+                    coupled_value = key_val_path[:indx]
+
                     if target_name in list(self.coupled_sweep_paths.keys()):
                         # Add path to coupled sweeps
-                        self.coupled_sweep_paths[target_name][key_val_path[indx-1]] = deepcopy(key_val_path[:indx])
+                        self.coupled_sweep_paths[target_name][coupled_name] = deepcopy(coupled_value)
                     else:
                         # Find first instance of target name
                         target_name_paths = list(self.path_find(
@@ -415,7 +420,7 @@ class Config:
                         if len(target_name_paths) > 0 and len(target_name_paths[0]):
                             self.coupled_sweep_paths[target_name] = {    
                                 target_name : target_name_paths[0],
-                                key_val_path[indx-1] : deepcopy(key_val_path[:indx])
+                                coupled_name : deepcopy(coupled_value)
                             }
                 # Else add to isolated sweep paths
                 else:
@@ -434,9 +439,6 @@ class Config:
             for item in nested_dict.keys()
         ]
         self.sweep_param_names = list(flatten(sweep_param_names))
-        # Get sweep target names (exclude coupled names that are not targets)
-        self.sweep_target_names = list(self.isolated_sweep_paths.keys())
-        self.sweep_target_names += list(self.coupled_sweep_paths.keys())
         
     def validate_config(self,parameters=None,settings=None,base_schema=None,key_path=[],**kwargs):
         # Pass defaults if no meaningful arguments are provided
