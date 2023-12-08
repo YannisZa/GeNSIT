@@ -90,16 +90,30 @@ clear; multiresticodm summarise -s r2 \
 
 ## Experiment 1
 
--s table
--et NonJointTableSIM_NN -et JointTableSIM_NN -et SIM_MCMC -et JointTableSIM_MCMC \
+Get SRMSEs for all samples and all experiments:
 
 ```
 clear; multiresticodm summarise -s table -s intensity \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
--et SIM_NN \
+-et SIM_MCMC -et JointTableSIM_MCMC -et SIM_NN -et NonJointTableSIM_NN -et JointTableSIM_NN \
 -stat 'srmse' 'mean&' 'iter+seed&' \
--k sigma -k name -btt 'iter' 0 100 100 -nw 6 --region_mass 0.99
+-k sigma -k name -btt 'iter' 0 100 100 \
+-fe SRMSEs -nw 1 --force_reload
 ```
+
+Get coverage probabilities for all samples and all experiments:
+-et JointTableSIM_MCMC -et SIM_NN -et NonJointTableSIM_NN -et JointTableSIM_NN
+
+```
+clear; multiresticodm summarise -s table -s intensity \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-et SIM_MCMC \
+-stat 'coverage_probability' '&mean|*100|rint' '&origin+destination||' \
+-k sigma -k name -k type --region_mass 0.99 \
+-fe CoverageProbabilities -nw 1 --force_reload
+```
+
+Debugging scripts
 
 ```
 -d exp1/SIM_MCMC_SweepedNoise_16_05_2023_20_09_04 \
@@ -112,15 +126,6 @@ clear; multiresticodm summarise -s intensity \
 -stat 'srmse' 'mean&' 'iter+seed&' \
 -k sigma -k name -k type \
 -btt 'iter' 100 100 1000 -fe all_SIM_NN_SMRSEs -nw 1 --force_reload
-```
-
-```
-clear; multiresticodm summarise -s intensity \
--d exp1/SIM_NN_SweepedNoise_16_05_2023_20_09_04 \
--dn cambridge_work_commuter_lsoas_to_msoas \
--stat 'coverage_probability' '&mean|*100|floor' '&origin+destination||' \
--k sigma -k name -k type --region_mass 0.99 \
--fe CoverageProbabilities -nw 1 --force_reload
 ```
 
 ## Experiment 5 (Expected loss)
