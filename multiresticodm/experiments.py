@@ -162,7 +162,7 @@ class Experiment(object):
 
         # Update seed if specified
         self.seed = None
-        if "seed" in self.config['inputs'].keys():
+        if "seed" in self.config['inputs'] and not isinstance(self.config['inputs']["seed"],dict):
             self.seed = int(self.config['inputs']["seed"])
             self.logger.info(f"Updated seed to {self.seed}")
 
@@ -360,7 +360,10 @@ class Experiment(object):
                                 compression=3,
                             )
                         )
-                        getattr(self,loss_name).attrs['dim_names'] = DATA_SCHEMA['loss']['dims']
+                        getattr(self,loss_name).attrs['dim_names'] = (
+                            (['iter'] if DATA_SCHEMA['loss'].get('is_iterable',False) else [])+
+                            DATA_SCHEMA['loss'].get('dims',[])
+                        )
                         getattr(self,loss_name).attrs['dims_mode__time'] = 'start_and_step'
                         getattr(self,loss_name).attrs['dims__time'] = [self._write_start, self._write_every]
                     else:
@@ -385,7 +388,10 @@ class Experiment(object):
                             chunks=True, 
                             compression=3
                         )
-                        dset.attrs['dim_names'] = DATA_SCHEMA[p_name]['dims']
+                        dset.attrs['dim_names'] = (
+                            (['iter'] if DATA_SCHEMA[p_name].get('is_iterable',False) else [])+
+                            DATA_SCHEMA[p_name].get('dims',[])
+                        )
                         dset.attrs['dims_mode__time'] = 'start_and_step'
                         dset.attrs['dims__time'] = [self._write_start, self._write_every]
                     else:
@@ -407,7 +413,10 @@ class Experiment(object):
                             shape = tuple([grange['n'] for grange in self.config['experiments'][0]['grid_ranges'].values()]),
                         )
                     )
-                    getattr(self,'r2').attrs['r2'] = DATA_SCHEMA['r2']['dims']
+                    getattr(self,'r2').attrs['r2'] = (
+                        (['iter'] if DATA_SCHEMA['r2'].get('is_iterable',False) else [])+
+                        DATA_SCHEMA['r2'].get('dims',[])
+                    )
                     getattr(self,'r2').attrs['dims_mode__time'] = 'start_and_step'
                     getattr(self,'r2').attrs['dims__time'] = [self._write_start, self._write_every]
                 else:
@@ -427,18 +436,22 @@ class Experiment(object):
                         # Delete current dataset
                         safe_delete(getattr(self,sample))
                     if sample not in self.outputs.h5group:
+                        all_dims = (
+                            (['iter'] if DATA_SCHEMA[sample].get('is_iterable',False) else [])+
+                            DATA_SCHEMA[sample].get('dims',[])
+                        )
                         setattr(
                             self,
                             sample,
                             self.outputs.h5group.create_dataset(
                                 sample,
-                                (0,*[dims[d] for d in DATA_SCHEMA[sample]["dims"]]),
-                                maxshape=(None,*[dims[d] for d in DATA_SCHEMA[sample]["dims"]]),
+                                (0,*[dims[d] for d in DATA_SCHEMA[sample].get('dims',[])]),
+                                maxshape=(None,*[dims[d] for d in DATA_SCHEMA[sample].get('dims',[])]),
                                 chunks=True,
                                 compression=3,
                             )
                         )
-                        getattr(self,sample).attrs[sample] = DATA_SCHEMA[sample]['dims']
+                        getattr(self,sample).attrs[sample] = all_dims
                         getattr(self,sample).attrs['dims_mode__time'] = 'start_and_step'
                         getattr(self,sample).attrs['dims__time'] = [self._write_start, self._write_every]
                     else:
@@ -537,11 +550,17 @@ class Experiment(object):
                     if sample is not None:
                         sample_value = sample_value.clone().detach().cpu() if torch.is_tensor(sample_value) else sample_value
                     else:
-                        sample_value = np.ones(DATA_SCHEMA[sample]["dims"]) if DATA_SCHEMA[sample]["dims"] else None
+                        sample_value = np.ones(DATA_SCHEMA[sample].get("dims",[])) \
+                            if len(DATA_SCHEMA[sample].get("dims",[])) > 0 \
+                            else None
                         if sample_value is not None:
                             sample_value[:] = None
                     getattr(self,sample).resize(getattr(self,sample).shape[0] + 1, axis=0)
-                    if len(DATA_SCHEMA[sample]["dims"]):
+                    all_dims = (
+                        (['iter'] if DATA_SCHEMA[sample].get('is_iterable',False) else [])+
+                        DATA_SCHEMA[sample].get('dims',[])
+                    )
+                    if len(all_dims) > 0:
                         getattr(self,sample)[-1,...] = sample_value
                     else:
                         getattr(self,sample)[-1] = sample_value
@@ -560,7 +579,7 @@ class Experiment(object):
                 print(p,v)
 
     
-    def update_metadata(self):
+    def show_progress(self):
         if hasattr(self,'theta_acc'):
             self.config['theta_acceptance'] = int(100*self.theta_acc[:].mean(axis=0))
             self.logger.progress(f"Theta acceptance: {self.config['theta_acceptance']}")
@@ -807,7 +826,7 @@ class RSquared_Analysis(Experiment):
         self.config.settings['predicted_w'] = to_json_format(max_w_prediction)
 
         # Update metadata
-        self.update_metadata()
+        self.show_progress()
 
         # Write metadata
         self.write_metadata()
@@ -1098,7 +1117,9 @@ class SIM_MCMC(Experiment):
                     log_destination_attraction_acc = log_dest_attract_acc
                 )
 
-                self.logger.iteration(f"Completed epoch {i+1} / {N}.")
+            # print statements
+            self.show_progress()
+            self.logger.iteration(f"Completed iteration {i+1} / {N}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -1106,7 +1127,7 @@ class SIM_MCMC(Experiment):
                 self.compute_time[-1] = time.time() - start_time
         
         # Update metadata
-        self.update_metadata()
+        self.show_progress()
 
         # Write metadata
         self.write_metadata()
@@ -1336,8 +1357,6 @@ class JointTableSIM_MCMC(Experiment):
                     log_destination_attraction_acc = log_dest_attract_acc,
                 )
 
-                self.logger.iteration(f"Completed epoch {i+1} / {N}.")
-
             # Compute new intensity
             log_intensity_sample = self.harris_wilson_mcmc.physics_model.intensity_model.log_intensity(
                 log_destination_attraction = log_destination_attraction_sample,
@@ -1370,13 +1389,17 @@ class JointTableSIM_MCMC(Experiment):
                 **dict(zip(self.params_to_learn,theta_sample))
             )
 
+            # print statements
+            self.show_progress()
+            self.logger.iteration(f"Completed iteration {i+1} / {N}.")
+
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
                 self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
                 self.compute_time[-1] = time.time() - start_time
             
         # Update metadata
-        self.update_metadata()
+        self.show_progress()
 
         # Write metadata
         self.write_metadata()
@@ -1499,11 +1522,11 @@ class Table_MCMC(Experiment):
         table_sample = initial_params['table']
 
         # Store number of samples
-        num_epochs = self.config['training']['N']
+        N = self.config['training']['N']
 
         # For each epoch
-        for e in tqdm(
-            range(num_epochs),
+        for i in tqdm(
+            range(N),
             disable=self.tqdm_disabled,
             leave=False,
             position=(self.device_id+1),
@@ -1529,7 +1552,9 @@ class Table_MCMC(Experiment):
                 **self.config['training']
             )
 
-            self.logger.iteration(f"Completed epoch {e+1} / {num_epochs}.")
+            # print statements
+            self.show_progress()
+            self.logger.iteration(f"Completed iteration {i+1} / {N}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -1537,7 +1562,7 @@ class Table_MCMC(Experiment):
                 self.compute_time[-1] = time.time() - self.start_time
 
         # Update metadata
-        self.update_metadata()
+        self.show_progress()
 
         # Write metadata
         self.write_metadata()
@@ -1642,7 +1667,7 @@ class TableSummaries_MCMCConvergence(Experiment):
             tables0.append(self.samplers[str(k)].initialise_table(np.exp(self.true_log_intensities)))
 
         # Update metadata initially
-        self.update_metadata(
+        self.show_progress(
             0,
             batch_counter=0,
             print_flag=False,
@@ -1732,7 +1757,7 @@ class TableSummaries_MCMCConvergence(Experiment):
                 print(table_norm[-1])
 
         # Update metadata
-        self.update_metadata(
+        self.show_progress(
             (i+1),
             batch_counter=0,
             print_flag=True,
@@ -1804,8 +1829,8 @@ class SIM_NN(Experiment):
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
-            input_size=self.inputs.data.destination_attraction_ts.shape[-1],
-            output_size=len(config['inputs']['to_learn']),
+            input_size = self.inputs.data.dims['destination'],
+            output_size = len(config['inputs']['to_learn']),
             **config['neural_network']['hyperparameters'],
             logger = self.logger
         ).to(self.device)
@@ -1853,7 +1878,7 @@ class SIM_NN(Experiment):
         self.initialise_data_structures()
         
         # Store number of samples
-        num_epochs = self.config['training']['N']
+        N = self.config['training']['N']
 
         # Track the training loss
         loss_sample = {
@@ -1865,8 +1890,8 @@ class SIM_NN(Experiment):
         n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
 
         # For each epoch
-        for e in tqdm(
-            range(num_epochs),
+        for i in tqdm(
+            range(N),
             disable=self.tqdm_disabled,
             leave=False,
             position=(self.device_id+1),
@@ -1898,7 +1923,7 @@ class SIM_NN(Experiment):
                         destination_attraction_ts = training_data
                     ),
                     prediction_data = dict(
-                        destination_attraction_ts = torch.flatten(destination_attraction_sample)
+                        destination_attraction_ts = [destination_attraction_sample]
                     )
                 )
 
@@ -1917,13 +1942,9 @@ class SIM_NN(Experiment):
                     **self.config['training']
                 )
             
-            # if hasattr(self,'harris_wilson_nn'):
-            #     loss_names = list(self.harris_wilson_nn.loss_functions.keys())
-            #     loss_names = loss_names if len(loss_names) <= 1 else loss_names+['total_loss']
-            #     for loss_name in loss_names:
-            #         self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:][-1]}')
-            # print('\n')
-            self.logger.iteration(f"Completed epoch {e+1} / {num_epochs}.\n")
+            # print statements
+            self.show_progress()
+            self.logger.iteration(f"Completed iteration {i+1} / {N}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -1931,7 +1952,7 @@ class SIM_NN(Experiment):
                 self.compute_time[-1] = time.time() - start_time
         
         # Update metadata
-        self.update_metadata()
+        self.show_progress()
 
         # Write metadata
         self.write_metadata()
@@ -2010,8 +2031,8 @@ class NonJointTableSIM_NN(Experiment):
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
-            input_size=self.inputs.data.destination_attraction_ts.shape[-1],
-            output_size=len(config['inputs']['to_learn']),
+            input_size = self.inputs.data.dims['destination'],
+            output_size = len(config['inputs']['to_learn']),
             **config['neural_network']['hyperparameters'],
             logger = self.logger
         ).to(self.device)
@@ -2065,7 +2086,7 @@ class NonJointTableSIM_NN(Experiment):
         table_sample = initial_params['table']
         
         # Store number of samples
-        num_epochs = self.config['training']['N']
+        N = self.config['training']['N']
 
         # Track the training loss
         loss_sample = {
@@ -2077,8 +2098,8 @@ class NonJointTableSIM_NN(Experiment):
         n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
 
         # For each epoch
-        for e in tqdm(
-            range(num_epochs),
+        for i in tqdm(
+            range(N),
             disable=self.tqdm_disabled,
             leave=False,
             position=(self.device_id+1),
@@ -2110,7 +2131,7 @@ class NonJointTableSIM_NN(Experiment):
                         destination_attraction_ts = training_data
                     ),
                     prediction_data = dict(
-                        destination_attraction_ts = torch.flatten(destination_attraction_sample)
+                        destination_attraction_ts = [destination_attraction_sample]
                     )
                 )
             
@@ -2148,7 +2169,9 @@ class NonJointTableSIM_NN(Experiment):
                     **self.config['training']
                 )
             
-            self.logger.iteration(f"Completed epoch {e+1} / {num_epochs}.")
+            # print statements
+            self.show_progress()
+            self.logger.iteration(f"Completed iteration {i+1} / {N}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -2156,7 +2179,7 @@ class NonJointTableSIM_NN(Experiment):
                 self.compute_time[-1] = time.time() - start_time
 
         # Update metadata
-        self.update_metadata()
+        self.show_progress()
 
         # Write metadata
         self.write_metadata()
@@ -2236,7 +2259,7 @@ class JointTableSIM_NN(Experiment):
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
-            input_size = self.inputs.data.destination_attraction_ts.shape[-1],
+            input_size = self.inputs.data.dims['destination'],
             output_size = len(config['inputs']['to_learn']),
             **config['neural_network']['hyperparameters'],
             logger = self.logger
@@ -2294,7 +2317,7 @@ class JointTableSIM_NN(Experiment):
         table_sample = initial_params['table']
         
         # Store number of samples
-        num_epochs = self.config['training']['N']
+        N = self.config['training']['N']
 
         # Track the training loss
         loss_sample = {
@@ -2306,8 +2329,8 @@ class JointTableSIM_NN(Experiment):
         n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
     
         # For each epoch
-        for e in tqdm(
-            range(num_epochs),
+        for i in tqdm(
+            range(N),
             disable=self.tqdm_disabled,
             leave=False,
             position=(self.device_id+1),
@@ -2318,8 +2341,9 @@ class JointTableSIM_NN(Experiment):
             start_time = time.time()
 
             # Process the training set elementwise, updating the loss after batch_size steps
-            for t, training_data in enumerate(torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)):
-
+            for t, training_data in enumerate(
+                torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)
+            ):
                 # Perform neural net training
                 theta_sample, \
                 destination_attraction_sample = self.harris_wilson_nn.epoch_time_step(
@@ -2334,7 +2358,7 @@ class JointTableSIM_NN(Experiment):
                 # Add axis to every sample to ensure compatibility 
                 # with the functions used below
                 theta_sample_expanded = torch.unsqueeze(theta_sample,0)
-                log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0).unsqueeze(0)
+                log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0)
 
                 # Compute log intensity
                 log_intensity_sample = self.harris_wilson_nn.physics_model.intensity_model.log_intensity(
@@ -2343,42 +2367,30 @@ class JointTableSIM_NN(Experiment):
                     **dict(zip(self.harris_wilson_nn.physics_model.params_to_learn,theta_sample_expanded.split(1,dim=1)))
                 ).squeeze()
                 
-                # Update destination_attraction loss
-                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
-                    previous_loss = loss_sample,
-                    n_processed_steps = n_processed_steps,
-                    validation_data = dict(
-                        destination_attraction_ts = training_data,
-                    ),
-                    prediction_data = dict(
-                        destination_attraction_ts = torch.flatten(destination_attraction_sample)
-                    ),
-                    loss_function_names = ['dest_attraction_ts_loss'],
-                    aux_inputs = vars(self.inputs.data)
-                )
-                
-                # Sample table
+                # Sample table(s)
+                table_samples = []
                 for _ in range(self.config['mcmc']['contingency_table'].get('table_steps',1)):
-                    
                     # Perform table step
                     table_sample,accepted = self.ct_mcmc.table_gibbs_step(
                         table_prev = table_sample,
                         log_intensity = log_intensity_sample
                     )
+                    table_samples.append(table_sample/table_sample.sum())
 
-                    # Update losses
-                    loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
-                        previous_loss = loss_sample,
-                        n_processed_steps = n_processed_steps,
-                        validation_data = dict(
-                            log_intensity = log_intensity_sample#/log_intensity_sample.sum()
-                        ),
-                        prediction_data = dict(
-                            table = table_sample#/table_sample.sum(),
-                        ),
-                        loss_function_names = [lf for lf in self.harris_wilson_nn.loss_functions.keys() if lf != 'dest_attraction_ts_loss'],
-                        aux_inputs = vars(self.inputs.data)
-                    )
+                # Update losses
+                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
+                    previous_loss = loss_sample,
+                    n_processed_steps = n_processed_steps,
+                    validation_data = dict(
+                        destination_attraction_ts = training_data,
+                        log_intensity = log_intensity_sample/log_intensity_sample.sum()
+                    ),
+                    prediction_data = dict(
+                        destination_attraction_ts = [destination_attraction_sample],
+                        table = table_samples
+                    ),
+                    aux_inputs = vars(self.inputs.data)
+                )
 
                 # Clean loss and write to file
                 # This will only store the last table sample
@@ -2394,7 +2406,10 @@ class JointTableSIM_NN(Experiment):
                     data_size = len(training_data),
                     **self.config['training']
                 )
-            self.logger.iteration(f"Completed epoch {e+1} / {num_epochs}.")
+            
+            # print statements
+            self.show_progress()
+            self.logger.iteration(f"Completed iteration {i+1} / {N}.")
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -2402,7 +2417,7 @@ class JointTableSIM_NN(Experiment):
                 self.compute_time[-1] = time.time() - start_time
                 
         # Update metadata
-        self.update_metadata()
+        self.show_progress()
 
         # Write metadata
         self.write_metadata()
