@@ -107,7 +107,15 @@ LOSS_DATA_REQUIREMENTS = {
         "prediction_data": ["destination_attraction_ts"],
         "validation_data": ["destination_attraction_ts"],
     },
+    "dest_attraction_ts_likelihood_loss": {
+        "prediction_data": ["destination_attraction_ts"],
+        "validation_data": ["destination_attraction_ts"],
+    },
     "table_loss": {
+        "prediction_data": ["table"],
+        "validation_data": ["log_intensity"]
+    },
+    "table_likelihood_loss": {
         "prediction_data": ["table"],
         "validation_data": ["log_intensity"]
     },
@@ -216,6 +224,7 @@ INPUT_SCHEMA = {
         "funcs":[],
         "args_dtype":[],
         "dims":[],
+
         "cast_to_xarray":False
     },
     "dims":{},
@@ -231,7 +240,8 @@ TABLE_SCHEMA = {
         "ndmin":2,
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "dims":["iter","origin","destination"]
+        "is_iterable": True,
+        "dims":["origin","destination"]
     }
 }
 INTENSITY_SCHEMA = {
@@ -349,12 +359,9 @@ OUTPUT_SCHEMA = {
 }
 for loss in LOSS_DATA_REQUIREMENTS.keys():
     OUTPUT_SCHEMA[loss] = {
-        "funcs":[],
         "axes":[],
         "dtype":"float32", 
-        "args_dtype":[],
-        "is_iterable": True,
-        "dims":[]
+        "is_iterable": True
     }
 
 DATA_SCHEMA = {**INPUT_SCHEMA,**OUTPUT_SCHEMA}
