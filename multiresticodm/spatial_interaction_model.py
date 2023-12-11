@@ -223,12 +223,16 @@ class SpatialInteraction2D():
     
 
     def intensity_demand(self,**kwargs):
+        
+        self.logger.debug('Computing intensity demand')
+
         # Compute log flow
         log_flow = self.log_intensity(**kwargs)
         # Squeeze output
         log_flow = torch.squeeze(log_flow)
         # Compute destination demand
         log_destination_demand = torch.logsumexp(log_flow,dim=0)
+        
         return torch.exp(log_destination_demand)
     
 
