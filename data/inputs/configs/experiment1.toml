@@ -10,7 +10,7 @@ dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
   default = 1
-  range = ["1:10:1"]
+  range = ["0:99:1"]
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta'] 
   range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
@@ -35,15 +35,14 @@ load_experiment = ''
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
-    default = [[+0,+1]]
-    range = [[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
+    default = [[]]
+    range = [[], [[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'
   [contingency_table.constraints.cells.sweep]
     default = ''
-    range = ['','','',
-      'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
-      'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
+    range = [
+      '','','','','cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt','cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
     ]
     coupled = true
     target_name = 'title'
@@ -51,7 +50,8 @@ load_experiment = ''
 [spatial_interaction_model]
   [spatial_interaction_model.name.sweep]
     default = 'TotallyConstrained'
-    range = ['TotallyConstrained','ProductionConstrained']
+    range = ['TotallyConstrained','TotallyConstrained','ProductionConstrained',
+    'ProductionConstrained','TotallyConstrained','TotallyConstrained']
     coupled = true
     target_name = 'title'
     
@@ -64,9 +64,9 @@ load_experiment = ''
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
-    noise_percentage = 3.0
+    noise_percentage = +0.01
     epsilon = 1.0
-    delta = 0.0
+    # delta = 0.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356
       range = [0.0141421356, 0.1414213562, nan]
@@ -74,11 +74,7 @@ load_experiment = ''
 [training]
   num_steps = +1
   batch_size = +1
-  [training.N.sweep]
-    default = 10000
-#     range = ["repeat(10,10000)","repeat(100,1000)","repeat(1000,100)","repeat(10000,10)","repeat(100000,1)",]
-#     coupled = true
-#     target_name = 'seed'
+  N = 10000
 
 [mcmc]
     disable_tqdm = true
@@ -100,7 +96,6 @@ load_experiment = ''
           [[1.0,0.0],[0.0,1.0]],
           [[1.0,0.0],[0.0,1.0]]
         ]
-        #[[ 0.0349674,  0.00], [ 0.00,  0.0349968]]
         coupled = true
         target_name = 'sigma'
     [mcmc.destination_attraction]
@@ -114,10 +109,28 @@ load_experiment = ''
 
 [neural_network]
   disable_tqdm = true
-  [[neural_network.loss]]
-    loss_name = ['dest_attraction_ts_loss']
-    loss_function = ['mseloss']
-    loss_kwarg_keys = ['noise_percentage']
+  [neural_network.loss.loss_name.sweep]
+    default = ['dest_attraction_ts_loss']
+    range = [
+      ['dest_attraction_ts_likelihood_loss'],
+      ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+    ]
+  [neural_network.loss.loss_function.sweep]
+    default = ['mseloss']
+    range = [
+      ['custom'],
+      ['custom','custom']
+    ]
+    coupled = true
+    target_name = 'loss_name'
+  [neural_network.loss.loss_kwarg_keys.sweep]
+    default = [[]]
+    range = [
+      [['noise_percentage']],
+      [['noise_percentage'],[]]
+    ]
+    coupled = true
+    target_name = 'loss_name'
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
@@ -180,6 +193,5 @@ load_experiment = ''
     out_directory = './data/outputs/'
     out_group = 'exp1'
     [outputs.title.sweep]
-      default = '_total_constrained'
-      range = ['_total_constrained','_row_constrained']
-      # ,'_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      default = '_unconstrained'
+      range = ['_unconstrained','_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
