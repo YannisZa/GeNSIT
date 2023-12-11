@@ -10,7 +10,7 @@ dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
   default = 0
-  range = ["0:99:1"]
+  range = ["0:29:1"]
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta', 'sigma']
   # range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
@@ -35,13 +35,13 @@ load_experiment = ''
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
-    default = [[]]
-    range = [[],[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
+    default = [[+0,+1]]
+    range = [[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'
   [contingency_table.constraints.cells.sweep]
     default = ''
-    range = ['','','','',
+    range = ['','','',
       'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
       'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
     ]
@@ -52,7 +52,7 @@ load_experiment = ''
   [spatial_interaction_model.name.sweep]
     default = 'TotallyConstrained'
     range = [
-      'TotallyConstrained','TotallyConstrained','ProductionConstrained',
+      'TotallyConstrained','ProductionConstrained',
       'TotallyConstrained','TotallyConstrained','TotallyConstrained'
     ]
     coupled = true
@@ -90,7 +90,7 @@ load_experiment = ''
       margin0 = 'multinomial'
       [mcmc.contingency_table.table_steps.sweep]
         default = 1
-        range = [1,10,50,100]
+        range = [1,10,100]
 
 [neural_network]
   disable_tqdm = true
@@ -108,7 +108,7 @@ load_experiment = ''
       ['custom'],
       ['custom'],
       ['mseloss'],
-      ['mseloss','custom'],
+      ['custom','custom'],
     ]
     coupled = true
     target_name = 'loss_name'
@@ -154,5 +154,5 @@ load_experiment = ''
     out_directory = './data/outputs/'
     out_group = 'exp5_expected_loss'
     [outputs.title.sweep]
-      default = '_uncostrained'
-      range = ['_uncostrained','_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      default = '_total_constrained'
+      range = ['_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
