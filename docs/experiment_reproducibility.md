@@ -51,6 +51,7 @@ Set `ulimit -n 50000`
 ### Dependent (joint) Table and SIM
 
 clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml -et JointTableSIM_NN -nw 10 -nt 4 -sm
+clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml -et JointTableSIM_NN -nw 1 -nt 4 -sm
 
 # Plots
 
