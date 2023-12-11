@@ -105,7 +105,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             Number of Table Markov bases: {len(self.markov_basis.basis_dictionaries)}
             Number of workers: {self.n_workers}
             Number of threads: {str(self.n_threads)}
-            Random seed: {self.ct.config['inputs']['seed']}
+            Random seed: {self.ct.config['inputs'].get('seed',None)}
         """
 
     def __repr__(self):
@@ -203,7 +203,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         if intensity is None:
             intensity = torch.ones(tuple(list(unpack_dims(self.ct.data.dims))),dtype=float32)
 
-        _ = set_seed(self.ct.config['inputs']['seed'])
+        _ = set_seed(self.ct.config['inputs'].get('seed',None))
 
         margins = {}
         for ax in sorted_axes:
