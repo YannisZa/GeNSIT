@@ -88,7 +88,7 @@ class HarrisWilsonMarkovChainMonteCarlo():
         if not read_stopping_times:
             # Generate stopping times
             self.logger.note('Generating stopping times')
-            self.stopping_times = ProbabilityUtils.generate_stopping_times(N=N,k_power=self.k_power,seed=self.config['inputs']['seed'])
+            self.stopping_times = ProbabilityUtils.generate_stopping_times(N=N,k_power=self.k_power,seed=self.config['inputs'].get('seed'))
             # Reset random seed
             set_seed(None)
             # Export stopping times
