@@ -87,7 +87,7 @@ def log_flow_matrix(**kwargs):
     tensor = kwargs.get('torch',True)
     # Required inputs
     origin_demand = kwargs['origin_demand']
-    grand_total = kwargs.get('grand_total',None)
+    grand_total = kwargs.get('grand_total',1.0)
     cost_matrix = kwargs['cost_matrix']
     # Required outputs
     log_destination_attraction = kwargs['log_destination_attraction']
