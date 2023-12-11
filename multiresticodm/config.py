@@ -8,6 +8,7 @@ from copy import deepcopy
 from itertools import product
 
 from multiresticodm import ROOT
+from multiresticodm.exceptions import *
 from multiresticodm.global_variables import deep_walk
 from multiresticodm.config_data_structures import instantiate_data_type
 from multiresticodm.utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify
@@ -233,9 +234,9 @@ class Config:
             return deleted,settings
         deleted = False
         if len(key_path) == 1:
-            del settings[key_path[0]]
-            # safe_delete(settings[key_path[0]])
-            deleted = True
+            if key_path[0] in settings:
+                del settings[key_path[0]]
+                deleted = True
         else:
             deleted,settings = self.path_delete(settings[key_path[0]],key_path[1:],deleted)
         return deleted,settings
@@ -295,13 +296,13 @@ class Config:
 
                 # Delete excluded key paths
                 if key_path[-1] == 'exclude' and experiment_schema[key_path_str]:
-                    self.logger.warning(f"Excluding key path {' > '.join(key_path[:-1])}")
+                    self.logger.info(f"Excluding key path {' > '.join(key_path[:-1])}")
                     # Update settings
-                    _,self.settings = self.path_delete(self.settings,key_path[:-1])
+                    _,_ = self.path_delete(self.settings,key_path[:-1])
                     # Update base schema
-                    _,self.schema = self.path_delete(self.schema,key_path[:-1])
+                    _,_ = self.path_delete(self.schema,key_path[:-1])
                     # Update base parameters
-                    _,self.parameters = self.path_delete(self.parameters,key_path[:-1])
+                    _,_ = self.path_delete(self.parameters,key_path[:-1])
                 # Modify the base schema only
                 else:
                     if not self.path_modify(
@@ -311,14 +312,14 @@ class Config:
                     ):
                         raise Exception(f"Could not update base schema at {'>'.join(key_path)}")
 
-            # Validate config
-            self.validate_config(
-                parameters = self.parameters,
-                settings = self.settings,
-                base_schema = self.schema,
-                key_path = [],
-                experiment_type = experiment_type
-            )
+        # Validate config
+        self.validate_config(
+            parameters = self.parameters,
+            settings = self.settings,
+            base_schema = self.schema,
+            key_path = [],
+            experiment_type = experiment_type
+        )
 
     def sweep_mode(self,settings:dict = None):
         # Check if sweep mode is active
@@ -807,7 +808,11 @@ class Config:
         try:
             assert len(sweep_configurations_copy) == len(set(sweep_configurations_copy))
         except:
-            raise Exception('Sweep configurations contain duplicates! Remove them and run again.')
+            raise DuplicateData(
+                message = 'Sweep configurations contain duplicates!',
+                len_data = len(sweep_configurations_copy),
+                len_unique_data = len(set(sweep_configurations_copy))
+            )
         
         # Print parameter space size
         param_sizes = [f"{v['var']} ({len(v['values'])})" for v in sweep_params['isolated'].values()]
@@ -869,7 +874,7 @@ class Config:
                     "values": sweep_vals
                 })
                 # Target variables should be unique 
-                # as they are used for name output folders
+                # as they are used for naming output folders
                 if key_path[-1] == target_name:
                     try:
                         assert len(sweep_vals) == len(unique(sweep_vals))

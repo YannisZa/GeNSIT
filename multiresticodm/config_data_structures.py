@@ -101,7 +101,6 @@ class PrimitiveEntry(Entry):
     
     def check_scope(self):
         valid_scope = self.schema.get("is-any-of",[])
-        valid_scope = self.schema.get("is-any-of",[])
         if isinstance(valid_scope,list) and len(valid_scope) > 0:
             try: 
                 assert self.data in valid_scope
@@ -196,6 +195,20 @@ class Str(PrimitiveEntry):
     
     def __str__(self) -> str:
         return "String()"
+
+    def check_scope(self):
+        super().check_scope()
+        substrings = self.schema.get("contains",[])
+        if isinstance(substrings,list) and len(substrings) > 0:
+            try: 
+                assert any([str(substr) in self.data for substr in substrings])
+            except:
+                raise InvalidScopeException(
+                    f"None of the substrings {', '.join(substrings)} are contained in data {self.data}",
+                    key_path=self.key_path,
+                    data=self.data
+                )
+        return True
 
     def check(self):
         # Check that correct type is used
