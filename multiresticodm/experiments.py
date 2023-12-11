@@ -2111,7 +2111,9 @@ class NonJointTableSIM_NN(Experiment):
             start_time = time.time()
             
             # Process the training set elementwise, updating the loss after batch_size steps
-            for t, training_data in enumerate(torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)):
+            for t, training_data in enumerate(
+                torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)
+            ):
 
                 # Perform neural net training
                 theta_sample, \
@@ -2123,6 +2125,24 @@ class NonJointTableSIM_NN(Experiment):
                     dt = self.config['harris_wilson_model']['dt']
                 )
                 log_destination_attraction_sample = torch.log(destination_attraction_sample)
+            
+                # Add axis to every sample to ensure compatibility 
+                # with the functions used below
+                theta_sample_expanded = torch.unsqueeze(theta_sample,0)
+                log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0)
+
+                # Compute log intensity
+                log_intensity_sample = self.harris_wilson_nn.physics_model.intensity_model.log_intensity(
+                    log_destination_attraction = log_destination_attraction_sample_expanded,
+                    grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))],
+                    **dict(zip(self.harris_wilson_nn.physics_model.params_to_learn,theta_sample_expanded.split(1,dim=1)))
+                ).squeeze()
+
+                # Sample table
+                table_sample,accepted = self.ct_mcmc.table_gibbs_step(
+                    table_prev = table_sample,
+                    log_intensity = log_intensity_sample
+                )
 
                 # Update losses
                 loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
@@ -2134,26 +2154,6 @@ class NonJointTableSIM_NN(Experiment):
                     prediction_data = dict(
                         destination_attraction_ts = [destination_attraction_sample]
                     )
-                )
-            
-                # Add axis to every sample to ensure compatibility 
-                # with the functions used below
-                theta_sample_expanded = torch.unsqueeze(theta_sample,0)
-                log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0).unsqueeze(0)
-
-                # Compute log intensity
-                log_intensity_sample = self.harris_wilson_nn.physics_model.intensity_model.log_intensity(
-                    log_destination_attraction = log_destination_attraction_sample_expanded,
-                    grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))],
-                    **dict(zip(self.harris_wilson_nn.physics_model.params_to_learn,theta_sample_expanded.split(1,dim=1)))
-                ).squeeze()
-
-                self.logger.progress(log_intensity_sample.sum())
-
-                # Sample table
-                table_sample,accepted = self.ct_mcmc.table_gibbs_step(
-                    table_prev = table_sample,
-                    log_intensity = log_intensity_sample
                 )
 
                 # Clean and write to file
@@ -2344,6 +2344,7 @@ class JointTableSIM_NN(Experiment):
             for t, training_data in enumerate(
                 torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)
             ):
+                
                 # Perform neural net training
                 theta_sample, \
                 destination_attraction_sample = self.harris_wilson_nn.epoch_time_step(
