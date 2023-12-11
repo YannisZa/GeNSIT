@@ -10,6 +10,10 @@
     "mcmc>contingency_table>exclude": true,
     "experiments>0>grid_ranges>exclude": true
   },
+  "JointTableSIM_NN": {
+    "mcmc>parameters>exclude": true,
+    "mcmc>destination_attraction>exclude": true
+  },
   "JointTableSIM_MCMC": {
     "inputs>to_learn>sweep>is-any-of>default>default-value": ["alpha", "beta"],
     "inputs>to_learn>sweep>is-any-of>default>is-any-of": ["alpha", "beta"],
