@@ -27,6 +27,20 @@ class MissingData(DataException):
             Missing data {self.missing_data_name} in {self.location} ({self.data_names})!
         """
 
+class DuplicateData(DataException):
+    def __init__(self,message:str,len_data:int,len_unique_data:int,**kwargs):
+        self.message = message
+        self.len_data = len_data
+        self.len_unique_data = len_unique_data
+    
+    def __str__(self):
+        return f"""
+            {self.message}
+            # values: {self.len_data}
+            # unique values: {self.len_unique_data}
+        """
+
+
 class EmptyData(DataException):
     def __init__(self,message:str,data_names:str,**kwargs):
         super().__init__('',**kwargs)
