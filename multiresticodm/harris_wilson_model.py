@@ -8,8 +8,8 @@ from torch import float32
 
 from multiresticodm.config import Config
 from multiresticodm.global_variables import PARAMETER_DEFAULTS,Dataset
-from multiresticodm.spatial_interaction_model import SpatialInteraction2D
 from multiresticodm.utils import set_seed, setup_logger, to_json_format
+from multiresticodm.spatial_interaction_model import SpatialInteraction2D
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
 
@@ -211,7 +211,6 @@ class HarrisWilson:
             ['log_destination_attraction_ts','log_destination_attraction_pred','noise_percentage'],
             kwargs
         )
-
         log_destination_attraction_ts = kwargs['log_destination_attraction_ts']
         log_destination_attraction_pred = kwargs['log_destination_attraction_pred']
         noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage'])
@@ -238,9 +237,9 @@ class HarrisWilson:
         # Compute difference
         diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
         # Compute gradient of log likelihood
-        return (1./noise_var)*diff
+        return (1./noise_var) * diff
     
-    def dest_attraction_likelihood_loss(
+    def dest_attraction_ts_likelihood_loss(
             self,
             *args,
             **kwargs
@@ -333,8 +332,11 @@ class HarrisWilson:
             alpha = alpha,
             beta = beta,
             log_destination_attraction = torch.log(new_sizes),
-            grand_total = torch.tensor(1.)
+            grand_total = torch.tensor(
+                1., dtype = float32, device = self.device
+            )
         )
+        demand = demand.reshape(curr_destination_attractions.shape)
         
         new_sizes = (
             new_sizes + \
@@ -346,7 +348,7 @@ class HarrisWilson:
                 / torch.sqrt(torch.tensor(2, dtype=torch.float) * torch.pi * dt).to(
                     self.device
                 )
-                * torch.normal(0, 1, size=(1, self.intensity_model.dims['destination'])).to(self.device),
+                * torch.normal(0, 1, size=(self.intensity_model.dims['destination'],1)).to(self.device),
             )
             * dt
         )

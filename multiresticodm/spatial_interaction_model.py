@@ -76,7 +76,7 @@ class SpatialInteraction2D():
         self.param_names = ['alpha','beta']
 
         # Attribute names
-        self.attribute_names = ['dims','grand_total']
+        self.attribute_names = ['dims']
 
         # True and auxiliary parameters
         for param in self.param_names:
@@ -150,24 +150,18 @@ class SpatialInteraction2D():
         """
 
     def get_input_kwargs(self,passed_kwargs):
-        
         kwargs = {}
         for key in self.REQUIRED_INPUTS:
             # Try to read data from passed kwargs
             # Then try to read stored data
             # else return None
-            if len(passed_kwargs.keys()) > 0:
-                kwargs[key] = passed_kwargs.pop(key,getattr(self.data,key,None))
-            else:
-                kwargs[key] = getattr(self.data,key,None)
+            kwargs[key] = passed_kwargs.pop(key,getattr(self.data,key,None))
         for key in self.attribute_names:
             # Try to read attribute from passed kwargs
             # Then try to read stored attribute
             # else return None
-            if len(passed_kwargs.keys()) > 0:
-                kwargs[key] = passed_kwargs.pop(key,getattr(self,key,None))
-            else:
-                kwargs[key] = getattr(self,key,None)
+            kwargs[key] = passed_kwargs.pop(key,getattr(self,key,None))
+
         kwargs = {**kwargs,**passed_kwargs}
 
         return kwargs
@@ -229,14 +223,12 @@ class SpatialInteraction2D():
     
 
     def intensity_demand(self,**kwargs):
-
         # Compute log flow
         log_flow = self.log_intensity(**kwargs)
         # Squeeze output
         log_flow = torch.squeeze(log_flow)
-
         # Compute destination demand
-        log_destination_demand = torch.logsumexp(log_flow,dim=0,keepdim=True)
+        log_destination_demand = torch.logsumexp(log_flow,dim=0)
         return torch.exp(log_destination_demand)
     
 

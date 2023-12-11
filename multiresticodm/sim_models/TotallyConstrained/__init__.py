@@ -79,7 +79,7 @@ def log_flow_matrix(**kwargs):
     device = kwargs.get('device','cpu')
     tensor = kwargs.get('torch',True)
     # Required inputs
-    grand_total = kwargs.get('grand_total',None)
+    grand_total = kwargs.get('grand_total',1.0)
     cost_matrix = kwargs['cost_matrix']
     # Required outputs
     log_destination_attraction = kwargs['log_destination_attraction']
@@ -147,8 +147,6 @@ def log_flow_matrix(**kwargs):
     normalisation = torch.reshape(normalisation,(N,1,1,sweep))
     # Evaluate log flow scaled
     log_flow = log_utility - normalisation + log_grand_total
-
-    # print(torch.exp(log_flow).sum(dim=(1,2)))
     
     if kwargs.get('torch',True):
         # Return torch tensor
