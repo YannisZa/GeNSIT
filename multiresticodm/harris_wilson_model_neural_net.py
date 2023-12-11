@@ -13,7 +13,6 @@ from typing import Any, List, Union
 
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger, print_json
-import multiresticodm.probability_utils as ProbabilityUtils
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS
 
@@ -146,7 +145,6 @@ class NeuralNet(nn.Module):
         :param learning_rate: the learning rate of the optimizer. Default is 1e-3.
         :param __: Additional model parameters (ignored)
         '''
-
         super().__init__()
         self.flatten = nn.Flatten()
 
@@ -278,12 +276,13 @@ class HarrisWilson_NN:
                     """)
                 # Add value to function arguments
                 fn_kwargs[key] = key_val
+            
             # Get loss function from global variables (standard torch loss functions)
             loss_func = LOSS_FUNCTIONS.get(function.lower(),None)
             # if failed get loss function from loss dictionary provided
-            loss_func = loss.get(function,loss_func) if loss_func is None else loss_func(**fn_kwargs)
+            loss_func = loss.get(name,loss_func) if loss_func is None else loss_func(**fn_kwargs)
             # if failed get loss function from physics model defined functions
-            loss_func = getattr(self.physics_model,function,loss_func) if loss_func is None else loss_func
+            loss_func = getattr(self.physics_model,name,loss_func) if loss_func is None else loss_func
             
             # Add kwargs
             if loss_func is not None:
@@ -314,11 +313,22 @@ class HarrisWilson_NN:
         loss_function_names = list(set(loss_function_names).intersection(set(list(self.loss_functions.keys()))))
         for name in loss_function_names:
             # Make sure you have the necessary data
+            prediction_data_sizes = {}
+            # prediction_set
             for pred_dataset in LOSS_DATA_REQUIREMENTS[name]['prediction_data']:
                 try:
                     assert prediction_data.get(pred_dataset,None) is not None
+                    # Monitor number of samples in monte carlo estimation of loss
+                    # for each prediction dataset
+                    prediction_data_sizes[pred_dataset] = len(prediction_data.get(pred_dataset))
                 except:
                     raise Exception(f"Loss {name} is missing prediction data {pred_dataset}.")
+            # Make sure the same amount of prediction samples are provided 
+            # for each dataset of a given loss functional
+            try:
+                assert len(set([prediction_data_sizes[k] for k in prediction_data_sizes.keys()])) == 1
+            except:
+                raise Exception(f"Prediction data sample sizes differ {prediction_data_sizes}.")
             for validation_dataset in LOSS_DATA_REQUIREMENTS[name]['validation_data']:
                 try:
                     validation_data[validation_dataset] = validation_data.get(validation_dataset) \
@@ -327,36 +337,45 @@ class HarrisWilson_NN:
                     assert validation_data[validation_dataset] is not None
                 except:
                     raise Exception(f"Loss {name} is missing validation data {validation_dataset}.")
-
-            if name == 'total_distance_travelled_loss':
-                # Calculate total cost incurred by travelling from every origin
-                total_cost_predicted = torch.tensordot(
-                    prediction_data['table'].to(dtype=float32),
-                    validation_data['cost_matrix']
-                ).sum(dim=0)
-                # Normalise to 1
-                normalised_total_cost_predicted = total_cost_predicted / total_cost_predicted.sum(dim=0)
-                # Add to total loss
-                res = self.loss_functions[name](
-                    normalised_total_cost_predicted,
-                    validation_data['total_cost_by_origin'],
-                    **self.loss_kwargs.get(name,{})
-                )
-            else:
-                # Add to total loss
-                pred_dataset = LOSS_DATA_REQUIREMENTS[name]['prediction_data'][0]
-                validation_dataset = LOSS_DATA_REQUIREMENTS[name]['validation_data'][0]
-                res = self.loss_functions[name](
-                    prediction_data[pred_dataset].to(dtype=float32),
-                    validation_data[validation_dataset].to(dtype=float32),
-                    **self.loss_kwargs.get(name,{})
-                )
+            
+            # Compute monte carlo estimate of loss
+            # Number of MC samples
+            N_samples = list(prediction_data_sizes.values())[0]
+            total_loss = torch.tensor(
+                0.0,
+                dtype = float32,
+                device = self.physics_model.device
+            )
+            for n in range(N_samples):
+                if name == 'total_distance_travelled_loss':
+                    # Calculate total cost incurred by travelling from every origin
+                    total_cost_predicted = torch.tensordot(
+                        prediction_data[pred_dataset]['table'][n].to(dtype=float32),
+                        validation_data['cost_matrix']
+                    ).sum(dim=0)
+                    # Normalise to 1
+                    normalised_total_cost_predicted = total_cost_predicted / total_cost_predicted.sum(dim=0)
+                    # Add to total loss
+                    res = self.loss_functions[name](
+                        normalised_total_cost_predicted,
+                        validation_data['total_cost_by_origin'],
+                        **self.loss_kwargs.get(name,{})
+                    )
+                else:
+                    # Add to total loss
+                    pred_dataset = LOSS_DATA_REQUIREMENTS[name]['prediction_data'][0]
+                    validation_dataset = LOSS_DATA_REQUIREMENTS[name]['validation_data'][0]
+                    res = self.loss_functions[name](
+                        prediction_data[pred_dataset][n].to(dtype=float32),
+                        validation_data[validation_dataset].to(dtype=float32),
+                        **self.loss_kwargs.get(name,{})
+                    )
+                # Gather current loss
+                total_loss += res
             # Update loss
-            previous_loss[name] = previous_loss[name] + res
+            previous_loss[name] = previous_loss[name] + total_loss / N_samples
             # Keep track number of loss samples per loss function
             n_processed_steps[name] += 1
-
-
         return previous_loss,n_processed_steps
 
     def epoch(
@@ -405,7 +424,7 @@ class HarrisWilson_NN:
             validation_data_copy['destination_attraction_ts'] = data
             # Add prediction of destination attraction to predicted data
             # for evaluating the loss function
-            prediction_data['destination_attraction_ts'] = torch.flatten(predicted_dest_attraction)
+            prediction_data['destination_attraction_ts'] = [torch.flatten(predicted_dest_attraction)]
             # Update loss
             loss,n_processed_steps = self.update_loss(
                 previous_loss = loss,
@@ -461,7 +480,6 @@ class HarrisWilson_NN:
         self.logger.debug('Running neural net')
         predicted_theta = self._neural_net(torch.flatten(validation_data['destination_attraction_ts']))
         self.logger.debug('Forward pass on SDE')
-
         predicted_dest_attraction = self.physics_model.run_single(
             curr_destination_attractions = validation_data['destination_attraction_ts'],
             free_parameters = predicted_theta,
