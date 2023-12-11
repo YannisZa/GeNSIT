@@ -119,7 +119,6 @@ nbconvert==6.4.5
 nbformat==5.2.0
 nbimporter==0.3.4
 nest-asyncio==1.5.4
-netifaces==0.10.4
 networkx==2.7.1
 notebook==6.4.10
 notebook_shim==0.2.2
@@ -183,7 +182,6 @@ quantecon==0.5.2
 quilt3==5.0.0
 ranger-fm==1.9.3
 rasterstats==0.16.0
-reportlab==3.5.34
 requests==2.27.1
 requests-futures==1.0.0
 requests-unixsocket==0.2.0
@@ -192,7 +190,6 @@ Rtree==0.9.7
 ruamel.base==1.0.0
 ruamel.yaml==0.17.21
 ruamel.yaml.clib==0.2.6
-rvlib==0.0.6
 s2sphere==0.2.5
 s3transfer==0.5.2
 scikit-learn==1.2.2
