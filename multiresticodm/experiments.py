@@ -5,8 +5,9 @@ import warnings
 from tqdm import tqdm
 from copy import deepcopy
 from datetime import datetime
-from torch import float32, uint8, float16
+from multiprocessing import Manager
 from joblib import Parallel, delayed
+from torch import float32, uint8, float16
 
 from multiresticodm.utils import *
 from multiresticodm.config import Config
@@ -168,8 +169,8 @@ class Experiment(object):
 
         # Get device name
         self.device = self.config['inputs']['device']
-        # Get device id
-        self.device_id = kwargs.get('device_id',0)
+        # Get tqdm position
+        self.position = kwargs.get('position',0)
         # print('current_device',torch.cuda.current_device())
 
         # Disable tqdm if needed
@@ -744,8 +745,8 @@ class RSquared_Analysis(Experiment):
         progress = tqdm(
             total = len(alpha_values)*len(beta_values),
             disable = self.tqdm_disabled,
-            position=(self.device_id+1),
-            desc = f"RSquaredAnalysis device id: {self.device_id}",
+            position=self.position,
+            desc = f"RSquaredAnalysis instance: {self.position}",
             leave = False
         )
 
@@ -1051,8 +1052,8 @@ class SIM_MCMC(Experiment):
             range(N),
             disable=self.tqdm_disabled,
             leave=False,
-            position=(self.device_id+1),
-            desc = f"SIM_MCMC device id: {self.device_id}"
+            position=self.position,
+            desc = f"SIM_MCMC instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -1285,8 +1286,8 @@ class JointTableSIM_MCMC(Experiment):
             range(N),
             disable=self.tqdm_disabled,
             leave=False,
-            position=(self.device_id+1),
-            desc = f"JointTableSIM_MCMC device id: {self.device_id}"
+            position=self.position,
+            desc = f"JointTableSIM_MCMC instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -1529,8 +1530,8 @@ class Table_MCMC(Experiment):
             range(N),
             disable=self.tqdm_disabled,
             leave=False,
-            position=(self.device_id+1),
-            desc = f"Table MCMC device id: {self.device_id}"
+            position=self.position,
+            desc = f"Table MCMC instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -1708,8 +1709,8 @@ class TableSummaries_MCMCConvergence(Experiment):
             range(1,N),
             disable=self.tqdm_disabled,
             leave=False,
-            position=(self.device_id+1),
-            desc = f"TableSummaries_MCMCConvergence device id: {self.device_id}"
+            position=self.position,
+            desc = f"TableSummaries_MCMCConvergence instance: {self.position}"
         ):
             # Run MCMC for one step in all chains in ensemble
             # Do it in parallel
@@ -1894,8 +1895,8 @@ class SIM_NN(Experiment):
             range(N),
             disable=self.tqdm_disabled,
             leave=False,
-            position=(self.device_id+1),
-            desc = f"SIM_NN device id: {self.device_id}"
+            position=self.position,
+            desc = f"SIM_NN instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -2102,8 +2103,8 @@ class NonJointTableSIM_NN(Experiment):
             range(N),
             disable=self.tqdm_disabled,
             leave=False,
-            position=(self.device_id+1),
-            desc = f"NonJointTableSIM_NN device id: {self.device_id}"
+            position=self.position,
+            desc = f"NonJointTableSIM_NN instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -2327,14 +2328,13 @@ class JointTableSIM_NN(Experiment):
 
         # Track number of elements in each loss function
         n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
-    
         # For each epoch
         for i in tqdm(
             range(N),
             disable=self.tqdm_disabled,
             leave=False,
-            position=(self.device_id+1),
-            desc = f"JointTableSIM_NN device id: {self.device_id}"
+            position=self.position,
+            desc = f"JointTableSIM_NN instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -2588,42 +2588,42 @@ class ExperimentSweep():
         )
         
     
-    def prepare_instantiate_and_run(self,instance_num:int,sweep_configuration:dict,semaphore=None,counter=None,pbar=None):
+    def prepare_instantiate_and_run(self,instance_num:int,sweep_configuration:dict,active_positions=None):
         try:
-            if semaphore is not None:
-                semaphore.acquire()
-            
+
             # Prepare experiment
             config,sweep = self.prepare_experiment(sweep_configuration)
 
-            
             self.logger.info(f'Instance = {str(instance_num)} START')
 
+            # Find tqdm position
+            if active_positions is not None:
+                position_id = position_index(active_positions)
+                # Activate it
+                active_positions[position_id] = True
+            else:
+                position_id = 0
+            
             # Create new experiment
             new_experiment = instantiate_experiment(
-                experiment_type=config.settings['experiment_type'],
-                config=config,
-                sweep_params=sweep,
-                instance=str(instance_num),
-                base_dir=self.outputs_base_dir,
-                experiment_id=self.outputs_experiment_id,
-                device_id=(instance_num%self.n_workers),
-                logger=self.logger,
+                experiment_type = config.settings['experiment_type'],
+                config = config,
+                sweep_params = sweep,
+                instance = str(instance_num),
+                base_dir = self.outputs_base_dir,
+                experiment_id = self.outputs_experiment_id,
+                position = (position_id+1),
+                logger = self.logger
             )
             self.logger.debug('New experiment set up')
 
             # Running experiment
             new_experiment.run()
-            if counter is not None and pbar is not None:
-                with counter.get_lock():
-                    counter.value += 1
-                    pbar.n = counter.value
-                    pbar.refresh()
-                
-            if semaphore is not None:
-                semaphore.release()
-            # gc.collect()
+
             self.logger.info(f'Instance = {str(instance_num)} DONE')
+            
+            return position_id
+        
         except Exception as e:
             raise Exception(f'failed running instance {instance_num}')
 
@@ -2635,12 +2635,10 @@ class ExperimentSweep():
             leave=False,
             position=0
         ):
-            self.prepare_instantiate_and_run(
+            _ = self.prepare_instantiate_and_run(
                 instance_num = instance,
                 sweep_configuration = sweep_config,
-                semaphore = None,
-                counter = None,
-                pbar = None
+                active_positions = None,
             )
     
     def run_concurrent(self,sweep_configurations):
@@ -2659,21 +2657,29 @@ class ExperimentSweep():
                 leave=True,
                 position=0
             )
-            def my_callback(fut):
-                progress.update()
             
-            with BoundedQueueProcessPoolExecutor(self.n_workers) as executor:
-                # Start the processes and ignore the results
-                for instance,sweep_config in enumerate(sweep_config_chunk):
-                    future = executor.submit(
-                        self.prepare_instantiate_and_run,
-                        instance_num = instance,
-                        sweep_configuration = sweep_config
-                    ) 
-                    future.add_done_callback(my_callback)
+            with Manager() as manager:
+                # Process active flag by tqdm position
+                active_positions = manager.list([False]*self.n_workers)
 
-            # Delete executor and progress bar
-            progress.close()
-            safe_delete(progress)
-            executor.shutdown(wait=True)
-            safe_delete(executor)
+                def my_callback(fut):
+                    progress.update()
+                    position_id = fut.result()
+                    active_positions[position_id] = False
+
+                with BoundedQueueProcessPoolExecutor(self.n_workers) as executor:
+                    # Start the processes and ignore the results
+                    for instance,sweep_config in enumerate(sweep_config_chunk):
+                        future = executor.submit(
+                            self.prepare_instantiate_and_run,
+                            instance_num = instance,
+                            sweep_configuration = sweep_config,
+                            active_positions = active_positions
+                        )
+                        future.add_done_callback(my_callback)
+
+                # Delete executor and progress bar
+                progress.close()
+                safe_delete(progress)
+                executor.shutdown(wait=True)
+                safe_delete(executor)

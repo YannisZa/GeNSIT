@@ -1168,3 +1168,12 @@ def unstack_dims(data:xr.DataArray,dims:list):
 
 def is_sorted(x):
     return np.all(x[:-1] <= x[1:])
+
+def position_index(active_positions):
+    # Find first inactive position
+    for i,active in enumerate(active_positions):
+        # If position is not active return it
+        if not active:
+            return i
+
+    return len(active_positions)
