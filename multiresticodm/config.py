@@ -11,7 +11,7 @@ from multiresticodm import ROOT
 from multiresticodm.exceptions import *
 from multiresticodm.global_variables import deep_walk
 from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify
+from multiresticodm.utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify, string_to_numeric
 
 class Config:
 
@@ -234,11 +234,16 @@ class Config:
             return deleted,settings
         deleted = False
         if len(key_path) == 1:
-            if key_path[0] in settings:
+            if (isinstance(settings,dict) and key_path[0] in settings) or \
+                isinstance(settings,list) and key_path[0] < len(settings):
                 del settings[key_path[0]]
                 deleted = True
         else:
-            deleted,settings = self.path_delete(settings[key_path[0]],key_path[1:],deleted)
+            # Convert key to index if it is numeric
+            # otherwise keep it as string
+            current_key = key_path[0]
+            current_key = string_to_numeric(current_key) if current_key.isnumeric() else current_key
+            deleted,settings = self.path_delete(settings[current_key],key_path[1:],deleted)
         return deleted,settings
 
     def path_set(self,settings,value,key_path=[],overwrite:bool=False):
@@ -449,52 +454,37 @@ class Config:
             settings = self.settings
         if base_schema is None:
             base_schema = self.schema
-        for k, v in parameters.items():
+        
+        for k, v in parameters.items() if isinstance(parameters,dict) else enumerate(parameters):
             # Experiment settings are provided in list of dictionaries
             # Special treatment is required
+            
+            # Append key to path
+            key_path.append(k)
+            # print('>'.join(list(map(str,key_path))))
+            
             if isinstance(v,list):
-                # Append key to path
-                key_path.append(k)
-                # print('>'.join(key_path))
-                # Get schema for key path
-                schema,_ = self.path_get(
-                    key_path = key_path, 
-                    settings = base_schema
-                )
-                # Create dummy schema so that it can be found recursively
-                dummy_schema = {}
-                self.path_set(dummy_schema,schema,[k],overwrite=True)
-                # Check if key was found in settings and schema
-                settings_val, settings_found = self.path_get(
-                    key_path = key_path, 
-                    settings = settings
-                )
 
-                if settings_found:
-                    # For every entry in settings, 
-                    # validate using the same schema
+                for idx, subvalue in enumerate(v):
+                    # Append key to path
+                    key_path.append(idx)
+
+                    self.validate_config(
+                        subvalue,
+                        settings,
+                        base_schema,
+                        key_path,
+                        **kwargs
+                    )
                     # Remove it from path
-                    key_path.remove(k)
-                    for value in settings_val:
-                        # Create a dummy setting to validate dummy schema
-                        dummy_settings = {}
-                        self.path_set(dummy_settings,value,[k],overwrite=True)
-                        # Validate config
-                        self.validate_config(dummy_schema,dummy_settings,base_schema,key_path,**kwargs)
-                else:
-                    # Remove it from path
-                    key_path.remove(k)
+                    key_path.remove(idx)
 
             # If settings are a dictionary, validate settings 
             # against each key path
             elif k != 'sweep' and isinstance(v,dict):
-                # Append key to path
-                key_path.append(k)
-                # print('>'.join(key_path))
                 # Apply function recursively
                 self.validate_config(v,settings,base_schema,key_path,**kwargs)
-                # Remove it from path
-                key_path.remove(k)
+            
             # If settings are any other (primitive of non-promitive) value,
             # validate settings for given key path
             # Special treament is required depending on:
@@ -508,11 +498,7 @@ class Config:
             # - whether sweep is deactivated and only sweep configuration is provided (See 7:)
             # - all data type-specific checks (See 8:)
             else:
-                # if v:
-                # Append key to path
-                key_path.append(k)
-                # print('>'.join(key_path))
-                
+
                 # Check if key was found in settings and schema
                 settings_val, settings_found = self.path_get(
                     key_path = key_path, 
@@ -528,11 +514,6 @@ class Config:
                     assert schema_found
                 except:
                     raise Exception(f"Key {'>'.join(key_path)} not found in schema.")
-                
-                # 0: Check if argument needs to be excluded
-                # and add it to excluded key paths if that is the case
-                # if isinstance(schema_val,dict) and schema_val.get('exclude',False):
-                #     self.excluded_key_paths.append(key_path)
 
                 # 1: Check if argument is optional in case it is not included in settings
                 # and it is not part of a sweep
@@ -763,8 +744,8 @@ class Config:
                             self.logger.error(f"Config for experiment(s) {kwargs.get('experiment_type','experiment_type')} failed.")
                             sys.exit()
                 
-                # Remove it from path
-                key_path.remove(k)
+            # Remove it from path
+            key_path.remove(k)
         
     def prepare_sweep_configurations(self,sweep_params):
 

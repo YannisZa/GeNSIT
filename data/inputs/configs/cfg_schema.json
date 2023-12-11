@@ -817,14 +817,8 @@
           }
         }
       },
-      "margins": {
-        "sweepable": false,
-        "optional": true,
-        "exclude": false,
-
-        "dtype": "customDict",
-        "dict-key-dtype": "str",
-        "dict-value-schema": {
+      "margins": [
+        {
           "file": {
             "sweepable": true,
             "optional": true,
@@ -854,7 +848,7 @@
             "default-value": []
           }
         }
-      }
+      ]
     }
   },
   "contingency_table": {
@@ -1882,14 +1876,8 @@
       }
     }
   },
-  "experiments": {
-    "sweepable": false,
-    "optional": false,
-    "exclude": false,
-
-    "dtype": "customDict",
-    "dict-key-dtype": "str",
-    "dict-value-schema": {
+  "experiments": [
+    {
       "type": {
         "sweepable": false,
         "optional": false,
@@ -2009,7 +1997,7 @@
         }
       }
     }
-  },
+  ],
   "outputs": {
     "sweepable": false,
     "optional": false,

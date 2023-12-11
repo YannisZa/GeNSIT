@@ -116,7 +116,6 @@
       },
       "margins": [
         {
-          "axis": true,
           "file": {
             "sweep": {
               "default": true,
