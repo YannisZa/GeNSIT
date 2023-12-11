@@ -75,7 +75,7 @@ load_experiment = ''
   num_steps = +1
   batch_size = +1
   [training.N.sweep]
-    default = 10000
+    default = 100#00
     range = ["repeat(10,10000)","repeat(100,1000)","repeat(1000,100)","repeat(10000,10)","repeat(100000,1)",]
     coupled = true
     target_name = 'seed'
@@ -143,14 +143,6 @@ load_experiment = ''
 [[experiments]]
   type = 'JointTableSIM_NN'
   comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
-  disable_tqdm = true
-  export_samples = true
-  export_metadata = true
-  overwrite = true
-
-[[experiments]]
-  type = 'SIM_NN'
-  comment = 'Spatial Interaction Model parameter learning using Neural Networks'
   disable_tqdm = true
   export_samples = true
   export_metadata = true

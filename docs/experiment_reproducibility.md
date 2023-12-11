@@ -19,7 +19,7 @@ clear; multiresticodm run ./data/inputs/configs/debug.toml -nw 1 -nt 12 -et RSqu
 
 ### Dependent (joint) Table and SIM
 
-clear; multiresticodm run ./data/inputs/configs/experiment2.toml -nw 1 -sm
+clear; multiresticodm run ./data/inputs/configs/experiment2.toml -nw 4 -nt 6 -sm
 
 ## Experiment 3
 
