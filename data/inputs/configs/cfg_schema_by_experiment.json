@@ -30,7 +30,8 @@
     ],
     "neural_network>loss>loss_name>sweep>default>default-value": "dest_attraction_ts_loss",
     "neural_network>loss>loss_name>sweep>range>is-any-of": [
-      "dest_attraction_ts_loss"
+      "dest_attraction_ts_loss",
+      "dest_attraction_ts_likelihood_loss"
     ],
     "neural_network>loss>loss_name>sweep>range>default-value": "dest_attraction_ts_loss",
     "experiments>0>grid_ranges>exclude": true
@@ -41,7 +42,8 @@
     ],
     "neural_network>loss>loss_name>sweep>default>default-value": "dest_attraction_ts_loss",
     "neural_network>loss>loss_name>sweep>range>is-any-of": [
-      "dest_attraction_ts_loss"
+      "dest_attraction_ts_loss",
+      "dest_attraction_ts_likelihood_loss"
     ],
     "neural_network>loss>loss_name>sweep>range>default-value": "dest_attraction_ts_loss",
     "contingency_table>exclude": true,
