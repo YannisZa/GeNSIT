@@ -67,10 +67,10 @@ load_experiment = ''
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
-    noise_percentage = +0.000_1
+    noise_percentage = +0.01
     epsilon = +1.0
-    delta = +0.0
-    kappa = +1.0000000596046483
+    # delta = +0.0
+    # kappa = +1.0000000596046483
     [harris_wilson_model.parameters.sigma.sweep]
       default = nan
       # range = [0.0141421356, 0.1414213562, nan]
@@ -89,19 +89,25 @@ load_experiment = ''
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
       [mcmc.contingency_table.table_steps.sweep]
-        default = 10
+        default = 1
         range = [1,10,50,100]
 
 [neural_network]
   disable_tqdm = true
   [neural_network.loss.loss_name.sweep]
     default = ['table_likelihood_loss']
-    range = [['table_likelihood_loss'],['dest_attraction_likelihood_loss'],['dest_attraction_likelihood_loss','table_likelihood_loss']]
+    range = [
+      ['table_likelihood_loss'],
+      ['dest_attraction_ts_likelihood_loss'],
+      ['dest_attraction_ts_loss'],
+      ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+    ]
   [neural_network.loss.loss_function.sweep]
     default = ['custom']
     range = [
       ['custom'],
       ['custom'],
+      ['mseloss'],
       ['mseloss','custom'],
     ]
     coupled = true
@@ -109,10 +115,13 @@ load_experiment = ''
   [neural_network.loss.loss_kwarg_keys.sweep]
     default = [[]]
     range = [
-      [],
-      ['noise_percentage'],
-      ['noise_percentage']
+      [[]],
+      [['noise_percentage']],
+      [[]],
+      [['noise_percentage'],[]]
     ]
+    coupled = true
+    target_name = 'loss_name'
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
