@@ -540,14 +540,14 @@ class Config:
                 # 1: Check if argument is optional in case it is not included in settings
                 # and it is not part of a sweep
                 if not 'sweep' in key_path and not settings_found:
-                    self.logger.debug('check 1')
+                    self.logger.trace('check 1')
                     if isinstance(schema_val,dict) and not schema_val['optional']:
                         raise Exception(f"""
                             Key {'>'.join(key_path)} is compulsory but not included
                         """)
 
                 if key_path[-1] == 'sweep' and settings_found:
-                    self.logger.debug('check sweep')
+                    self.logger.trace('check sweep')
                     # 2: Check if argument is not sweepable but contains 
                     # a sweep parameter in settings
                     # Get schema of parameter configured for a sweep
@@ -556,7 +556,7 @@ class Config:
                         settings = base_schema
                     )
                     if not schema_parent_val["sweepable"]:
-                        self.logger.debug('check 2')
+                        self.logger.trace('check 2')
                         raise Exception(f"""
                             Key {'>'.join(key_path)} is not sweepable 
                             but contains a sweep configuration
@@ -575,7 +575,7 @@ class Config:
                     # 4: Check whether a range configuration is provided
                     # otherwise replace sweep key-value pair with sweep default
                     if "range" not in list(settings_val.keys()):
-                        self.logger.debug('check 4')
+                        self.logger.trace('check 4')
                         # Get child key settings
                         settings_child_val, settings_child_found = self.path_get(
                             key_path = (key_path+['default']), 
@@ -598,7 +598,7 @@ class Config:
                     # 5: Check that argument that is coupled sweepable containts 
                     # a target name and that target name exists as a key
                     if settings_val.get('coupled',False):
-                        self.logger.debug('check 5')
+                        self.logger.trace('check 5')
                         try:
                             assert "target_name" in list(settings_val.keys()) and \
                                 self.path_exists(settings_val['target_name'],self.settings)
@@ -643,7 +643,7 @@ class Config:
 
                 # 6: Check that if parameter sweep is activated
                 if key_path[-1] == 'sweep_mode':
-                    self.logger.debug('check 6')
+                    self.logger.trace('check 6')
                     self.sweep_active = settings_val
                 
                 # 7: If sweep is deactivated and
@@ -652,7 +652,7 @@ class Config:
                 # B: a sweep configuration is NOT provided but the values are provided
                 # then read the values provided
                 if key_path[-1] == 'sweep' and (not self.sweep_active or not settings_found):
-                    self.logger.debug('check 7')
+                    self.logger.trace('check 7')
                     
                     # If a sweep configuration has been provided
                     # read the default values
@@ -733,7 +733,7 @@ class Config:
                 # 8: Check all data type-specific checks
                 # according to the schema
                 if settings_found:
-                    self.logger.debug(f"check 8, has sweep: {self.has_sweep(key_path)}")
+                    self.logger.trace(f"check 8, has sweep: {self.has_sweep(key_path)}")
                     # If parameter is sweepable but settings 
                     # does not contain a sweep configuration
                     if self.has_sweep(key_path) and not isinstance(settings_val,dict):
