@@ -242,7 +242,7 @@ class Experiment(object):
             pass
 
     def define_sample_batch_sizes(self):
-        N = self.harris_wilson_mcmc.config['training']['N']
+        N = self.learning_model.config['training']['N']
         # Define sample batch sizes
         sample_sizes = np.repeat(int(self.store_progress*N),np.floor(1/self.store_progress))
         if sample_sizes.sum() < N:
@@ -297,10 +297,10 @@ class Experiment(object):
                     theta = self.physics_model.params_to_learn
                 except:
                     try:
-                        theta = self.harris_wilson_mcmc.physics_model.params_to_learn
+                        theta = self.learning_model.physics_model.params_to_learn
                     except:
                         try:
-                            theta = self.harris_wilson_nn.physics_model.params_to_learn
+                            theta = self.learning_model.physics_model.params_to_learn
                         except:
                             self.logger.warning("Theta could not be initialised.")
                 self.params_to_learn = list(theta.keys())
@@ -325,7 +325,7 @@ class Experiment(object):
             elif param == 'loss':
                 initialisations['loss'] = {
                     nm:torch.tensor(0.0,dtype=float32,device=self.device,requires_grad=True) \
-                    for nm in self.harris_wilson_nn.loss_functions.keys()
+                    for nm in self.learning_model.loss_functions.keys()
                 }
             
             elif param == 'log_target':
@@ -344,7 +344,7 @@ class Experiment(object):
             
             # Setup neural net loss
             if 'loss' in self.output_names:
-                for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total_loss']:
+                for loss_name in list(self.learning_model.loss_functions.keys())+['total_loss']:
                     # Setup chunked dataset to store the state data in
                     if loss_name in self.outputs.h5group and not load_experiment:
                         # Delete current dataset
@@ -463,7 +463,7 @@ class Experiment(object):
                         )
             
             
-    def update_and_export(
+    def model_update_and_export(
             self,
             batch_size: int,
             data_size: int,
@@ -483,8 +483,9 @@ class Experiment(object):
                 loss_values = sum([val for val in loss.values()])
                 # Perform gradient update
                 loss_values.backward()
-                self.harris_wilson_nn._neural_net.optimizer.step()
-                self.harris_wilson_nn._neural_net.optimizer.zero_grad()
+                # loss_values.backward(retain_graph = True)
+                self.learning_model._neural_net.optimizer.step()
+                self.learning_model._neural_net.optimizer.zero_grad()
 
                 # Compute average losses here
                 n_processed_steps = kwargs.pop('n_processed_steps',None)
@@ -507,10 +508,10 @@ class Experiment(object):
         # Reset loss
         loss = {
             nm:torch.tensor(0.0,requires_grad=True) \
-            for nm in self.harris_wilson_nn.loss_functions.keys()    
+            for nm in self.learning_model.loss_functions.keys()    
         }
         # Reset number of epoch steps for loss calculation
-        n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
+        n_processed_steps = {nm : 0 for nm in self.learning_model.loss_functions.keys()}
         return loss,n_processed_steps
 
     def write_data(self,**kwargs):
@@ -523,7 +524,7 @@ class Experiment(object):
         self.logger.debug('Writing data')
         if self._time >= self._write_start and self._time % self._write_every == 0:
             if 'loss' in self.output_names:
-                for loss_name in list(self.harris_wilson_nn.loss_functions.keys())+['total_loss']:
+                for loss_name in list(self.learning_model.loss_functions.keys())+['total_loss']:
                     # Store samples
                     _loss_sample = kwargs.get(loss_name,None)
                     _loss_sample = _loss_sample.clone().detach().cpu().numpy().item() if _loss_sample is not None else None
@@ -593,13 +594,11 @@ class Experiment(object):
         if hasattr(self,'table_acc'):
             self.config['table_acceptance'] = int(100*self.table_acc[:].mean(axis=0))
             self.logger.progress(f"Table acceptance: {self.config['table_acceptance']}")
-        if hasattr(self,'harris_wilson_nn'):
-            loss_names = list(self.harris_wilson_nn.loss_functions.keys())
+        if hasattr(self,'learning_model') and self.learning_model.model_type == 'neural_network':
+            loss_names = list(self.learning_model.loss_functions.keys())
             loss_names = loss_names if len(loss_names) <= 1 else loss_names+['total_loss']
             for loss_name in loss_names:
                 self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:][-1]}')
-        if self.logger.console.isEnabledFor(PROGRESS):
-            print('\n')
 
 class DataGeneration(Experiment):
 
@@ -851,8 +850,8 @@ class LogTargetAnalysis(Experiment):
         self.bmin,self.bmax = config['b_range']
 
         # Spatial interaction model MCMC
-        self.harris_wilson_mcmc = instantiate_harris_wilson_mcmc(sim)
-        self.harris_wilson_mcmc.build(**kwargs)
+        self.learning_model = instantiate_harris_wilson_mcmc(sim)
+        self.learning_model.build(**kwargs)
 
     def run(self,**kwargs) -> None:
         # Initialize search grid
@@ -886,7 +885,7 @@ class LogTargetAnalysis(Experiment):
                     theta[1] = YY[i, j]
 
                     # Minimise potential function
-                    log_z_inverse,_ = self.harris_wilson_mcmc.biased_z_inverse(0,theta)
+                    log_z_inverse,_ = self.learning_model.biased_z_inverse(0,theta)
 
                     # Compute potential function
                     potential_func,_ = self.sim.sde_potential_and_gradient(xd,theta)
@@ -980,15 +979,15 @@ class SIM_MCMC(Experiment):
 
         # Spatial interaction model MCMC
         self.logger.note("Initializing the Harris Wilson model MCMC")
-        self.harris_wilson_mcmc = instantiate_harris_wilson_mcmc(
+        self.learning_model = instantiate_harris_wilson_mcmc(
             config = config,
             physics_model = harris_wilson_model,
             logger = self.logger
         )
-        self.harris_wilson_mcmc.build(**kwargs)
+        self.learning_model.build(**kwargs)
         
         # Get config
-        self.config = getattr(self.harris_wilson_mcmc,'config') if hasattr(self.harris_wilson_mcmc,'config') else config
+        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
 
         # Create outputs
         self.outputs = Outputs(
@@ -1006,14 +1005,14 @@ class SIM_MCMC(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.harris_wilson_mcmc}")
+        self.logger.note(f"{self.learning_model}")
         self.logger.info(f"Experiment: {self.outputs.experiment_id}")
         # self.logger.critical(f"{json.dumps(kwargs.get('sweep_params',{}),indent=2)}")
 
         
     def run(self,**kwargs) -> None:
 
-        self.logger.info(f"Running MCMC inference of {self.harris_wilson_mcmc.physics_model.noise_regime} noise SpatialInteraction.")
+        self.logger.info(f"Running MCMC inference of {self.learning_model.physics_model.noise_regime} noise SpatialInteraction.")
 
         # Fix random seed
         set_seed(self.seed)
@@ -1028,25 +1027,25 @@ class SIM_MCMC(Experiment):
         
         # Expand theta
         theta_sample_scaled = deepcopy(theta_sample)
-        theta_sample_scaled[1] *= self.harris_wilson_mcmc.physics_model.params.bmax
+        theta_sample_scaled[1] *= self.learning_model.physics_model.params.bmax
 
         # Compute initial log inverse z(\theta)
-        log_z_inverse, sign_sample = self.harris_wilson_mcmc.z_inverse(
+        log_z_inverse, sign_sample = self.learning_model.z_inverse(
                 0,
                 dict(zip(self.params_to_learn,theta_sample_scaled))
         )
         # Evaluate log potential function for initial choice of \theta
-        V, gradV = self.harris_wilson_mcmc.physics_model.sde_potential_and_gradient(
+        V, gradV = self.learning_model.physics_model.sde_potential_and_gradient(
                 log_destination_attraction_sample,
                 **dict(zip(self.params_to_learn,theta_sample_scaled)),
-                **vars(self.harris_wilson_mcmc.physics_model.params)
+                **vars(self.learning_model.physics_model.params)
         )
 
         # Store number of samples
         N = self.config.settings['training']['N']
         # Total samples for table,theta,x posteriors, respectively
-        M = self.harris_wilson_mcmc.theta_steps
-        L = self.harris_wilson_mcmc.log_destination_attraction_steps
+        M = self.learning_model.theta_steps
+        L = self.learning_model.log_destination_attraction_steps
 
         for i in tqdm(
             range(N),
@@ -1078,7 +1077,7 @@ class SIM_MCMC(Experiment):
                 V, \
                 gradV, \
                 log_z_inverse, \
-                sign_sample = self.harris_wilson_mcmc.theta_step(
+                sign_sample = self.learning_model.theta_step(
                     i,
                     theta_sample,
                     log_destination_attraction_sample,
@@ -1106,7 +1105,7 @@ class SIM_MCMC(Experiment):
                 log_destination_attraction_sample, \
                 log_dest_attract_acc, \
                 V, \
-                gradV = self.harris_wilson_mcmc.log_destination_attraction_step(
+                gradV = self.learning_model.log_destination_attraction_step(
                     theta_sample,
                     self.inputs.data.log_destination_attraction,
                     log_destination_attraction_sample,
@@ -1121,6 +1120,8 @@ class SIM_MCMC(Experiment):
             # print statements
             self.show_progress()
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
+            if self.logger.console.isEnabledFor(PROGRESS):
+                print('\n')
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -1187,15 +1188,15 @@ class JointTableSIM_MCMC(Experiment):
         
         # Spatial interaction model MCMC
         self.logger.note("Initializing the Harris Wilson model MCMC")
-        self.harris_wilson_mcmc = instantiate_harris_wilson_mcmc(
+        self.learning_model = instantiate_harris_wilson_mcmc(
             config = config,
             physics_model = harris_wilson_model,
             logger = self.logger
         )
-        self.harris_wilson_mcmc.build(**kwargs)
+        self.learning_model.build(**kwargs)
         
         # Get config
-        config = getattr(self.harris_wilson_mcmc,'config') if hasattr(self.harris_wilson_mcmc,'config') else config
+        config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -1232,12 +1233,12 @@ class JointTableSIM_MCMC(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.harris_wilson_mcmc}")
+        self.logger.note(f"{self.learning_model}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
         
     def run(self,**kwargs) -> None:
 
-        self.logger.info(f"Running MCMC inference of {self.harris_wilson_mcmc.physics_model.noise_regime} noise {self.harris_wilson_mcmc.physics_model.name}.")
+        self.logger.info(f"Running MCMC inference of {self.learning_model.physics_model.noise_regime} noise {self.learning_model.physics_model.name}.")
 
         # Fix random seed
         set_seed(self.seed)
@@ -1253,10 +1254,10 @@ class JointTableSIM_MCMC(Experiment):
         
         # Expand theta
         theta_sample_scaled = deepcopy(theta_sample)
-        theta_sample_scaled[1] *= self.harris_wilson_mcmc.physics_model.params.bmax
+        theta_sample_scaled[1] *= self.learning_model.physics_model.params.bmax
 
         # Compute table likelihood and its gradient
-        negative_log_table_likelihood = self.harris_wilson_mcmc.negative_table_log_likelihood_expanded(
+        negative_log_table_likelihood = self.learning_model.negative_table_log_likelihood_expanded(
             log_destination_attraction = log_destination_attraction_sample,
             alpha = theta_sample_scaled[0],
             beta = theta_sample_scaled[1],
@@ -1264,23 +1265,23 @@ class JointTableSIM_MCMC(Experiment):
         )
 
         # Compute initial log inverse z(\theta)
-        log_z_inverse, sign_sample = self.harris_wilson_mcmc.z_inverse(
+        log_z_inverse, sign_sample = self.learning_model.z_inverse(
             0,
             dict(zip(self.params_to_learn,theta_sample_scaled))
         )
 
         # Evaluate log potential function for initial choice of \theta
-        V, gradV = self.harris_wilson_mcmc.physics_model.sde_potential_and_gradient(
+        V, gradV = self.learning_model.physics_model.sde_potential_and_gradient(
             log_destination_attraction_sample,
             **dict(zip(self.params_to_learn,theta_sample_scaled)),
-            **vars(self.harris_wilson_mcmc.physics_model.params)
+            **vars(self.learning_model.physics_model.params)
         )
 
         # Store number of samples
         N = self.config.settings['training']['N']
         # Total samples for table,theta,x posteriors, respectively
-        M = self.harris_wilson_mcmc.theta_steps
-        L = self.harris_wilson_mcmc.log_destination_attraction_steps
+        M = self.learning_model.theta_steps
+        L = self.learning_model.log_destination_attraction_steps
 
         for i in tqdm(
             range(N),
@@ -1314,7 +1315,7 @@ class JointTableSIM_MCMC(Experiment):
                 gradV, \
                 log_z_inverse, \
                 negative_log_table_likelihood, \
-                sign_sample = self.harris_wilson_mcmc.theta_step(
+                sign_sample = self.learning_model.theta_step(
                             i,
                             theta_sample,
                             log_destination_attraction_sample,
@@ -1345,7 +1346,7 @@ class JointTableSIM_MCMC(Experiment):
                 log_dest_attract_acc, \
                 V, \
                 gradV, \
-                negative_log_table_likelihood = self.harris_wilson_mcmc.log_destination_attraction_step(
+                negative_log_table_likelihood = self.learning_model.log_destination_attraction_step(
                     theta_sample,
                     self.inputs.data.log_destination_attraction,
                     log_destination_attraction_sample,
@@ -1359,7 +1360,7 @@ class JointTableSIM_MCMC(Experiment):
                 )
 
             # Compute new intensity
-            log_intensity_sample = self.harris_wilson_mcmc.physics_model.intensity_model.log_intensity(
+            log_intensity_sample = self.learning_model.physics_model.intensity_model.log_intensity(
                 log_destination_attraction = log_destination_attraction_sample,
                 **dict(zip(self.params_to_learn,theta_sample)),
             )
@@ -1384,7 +1385,7 @@ class JointTableSIM_MCMC(Experiment):
                 )
             
             # Compute table likelihood for updated table
-            negative_log_table_likelihood = self.harris_wilson_mcmc.negative_table_log_likelihood_expanded(
+            negative_log_table_likelihood = self.learning_model.negative_table_log_likelihood_expanded(
                 log_destination_attraction = log_destination_attraction_sample,
                 table = table_sample,
                 **dict(zip(self.params_to_learn,theta_sample))
@@ -1393,6 +1394,8 @@ class JointTableSIM_MCMC(Experiment):
             # print statements
             self.show_progress()
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
+            if self.logger.console.isEnabledFor(PROGRESS):
+                print('\n')
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -1544,7 +1547,7 @@ class Table_MCMC(Experiment):
             )
 
             # Clean and write to file
-            _,_ = self.update_and_export(
+            _,_ = self.model_update_and_export(
                 table = table_sample,
                 table_acceptance = accepted,
                 # Batch size is in training settings
@@ -1556,6 +1559,8 @@ class Table_MCMC(Experiment):
             # print statements
             self.show_progress()
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
+            if self.logger.console.isEnabledFor(PROGRESS):
+                print('\n')
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -1838,7 +1843,7 @@ class SIM_NN(Experiment):
 
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
-        self.harris_wilson_nn = HarrisWilson_NN(
+        self.learning_model = HarrisWilson_NN(
             config = config,
             neural_net = neural_network,
             loss = config['neural_network'].pop('loss'),
@@ -1849,7 +1854,7 @@ class SIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else config
+        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
 
         # Create outputs
         self.outputs = Outputs(
@@ -1867,7 +1872,7 @@ class SIM_NN(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.harris_wilson_nn}")
+        self.logger.note(f"{self.learning_model}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
         
 
@@ -1881,14 +1886,22 @@ class SIM_NN(Experiment):
         # Store number of samples
         N = self.config['training']['N']
 
+        # Initialise samples
+        log_intensity_sample = None
+        grand_total = torch.tensor(1.0,dtype=float32,device=self.device)
+
         # Track the training loss
         loss_sample = {
-            nm:torch.tensor(0.0,requires_grad=True) \
-            for nm in self.harris_wilson_nn.loss_functions.keys()    
+            nm : torch.tensor(
+                0.0,
+                dtype = float32,
+                requires_grad = True
+            ) \
+            for nm in self.learning_model.loss_functions.keys()
         }
 
         # Track number of elements in each loss function
-        n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
+        n_processed_steps = {nm : 0 for nm in self.learning_model.loss_functions.keys()}
 
         # For each epoch
         for i in tqdm(
@@ -1905,19 +1918,38 @@ class SIM_NN(Experiment):
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)):
                 
-                # Perform neural net training
-                theta_sample, \
-                destination_attraction_sample = self.harris_wilson_nn.epoch_time_step(
-                    experiment = self,
-                    validation_data = dict(
-                        destination_attraction_ts = training_data
-                    ),
-                    dt = self.config['harris_wilson_model']['dt']
+                # Learn parameters by solving neural net
+                self.logger.debug('Solving neural net')
+                theta_sample = self.learning_model._neural_net(
+                    torch.flatten(training_data)
+                )            
+                # Add axis to every sample to ensure compatibility 
+                # with the functions used below
+                theta_sample_expanded = torch.unsqueeze(theta_sample,0).split(1,dim=1)
+                training_data_expanded = training_data.clone()
+                training_data_expanded.requires_grad = True
+                
+                # Compute log intensity
+                log_intensity_sample = self.learning_model.physics_model.intensity_model.log_intensity(
+                    log_destination_attraction = torch.log(training_data_expanded),
+                    grand_total = grand_total,
+                    **dict(zip(
+                        self.learning_model.physics_model.params_to_learn,
+                        theta_sample_expanded
+                    ))
+                ).squeeze()
+
+                # Solve SDE
+                destination_attraction_sample = self.learning_model.physics_model.run_single(
+                    curr_destination_attractions = training_data,
+                    free_parameters = theta_sample,
+                    log_intensity_normalised = (log_intensity_sample - torch.log(grand_total)),
+                    dt = self.config['harris_wilson_model']['dt'],
+                    requires_grad = True
                 )
-                log_destination_attraction_sample = torch.log(destination_attraction_sample)
 
                 # Update losses
-                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
+                loss_sample,n_processed_steps = self.learning_model.update_loss(
                     previous_loss = loss_sample,
                     n_processed_steps = n_processed_steps,
                     validation_data = dict(
@@ -1927,16 +1959,13 @@ class SIM_NN(Experiment):
                         destination_attraction_ts = [destination_attraction_sample]
                     )
                 )
-
-                # print('theta',theta_sample)
-                # print('destination_attraction_sample',destination_attraction_sample)
                 
                 # Clean and write to file
-                loss_sample,n_processed_steps = self.update_and_export(
+                loss_sample,n_processed_steps = self.model_update_and_export(
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
                     theta = theta_sample,
-                    log_destination_attraction = log_destination_attraction_sample,
+                    log_destination_attraction = torch.log(destination_attraction_sample),
                     # Batch size is in training settings
                     t = t,
                     data_size = len(training_data),
@@ -1946,6 +1975,8 @@ class SIM_NN(Experiment):
             # print statements
             self.show_progress()
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
+            if self.logger.console.isEnabledFor(PROGRESS):
+                print('\n')
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -2040,7 +2071,7 @@ class NonJointTableSIM_NN(Experiment):
 
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
-        self.harris_wilson_nn = HarrisWilson_NN(
+        self.learning_model = HarrisWilson_NN(
             config = config,
             neural_net = neural_network,
             loss = config['neural_network'].pop('loss'),
@@ -2051,7 +2082,7 @@ class NonJointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else config
+        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
 
         # Create outputs
         self.outputs = Outputs(
@@ -2069,7 +2100,7 @@ class NonJointTableSIM_NN(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.harris_wilson_nn}")
+        self.logger.note(f"{self.learning_model}")
         self.logger.note(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
         
@@ -2085,18 +2116,23 @@ class NonJointTableSIM_NN(Experiment):
         theta_sample = initial_params['theta']
         log_destination_attraction_sample = initial_params['log_destination_attraction']
         table_sample = initial_params['table']
+        grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))].to(float32)
         
         # Store number of samples
         N = self.config['training']['N']
 
         # Track the training loss
         loss_sample = {
-            nm:torch.tensor(0.0,requires_grad=True) \
-            for nm in self.harris_wilson_nn.loss_functions.keys()    
+            nm : torch.tensor(
+                0.0,
+                dtype = float32,
+                requires_grad = True
+            ) \
+            for nm in self.learning_model.loss_functions.keys()
         }
 
         # Track number of elements in each loss function
-        n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
+        n_processed_steps = {nm : 0 for nm in self.learning_model.loss_functions.keys()}
 
         # For each epoch
         for i in tqdm(
@@ -2115,28 +2151,35 @@ class NonJointTableSIM_NN(Experiment):
                 torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)
             ):
 
-                # Perform neural net training
-                theta_sample, \
-                destination_attraction_sample = self.harris_wilson_nn.epoch_time_step(
-                    experiment = self,
-                    validation_data = dict(
-                        destination_attraction_ts = training_data
-                    ),
-                    dt = self.config['harris_wilson_model']['dt']
-                )
-                log_destination_attraction_sample = torch.log(destination_attraction_sample)
-            
+                # Learn parameters by solving neural net
+                self.logger.debug('Solving neural net')
+                theta_sample = self.learning_model._neural_net(
+                    torch.flatten(training_data)
+                )            
                 # Add axis to every sample to ensure compatibility 
                 # with the functions used below
-                theta_sample_expanded = torch.unsqueeze(theta_sample,0)
-                log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0)
-
+                theta_sample_expanded = torch.unsqueeze(theta_sample,0).split(1,dim=1)
+                training_data_expanded = training_data.clone()
+                training_data_expanded.requires_grad = True
+                
                 # Compute log intensity
-                log_intensity_sample = self.harris_wilson_nn.physics_model.intensity_model.log_intensity(
-                    log_destination_attraction = log_destination_attraction_sample_expanded,
-                    grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))],
-                    **dict(zip(self.harris_wilson_nn.physics_model.params_to_learn,theta_sample_expanded.split(1,dim=1)))
+                log_intensity_sample = self.learning_model.physics_model.intensity_model.log_intensity(
+                    log_destination_attraction = torch.log(training_data_expanded),
+                    grand_total = grand_total,
+                    **dict(zip(
+                        self.learning_model.physics_model.params_to_learn,
+                        theta_sample_expanded
+                    ))
                 ).squeeze()
+
+                # Solve SDE
+                destination_attraction_sample = self.learning_model.physics_model.run_single(
+                    curr_destination_attractions = training_data,
+                    free_parameters = theta_sample,
+                    log_intensity_normalised = (log_intensity_sample - torch.log(grand_total)),
+                    dt = self.config['harris_wilson_model']['dt'],
+                    requires_grad = True
+                )
 
                 # Sample table
                 table_sample,accepted = self.ct_mcmc.table_gibbs_step(
@@ -2145,7 +2188,7 @@ class NonJointTableSIM_NN(Experiment):
                 )
 
                 # Update losses
-                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
+                loss_sample,n_processed_steps = self.learning_model.update_loss(
                     previous_loss = loss_sample,
                     n_processed_steps = n_processed_steps,
                     validation_data = dict(
@@ -2157,7 +2200,7 @@ class NonJointTableSIM_NN(Experiment):
                 )
 
                 # Clean and write to file
-                loss_sample,n_processed_steps = self.update_and_export(
+                loss_sample,n_processed_steps = self.model_update_and_export(
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
                     theta = theta_sample,
@@ -2173,6 +2216,8 @@ class NonJointTableSIM_NN(Experiment):
             # print statements
             self.show_progress()
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
+            if self.logger.console.isEnabledFor(PROGRESS):
+                print('\n')
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
@@ -2268,7 +2313,7 @@ class JointTableSIM_NN(Experiment):
 
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
-        self.harris_wilson_nn = HarrisWilson_NN(
+        self.learning_model = HarrisWilson_NN(
             config = config,
             neural_net = neural_network,
             loss = dict(
@@ -2282,7 +2327,7 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.harris_wilson_nn,'config') if hasattr(self.harris_wilson_nn,'config') else config
+        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
 
         # Create outputs
         self.outputs = Outputs(
@@ -2300,14 +2345,14 @@ class JointTableSIM_NN(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.harris_wilson_nn}")
+        self.logger.note(f"{self.learning_model}")
         self.logger.info(f"{self.ct_mcmc}")
-        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}. Sweep id: {self.outputs.sweep_id}")
 
     def run(self,**kwargs) -> None:
 
         self.logger.note(f"Running Joint Table Inference and Neural Network training of Harris Wilson model.")
-
+        
         # Initialise data structures
         self.initialise_data_structures()
 
@@ -2316,18 +2361,24 @@ class JointTableSIM_NN(Experiment):
         theta_sample = initial_params['theta']
         log_destination_attraction_sample = initial_params['log_destination_attraction']
         table_sample = initial_params['table']
-        
+        grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))].to(float32)
+
         # Store number of samples
         N = self.config['training']['N']
 
         # Track the training loss
         loss_sample = {
-            nm:torch.tensor(0.0,requires_grad=True) \
-            for nm in self.harris_wilson_nn.loss_functions.keys()    
+            nm : torch.tensor(
+                0.0,
+                dtype = float32,
+                requires_grad = True
+            ) \
+            for nm in self.learning_model.loss_functions.keys()
         }
 
         # Track number of elements in each loss function
-        n_processed_steps = {nm:0 for nm in self.harris_wilson_nn.loss_functions.keys()}
+        n_processed_steps = {nm : 0 for nm in self.learning_model.loss_functions.keys()}
+        
         # For each epoch
         for i in tqdm(
             range(N),
@@ -2344,29 +2395,36 @@ class JointTableSIM_NN(Experiment):
             for t, training_data in enumerate(
                 torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)
             ):
-                
-                # Perform neural net training
-                theta_sample, \
-                destination_attraction_sample = self.harris_wilson_nn.epoch_time_step(
-                    experiment = self,
-                    validation_data = dict(
-                        destination_attraction_ts = training_data
-                    ),
-                    dt = self.config['harris_wilson_model']['dt']
-                )
-                log_destination_attraction_sample = torch.log(destination_attraction_sample)
 
+                # Learn parameters by solving neural net
+                self.logger.debug('Solving neural net')
+                theta_sample = self.learning_model._neural_net(
+                    torch.flatten(training_data)
+                )            
                 # Add axis to every sample to ensure compatibility 
                 # with the functions used below
-                theta_sample_expanded = torch.unsqueeze(theta_sample,0)
-                log_destination_attraction_sample_expanded = log_destination_attraction_sample.unsqueeze(0)
-
+                theta_sample_expanded = torch.unsqueeze(theta_sample,0).split(1,dim=1)
+                training_data_expanded = training_data.clone()
+                training_data_expanded.requires_grad = True
+                
                 # Compute log intensity
-                log_intensity_sample = self.harris_wilson_nn.physics_model.intensity_model.log_intensity(
-                    log_destination_attraction = log_destination_attraction_sample_expanded,
-                    grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))],
-                    **dict(zip(self.harris_wilson_nn.physics_model.params_to_learn,theta_sample_expanded.split(1,dim=1)))
+                log_intensity_sample = self.learning_model.physics_model.intensity_model.log_intensity(
+                    log_destination_attraction = torch.log(training_data_expanded),
+                    grand_total = grand_total,
+                    **dict(zip(
+                        self.learning_model.physics_model.params_to_learn,
+                        theta_sample_expanded
+                    ))
                 ).squeeze()
+
+                # Solve SDE
+                destination_attraction_sample = self.learning_model.physics_model.run_single(
+                    curr_destination_attractions = training_data,
+                    free_parameters = theta_sample,
+                    log_intensity_normalised = (log_intensity_sample - torch.log(grand_total)),
+                    dt = self.config['harris_wilson_model']['dt'],
+                    requires_grad = True
+                )
                 
                 # Sample table(s)
                 table_samples = []
@@ -2379,12 +2437,13 @@ class JointTableSIM_NN(Experiment):
                     table_samples.append(table_sample/table_sample.sum())
 
                 # Update losses
-                loss_sample,n_processed_steps = self.harris_wilson_nn.update_loss(
+                # print('log_intensity_sample',log_intensity_sample.requires_grad,log_intensity_sample.shape)
+                loss_sample,n_processed_steps = self.learning_model.update_loss(
                     previous_loss = loss_sample,
                     n_processed_steps = n_processed_steps,
                     validation_data = dict(
                         destination_attraction_ts = training_data,
-                        log_intensity = log_intensity_sample/log_intensity_sample.sum()
+                        log_intensity = log_intensity_sample - torch.log(grand_total)
                     ),
                     prediction_data = dict(
                         destination_attraction_ts = [destination_attraction_sample],
@@ -2395,11 +2454,11 @@ class JointTableSIM_NN(Experiment):
 
                 # Clean loss and write to file
                 # This will only store the last table sample
-                loss_sample,n_processed_steps = self.update_and_export(
+                loss_sample,n_processed_steps = self.model_update_and_export(
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
                     theta = theta_sample,
-                    log_destination_attraction = log_destination_attraction_sample,
+                    log_destination_attraction = torch.log(destination_attraction_sample),
                     table = table_sample,
                     table_acceptance = accepted,
                     # Batch size is in training settings
@@ -2411,6 +2470,8 @@ class JointTableSIM_NN(Experiment):
             # print statements
             self.show_progress()
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
+            if self.logger.console.isEnabledFor(PROGRESS):
+                print('\n')
 
             # Write the epoch training time (wall clock time)
             if hasattr(self,'compute_time'):
