@@ -51,6 +51,9 @@ class HarrisWilsonMarkovChainMonteCarlo():
         self.logger.setLevels(
             console_level = level
         )
+
+        # Type of learning model
+        self.model_type = 'markov_chain_monte_carlo'
         
         # Store sim model but not its config
         self.physics_model = physics_model

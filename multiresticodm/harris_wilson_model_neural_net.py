@@ -14,7 +14,7 @@ from typing import Any, List, Union
 from multiresticodm.config import Config
 from multiresticodm.utils import setup_logger, print_json
 from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS
+from multiresticodm.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, DATA_SCHEMA
 
 
 def get_architecture(
@@ -237,7 +237,10 @@ class HarrisWilson_NN:
             console_level = level
         )
 
-        # The numeric    solver
+        # Type of learning model
+        self.model_type = 'neural_network'
+
+        # The numeric solver
         self.physics_model = physics_model
 
         # Config file
@@ -311,6 +314,7 @@ class HarrisWilson_NN:
         # Get subset of loss function names
         loss_function_names = loss_function_names if loss_function_names is not None else list(self.loss_functions.keys())
         loss_function_names = list(set(loss_function_names).intersection(set(list(self.loss_functions.keys()))))
+        
         for name in loss_function_names:
             # Make sure you have the necessary data
             prediction_data_sizes = {}
@@ -321,6 +325,7 @@ class HarrisWilson_NN:
                     # Monitor number of samples in monte carlo estimation of loss
                     # for each prediction dataset
                     prediction_data_sizes[pred_dataset] = len(prediction_data.get(pred_dataset))
+                    # print(name,pred_dataset,[pdata.requires_grad for pdata in prediction_data.get(pred_dataset)])
                 except:
                     raise Exception(f"Loss {name} is missing prediction data {pred_dataset}.")
             # Make sure the same amount of prediction samples are provided 
@@ -335,17 +340,14 @@ class HarrisWilson_NN:
                         if validation_data.get(validation_dataset,None) is not None \
                         else aux_inputs.get(validation_dataset,None)
                     assert validation_data[validation_dataset] is not None
+                    # print(name,validation_dataset,validation_data[validation_dataset].requires_grad)
                 except:
                     raise Exception(f"Loss {name} is missing validation data {validation_dataset}.")
             
             # Compute monte carlo estimate of loss
             # Number of MC samples
             N_samples = list(prediction_data_sizes.values())[0]
-            total_loss = torch.tensor(
-                0.0,
-                dtype = float32,
-                device = self.physics_model.device
-            )
+            total_loss = []
             for n in range(N_samples):
                 if name == 'total_distance_travelled_loss':
                     # Calculate total cost incurred by travelling from every origin
@@ -370,101 +372,21 @@ class HarrisWilson_NN:
                         validation_data[validation_dataset].to(dtype=float32),
                         **self.loss_kwargs.get(name,{})
                     )
-                # Gather current loss
-                total_loss += res
+                # Gather current Monte Carlo total loss
+                total_loss.append(res)
             # Update loss
-            previous_loss[name] = previous_loss[name] + total_loss / N_samples
+            previous_loss[name] = previous_loss[name] + sum(total_loss) / N_samples
             # Keep track number of loss samples per loss function
-            n_processed_steps[name] += 1
+            n_processed_steps[name] = n_processed_steps[name] + 1
         return previous_loss,n_processed_steps
-
-    def epoch(
-        self,
-        *,
-        experiment,
-        batch_size: int,
-        validation_data: dict,
-        prediction_data: dict = {},
-        loss_function_names: dict = {},
-        aux_inputs:dict = {},
-        dt: float = None,
-        **kwargs,
-    ):
-
-        '''Trains the model for a single epoch.
-
-        :param training_data: the training data
-        :param batch_size: the number of time series elements to process before conducting a gradient descent
-                step
-        :param epsilon: (optional) the epsilon value to use during training
-        :param dt: (optional) the time differential to use during training
-        :param __: other parameters (ignored)
-        '''
-
-        # Track the training loss
-        loss = torch.tensor(0.0, requires_grad=True)
-
-        # Count the number of batch items processed
-        n_processed_steps = {}
-
-        # Copy validation data to override on the fly
-        validation_data_copy = deepcopy(validation_data)
-
-        # Process the training set elementwise, updating the loss after batch_size steps
-        for t, data in enumerate(validation_data['destination_attraction_ts']):
-            predicted_theta = self._neural_net(torch.flatten(data))
-            predicted_dest_attraction = self.physics_model.run_single(
-                curr_destination_attractions=data,
-                free_parameters=predicted_theta,
-                dt=dt,
-                requires_grad=True,
-            )
-
-            # Add destination attraction data for this time step
-            validation_data_copy['destination_attraction_ts'] = data
-            # Add prediction of destination attraction to predicted data
-            # for evaluating the loss function
-            prediction_data['destination_attraction_ts'] = [torch.flatten(predicted_dest_attraction)]
-            # Update loss
-            loss,n_processed_steps = self.update_loss(
-                previous_loss = loss,
-                n_processed_steps = n_processed_steps,
-                data = validation_data_copy,
-                predictions = prediction_data,
-                loss_function_names = loss_function_names,
-                aux_inputs = aux_inputs
-            )
-
-            # Update the model parameters after every batch and clear the loss
-            if t % batch_size == 0 or t == len(validation_data) - 1:
-                # Extract values from each sub-loss
-                loss_values = sum([val for val in loss.values()])
-                loss_values.backward()
-                self._neural_net.optimizer.step()
-                self._neural_net.optimizer.zero_grad()
-                self._time += 1
-                # Compute average losses here
-                n_processed_steps = kwargs.pop('n_processed_steps',None)
-                if n_processed_steps is not None:
-                    for name in loss.items():
-                        loss[name] = loss[name] / n_processed_steps[name]
-                self._loss_sample = (
-                    sum([val for val in loss.values()]).clone().detach().cpu().numpy().item()
-                )
-                self._theta_sample = predicted_theta.clone().detach().cpu()
-                self._log_destination_attraction_sample = torch.log(predicted_dest_attraction).clone().detach().cpu()
-                del loss
-                loss = {}
-                n_processed_steps = {}
-
-        return loss, predicted_theta, torch.log(predicted_dest_attraction.squeeze())
 
 
     def epoch_time_step(
         self,
         *,
-        experiment,
+        log_intensity_normalised: torch.tensor,
         validation_data: dict,
+        grand_total: torch.tensor,
         dt: float,
         **__,
     ):
@@ -477,16 +399,38 @@ class HarrisWilson_NN:
         :param dt: (optional) the time differential to use during training
         :param __: other parameters (ignored)
         '''
-        self.logger.debug('Running neural net')
-        predicted_theta = self._neural_net(torch.flatten(validation_data['destination_attraction_ts']))
-        self.logger.debug('Forward pass on SDE')
-        predicted_dest_attraction = self.physics_model.run_single(
-            curr_destination_attractions = validation_data['destination_attraction_ts'],
+
+        # Learn parameters by solving neural net
+        self.logger.debug('Solving neural net')
+        predicted_theta = self._neural_net(
+            torch.flatten(validation_data['destination_attraction_ts'])
+        )
+
+        # Add axis to every sample to ensure compatibility 
+        # with the functions used below
+        predicted_theta_expanded = torch.unsqueeze(predicted_theta,0).split(1,dim=1)
+        training_data_expanded = validation_data['destination_attraction_ts'].clone()
+        training_data_expanded.requires_grad = True
+        
+        # Compute log intensity
+        predicted_log_intensity = self.learning_model.physics_model.intensity_model.log_intensity(
+            log_destination_attraction = torch.log(training_data_expanded),
+            grand_total = grand_total,
+            **dict(zip(
+                self.learning_model.physics_model.params_to_learn,
+                predicted_theta_expanded
+            ))
+        ).squeeze()
+
+        # Solve SDE
+        predicted_dest_attraction = self.learning_model.physics_model.run_single(
+            curr_destination_attractions = training_data,
             free_parameters = predicted_theta,
+            log_intensity_normalised = (predicted_log_intensity - torch.log(grand_total)),
             dt = dt,
             requires_grad = True
         )
-        return predicted_theta, predicted_dest_attraction
+        return predicted_theta, predicted_dest_attraction, predicted_log_intensity
 
 
     def __repr__(self):
