@@ -7,7 +7,8 @@ Set `ulimit -n 50000`
 ## Experiment 1
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 6 -nt 7 -sm -et SIM_NN
+clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 5 -nt 6 -sm -et NonJointTableSIM_NN
+clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 6 -nt 7 -sm -et JointTableSIM_NN
 ```
 
 ```
