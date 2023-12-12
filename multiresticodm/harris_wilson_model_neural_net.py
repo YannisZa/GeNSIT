@@ -265,25 +265,36 @@ class HarrisWilson_NN:
                 key_val,key_found = self.config.path_get(
                     key_path = key_path
                 )
+
                 # Try to find kwargs in config
                 if not key_found:
-                    loss = loss.get(key,'not-found')
-                    key_found = loss != 'not-found'
-                
+                    # Find path to key
+                    key_path = list(self.config.path_find(key,settings = loss))
+                    key_path = key_path[0] if len(key_path) > 0 else []
+                    # Get value of key
+                    key_val,key_found = self.config.path_get(
+                        key_path = key_path,
+                        settings = loss
+                    )
+
                 try:
                     assert key_found
                 except:
                     raise Exception(f"""
-                        Could not find {name} keyword argument {key} 
-                        for {function} in settings or as a loss argument ({list(loss.keys())}).
+                        Could not find {name} keyword argument {key} for {function} in settings.
                     """)
-                # Add value to function arguments
-                fn_kwargs[key] = key_val
+                
+                # If value is dictionary then read both name and value of kwargs
+                if isinstance(key_val,dict):
+                    fn_kwargs[key_val['name']] = key_val['value']
+                # else just read value
+                else:
+                    fn_kwargs[key] = key_val
             
             # Get loss function from global variables (standard torch loss functions)
             loss_func = LOSS_FUNCTIONS.get(function.lower(),None)
             # if failed get loss function from loss dictionary provided
-            loss_func = loss.get(name,loss_func) if loss_func is None else loss_func(**fn_kwargs)
+            loss_func = loss.get(name,loss_func) if loss_func is None else loss_func()
             # if failed get loss function from physics model defined functions
             loss_func = getattr(self.physics_model,name,loss_func) if loss_func is None else loss_func
 
