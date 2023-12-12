@@ -49,7 +49,8 @@ class Entry():
         return None if is_null(self.data) else self.data
     
     def check_type(self,data_type=None):
-        data_type = self.schema.get("dtype",data_type)
+        # print("Check type")
+        data_type = data_type if data_type is not None else self.schema.get("dtype",data_type)
         allow_nan = self.schema.get("allow-nan",False)
         if data_type is not None:
             try: 
@@ -83,6 +84,7 @@ class PrimitiveEntry(Entry):
 
     
     def check_range(self):
+        # print("Check range")
         # Check that correct range is used for each element
         valid_range = self.schema.get("valid-range","invalid")
         if valid_range != "invalid":
@@ -94,12 +96,13 @@ class PrimitiveEntry(Entry):
             except:
                 raise InvalidRangeException(
                     f"Data {self.data} is out of range {valid_range}",
-                    key_path=self.key_path,
-                    data=self.data
+                    key_path = self.key_path,
+                    data = self.data
                 )
         return True
     
     def check_scope(self):
+        # print("Check scope")
         valid_scope = self.schema.get("is-any-of",[])
         if isinstance(valid_scope,list) and len(valid_scope) > 0:
             try: 
@@ -107,6 +110,16 @@ class PrimitiveEntry(Entry):
             except:
                 raise InvalidScopeException(
                     f"Data {self.data} is not in scope {valid_scope}",
+                    key_path=self.key_path,
+                    data=self.data
+                )
+        substrings = self.schema.get("contains",[])
+        if isinstance(substrings,list) and len(substrings) > 0:
+            try: 
+                assert any([str(substr) in self.data for substr in substrings])
+            except:
+                raise InvalidScopeException(
+                    f"None of the substrings {', '.join(substrings)} are contained in data {self.data}",
                     key_path=self.key_path,
                     data=self.data
                 )
@@ -121,6 +134,7 @@ class Bool(PrimitiveEntry):
         return "Boolean()"
     
     def check_boolean(self):
+        # print("Check boolean")
         # Check that the data is either true or false
         try:
             assert str(self.data) in ['True','False']
@@ -136,6 +150,7 @@ class Numeric(PrimitiveEntry):
         super().__init__(data,schema,key_path)
         
     def check_numeric(self):
+        # print("Check numeric")
         try:
             assert self.data.isnumeric()
         except:
@@ -147,6 +162,7 @@ class Numeric(PrimitiveEntry):
         return True
 
     def check_finiteness(self):
+        # print("Check finiteness")
         # Get whether data is allowed to be infinite or not
         infinite = self.schema.get("is-infinite",True)
         if not infinite:
@@ -196,20 +212,6 @@ class Str(PrimitiveEntry):
     def __str__(self) -> str:
         return "String()"
 
-    def check_scope(self):
-        super().check_scope()
-        substrings = self.schema.get("contains",[])
-        if isinstance(substrings,list) and len(substrings) > 0:
-            try: 
-                assert any([str(substr) in self.data for substr in substrings])
-            except:
-                raise InvalidScopeException(
-                    f"None of the substrings {', '.join(substrings)} are contained in data {self.data}",
-                    key_path=self.key_path,
-                    data=self.data
-                )
-        return True
-
     def check(self):
         # Check that correct type is used
         self.check_type()
@@ -243,6 +245,7 @@ class Path(Str):
         return "Path(String)"
 
     def check_path_exists(self):
+        # print("Check path exists")
         if self.schema.get("path-exists",False) or \
             self.schema.get("file-exists",False) or \
             self.schema.get("directory-exists",False) or \
@@ -258,6 +261,7 @@ class Path(Str):
         return True
 
     def check_directory_exists(self):
+        # print("Check directory exists")
         self.check_path_exists() 
         try:
             os.path.isdir(self.data)
@@ -270,6 +274,7 @@ class Path(Str):
         return True
 
     def check_file_exists(self):
+        # print("Check file exists")
         self.check_path_exists()
         try:
             os.path.isfile(self.data)
@@ -282,6 +287,7 @@ class Path(Str):
         return True
 
     def check_extension(self):
+        # print("Check extension")
         extension = self.schema.get("extension",None)
         if extension is not None:
             extension = self.schema.get("file-extension",None)
@@ -345,7 +351,12 @@ class NonPrimitiveEntry(Entry):
     def __str__(self) -> str:
         return "NonPrimitiveEntry()"
 
+    def __iter__(self):
+        for datum in self.data:
+            yield datum
+
     def check_length(self):
+        # print("Check length")
         # Check that list has specified length
         length = self.schema.get("length",None)
         if length is not None:
@@ -370,11 +381,12 @@ class NonPrimitiveEntry(Entry):
         return True
 
     def check_uniqueness(self,vals:Iterable):
+        # print("Check uniqueness")
         # Check that unique values are provided
         unique_vals = self.schema.get("unique-vals",False)
         if unique_vals:
             # Express data in python primitive types
-            data = [v.value() for v in vals]
+            data = [v.value() if isinstance(v.value(),PrimitiveEntry) else str(v.value()) for v in vals]
             try: 
                 assert len(data) == len(set(data))
             except:
@@ -386,9 +398,15 @@ class NonPrimitiveEntry(Entry):
         return True
 
     def check_elements(self,vals:Iterable):
-        # Check that all keys of the dictionary are valid
-        for key in vals:
-            key.check()
+        # print("Check elements")
+        # Check that all values are valid
+        if isinstance(vals,NonPrimitiveEntry) or isinstance(vals,Iterable):
+            for elem in vals:
+                if isinstance(elem,NonPrimitiveEntry) or isinstance(elem,Iterable):
+                    self.check_elements(elem)
+                else:
+                    elem.check()
+        
         return True
     
     def check(self):
@@ -401,10 +419,7 @@ class List(NonPrimitiveEntry):
         self.dtype = list
         
         # First check that input is indeed a list
-        # key_path_copy = deepcopy(self.key_path)
-        # self.key_path = []
-        self.check_type()
-        # self.key_path = key_path_copy
+        self.check_type(data_type = self.dtype)
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
@@ -428,8 +443,7 @@ class List(NonPrimitiveEntry):
 
     def value(self) -> list:
         return [self.schema['default-value'] if is_null(datum.value()) else datum.value() for datum in self.data]
-            
-        
+    
     def check(self):
         # Check that correct length is provided
         self.check_length()
@@ -446,10 +460,7 @@ class List2D(NonPrimitiveEntry):
         self.dtype = list
 
         # First check that input is indeed a list
-        # key_path_copy = deepcopy(self.key_path)
-        # self.key_path = []
-        self.check_type()
-        # self.key_path = key_path_copy
+        self.check_type(data_type = self.dtype)
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
@@ -468,14 +479,20 @@ class List2D(NonPrimitiveEntry):
             # If not done so already, store schema setting
             if not stored:
                 self.schema[k] = v
-                
+        
         # Get all value entries
         self.data = [ [instantiate_data_type(val,self.schema,key_path) for val in row] for row in data]
+    
+    def __iter__(self) -> list:
+        for row in self.data:
+            for col in row:
+                yield col
 
     def value(self) -> list:
         return [[self.schema['default-value'] if is_null(datum.value()) else datum.value() for datum in row] for row in self.data]
             
     def check_dims(self):
+        # print("Check dims")
         # Check that list has specified length
         nrows,ncols = self.schema.get("nrows",None),self.schema.get("ncols",None)
         if ncols is not None and nrows is not None:
@@ -509,13 +526,6 @@ class List2D(NonPrimitiveEntry):
                     )
         return True
 
-    def check_elements(self,vals:Iterable):
-        # Check that all keys of the dictionary are valid
-        for row in vals:
-            for key in row:
-                key.check()
-        return True
-
     def check(self):
         # Check that correct length is provided
         self.check_dims()
@@ -527,7 +537,7 @@ class List2D(NonPrimitiveEntry):
 class CustomList(NonPrimitiveEntry):
     def __init__(self,data,schema,key_path):
         super().__init__(data,schema,key_path)
-        self.dtype = Sequence
+        self.dtype = list
         # Parse data
         try:
             self.data, self.parsing_success = self.parse(self.data,self.schema)
@@ -538,10 +548,7 @@ class CustomList(NonPrimitiveEntry):
             sys.exit()
         
         # First check that input is indeed a list
-        # key_path_copy = deepcopy(self.key_path)
-        # self.key_path = []
-        self.check_type()
-        # self.key_path = key_path_copy
+        self.check_type(data_type = self.dtype)
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
@@ -578,8 +585,7 @@ class CustomList(NonPrimitiveEntry):
                 res = self._parse(datum,schema)
                 results.append(res[0])
                 successes.append(res[1])
-            results = list(flatten(results))
-            return results, all(successes)
+            return list(flatten(results)), all(successes)
         else:
             return data,True
         
@@ -619,6 +625,7 @@ class CustomList(NonPrimitiveEntry):
             return data,True
 
     def check_parsing(self):
+        # print("Check parsing")
         try:
             assert self.parsing_success
         except:
@@ -644,10 +651,7 @@ class Dict(NonPrimitiveEntry):
         self.dtype = dict
 
         # First check that input is indeed a dict
-        # key_path_copy = deepcopy(self.key_path)
-        # self.key_path = []
-        self.check_type()
-        # self.key_path = key_path_copy
+        self.check_type(data_type = self.dtype)
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'
@@ -695,10 +699,7 @@ class CustomDict(NonPrimitiveEntry):
         self.dtype = dict
 
         # First check that input is indeed a dict
-        # key_path_copy = deepcopy(self.key_path)
-        # self.key_path = []
-        self.check_type()
-        # self.key_path = key_path_copy
+        self.check_type(data_type = self.dtype)
 
         # Then prep schema for list values
         # Remove all key prefixes that start with 'list'

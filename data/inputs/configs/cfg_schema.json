@@ -118,8 +118,7 @@
             "delta",
             "sigma",
             "noise_percentage"
-          ],
-          "unique-vals": true
+          ]
         }
       }
     },
@@ -931,11 +930,10 @@
         },
         "range": {
           "dtype": "list",
-          "list-length": [1, 2],
+          "list-length": [1, null],
           "list-dtype": "str",
           "default-value": "TotallyConstrained",
-          "is-any-of": ["TotallyConstrained", "ProductionConstrained"],
-          "unique-vals": true
+          "is-any-of": ["TotallyConstrained", "ProductionConstrained"]
         }
       }
     },
@@ -1241,9 +1239,9 @@
               ]
             ],
             "list-dtype": "list2D",
-            "list2D-nrows": 2,
-            "list2D-ncols": 2,
-            "list2D-dtype": "float",
+            "list-list2D-nrows": 2,
+            "list-list2D-ncols": 2,
+            "list-list2D-dtype": "float",
             "value-range": [0.0, null]
           }
         }
@@ -1575,8 +1573,7 @@
               "table_loss",
               "table_likelihood_loss",
               "total_distance_loss"
-            ],
-            "unique-vals": false
+            ]
           },
           "range": {
             "dtype": "list",
@@ -1586,7 +1583,9 @@
             "default-value": "dest_attraction_ts_loss",
             "is-any-of": [
               "dest_attraction_ts_loss",
+              "dest_attraction_ts_likelihood_loss",
               "table_loss",
+              "table_likelihood_loss",
               "total_distance_loss"
             ],
             "unique-vals": true
@@ -1603,8 +1602,7 @@
             "dtype": "list",
             "list-dtype": "str",
             "list-length": [1, null],
-            "default-value": "mseloss",
-            "unique-vals": false
+            "default-value": "mseloss"
           },
           "range": {
             "dtype": "list",
@@ -1933,7 +1931,7 @@
       "grid_ranges": {
         "sweepable": false,
         "optional": true,
-        "exclude": true,
+        "exclude": false,
 
         "alpha": {
           "sweepable": false,

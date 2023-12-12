@@ -242,7 +242,9 @@ class Config:
             # Convert key to index if it is numeric
             # otherwise keep it as string
             current_key = key_path[0]
-            current_key = string_to_numeric(current_key) if current_key.isnumeric() else current_key
+            current_key = string_to_numeric(current_key) \
+                if isinstance(current_key,str) and current_key.isnumeric() \
+                else current_key
             deleted,settings = self.path_delete(settings[current_key],key_path[1:],deleted)
         return deleted,settings
 
@@ -289,11 +291,14 @@ class Config:
         experiment_type = self.settings['experiments'][0]['type']
         # Get experiment-specific schema
         experiment_schema = self.experiment_schemas.get(experiment_type,None)
+
         if experiment_schema is not None:
             # Update base schema based on experiment-specific requirements
-            for key_path_str in deepcopy(list(experiment_schema.keys())):
+            for key_path_str in list(experiment_schema.keys()):
                 # Convert keys to key path lists
-                key_path = key_path_str.split('>')
+                # Make sure that list indices are of type int and 
+                # the rest of the keys are of type str
+                key_path = [string_to_numeric(kp) if kp.isnumeric() else kp for kp in key_path_str.split('>')]
                 
                 # Do not update dtypes!
                 if "dtype" in key_path:
@@ -301,7 +306,7 @@ class Config:
 
                 # Delete excluded key paths
                 if key_path[-1] == 'exclude' and experiment_schema[key_path_str]:
-                    self.logger.info(f"Excluding key path {' > '.join(key_path[:-1])}")
+                    self.logger.warning(f"Excluding key path {' > '.join(key_path_str.split('>')[:-1])}")
                     # Update settings
                     _,_ = self.path_delete(self.settings,key_path[:-1])
                     # Update base schema
@@ -310,13 +315,24 @@ class Config:
                     _,_ = self.path_delete(self.parameters,key_path[:-1])
                 # Modify the base schema only
                 else:
-                    if not self.path_modify(
+                    self.logger.debug(f"Modifying key path {' > '.join(key_path_str.split('>')[:-1])}")
+                    path_modified = self.path_modify(
                         self.schema,
                         experiment_schema[key_path_str],
                         key_path
-                    ):
-                        raise Exception(f"Could not update base schema at {'>'.join(key_path)}")
-
+                    )
+                    if not path_modified:
+                        raise Exception(f"Could not update base schema at {'>'.join(key_path_str.split('>'))}")
+                    
+                    # Make sure path can be found in schema
+                    new_value,path_found = self.path_get(
+                        key_path,
+                        self.schema
+                    )
+                    if not path_found:
+                        self.logger.error(f"Value = {new_value}")
+                        raise Exception(f"Could not find base schema key path {'>'.join(key_path_str.split('>'))}")
+        
         # Validate config
         self.validate_config(
             parameters = self.parameters,
@@ -483,7 +499,13 @@ class Config:
             # against each key path
             elif k != 'sweep' and isinstance(v,dict):
                 # Apply function recursively
-                self.validate_config(v,settings,base_schema,key_path,**kwargs)
+                self.validate_config(
+                    v,
+                    settings,
+                    base_schema,
+                    key_path,
+                    **kwargs
+                )
             
             # If settings are any other (primitive of non-promitive) value,
             # validate settings for given key path
@@ -508,7 +530,7 @@ class Config:
                     key_path = key_path, 
                     settings = base_schema
                 )
-                
+
                 # key must exist in schema
                 try: 
                     assert schema_found
@@ -518,12 +540,14 @@ class Config:
                 # 1: Check if argument is optional in case it is not included in settings
                 # and it is not part of a sweep
                 if not 'sweep' in key_path and not settings_found:
+                    self.logger.debug('check 1')
                     if isinstance(schema_val,dict) and not schema_val['optional']:
                         raise Exception(f"""
                             Key {'>'.join(key_path)} is compulsory but not included
                         """)
 
                 if key_path[-1] == 'sweep' and settings_found:
+                    self.logger.debug('check sweep')
                     # 2: Check if argument is not sweepable but contains 
                     # a sweep parameter in settings
                     # Get schema of parameter configured for a sweep
@@ -532,6 +556,7 @@ class Config:
                         settings = base_schema
                     )
                     if not schema_parent_val["sweepable"]:
+                        self.logger.debug('check 2')
                         raise Exception(f"""
                             Key {'>'.join(key_path)} is not sweepable 
                             but contains a sweep configuration
@@ -550,6 +575,7 @@ class Config:
                     # 4: Check whether a range configuration is provided
                     # otherwise replace sweep key-value pair with sweep default
                     if "range" not in list(settings_val.keys()):
+                        self.logger.debug('check 4')
                         # Get child key settings
                         settings_child_val, settings_child_found = self.path_get(
                             key_path = (key_path+['default']), 
@@ -572,6 +598,7 @@ class Config:
                     # 5: Check that argument that is coupled sweepable containts 
                     # a target name and that target name exists as a key
                     if settings_val.get('coupled',False):
+                        self.logger.debug('check 5')
                         try:
                             assert "target_name" in list(settings_val.keys()) and \
                                 self.path_exists(settings_val['target_name'],self.settings)
@@ -614,9 +641,9 @@ class Config:
                         if is_sweep:
                             self.isolated_sweep_paths[key_path[-2]] = deepcopy(key_path[:-1])
 
-
                 # 6: Check that if parameter sweep is activated
                 if key_path[-1] == 'sweep_mode':
+                    self.logger.debug('check 6')
                     self.sweep_active = settings_val
                 
                 # 7: If sweep is deactivated and
@@ -625,6 +652,7 @@ class Config:
                 # B: a sweep configuration is NOT provided but the values are provided
                 # then read the values provided
                 if key_path[-1] == 'sweep' and (not self.sweep_active or not settings_found):
+                    self.logger.debug('check 7')
                     
                     # If a sweep configuration has been provided
                     # read the default values
@@ -705,6 +733,7 @@ class Config:
                 # 8: Check all data type-specific checks
                 # according to the schema
                 if settings_found:
+                    self.logger.debug(f"check 8, has sweep: {self.has_sweep(key_path)}")
                     # If parameter is sweepable but settings 
                     # does not contain a sweep configuration
                     if self.has_sweep(key_path) and not isinstance(settings_val,dict):
@@ -727,10 +756,16 @@ class Config:
                             self.logger.error(f"Config for experiment(s) {kwargs.get('experiment_type','experiment_type')} failed.")
                             sys.exit()
                     elif self.has_sweep(key_path) and isinstance(settings_val,dict):
-                        # Do nothing
-                        None
+                        # Apply function recursively
+                        self.validate_config(
+                            v,
+                            settings,
+                            base_schema,
+                            key_path,
+                            **kwargs
+                        )
                     else:
-                        # Parse settings value into approapriate data structure
+                        # Parse settings value into appropriate data structure
                         entry = instantiate_data_type(
                             data=settings_val,
                             schema=schema_val,
