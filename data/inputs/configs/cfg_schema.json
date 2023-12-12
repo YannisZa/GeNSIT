@@ -1587,8 +1587,7 @@
               "table_loss",
               "table_likelihood_loss",
               "total_distance_loss"
-            ],
-            "unique-vals": true
+            ]
           }
         }
       },
@@ -1609,8 +1608,7 @@
             "list-dtype": "list",
             "list-length": [1, null],
             "list-list-dtype": "str",
-            "default-value": "mseloss",
-            "unique-vals": true
+            "default-value": "mseloss"
           }
         }
       },

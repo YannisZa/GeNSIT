@@ -393,7 +393,7 @@ class NonPrimitiveEntry(Entry):
                 raise DataUniquenessException(
                     f"Data {data} is not unique",
                     key_path=self.key_path,
-                    data=self.data
+                    data=data
                 )
         return True
 
