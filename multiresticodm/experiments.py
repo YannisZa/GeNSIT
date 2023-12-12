@@ -2359,7 +2359,6 @@ class JointTableSIM_NN(Experiment):
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
         theta_sample = initial_params['theta']
-        log_destination_attraction_sample = initial_params['log_destination_attraction']
         table_sample = initial_params['table']
         grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))].to(float32)
 
@@ -2375,7 +2374,7 @@ class JointTableSIM_NN(Experiment):
             ) \
             for nm in self.learning_model.loss_functions.keys()
         }
-
+        
         # Track number of elements in each loss function
         n_processed_steps = {nm : 0 for nm in self.learning_model.loss_functions.keys()}
         
