@@ -5,9 +5,9 @@ import warnings
 from tqdm import tqdm
 from copy import deepcopy
 from datetime import datetime
+from torch import float32, uint8
 from multiprocessing import Manager
 from joblib import Parallel, delayed
-from torch import float32, uint8, float16
 
 from multiresticodm.utils import *
 from multiresticodm.config import Config
@@ -2596,12 +2596,16 @@ class ExperimentSweep():
             config,sweep = self.prepare_experiment(sweep_configuration)
 
             self.logger.info(f'Instance = {str(instance_num)} START')
-
+            
             # Find tqdm position
             if active_positions is not None:
                 position_id = position_index(active_positions)
                 # Activate it
                 active_positions[position_id] = True
+                # Sleep for a second so that active_positions
+                # can sync with other instances
+                self.logger.debug(f"{instance_num},{active_positions},{position_id}")
+                time.sleep(1)
             else:
                 position_id = 0
             
@@ -2622,10 +2626,10 @@ class ExperimentSweep():
             new_experiment.run()
 
             self.logger.info(f'Instance = {str(instance_num)} DONE')
-            
+
             return position_id
         
-        except Exception as e:
+        except Exception:
             raise Exception(f'failed running instance {instance_num}')
 
     def run_sequential(self,sweep_configurations):
@@ -2636,11 +2640,14 @@ class ExperimentSweep():
             leave=False,
             position=0
         ):
-            _ = self.prepare_instantiate_and_run(
-                instance_num = instance,
-                sweep_configuration = sweep_config,
-                active_positions = None,
-            )
+            try:
+                _ = self.prepare_instantiate_and_run(
+                    instance_num = instance,
+                    sweep_configuration = sweep_config,
+                    active_positions = None
+                )
+            except Exception as exc:
+                raise exc
     
     def run_concurrent(self,sweep_configurations):
 
