@@ -283,13 +283,13 @@ class HarrisWilson_NN:
             loss_func = loss.get(name,loss_func) if loss_func is None else loss_func(**fn_kwargs)
             # if failed get loss function from physics model defined functions
             loss_func = getattr(self.physics_model,name,loss_func) if loss_func is None else loss_func
-            
+
             # Add kwargs
             if loss_func is not None:
                 self.loss_functions[name] = loss_func
                 self.loss_kwargs[name] = fn_kwargs
             else:
-                raise Exception(f"Loss {name} is missing loss function {function}.")
+                raise Exception(f"Loss {name} is missing function {function}. Loss function is set to {loss_func}.")
 
         self._loss_sample = torch.tensor(0.0, requires_grad=False)
         self._theta_sample = torch.stack(
