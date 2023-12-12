@@ -128,8 +128,6 @@ def log_flow_matrix(**kwargs):
         beta = torch.tensor(
             beta.values
         ).to(dtype=float32,device=device)
-
-    log_flow = torch.zeros((N,origin,destination,sweep)).to(dtype=float32,device=device)
     
     # Reshape tensors to ensure operations are possible
     log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,destination,sweep))
