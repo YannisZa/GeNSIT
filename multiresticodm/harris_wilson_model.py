@@ -7,9 +7,9 @@ import torch
 from torch import float32
 
 from multiresticodm.config import Config
-from multiresticodm.global_variables import PARAMETER_DEFAULTS,Dataset
 from multiresticodm.utils import set_seed, setup_logger, to_json_format
 from multiresticodm.spatial_interaction_model import SpatialInteraction2D
+from multiresticodm.global_variables import PARAMETER_DEFAULTS,DATA_SCHEMA,Dataset
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
 
@@ -274,7 +274,8 @@ class HarrisWilson:
         self,
         *,
         curr_destination_attractions,
-        free_parameters=None,
+        log_intensity_normalised,
+        free_parameters = None,
         dt: float = None,
         requires_grad: bool = True
     ):
@@ -288,6 +289,8 @@ class HarrisWilson:
         :return: the updated values
 
         """
+        self.logger.debug(f"Forward solving SDE")
+        self.logger.trace('Parsing parameters')
         # Parameters to learn
         alpha = (
             self.params.alpha
@@ -322,27 +325,28 @@ class HarrisWilson:
 
         # Training parameters
         dt = self.dt if dt is None else dt
-
+        self.logger.trace('Cloning dest attractions')
         new_sizes = curr_destination_attractions.clone()
         new_sizes.requires_grad = requires_grad
 
 
-        # Calculate the vector of demands
-        demand = self.intensity_model.intensity_demand(
-            alpha = alpha,
-            beta = beta,
-            log_destination_attraction = torch.log(new_sizes),
-            grand_total = torch.tensor(
-                1., dtype = float32, device = self.device
+        # Compute normalised demand
+        demand_normalised = torch.exp(
+            torch.logsumexp(
+                log_intensity_normalised,
+                dim = DATA_SCHEMA['log_destination_attraction']['dims'].index('destination')
             )
         )
-        demand = demand.reshape(curr_destination_attractions.shape)
         
+        # Reshape demand to match rest of objects
+        demand_normalised = demand_normalised.reshape(new_sizes.shape)
+        
+        self.logger.trace('Time update')
         new_sizes = (
             new_sizes + \
             +torch.mul(
                 curr_destination_attractions,
-                epsilon * (demand - kappa * curr_destination_attractions + delta)
+                epsilon * (demand_normalised - kappa * curr_destination_attractions + delta)
                 + sigma
                 * 1
                 / torch.sqrt(torch.tensor(2, dtype=torch.float) * torch.pi * dt).to(
