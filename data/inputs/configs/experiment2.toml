@@ -93,16 +93,14 @@ load_experiment = ''
 [neural_network]
   disable_tqdm = true
   [neural_network.loss.loss_name.sweep]
-    default = ['dest_attraction_ts_loss']
+    default = ['table_likelihood_loss']
     range = [
-      ['dest_attraction_ts_loss'],
-      ['dest_attraction_ts_likelihood_loss'],
+      ['table_likelihood_loss'],
       ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
     ]
   [neural_network.loss.loss_function.sweep]
-    default = ['mseloss']
+    default = ['custom']
     range = [
-      ['mseloss'],
       ['custom'],
       ['custom','custom']
     ]
@@ -112,7 +110,6 @@ load_experiment = ''
     default = [[]]
     range = [
       [[]],
-      [['noise_percentage']],
       [['noise_percentage'],[]]
     ]
     coupled = true

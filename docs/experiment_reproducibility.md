@@ -8,14 +8,18 @@ Set `ulimit -n 50000`
 
 ```
 clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 6 -nt 5 -sm -et NonJointTableSIM_NN \
--ln dest_attraction_ts_likelihood_loss -lf custom -lkk noise_percentage
+-ln dest_attraction_ts_loss -ln dest_attraction_ts_likelihood_loss \
+-lf mseloss -lf custom \
+-lkk '' -lkk noise_percentage
 clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 6 -nt 4 -sm -et JointTableSIM_NN
 ```
 
 ## Experiment 2
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment2.toml -nw 4 -nt 6 -sm
+clear; multiresticodm run ./data/inputs/configs/experiment2.toml -nw 4 -nt 6 -sm -et NonJointTableSIM_NN \
+-ln dest_attraction_ts_likelihood_loss -lf custom -lkk noise_percentage
+clear; multiresticodm run ./data/inputs/configs/experiment2.toml -nw 4 -nt 6 -sm -et NonJointTableSIM_NN
 ```
 
 ## Experiment 3

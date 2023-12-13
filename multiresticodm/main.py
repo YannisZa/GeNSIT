@@ -308,7 +308,7 @@ def create(
             default = None, multiple = True, help = 'Overwrites neural net loss name(s)')
 @click.option('--loss_function','-lf', type=click.Choice(list(LOSS_FUNCTIONS.keys())), callback=to_list,
             default = None, multiple = True, help = 'Overwrites neural net loss function(s)')
-@click.option('--loss_kwarg_keys','-lkk', type=click.Choice(list(DATA_SCHEMA.keys())), callback=to_list2d,
+@click.option('--loss_kwarg_keys','-lkk', type=click.STRING, callback=to_list2d,
             default = None, multiple = True, help = 'Overwrites neural net loss function(s) kwarg parameter keys')
 @click.option('--grid_size','-gs', type=click.IntRange(min=1),
             default = None, help = 'Overwrites size of square grid for R^2 and Log Target analyses.')

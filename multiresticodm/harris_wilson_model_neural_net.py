@@ -268,6 +268,7 @@ class HarrisWilson_NN:
 
         # Parse loss functions
         for name,function,kwarg_keys in zip(loss['loss_name'],loss['loss_function'],loss['loss_kwarg_keys']):
+            print(name,function,kwarg_keys)
             # Construct kwargs from key names
             fn_kwargs = {}
             for key in kwarg_keys:
