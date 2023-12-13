@@ -110,27 +110,27 @@ load_experiment = ''
 [neural_network]
   disable_tqdm = true
   [neural_network.loss.loss_name.sweep]
-    default = ['dest_attraction_ts_likelihood_loss']
-    # range = [
-    #   ['dest_attraction_ts_likelihood_loss'],
-    #   ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
-    # ]
+    default = ['table_likelihood_loss']
+    range = [
+      ['table_likelihood_loss'],
+      ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+    ]
   [neural_network.loss.loss_function.sweep]
     default = ['custom']
-    # range = [
-    #   ['custom'],
-    #   ['custom','custom']
-    # ]
-    # coupled = true
-    # target_name = 'loss_name'
+    range = [
+      ['custom'],
+      ['custom','custom']
+    ]
+    coupled = true
+    target_name = 'loss_name'
   [neural_network.loss.loss_kwarg_keys.sweep]
     default = [['noise_percentage']]
-    # range = [
-    #   [['noise_percentage']],
-    #   [['noise_percentage'],[]]
-    # ]
-    # coupled = true
-    # target_name = 'loss_name'
+    range = [
+      [['noise_percentage']],
+      [['noise_percentage'],[]]
+    ]
+    coupled = true
+    target_name = 'loss_name'
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
