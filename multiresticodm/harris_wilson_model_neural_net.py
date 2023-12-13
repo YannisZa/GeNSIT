@@ -12,9 +12,10 @@ from torch import nn, float32
 from typing import Any, List, Union
 
 from multiresticodm.config import Config
+from multiresticodm.utils.exceptions import *
 from multiresticodm.utils.misc_utils import setup_logger, print_json
 from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.fixed.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, DATA_SCHEMA
+from multiresticodm.fixed.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS
 
 
 def get_architecture(
@@ -253,6 +254,18 @@ class HarrisWilson_NN:
         # Store loss function parameters
         self.loss_functions = {}
         self.loss_kwargs = {}
+
+        # Make sure the these configurations have the same length
+        try:
+            assert len(set([len(loss[k]) for k in ['loss_name','loss_function','loss_kwarg_keys']])) == 1
+        except:
+            raise InvalidDataLength(
+                data_name_lens = {
+                    k:len(loss[k]) \
+                    for k in ['loss_name','loss_function','loss_kwarg_keys']
+                }
+            )
+
         # Parse loss functions
         for name,function,kwarg_keys in zip(loss['loss_name'],loss['loss_function'],loss['loss_kwarg_keys']):
             # Construct kwargs from key names
@@ -390,58 +403,6 @@ class HarrisWilson_NN:
             # Keep track number of loss samples per loss function
             n_processed_steps[name] = n_processed_steps[name] + 1
         return previous_loss,n_processed_steps
-
-
-    def epoch_time_step(
-        self,
-        *,
-        log_intensity_normalised: torch.tensor,
-        validation_data: dict,
-        grand_total: torch.tensor,
-        dt: float,
-        **__,
-    ):
-
-        '''Trains the model for a single epoch and time step.
-
-        :param training_data: the training data
-        :param batch_size: the number of time series elements to process before conducting a gradient descent step
-        :param epsilon: (optional) the epsilon value to use during training
-        :param dt: (optional) the time differential to use during training
-        :param __: other parameters (ignored)
-        '''
-
-        # Learn parameters by solving neural net
-        self.logger.debug('Solving neural net')
-        predicted_theta = self._neural_net(
-            torch.flatten(validation_data['destination_attraction_ts'])
-        )
-
-        # Add axis to every sample to ensure compatibility 
-        # with the functions used below
-        predicted_theta_expanded = torch.unsqueeze(predicted_theta,0).split(1,dim=1)
-        training_data_expanded = validation_data['destination_attraction_ts'].clone()
-        training_data_expanded.requires_grad = True
-        
-        # Compute log intensity
-        predicted_log_intensity = self.learning_model.physics_model.intensity_model.log_intensity(
-            log_destination_attraction = torch.log(training_data_expanded),
-            grand_total = grand_total,
-            **dict(zip(
-                self.learning_model.physics_model.params_to_learn,
-                predicted_theta_expanded
-            ))
-        ).squeeze()
-
-        # Solve SDE
-        predicted_dest_attraction = self.learning_model.physics_model.run_single(
-            curr_destination_attractions = training_data,
-            free_parameters = predicted_theta,
-            log_intensity_normalised = (predicted_log_intensity - torch.log(grand_total)),
-            dt = dt,
-            requires_grad = True
-        )
-        return predicted_theta, predicted_dest_attraction, predicted_log_intensity
 
 
     def __repr__(self):
