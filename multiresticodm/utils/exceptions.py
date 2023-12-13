@@ -27,6 +27,17 @@ class MissingData(DataException):
             Missing data {self.missing_data_name} in {self.location} ({self.data_names})!
         """
 
+class InvalidDataLength(DataException):
+    def __init__(self,data_name_lens:dict,**kwargs):
+        super().__init__('',**kwargs)
+        self.data_name_lens = data_name_lens
+
+    def __str__(self):
+        return f"""
+            Data {self.data_name_lens} does not have equal lengths!
+        """
+
+
 class DuplicateData(DataException):
     def __init__(self,message:str,len_data:int,len_unique_data:int,**kwargs):
         self.message = message
