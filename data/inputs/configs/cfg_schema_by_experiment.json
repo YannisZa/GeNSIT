@@ -56,5 +56,10 @@
     "neural_network>exclude": true,
     "contingency_table>exclude": true,
     "mcmc>exclude": true
+  },
+  "LotTarget_Analysis": {
+    "neural_network>exclude": true,
+    "contingency_table>exclude": true,
+    "mcmc>exclude": true
   }
 }

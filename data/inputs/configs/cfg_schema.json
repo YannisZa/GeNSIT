@@ -1882,6 +1882,7 @@
         "default-value": "SIM_NN",
         "is-any-of": [
           "RSquared_Analysis",
+          "LogTarget_Analysis",
           "DataGeneration",
           "SIM_NN",
           "SIM_MCMC",
@@ -1935,60 +1936,66 @@
           "sweepable": false,
           "optional": true,
           "exclude": false,
+          "dtype": "dict",
+          "dict-key-dtype": "str",
+          "dict-value-schema": {
+            "min": {
+              "sweepable": false,
+              "optional": true,
+              "exclude": false,
 
-          "min": {
-            "sweepable": false,
-            "optional": true,
-            "exclude": false,
+              "dtype": "float",
+              "default": 0.0
+            },
+            "max": {
+              "sweepable": false,
+              "optional": true,
+              "exclude": false,
 
-            "dtype": "float",
-            "default": 0.0
-          },
-          "max": {
-            "sweepable": false,
-            "optional": true,
-            "exclude": false,
+              "dtype": "float",
+              "default": 2.0
+            },
+            "n": {
+              "sweepable": false,
+              "optional": true,
+              "exclude": false,
 
-            "dtype": "float",
-            "default": 2.0
-          },
-          "n": {
-            "sweepable": false,
-            "optional": true,
-            "exclude": false,
-
-            "dtype": "int",
-            "default": 100
+              "dtype": "int",
+              "default": 100
+            }
           }
         },
         "beta": {
           "sweepable": false,
           "optional": true,
           "exclude": false,
+          "dtype": "dict",
+          "dict-key-dtype": "str",
+          "dict-value-schema": {
+            "min": {
+              "sweepable": false,
+              "optional": true,
+              "exclude": false,
 
-          "min": {
-            "sweepable": false,
-            "optional": true,
-            "exclude": false,
+              "dtype": "float",
+              "default": 0.0
+            },
+            "max": {
+              "sweepable": false,
+              "optional": true,
+              "exclude": false,
 
-            "dtype": "float",
-            "default": 0.0
-          },
-          "max": {
-            "sweepable": false,
-            "optional": true,
-            "exclude": false,
+              "dtype": "float",
+              "default": 2.0
+            },
+            "n": {
+              "sweepable": false,
+              "optional": true,
+              "exclude": false,
 
-            "dtype": "float",
-            "default": 2.0
-          },
-          "n": {
-            "sweepable": false,
-            "optional": true,
-            "exclude": false,
-
-            "dtype": "int",
-            "default": 100
+              "dtype": "int",
+              "default": 100
+            }
           }
         }
       }
