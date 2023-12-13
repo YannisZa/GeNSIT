@@ -338,16 +338,30 @@ class Outputs(object):
                         step=1
                     ).astype(DATA_SCHEMA[sample_name]['args_dtype'][i])
 
+            # Keep only necessary global coordinates
+            sample_global_dims = ['iter'] if DATA_SCHEMA[sample_name]['is_iterable'] else []
+            sample_global_dims += DATA_SCHEMA[sample_name].get("dims",[])
+
             # Update coordinates to include schema and sweep coordinates
             # Keep only coordinates that are 1) core
             # 2) isolated sweeps 
             # or 3) the targets of coupled sweeps
             coordinates = {
                 **{k:v for k,v in local_coords.items() \
-                   if k != sample_name},# and k in self.config.sweep_target_names},
-                **global_coords,
+                   if k != sample_name},
+                **{k:v for k,v in global_coords.items() \
+                   if k in sample_global_dims},
                 **coordinates
             }
+            print(sample_name)
+            print_json(global_coords,newline=True)
+            # print({k:v for k,v in local_coords.items() \
+            #        if k != sample_name}.keys())
+            # print({k:v for k,v in global_coords.items() \
+            #        if k in sample_global_dims}.keys())
+            # print(coordinates.keys())
+            print_json(coordinates,newline=True)
+
             # Populate dictionary 
             xr_dict[sample_name] = {
                 "data": sample_data.reshape(tuple([len(val) for val in coordinates.values()])),
@@ -383,22 +397,43 @@ class Outputs(object):
                         continue
                     
                     start_idx = 0
+                    print(sample_name,sample_data.shape)
                     if OUTPUT_SCHEMA[sample_name]["is_iterable"]:
-                        global_coords['iter'] = np.arange(
-                            start=1,
-                            stop=sample_data.shape[start_idx]+1,
-                            step=1,
-                            dtype='int32'
-                        )
+                        if 'iter' in global_coords:
+                            global_coords.update({
+                                "iter" : np.arange(
+                                    start = 1,
+                                    stop = sample_data.shape[start_idx]+1,
+                                    step = 1,
+                                    dtype = 'int32'
+                                )
+                            })
+                        else:
+                            global_coords['iter'] = np.arange(
+                                start = 1,
+                                stop = sample_data.shape[start_idx]+1,
+                                step = 1,
+                                dtype = 'int32'
+                            )
                         start_idx = 1
-                    for i,dim in enumerate(OUTPUT_SCHEMA[sample_name]["dims"]):
-                        # Get iterations
-                        global_coords[dim] = np.arange(
-                            start=1,
-                            stop=sample_data.shape[i+start_idx]+1,
-                            step=1,
-                            dtype='int32'
-                        )
+                    for i,dim in enumerate(OUTPUT_SCHEMA[sample_name].get("dims",[])):
+                        if dim in global_coords:
+                            global_coords.update({
+                                dim : np.arange(
+                                    start=1,
+                                    stop=sample_data.shape[i+start_idx]+1,
+                                    step=1,
+                                    dtype='int32'
+                                )
+                            })
+                        else:
+                            global_coords[dim] = np.arange(
+                                start=1,
+                                stop=sample_data.shape[i+start_idx]+1,
+                                step=1,
+                                dtype='int32'
+                            )
+                    print(global_coords)
                     # Append
                     self.logger.debug(f'Appending {sample_name}')
                     data_vars[sample_name] = np.array([sample_data[:]])
@@ -824,7 +859,7 @@ class Outputs(object):
                 )
                 # Reorder coordinate names
                 samples = samples.transpose(
-                    'id',*OUTPUT_SCHEMA[sample_name]["dims"],'sweep'
+                    'id',*OUTPUT_SCHEMA[sample_name].get("dims",[]),'sweep'
                 )
             elif len(iter_dims) > 0:
                 samples = samples.stack(
@@ -832,7 +867,7 @@ class Outputs(object):
                 )
                 # Reorder coordinate names
                 samples = samples.transpose(
-                    'id',*OUTPUT_SCHEMA[sample_name]["dims"]
+                    'id',*OUTPUT_SCHEMA[sample_name].get("dims",[])
                 )
             elif len(sweep_dims) > 0:
                 samples = samples.stack(
@@ -840,12 +875,12 @@ class Outputs(object):
                 )
                 # Reorder coordinate names
                 samples = samples.transpose(
-                    *OUTPUT_SCHEMA[sample_name]["dims"],'sweep'
+                    *OUTPUT_SCHEMA[sample_name].get("dims",[]),'sweep'
                 )
             else:
                 # Reorder coordinate names
                 samples = samples.transpose(
-                    *OUTPUT_SCHEMA[sample_name]["dims"]
+                    *OUTPUT_SCHEMA[sample_name].get("dims",[])
                 )
             
 
@@ -1130,7 +1165,8 @@ class DataCollection(object):
         sample_name = new_data.attrs['arr_name']
 
         # Core dimensions for sample must be shared
-        sample_shared_dims = DATA_SCHEMA[sample_name]['dims']
+        sample_shared_dims = ['iter'] if DATA_SCHEMA[sample_name]["is_iterable"] else []
+        sample_shared_dims += DATA_SCHEMA[sample_name].get("dims",[])
         # Grouped by sweep params that will be shared
         sample_shared_dims = set(sample_shared_dims).union(set(group_by))
         # All input-related sweep params that will be shared
