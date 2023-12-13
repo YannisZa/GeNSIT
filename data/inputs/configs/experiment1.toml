@@ -124,9 +124,9 @@ load_experiment = ''
     coupled = true
     target_name = 'loss_name'
   [neural_network.loss.loss_kwarg_keys.sweep]
-    default = [['noise_percentage']]
+    default = [[]]
     range = [
-      [['noise_percentage']],
+      [[]],
       [['noise_percentage'],[]]
     ]
     coupled = true
