@@ -75,7 +75,7 @@ load_experiment = ''
   num_steps = +1
   batch_size = +1
   [training.N.sweep]
-    default = 100#00
+    default = 10
     range = ["repeat(10,10000)","repeat(100,1000)","repeat(1000,100)","repeat(10000,10)","repeat(100000,1)",]
     coupled = true
     target_name = 'seed'
@@ -97,14 +97,14 @@ load_experiment = ''
     range = [
       ['dest_attraction_ts_loss'],
       ['dest_attraction_ts_likelihood_loss'],
-      # ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+      ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
     ]
   [neural_network.loss.loss_function.sweep]
     default = ['mseloss']
     range = [
       ['mseloss'],
       ['custom'],
-      # ['custom','custom']
+      ['custom','custom']
     ]
     coupled = true
     target_name = 'loss_name'
@@ -113,7 +113,7 @@ load_experiment = ''
     range = [
       [[]],
       [['noise_percentage']],
-      # [['noise_percentage'],[]]
+      [['noise_percentage'],[]]
     ]
     coupled = true
     target_name = 'loss_name'
