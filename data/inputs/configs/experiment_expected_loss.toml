@@ -36,13 +36,12 @@ load_experiment = ''
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
     default = [[+0,+1]]
-    range = [[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
+    range = [[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'
   [contingency_table.constraints.cells.sweep]
     default = ''
     range = ['','','',
-      'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
       'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
     ]
     coupled = true
@@ -53,7 +52,7 @@ load_experiment = ''
     default = 'TotallyConstrained'
     range = [
       'TotallyConstrained','ProductionConstrained',
-      'TotallyConstrained','TotallyConstrained','TotallyConstrained'
+      'TotallyConstrained','TotallyConstrained'
     ]
     coupled = true
     target_name = 'title'
@@ -99,7 +98,6 @@ load_experiment = ''
     range = [
       ['table_likelihood_loss'],
       ['dest_attraction_ts_likelihood_loss'],
-      ['dest_attraction_ts_loss'],
       ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
     ]
   [neural_network.loss.loss_function.sweep]
@@ -107,7 +105,6 @@ load_experiment = ''
     range = [
       ['custom'],
       ['custom'],
-      ['mseloss'],
       ['custom','custom'],
     ]
     coupled = true
@@ -117,7 +114,6 @@ load_experiment = ''
     range = [
       [[]],
       [['noise_percentage']],
-      [[]],
       [['noise_percentage'],[]]
     ]
     coupled = true
@@ -155,4 +151,4 @@ load_experiment = ''
     out_group = 'exp5_expected_loss'
     [outputs.title.sweep]
       default = '_total_constrained'
-      range = ['_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      range = ['_total_constrained','_row_constrained','_doubly_constrained','_doubly_20%_cell_constrained']
