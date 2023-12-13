@@ -2536,7 +2536,7 @@ class ExperimentSweep():
                 # Sleep for a second so that active_positions
                 # can sync with other instances
                 self.logger.debug(f"{instance_num},{active_positions},{position_id}")
-                time.sleep(1)
+                time.sleep(2)
             else:
                 position_id = 0
             
