@@ -8,57 +8,62 @@ Set `ulimit -n 50000`
 
 ```
 clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 5 -nt 6 -sm -et NonJointTableSIM_NN
+clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 1 -nt 12 -sm -et NonJointTableSIM_NN \
+-ln dest_attraction_ts_likelihood_loss -lf custom -lkk noise_percentage
 clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 4 -nt 5 -sm -et JointTableSIM_NN
-```
-
-```
-clear; multiresticodm run ./data/inputs/configs/debug.toml -nw 1 -nt 12 -et SIM_NN
-clear; multiresticodm run ./data/inputs/configs/debug.toml -nw 1 -nt 12 -et RSquared_Analysis
 ```
 
 ## Experiment 2
 
-### Dependent (joint) Table and SIM
-
+```
 clear; multiresticodm run ./data/inputs/configs/experiment2.toml -nw 4 -nt 6 -sm
+```
 
 ## Experiment 3
 
-### NN SIM
-
-````clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
- -re SIM_NN -nw 10 -sm -ln dest_attraction_ts -lf mseloss```
-
-````
-
-clear; multiresticodm run ./data/inputs/configs/experiment3.toml -nw 1 -sm
-
 ```
-
-### Independent (non-joint) Table and SIM
-
-clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
--re NonJointTableSIM_NN -nw 10 -sm -ln dest_attraction_ts -lf mseloss
-
-### Dependent (joint) Table and SIM
-
-clear; multiresticodm run ./data/inputs/configs/experiment3.toml \
--re JointTableSIM_NN -nw 10 -sm \
--ln dest_attraction_ts -ln table_likelihood \
--lf mseloss -lf custom
+clear; multiresticodm run ./data/inputs/configs/experiment3.toml -nw 6 -nt 5 -sm
+```
 
 ## Experiment 4
 
-hi
-
 ## Experiment 5 (Expected loss)
 
-Set `ulimit -n 50000`
-
-### Dependent (joint) Table and SIM
-
+```
 clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml -et JointTableSIM_NN -nw 10 -nt 4 -sm
-clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml -et JointTableSIM_NN -nw 1 -nt 4 -sm
+```
+
+# Summaries and Metrics
+
+## Experiment 1
+
+Get SRMSEs for all samples and all experiments:
+
+```
+-et JointTableSIM_NN
+
+clear; multiresticodm summarise -s table -s intensity \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-et SIM_MCMC -et JointTableSIM_MCMC -et SIM_NN -et NonJointTableSIM_NN \
+-stat 'srmse' 'mean&' 'iter+seed&' \
+-k sigma -k name -btt 'iter' 0 100 100 \
+-fe SRMSEs -nw 1 --force_reload
+
+```
+
+Get coverage probabilities for all samples and all experiments
+
+```
+-et JointTableSIM_MCMC -et SIM_NN -et NonJointTableSIM_NN -et JointTableSIM_NN
+
+clear; multiresticodm summarise -s table -s intensity \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-et SIM_MCMC \
+-stat 'coverage_probability' '&mean|\*100|rint' '&origin+destination||' \
+-k sigma -k name -k type --region_mass 0.99 \
+-fe CoverageProbabilities -nw 1 --force_reload
+
+```
 
 # Plots
 
@@ -85,66 +90,6 @@ clear; multiresticodm plot -y srmse -x 'iter&seed' -x sigma \
 ```
 
 <!-- -fs 5 5 -ms 20 -ff pdf -tfs 14 -afs 14 -lls 18 -als 18 -->
-
-# Summaries and Metrics
-
-## Cost matrix signal
-
-```
-
-clear; multiresticodm summarise -s r2 \
--dn cambridge_work_commuter_lsoas_to_msoas/cm_signal \
--et RSquared_Analysis \
--stat 'r2' 'max&' '&' \
--k sigma -k bmax -k name -nw 1
-
-```
-
-## Experiment 1
-
-Get SRMSEs for all samples and all experiments:
-
-```
-
-clear; multiresticodm summarise -s table -s intensity \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
--et SIM_MCMC -et JointTableSIM_MCMC -et SIM_NN -et NonJointTableSIM_NN -et JointTableSIM_NN \
--stat 'srmse' 'mean&' 'iter+seed&' \
--k sigma -k name -btt 'iter' 0 100 100 \
--fe SRMSEs -nw 1 --force_reload
-
-```
-
-Get coverage probabilities for all samples and all experiments:
--et JointTableSIM_MCMC -et SIM_NN -et NonJointTableSIM_NN -et JointTableSIM_NN
-
-```
-
-clear; multiresticodm summarise -s table -s intensity \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
--et SIM_MCMC \
--stat 'coverage_probability' '&mean|\*100|rint' '&origin+destination||' \
--k sigma -k name -k type --region_mass 0.99 \
--fe CoverageProbabilities -nw 1 --force_reload
-
-```
-
-Debugging scripts
-
-```
-
--d exp1/SIM_MCMC_SweepedNoise_16_05_2023_20_09_04 \
--d exp1/JointTableSIM_MCMC_SweepedNoise_16_05_2023_20_09_04 \
-
-clear; multiresticodm summarise -s intensity \
--d exp1/SIM_NN_SweepedNoise_05_12_2023_21_23_00 \
--d exp1/SIM_NN_SweepedNoise_16_05_2023_20_09_04 \
--dn cambridge_work_commuter_lsoas_to_msoas \
--stat 'srmse' 'mean&' 'iter+seed&' \
--k sigma -k name -k type \
--btt 'iter' 100 100 1000 -fe all_SIM_NN_SMRSEs -nw 1 --force_reload
-
-```
 
 ## Experiment 5 (Expected loss)
 
@@ -175,7 +120,5 @@ clear; multiresticodm plot -y table_likelihood -x table_steps \
 -ylab 'Table loss' -xfq 6 10 -fs 4 4 -lls 8 -afs 8 -tfs 5 -nw 6
 
 -cs title \_total_constrained
-
-```
 
 ```
