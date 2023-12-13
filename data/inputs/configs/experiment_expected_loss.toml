@@ -68,8 +68,6 @@ load_experiment = ''
   [harris_wilson_model.parameters]
     noise_percentage = +0.01
     epsilon = +1.0
-    # delta = +0.0
-    # kappa = +1.0000000596046483
     [harris_wilson_model.parameters.sigma.sweep]
       default = nan
       # range = [0.0141421356, 0.1414213562, nan]

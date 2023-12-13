@@ -4,10 +4,20 @@ from copy import deepcopy
 
 
 def to_list(ctx, param, value):
-    return list(value)
+    if value is None:
+        return None
+    elif len(value) == 0:
+        return []
+    else:
+        return list(value)
 
 def to_list2d(ctx, param, value):
-    return [list(value)]
+    if value is None:
+        return None
+    elif len(value) == 0:
+        return []
+    else:
+        return [list(value)]
 
 def split_to_list(ctx, param, value):
     if value is None:
