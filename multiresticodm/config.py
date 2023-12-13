@@ -8,10 +8,10 @@ from copy import deepcopy
 from itertools import product
 
 from multiresticodm import ROOT
-from multiresticodm.exceptions import *
-from multiresticodm.global_variables import deep_walk
-from multiresticodm.config_data_structures import instantiate_data_type
-from multiresticodm.utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify, string_to_numeric
+from multiresticodm.utils.exceptions import *
+from multiresticodm.fixed.global_variables import deep_walk
+from multiresticodm.utils.config_data_structures import instantiate_data_type
+from multiresticodm.utils.misc_utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify, string_to_numeric
 
 class Config:
 
@@ -535,7 +535,7 @@ class Config:
                 try: 
                     assert schema_found
                 except:
-                    raise Exception(f"Key {'>'.join(key_path)} not found in schema.")
+                    raise Exception(f"Key {'>'.join(list(map(str,key_path)))} not found in schema.")
 
                 # 1: Check if argument is optional in case it is not included in settings
                 # and it is not part of a sweep
@@ -543,7 +543,7 @@ class Config:
                     self.logger.trace('check 1')
                     if isinstance(schema_val,dict) and not schema_val['optional']:
                         raise Exception(f"""
-                            Key {'>'.join(key_path)} is compulsory but not included
+                            Key {'>'.join(list(map(str,key_path)))} is compulsory but not included
                         """)
 
                 if key_path[-1] == 'sweep' and settings_found:
@@ -558,7 +558,7 @@ class Config:
                     if not schema_parent_val["sweepable"]:
                         self.logger.trace('check 2')
                         raise Exception(f"""
-                            Key {'>'.join(key_path)} is not sweepable 
+                            Key {'>'.join(list(map(str,key_path)))} is not sweepable 
                             but contains a sweep configuration
                         """)
                     # 3: Check that argument that is sweepable containts 
@@ -568,7 +568,7 @@ class Config:
                             and "default" in list(settings_val.keys())
                     except:
                         raise Exception(f"""
-                            Key {'>'.join(key_path)} is not a dictionary 
+                            Key {'>'.join(list(map(str,key_path)))} is not a dictionary 
                             or does not have 'default' configuration 
                             for a sweep
                         """)
@@ -586,7 +586,7 @@ class Config:
                             assert self.path_set(settings,settings_child_val,key_path[:-1])
                         except:
                             raise Exception(f"""
-                                Key {'>'.join(key_path)} could not be updated \
+                                Key {'>'.join(list(map(str,key_path)))} could not be updated \
                                 with sweep default
                             """)
                         # Flag for whether this parameter should be treated as 
@@ -604,7 +604,7 @@ class Config:
                                 self.path_exists(settings_val['target_name'],self.settings)
                         except:
                             raise Exception(f"""
-                                Key {'>'.join(key_path)} does not have a
+                                Key {'>'.join(list(map(str,key_path)))} does not have a
                                 'target_name' configuration for a sweep or
                                 target_name does not exist
                             """)
@@ -674,7 +674,7 @@ class Config:
                             assert settings_child_found
                         except:
                             raise Exception(f"""
-                                    Key {'>'.join(key_path)} could not be found \
+                                    Key {'>'.join(list(map(str,key_path)))} could not be found \
                                     with sweep default or without sweep
                                 """)
                         # Update settings with sweep default
@@ -682,7 +682,7 @@ class Config:
                             assert self.path_set(settings,settings_child_val,key_path[:-1])
                         except:
                             raise Exception(f"""
-                                Key {'>'.join(key_path)} could not be updated \
+                                Key {'>'.join(list(map(str,key_path)))} could not be updated \
                                 with sweep default
                             """)
 

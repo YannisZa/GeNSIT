@@ -3,11 +3,11 @@ import sys
 import traceback
 
 from typing import Any
-from copy import deepcopy
-from collections.abc import Iterable,Sequence
+from collections.abc import Iterable
 from numpy import arange, isfinite, isnan, shape, array, repeat
 
-from multiresticodm.utils import in_range,string_to_numeric,is_null,flatten
+from multiresticodm.utils.exceptions import *
+from multiresticodm.utils.misc_utils import in_range,string_to_numeric,is_null,flatten
 
 def instantiate_data_type(
     data,
@@ -19,13 +19,13 @@ def instantiate_data_type(
     except:
         print('faulty schema')
         print(schema)
-        raise Exception('>'.join(key_path))
+        raise Exception('>'.join(list(map(str,key_path))))
     try:
         data_type = data_type[0].capitalize() + data_type[1:]
     except:
         print('schema',schema)
         print('data_type',data_type)
-        raise Exception('>'.join(key_path))
+        raise Exception('>'.join(list(map(str,key_path))))
     if len(data_type) > 0 and hasattr(sys.modules[__name__], data_type):
         return getattr(sys.modules[__name__], data_type)(
             data=data,
@@ -33,7 +33,7 @@ def instantiate_data_type(
             key_path=key_path
         )
     else:
-        raise ValueError(f"Data type '{data_type}' not found for {'>'.join(key_path)}")
+        raise ValueError(f"Data type '{data_type}' not found for {'>'.join(list(map(str,key_path)))}")
 
 
 class Entry():
@@ -109,9 +109,9 @@ class PrimitiveEntry(Entry):
                 assert self.data in valid_scope
             except:
                 raise InvalidScopeException(
-                    f"Data {self.data} is not in scope {valid_scope}",
-                    key_path=self.key_path,
-                    data=self.data
+                    message = f"Data {self.data} is not in scope {valid_scope}",
+                    key_path = self.key_path,
+                    data = self.data
                 )
         substrings = self.schema.get("contains",[])
         if isinstance(substrings,list) and len(substrings) > 0:
@@ -675,11 +675,21 @@ class Dict(NonPrimitiveEntry):
         key_schema = {k.replace('key-','',1):v for k,v in self.schema.items() if k.startswith('key-')}
         # Get value schema
         value_schema = {k.replace('value-','',1):v for k,v in self.schema.items() if k.startswith('value-')}
+        # Get value schema if provided
+        if "schema" in value_schema:
+            value_schema = value_schema["schema"]
+        else:
+            # Convert generic value schema to key-specific value schema
+            value_schema = {k:value_schema for k in data.keys()}
         # Get all value entries
-        self.data = {instantiate_data_type(key,key_schema,key_path):instantiate_data_type(val,value_schema,key_path) for key,val in data.items()}
-    
+        self.data = {
+            instantiate_data_type(key,key_schema,key_path) : instantiate_data_type(val,value_schema[key],key_path) \
+            for key,val in data.items()
+        }
+
     def value(self) -> dict:
         return {key.value():(self.schema['default-value'] if is_null(datum) else datum.value()) for key,datum in self.data.items()}
+    
 
     def check(self):
         # Check that correct length is provided
@@ -692,172 +702,3 @@ class Dict(NonPrimitiveEntry):
         self.check_elements(vals=self.data.keys())
         # Check that each value is valid
         self.check_elements(vals=self.data.values())
-
-class CustomDict(NonPrimitiveEntry):
-    def __init__(self,data,schema,key_path):
-        super().__init__(data,schema,key_path)
-        self.dtype = dict
-
-        # First check that input is indeed a dict
-        self.check_type(data_type = self.dtype)
-
-        # Then prep schema for list values
-        # Remove all key prefixes that start with 'list'
-        self.schema = {} 
-        for k,v in schema.items():
-            if k in ['dtype','sweepable','target_name','optional']:
-                continue
-            # Remove all non-primitive entry names from preffix
-            stored = False
-            for name in self.names:
-                if k.startswith((name+'-')):
-                    self.schema[k.replace((name+'-'),'',1)] = v
-                    stored = True
-                    continue
-            # If not done so already, store schema setting
-            if not stored:
-                self.schema[k] = v
-
-        # Get key schema
-        key_schema = {k.replace('key-','',1):v for k,v in self.schema.items() if k.startswith('key-')}
-        # Get value schema
-        value_schema = {k.replace('value-','',1):v for k,v in self.schema.items() if k.startswith('value-')}["schema"]
-        # Get all value entries
-        self.data = {instantiate_data_type(key,key_schema,key_path):instantiate_data_type(val,value_schema[key],key_path) for key,val in data.items()}
-            
-    def value(self) -> dict:
-        return {key.value():(self.schema['default-value'] if is_null(datum) else datum.value()) for key,datum in self.data.items()}
-    
-
-    def check(self):
-        # Check that correct length is provided
-        self.check_length()
-        # Check that each key is valid
-        self.check_elements(vals=self.data.keys())
-        # Check that each value is valid
-        self.check_elements(vals=self.data.values())
-
-#--------------------------------------------------------------------
-#--------------------------------------------------------------------
-#------------------------- Entry Exceptions -------------------------
-#--------------------------------------------------------------------
-#--------------------------------------------------------------------
-
-class EntryException(Exception):
-    def __init__(self,message,**kwargs):
-        super().__init__(message)
-        self.message = message
-        self.key_path = kwargs.get('key_path',[])
-        self.data = kwargs.get('data','[data-not-found]')
-
-    def __str__(self):
-        return f"""
-            Error in {'>'.join(self.key_path)}
-            {self.message}
-            Data: {self.data}
-        """
-
-class InvalidLengthException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InvalidRangeException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class DataUniquenessException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InfiniteNumericException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InvalidTypeException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InvalidElementTypeException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InvalidScopeException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class StringNotNumericException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class PathNotExistException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InvalidExtensionException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InvalidBooleanException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class CustomListParsingException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class FileNotFoundException(PathNotExistException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class DirectoryNotFoundException(PathNotExistException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InvalidElementException(EntryException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InvalidKeyException(InvalidElementException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-class InvalidValueException(InvalidElementException):
-    def __init__(self,message,**kwargs):
-        super().__init__(message,**kwargs)
-
-#--------------------------------------------------------------------
-#--------------------------------------------------------------------
-#------------------------ Schema Exceptions -------------------------
-#--------------------------------------------------------------------
-#--------------------------------------------------------------------
-
-class SchemaException(Exception):
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.key_path = kwargs.get('key_path',[])
-        self.data = kwargs.get('data','[data-not-found]')
-
-    def __str__(self):
-        return f"""
-            Missing key {">".join(self.key_path)} in schema
-        """
-
-class RangeNotFoundException(SchemaException):
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-    
-class TypeNotFoundException(SchemaException):
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-
-class PathNotFoundException(SchemaException):
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-
-class ExtensionNotFoundException(SchemaException):
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-
-class EmptyOrInvalidScopeException(SchemaException):
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)

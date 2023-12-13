@@ -25,9 +25,9 @@ from typing import Dict, List, Union, Tuple
 from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
 
-from multiresticodm.exceptions import *
-from multiresticodm.logger_class import *
-from multiresticodm.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS
+from multiresticodm.utils.exceptions import *
+from multiresticodm.utils.logger_class import *
+from multiresticodm.fixed.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):

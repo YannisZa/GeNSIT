@@ -11,20 +11,20 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path as PathLib
 from joblib import Parallel, delayed
-from multiresticodm.global_variables import TABLE_INFERENCE_EXPERIMENTS
+from multiresticodm.fixed.global_variables import TABLE_INFERENCE_EXPERIMENTS
 
-import multiresticodm.probability_utils as ProbabilityUtils
+import multiresticodm.utils.probability_utils as ProbabilityUtils
 
 from multiresticodm.config import Config
-from multiresticodm.math_utils import torch_optimize
+from multiresticodm.utils.math_utils import torch_optimize
 from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.utils import setup_logger, makedir, set_seed
+from multiresticodm.utils.misc_utils import setup_logger, makedir, set_seed, unpack_dims
 
 AIS_SAMPLE_ARGS = ['alpha','beta','gamma','n_temperatures','ais_samples','leapfrog_steps','epsilon_step','semaphore','pbar']
 
 def instantiate_harris_wilson_mcmc(config:Config,physics_model:HarrisWilson,**kwargs):
     if hasattr(sys.modules[__name__], ('HarrisWilsonMarkovChainMonteCarlo')):
-        return getattr(sys.modules[__name__],f"HarrisWilson{len(config['inputs']['dims'].keys())}DMarkovChainMonteCarlo")(
+        return getattr(sys.modules[__name__],f"HarrisWilson{len(unpack_dims(config['inputs']['dims'],time_dims=False))}DMarkovChainMonteCarlo")(
             config = config,
             physics_model = physics_model,
             **kwargs

@@ -7,8 +7,8 @@ import torch.distributions as distr
 from typing import Union, Tuple
 from torch import int32, float32
 
-from multiresticodm.utils import set_seed
-from multiresticodm.math_utils import log_factorial_sum
+from multiresticodm.utils.misc_utils import set_seed
+from multiresticodm.utils.math_utils import log_factorial_sum
 
 def uniform_binary_choice(n:int=1):
     choices = [-1,1]

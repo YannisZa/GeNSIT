@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from multiresticodm.utils import write_txt
+from multiresticodm.utils.misc_utils import write_txt
 from multiresticodm.contingency_table import ContingencyTable2D
 
 # Specify path to table

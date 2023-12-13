@@ -8,9 +8,9 @@ os.environ['USE_PYGEOS'] = '0'
 
 import geopandas as gpd
 
-from multiresticodm.utils import *
+from multiresticodm.utils.misc_utils import *
 from dask.distributed import Client, LocalCluster
-from multiresticodm.notebook_functions import *
+from multiresticodm.utils.notebook_functions import *
 
 
 if __name__ == '__main__':

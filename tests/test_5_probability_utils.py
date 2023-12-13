@@ -10,7 +10,7 @@ from argparse import Namespace
 from multiresticodm.config import Config
 from multiresticodm.contingency_table import ContingencyTable2D
 from multiresticodm.spatial_interaction_model import ProductionConstrainedSIM,TotallyConstrainedSIM
-from multiresticodm.probability_utils import *
+from multiresticodm.utils.probability_utils import *
 from tests.test_4_spatial_interaction_model import Test4Helpers
 
 class Test5Helpers:

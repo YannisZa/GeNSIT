@@ -15,8 +15,8 @@ import geopandas as gpd
 from datetime import date
 from tqdm.auto import tqdm
 from joblib import Parallel, delayed
-from multiresticodm.notebook_functions import compute_individual_facility_shortest_path
-from multiresticodm.utils import read_json
+from multiresticodm.utils.notebook_functions import compute_individual_facility_shortest_path
+from multiresticodm.utils.misc_utils import read_json
 
 # Suppress warnings
 warnings.filterwarnings("ignore")

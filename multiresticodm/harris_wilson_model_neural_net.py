@@ -12,9 +12,9 @@ from torch import nn, float32
 from typing import Any, List, Union
 
 from multiresticodm.config import Config
-from multiresticodm.utils import setup_logger, print_json
+from multiresticodm.utils.misc_utils import setup_logger, print_json
 from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, DATA_SCHEMA
+from multiresticodm.fixed.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, DATA_SCHEMA
 
 
 def get_architecture(

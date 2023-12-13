@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from copy import deepcopy
 from multiresticodm.config import Config
-from multiresticodm.utils import ,f_to_array,deep_updates
+from multiresticodm.utils.misc_utils import ,f_to_array,deep_updates
 from multiresticodm.contingency_table import ContingencyTable2D
 from multiresticodm.markov_basis import instantiate_markov_basis
 

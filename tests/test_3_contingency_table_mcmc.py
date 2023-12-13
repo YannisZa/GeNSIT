@@ -8,7 +8,7 @@ import pandas as pd
 from copy import deepcopy
 from argparse import Namespace
 from multiresticodm.config import Config
-from multiresticodm.utils import *
+from multiresticodm.utils.misc_utils import *
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.markov_basis import instantiate_markov_basis
 from multiresticodm.spatial_interaction_model import ProductionConstrained

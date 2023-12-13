@@ -8,13 +8,13 @@ from torch import int32, float32
 from scipy.stats import nchypergeom_fisher
 from typing import Union, Tuple, Dict, List
 
-import multiresticodm.probability_utils as ProbabilityUtils
+import multiresticodm.utils.probability_utils as ProbabilityUtils
 
-from multiresticodm.math_utils import log_factorial_sum
+from multiresticodm.utils.math_utils import log_factorial_sum
 from multiresticodm.markov_basis import instantiate_markov_basis,MarkovBasis
 from multiresticodm.contingency_table import ContingencyTable, ContingencyTable2D
-from multiresticodm.probability_utils import uniform_binary_choice, log_odds_cross_ratio
-from multiresticodm.utils import  ndims, set_seed, setup_logger, tuplize, flatten, unpack_dims
+from multiresticodm.utils.probability_utils import uniform_binary_choice, log_odds_cross_ratio
+from multiresticodm.utils.misc_utils import  ndims, set_seed, setup_logger, tuplize, flatten, unpack_dims
 
 
 class ContingencyTableMarkovChainMonteCarlo(object):

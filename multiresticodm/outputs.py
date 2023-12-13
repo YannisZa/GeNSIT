@@ -19,14 +19,14 @@ from datetime import datetime
 from typing import Union,List,Tuple
 from itertools import product,chain
 
-from multiresticodm.utils import *
-from multiresticodm.exceptions import *
-from multiresticodm.math_utils import *
+from multiresticodm.utils.misc_utils import *
+from multiresticodm.utils.exceptions import *
+from multiresticodm.utils.math_utils import *
 from multiresticodm.config import Config
 from multiresticodm.inputs import Inputs
-from multiresticodm.global_variables import *
+from multiresticodm.fixed.global_variables import *
 from multiresticodm.spatial_interaction_model import *
-from multiresticodm.multiprocessor import BoundedQueueProcessPoolExecutor
+from multiresticodm.utils.multiprocessor import BoundedQueueProcessPoolExecutor
 
 OUTPUTS_MODULE = sys.modules[__name__]
 

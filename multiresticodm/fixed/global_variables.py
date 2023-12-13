@@ -35,7 +35,7 @@ PARAMETER_DEFAULTS = {
 }
 
 SWEEPABLE_PARAMS = {"iter"}
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 with open(os.path.join(ROOT,"data/inputs/configs/cfg_parameters.json"), "r") as f:
     config_params = json.load(f)
     # Find all sweepable parameters
@@ -349,6 +349,14 @@ OUTPUT_SCHEMA = {
         "args_dtype":["int32","int32"],
         "dims":["alpha_range","beta_range"]
     },
+    "log_posterior_approximation":{
+        "axes":[0,1],
+        "dtype":"float32",
+        "is_iterable": False,
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["alpha_range","beta_range"]
+    },
     "compute_time":{
         "axes":[],
         "dtype":"float32",
@@ -384,6 +392,7 @@ EXPERIMENT_OUTPUT_NAMES = {
     "TableSummaries_MCMCConvergence": ["table","compute_time"],
     "SIM_NN": ["log_destination_attraction","theta","loss","compute_time"],
     "RSquared_Analysis": ["r2"],
+    "LogTarget_Analysis": ["log_posterior_approximation"],
     "NonJointTableSIM_NN": ["log_destination_attraction","theta", "loss", "table","compute_time"],
     "JointTableSIM_NN": ["log_destination_attraction","theta","loss", "table","compute_time"]
 }

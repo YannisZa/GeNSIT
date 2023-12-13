@@ -7,11 +7,11 @@ import torch
 import psutil
 
 from multiresticodm.config import Config
-from multiresticodm.logger_class import *
-from multiresticodm.click_parsers import *
-from multiresticodm.utils import setup_logger, print_json
-from multiresticodm.plot_variables import PLOT_HASHMAP, PLOT_COORDINATES
-from multiresticodm.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS, MARGINAL_SOLVERS, DATA_SCHEMA, METRICS, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS
+from multiresticodm.utils.logger_class import *
+from multiresticodm.utils.click_parsers import *
+from multiresticodm.utils.misc_utils import setup_logger, print_json
+from multiresticodm.fixed.plot_variables import PLOT_HASHMAP, PLOT_COORDINATES
+from multiresticodm.fixed.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS, MARGINAL_SOLVERS, DATA_SCHEMA, METRICS, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS, EXPERIMENT_OUTPUT_NAMES
 
 
 def set_threads(n_threads):
@@ -77,7 +77,7 @@ _create_and_run_options = [
 _common_run_options = [
     click.option('--load_experiment','-le', multiple=False, type=click.Path(exists=True), default=None, 
                    help='Defines path to existing experiment output in order to load it and resume experimentation.'),
-    click.option('--experiment_type','-et', type=click.STRING, multiple=True, callback=to_list,
+    click.option('--experiment_type','-et', type=click.Choice(list(EXPERIMENT_OUTPUT_NAMES.keys())), multiple=True, callback=to_list,
                default = None, help = 'Decides which experiment types to run'),
     click.option('--title','-ttl', type=click.STRING,
                default = None, help = 'Title appended to output filename of experiment'),
@@ -142,7 +142,7 @@ def create_and_run_options(func):
 def exec(logger,settings,config_path,**kwargs):
     # Import all modules
     from multiresticodm.experiments import ExperimentHandler
-    from multiresticodm.utils import deep_updates,update_device
+    from multiresticodm.utils.misc_utils import deep_updates,update_device
     
     # Read config
     config = Config(
@@ -256,7 +256,7 @@ def create(
     set_threads(settings['n_threads'])
 
     # Import all modules
-    from multiresticodm.utils import deep_updates
+    from multiresticodm.utils.misc_utils import deep_updates
     from multiresticodm.experiments import ExperimentHandler
 
     # Setup logger

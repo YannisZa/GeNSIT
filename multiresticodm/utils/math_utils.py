@@ -9,7 +9,7 @@ from scipy import optimize
 from torch import int32, float32
 from itertools import chain, combinations
 
-from multiresticodm.utils import flatten,is_sorted
+from multiresticodm.utils.misc_utils import flatten,is_sorted
 
 
 def log_factorial_sum(arr):

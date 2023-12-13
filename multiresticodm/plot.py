@@ -20,15 +20,15 @@ from argparse import Namespace
 from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
 from statsmodels.graphics.tsaplots import plot_acf
 
-from multiresticodm.utils import *
+from multiresticodm.utils.misc_utils import *
 from multiresticodm.config import Config
-from multiresticodm.plot_variables import *
-from multiresticodm.global_variables import *
+from multiresticodm.fixed.plot_variables import *
+from multiresticodm.fixed.global_variables import *
 from multiresticodm.outputs import Outputs,OutputSummary
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.spatial_interaction_model import instantiate_sim
-from multiresticodm.probability_utils import log_odds_ratio_wrt_intensity
-from multiresticodm.math_utils import map_distance_name_to_function
+from multiresticodm.utils.probability_utils import log_odds_ratio_wrt_intensity
+from multiresticodm.utils.math_utils import map_distance_name_to_function
 
 latex_preamble = r'''
 \usepackage{amsmath}
