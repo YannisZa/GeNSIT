@@ -449,7 +449,7 @@ class Experiment(object):
                                 (0,*[dims[d] for d in DATA_SCHEMA[sample].get('dims',[])]),
                                 maxshape=(None,*[dims[d] for d in DATA_SCHEMA[sample].get('dims',[])]),
                                 chunks=True,
-                                compression=3,
+                                compression=3
                             )
                         )
                         getattr(self,sample).attrs[sample] = all_dims
@@ -544,30 +544,21 @@ class Experiment(object):
                 getattr(self,'r2')[kwargs['index']] = _r2_sample
 
             for sample in [
-                'log_destination_attraction','sign','table'
+                'log_destination_attraction','sign','table',
                 'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time'
             ]:
                 if sample in self.output_names:
+                    # Get sample value
                     sample_value = kwargs.get(sample,None)
-                    if sample is not None:
-                        sample_value = sample_value.clone().detach().cpu() if torch.is_tensor(sample_value) else sample_value
-                    else:
-                        sample_value = np.ones(DATA_SCHEMA[sample].get("dims",[])) \
-                            if len(DATA_SCHEMA[sample].get("dims",[])) > 0 \
-                            else None
-                        if sample_value is not None:
-                            sample_value[:] = None
+                    sample_value = sample_value.clone().detach().cpu() \
+                        if torch.is_tensor(sample_value) \
+                        else sample_value
+                    # Resize h5 data
                     getattr(self,sample).resize(getattr(self,sample).shape[0] + 1, axis=0)
-                    all_dims = (
-                        (['iter'] if DATA_SCHEMA[sample].get('is_iterable',False) else [])+
-                        DATA_SCHEMA[sample].get('dims',[])
-                    )
-                    if len(all_dims) > 0:
-                        getattr(self,sample)[-1,...] = sample_value
-                    else:
-                        getattr(self,sample)[-1] = sample_value
+                    # Store latest sample
+                    getattr(self,sample)[-1] = sample_value
 
-    
+
     def print_initialisations(self,parameter_inits,print_lengths:bool=True,print_values:bool=False):
         for p,v in parameter_inits.items():
             if isinstance(v,(list,np.ndarray)):
@@ -1124,9 +1115,7 @@ class SIM_MCMC(Experiment):
                 print('\n')
 
             # Write the epoch training time (wall clock time)
-            if hasattr(self,'compute_time'):
-                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
-                self.compute_time[-1] = time.time() - start_time
+            self.write_data(compute_time = time.time() - start_time)
         
         # Update metadata
         self.show_progress()
@@ -1246,8 +1235,8 @@ class JointTableSIM_MCMC(Experiment):
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
         theta_sample = initial_params['theta']
-        log_destination_attraction_sample = initial_params['log_destination_attraction']
         table_sample = initial_params['table']
+        log_destination_attraction_sample = initial_params['log_destination_attraction']
         
         # Print initialisations
         # self.print_initialisations(parameter_inits,print_lengths=False,print_values=True)
@@ -1396,11 +1385,8 @@ class JointTableSIM_MCMC(Experiment):
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
             if self.logger.console.isEnabledFor(PROGRESS):
                 print('\n')
-
-            # Write the epoch training time (wall clock time)
-            if hasattr(self,'compute_time'):
-                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
-                self.compute_time[-1] = time.time() - start_time
+            # Will wall clock time
+            self.write_data(compute_time = time.time() - start_time)
             
         # Update metadata
         self.show_progress()
@@ -1538,7 +1524,7 @@ class Table_MCMC(Experiment):
         ):
 
             # Track the epoch training time
-            self.start_time = time.time()
+            start_time = time.time()
 
             # Sample table
             table_sample,accepted = self.ct_mcmc.table_gibbs_step(
@@ -1550,6 +1536,7 @@ class Table_MCMC(Experiment):
             _,_ = self.model_update_and_export(
                 table = table_sample,
                 table_acceptance = accepted,
+                compute_time = time.time() - start_time,
                 # Batch size is in training settings
                 t = 0,
                 data_size = 1,
@@ -1561,11 +1548,6 @@ class Table_MCMC(Experiment):
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
             if self.logger.console.isEnabledFor(PROGRESS):
                 print('\n')
-
-            # Write the epoch training time (wall clock time)
-            if hasattr(self,'compute_time'):
-                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
-                self.compute_time[-1] = time.time() - self.start_time
 
         # Update metadata
         self.show_progress()
@@ -1966,6 +1948,7 @@ class SIM_NN(Experiment):
                     n_processed_steps = n_processed_steps,
                     theta = theta_sample,
                     log_destination_attraction = torch.log(destination_attraction_sample),
+                    compute_time = time.time() - start_time,
                     # Batch size is in training settings
                     t = t,
                     data_size = len(training_data),
@@ -1978,10 +1961,6 @@ class SIM_NN(Experiment):
             if self.logger.console.isEnabledFor(PROGRESS):
                 print('\n')
 
-            # Write the epoch training time (wall clock time)
-            if hasattr(self,'compute_time'):
-                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
-                self.compute_time[-1] = time.time() - start_time
         
         # Update metadata
         self.show_progress()
@@ -2113,8 +2092,6 @@ class NonJointTableSIM_NN(Experiment):
 
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
-        theta_sample = initial_params['theta']
-        log_destination_attraction_sample = initial_params['log_destination_attraction']
         table_sample = initial_params['table']
         grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))].to(float32)
         
@@ -2204,9 +2181,10 @@ class NonJointTableSIM_NN(Experiment):
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
                     theta = theta_sample,
-                    log_destination_attraction = log_destination_attraction_sample,
+                    log_destination_attraction = torch.log(destination_attraction_sample),
                     table = table_sample,
                     table_acceptance = accepted,
+                    compute_time = time.time() - start_time,
                     # Batch size is in training settings
                     t = t,
                     data_size = len(training_data),
@@ -2218,11 +2196,6 @@ class NonJointTableSIM_NN(Experiment):
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
             if self.logger.console.isEnabledFor(PROGRESS):
                 print('\n')
-
-            # Write the epoch training time (wall clock time)
-            if hasattr(self,'compute_time'):
-                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
-                self.compute_time[-1] = time.time() - start_time
 
         # Update metadata
         self.show_progress()
@@ -2358,7 +2331,6 @@ class JointTableSIM_NN(Experiment):
 
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
-        theta_sample = initial_params['theta']
         table_sample = initial_params['table']
         grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))].to(float32)
 
@@ -2460,6 +2432,7 @@ class JointTableSIM_NN(Experiment):
                     log_destination_attraction = torch.log(destination_attraction_sample),
                     table = table_sample,
                     table_acceptance = accepted,
+                    compute_time = time.time() - start_time,
                     # Batch size is in training settings
                     t = t,
                     data_size = len(training_data),
@@ -2471,11 +2444,6 @@ class JointTableSIM_NN(Experiment):
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
             if self.logger.console.isEnabledFor(PROGRESS):
                 print('\n')
-
-            # Write the epoch training time (wall clock time)
-            if hasattr(self,'compute_time'):
-                self.compute_time.resize(self.compute_time.shape[0] + 1, axis=0)
-                self.compute_time[-1] = time.time() - start_time
                 
         # Update metadata
         self.show_progress()
