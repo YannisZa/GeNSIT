@@ -1928,7 +1928,6 @@ class OutputSummary(object):
                 )
             except Exception as exc:
                 self.logger.error(traceback.format_exc())
-                # self.logger.error(str(exc))
                 sys.exit()
             
 
