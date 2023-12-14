@@ -7,25 +7,22 @@ Set `ulimit -n 50000`
 ## Experiment 1
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 6 -nt 5 -sm -et NonJointTableSIM_NN \
--ln dest_attraction_ts_loss -ln dest_attraction_ts_likelihood_loss \
--lf mseloss -lf custom \
--lkk '' -lkk noise_percentage
-clear; multiresticodm run ./data/inputs/configs/experiment1.toml -nw 6 -nt 4 -sm -et JointTableSIM_NN
+clear; multiresticodm run ./data/inputs/configs/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 5 -nw 6
+clear; multiresticodm run ./data/inputs/configs/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 5 -nw 6
 ```
 
 ## Experiment 2
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment2.toml -nw 4 -nt 6 -sm -et NonJointTableSIM_NN \
--ln dest_attraction_ts_likelihood_loss -lf custom -lkk noise_percentage
-clear; multiresticodm run ./data/inputs/configs/experiment2.toml -nw 4 -nt 6 -sm -et NonJointTableSIM_NN
+clear; multiresticodm run ./data/inputs/configs/experiment2_disjoint.toml -sm -et NonJointTableSIM_NN -nt 20 -nw 1
+clear; multiresticodm run ./data/inputs/configs/experiment2_joint.toml -sm -et JointTableSIM_NN -nt 6 -nw 4
 ```
 
 ## Experiment 3
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment3.toml -nw 6 -nt 5 -sm
+clear; multiresticodm run ./data/inputs/configs/experiment3_disjoint.toml -sm -et NonJointTableSIM_NN -nt 5 -nw 6
+clear; multiresticodm run ./data/inputs/configs/experiment3_joint.toml -sm -et JointTableSIM_NN -nt 6 -nw 4
 ```
 
 ## Experiment 4
