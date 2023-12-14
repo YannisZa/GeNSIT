@@ -257,53 +257,46 @@ class HarrisWilson_NN:
 
         # Make sure the these configurations have the same length
         try:
-            assert len(set([len(loss[k]) for k in ['loss_name','loss_function','loss_kwarg_keys']])) == 1
+            assert len(set([len(loss[k]) for k in ['loss_name','loss_function','loss_kwargs']])) == 1
         except:
             raise InvalidDataLength(
                 data_name_lens = {
                     k:len(loss[k]) \
-                    for k in ['loss_name','loss_function','loss_kwarg_keys']
+                    for k in ['loss_name','loss_function','loss_kwargs']
                 }
             )
 
         # Parse loss functions
-        for name,function,kwarg_keys in zip(loss['loss_name'],loss['loss_function'],loss['loss_kwarg_keys']):
-            print(name,function,kwarg_keys)
+        for name,function in zip(loss['loss_name'],loss['loss_function']):
             # Construct kwargs from key names
             fn_kwargs = {}
-            for key in kwarg_keys:
-                # Find path to key
-                key_path = list(self.config.path_find(key))
-                key_path = key_path[0] if len(key_path) > 0 else []
-                # Get value of key
-                key_val,key_found = self.config.path_get(
-                    key_path = key_path
-                )
-
-                # Try to find kwargs in config
-                if not key_found:
+            for key,value in loss['loss_kwargs'].items():
+                # If empty key provided move on
+                if len(key) <= 0 or key == 'nokey':
+                    continue
+                
+                # Set key to value if value is not null
+                if value is not None:
+                    fn_kwargs[key] = value
+                else:
                     # Find path to key
-                    key_path = list(self.config.path_find(key,settings = loss))
+                    key_path = list(self.config.path_find(key))
                     key_path = key_path[0] if len(key_path) > 0 else []
                     # Get value of key
                     key_val,key_found = self.config.path_get(
-                        key_path = key_path,
-                        settings = loss
+                        key_path = key_path
                     )
-
-                try:
-                    assert key_found
-                except:
-                    raise Exception(f"""
-                        Could not find {name} keyword argument {key} for {function} in settings.
-                    """)
-                
-                # If value is dictionary then read both name and value of kwargs
-                if isinstance(key_val,dict):
-                    fn_kwargs[key_val['name']] = key_val['value']
-                # else just read value
-                else:
+                    try:
+                        assert key_found
+                    except:
+                        raise Exception(f"""
+                            Could not find {name} keyword argument {key} for {function} in settings.
+                        """)
+                    
+                    # Update value
                     fn_kwargs[key] = key_val
+            
+            # print(name,function,fn_kwargs)
             
             # Get loss function from global variables (standard torch loss functions)
             loss_func = LOSS_FUNCTIONS.get(function.lower(),None)
