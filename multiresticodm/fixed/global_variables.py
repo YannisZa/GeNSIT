@@ -2,6 +2,7 @@ import os
 import json
 import torch 
 import operator
+from copy import deepcopy
 
 from torch import int32, float32, uint8, int8, float64, int64, int16
 from torch import bool as tbool
@@ -36,7 +37,7 @@ PARAMETER_DEFAULTS = {
 
 SWEEPABLE_PARAMS = {"iter"}
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-with open(os.path.join(ROOT,"data/inputs/configs/cfg_parameters.json"), "r") as f:
+with open(os.path.join(ROOT,"data/inputs/configs/schemas/cfg_parameters.json"), "r") as f:
     config_params = json.load(f)
     # Find all sweepable parameters
     for key_value_path in deep_walk(config_params):
@@ -102,22 +103,14 @@ def sigmoid(beta=torch.tensor(1.0)):
     return lambda x: torch.sigmoid(beta * x)
 
 
-LOSS_DATA_REQUIREMENTS = {
+RAW_LOSS_DATA_REQUIREMENTS = {
     "dest_attraction_ts_loss": {
-        "prediction_data": ["destination_attraction_ts"],
-        "validation_data": ["destination_attraction_ts"],
-    },
-    "dest_attraction_ts_likelihood_loss": {
         "prediction_data": ["destination_attraction_ts"],
         "validation_data": ["destination_attraction_ts"],
     },
     "table_loss": {
         "prediction_data": ["table"],
-        "validation_data": ["log_intensity"]
-    },
-    "table_likelihood_loss": {
-        "prediction_data": ["table"],
-        "validation_data": ["log_intensity"]
+        "validation_data": ["log_intensity"],
     },
     "total_distance_loss": {
         "prediction_data": ["table"],
@@ -126,6 +119,14 @@ LOSS_DATA_REQUIREMENTS = {
     "total_loss": {},
     "loss": {}
 }
+
+LOSS_DATA_REQUIREMENTS = deepcopy(RAW_LOSS_DATA_REQUIREMENTS)
+for k,v in RAW_LOSS_DATA_REQUIREMENTS.items():
+    if k in ['total_loss','loss']:
+        continue
+    # Create a likelihood equivalent loss
+    new_k = k.split("_loss")[0] + '_likelihood_loss'
+    LOSS_DATA_REQUIREMENTS.update({new_k:v})
 
 # Pytorch loss functions
 LOSS_FUNCTIONS = {
