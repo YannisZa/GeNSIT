@@ -9,9 +9,9 @@ import psutil
 from multiresticodm.config import Config
 from multiresticodm.utils.logger_class import *
 from multiresticodm.utils.click_parsers import *
-from multiresticodm.utils.misc_utils import setup_logger, print_json
+from multiresticodm.fixed.global_variables import *
+from multiresticodm.utils.misc_utils import setup_logger
 from multiresticodm.fixed.plot_variables import PLOT_HASHMAP, PLOT_COORDINATES
-from multiresticodm.fixed.global_variables import LOSS_DATA_REQUIREMENTS, LOSS_FUNCTIONS, TABLE_SOLVERS, MARGINAL_SOLVERS, DATA_SCHEMA, METRICS, NORMS, DISTANCE_FUNCTIONS, SWEEPABLE_PARAMS, EXPERIMENT_OUTPUT_NAMES
 
 
 def set_threads(n_threads):
@@ -308,7 +308,7 @@ def create(
             default = None, multiple = True, help = 'Overwrites neural net loss name(s)')
 @click.option('--loss_function','-lf', type=click.Choice(list(LOSS_FUNCTIONS.keys())), callback=to_list,
             default = None, multiple = True, help = 'Overwrites neural net loss function(s)')
-@click.option('--loss_kwarg_keys','-lkk', type=click.STRING, callback=to_list2d,
+@click.option('--loss_kwarg_keys','-lkk', type=click.STRING, callback=split_to_list,
             default = None, multiple = True, help = 'Overwrites neural net loss function(s) kwarg parameter keys')
 @click.option('--grid_size','-gs', type=click.IntRange(min=1),
             default = None, help = 'Overwrites size of square grid for R^2 and Log Target analyses.')
