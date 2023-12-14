@@ -285,7 +285,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         
         # Define table loss function
         table_loss = getattr(ProbabilityUtils,f"log_{self.ct.distribution_name}_pmf_unnormalised")
-        def table_loss_function(table:torch.tensor,log_intensity:torch.tensor) -> float:
+        def table_loss_function(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
             return (-1) * table_loss(table,log_intensity)
         self.table_loss_function = table_loss_function
 
