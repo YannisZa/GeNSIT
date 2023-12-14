@@ -257,12 +257,12 @@ class HarrisWilson_NN:
 
         # Make sure the these configurations have the same length
         try:
-            assert len(set([len(loss[k]) for k in ['loss_name','loss_function','loss_kwargs']])) == 1
+            assert len(set([len(loss[k]) for k in ['loss_name','loss_function']])) == 1
         except:
             raise InvalidDataLength(
                 data_name_lens = {
                     k:len(loss[k]) \
-                    for k in ['loss_name','loss_function','loss_kwargs']
+                    for k in ['loss_name','loss_function']
                 }
             )
 
