@@ -352,7 +352,7 @@
           "range": true
         }
       },
-      "loss_kwarg_keys": {
+      "loss_kwargs": {
         "sweep": {
           "default": true,
           "range": true

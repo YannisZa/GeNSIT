@@ -1,0 +1,148 @@
+log_level = 'info'
+sweep_mode = true
+
+[inputs]
+n_workers = +1
+n_threads = [+6,+6]
+device = 'cpu'
+in_directory = './data/inputs/'
+dataset = 'cambridge_work_commuter_lsoas_to_msoas'
+load_experiment = ''
+[inputs.seed.sweep]
+  default = 1
+  range = ["1:11111:1"]
+[inputs.to_learn.sweep]
+  default = ['alpha', 'beta'] 
+  range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
+  coupled = true
+  target_name = 'sigma'
+  
+[inputs.data]
+    [inputs.data.origin_demand]
+      file = 'origin_demand_sum_normalised.txt'
+    [inputs.data.destination_attraction_ts]
+      file ='destination_attraction_time_series_sum_normalised.txt'
+    [inputs.data.cost_matrix]
+      file = """cost_matrices/clustered_facilities_sample_20x20_20_01_2023_\
+      sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_\
+      prob_origin_destination_adjusted_normalised_boundary_only_\
+      edge_corrected_cost_matrix_max_normalised.txt"""
+    [inputs.data.ground_truth_table]
+      file = 'table_lsoas_to_msoas.txt'
+    [inputs.data.total_cost_by_origin]
+      file = 'lsoas_total_distance_to_work.txt'
+
+[contingency_table]
+  sparse_margins = false
+  [contingency_table.constraints.axes.sweep]
+    default = [[]]
+    range = [[],[[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
+    coupled = true
+    target_name = 'title'
+  [contingency_table.constraints.cells.sweep]
+    default = ''
+    range = ['','','','',
+      'cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
+      'cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
+    ]
+    coupled = true
+    target_name = 'title'
+
+[spatial_interaction_model]
+  [spatial_interaction_model.name.sweep]
+    default = 'TotallyConstrained'
+    range = [
+      'TotallyConstrained','TotallyConstrained','ProductionConstrained',
+      'TotallyConstrained','TotallyConstrained','TotallyConstrained'
+    ]
+    coupled = true
+    target_name = 'title'
+  
+  [spatial_interaction_model.parameters]
+    bmax = +1.0
+  
+[harris_wilson_model]
+  dt = +0.001
+  [harris_wilson_model.parameters]
+    noise_percentage = +0.01
+    epsilon = 1.0
+    # delta = 0.0
+    [harris_wilson_model.parameters.sigma.sweep]
+      default = 0.0141421356
+      range = [0.0141421356, 0.1414213562, nan]
+
+[training]
+  num_steps = +1
+  batch_size = +1
+  [training.N.sweep]
+    default = 10
+    range = ["repeat(10,10000)","repeat(100,1000)","repeat(1000,100)","repeat(10000,10)","repeat(100000,1)",]
+    coupled = true
+    target_name = 'seed'
+
+[mcmc]
+    disable_tqdm = true
+    mcmc_workers = +1
+    
+    [mcmc.contingency_table]
+      table_steps = +1
+      proposal = 'direct_sampling'
+      table0 = 'maximum_entropy_solution'
+      margin0 = 'multinomial'
+
+[neural_network]
+  disable_tqdm = true
+  [neural_network.loss.loss_name.sweep]
+    default = ['table_likelihood_loss']
+    range = [
+      ['table_likelihood_loss'],
+      ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+    ]
+  [neural_network.loss.loss_function.sweep]
+    default = ['custom']
+    range = [
+      ['custom'],
+      ['custom','custom']
+    ]
+    coupled = true
+    target_name = 'loss_name'
+  [neural_network.loss.loss_kwarg_keys.sweep]
+    default = [[]]
+    range = [
+      [[]],
+      [['noise_percentage'],[]]
+    ]
+    coupled = true
+    target_name = 'loss_name'
+  [neural_network.hyperparameters]
+    num_layers = +1
+    optimizer = 'Adam'
+    learning_rate = +0.002
+    [neural_network.hyperparameters.biases]
+      default = [+0.0, +4.0]
+      [neural_network.hyperparameters.biases.layer_specific]
+    [neural_network.hyperparameters.nodes_per_layer]
+      default = +20
+      [neural_network.hyperparameters.nodes_per_layer.layer_specific]
+    [neural_network.hyperparameters.activation_funcs]
+      default = 'linear'
+      [neural_network.hyperparameters.activation_funcs.layer_specific]
+        1 = 'abs'
+
+[[experiments]]
+  type = 'JointTableSIM_NN'
+  comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = true
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+
+[outputs]
+    chunk_size = +20_000
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/'
+    out_group = 'exp2'
+    [outputs.title.sweep]
+      default = '_uncostrained'
+      range = ['_uncostrained','_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']

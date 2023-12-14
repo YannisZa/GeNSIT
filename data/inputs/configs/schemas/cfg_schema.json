@@ -1572,7 +1572,8 @@
               "dest_attraction_ts_likelihood_loss",
               "table_loss",
               "table_likelihood_loss",
-              "total_distance_loss"
+              "total_distance_loss",
+              "total_distance_likelihood_loss"
             ]
           },
           "range": {
@@ -1586,7 +1587,8 @@
               "dest_attraction_ts_likelihood_loss",
               "table_loss",
               "table_likelihood_loss",
-              "total_distance_loss"
+              "total_distance_loss",
+              "total_distance_likelihood_loss"
             ]
           }
         }
@@ -1612,29 +1614,26 @@
           }
         }
       },
-      "loss_kwarg_keys": {
+      "loss_kwargs": {
         "sweepable": true,
         "optional": true,
         "exclude": false,
 
         "sweep": {
           "default": {
-            "dtype": "list",
-            "list-dtype": "list",
-            "list-length": [0, null],
-            "list-list-dtype": "str",
-            "default-value": [],
-            "list-list-unique-vals": false
+            "dtype": "dict",
+            "dict-key-dtype": "str",
+            "dict-value-dtype": "entry",
+            "default-key": "no-key",
+            "default-value": "no-value"
           },
           "range": {
             "dtype": "list",
-            "list-dtype": "list",
-            "list-list-dtype": "list",
-            "list-list-list-dtype": "str",
-            "list-length": [0, null],
-            "list-list-length": [0, null],
-            "default-value": [],
-            "list-list-list-unique-vals": true
+            "list-dtype": "dict",
+            "list-dict-key-dtype": "str",
+            "list-dict-value-dtype": "entry",
+            "list-dict-default-key": "no-key",
+            "list-dict-default-value": "no-value"
           }
         }
       }
@@ -1936,6 +1935,7 @@
           "sweepable": false,
           "optional": true,
           "exclude": false,
+
           "dtype": "dict",
           "dict-key-dtype": "str",
           "dict-value-schema": {
@@ -1969,6 +1969,7 @@
           "sweepable": false,
           "optional": true,
           "exclude": false,
+
           "dtype": "dict",
           "dict-key-dtype": "str",
           "dict-value-schema": {
