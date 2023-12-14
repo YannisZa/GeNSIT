@@ -75,7 +75,7 @@ class Config:
         with open(
             os.path.join(
                 ROOT,
-                'data/inputs/configs/cfg_schema.json'
+                'data/inputs/configs/schemas/cfg_schema.json'
             ), 
             'r'
         ) as f:
@@ -84,7 +84,7 @@ class Config:
         with open(
             os.path.join(
                 ROOT,
-                'data/inputs/configs/cfg_schema_by_experiment.json'
+                'data/inputs/configs/schemas/cfg_schema_by_experiment.json'
             ), 
             'r'
         ) as f:
@@ -95,7 +95,7 @@ class Config:
         with open(
             os.path.join(
                 ROOT,
-                'data/inputs/configs/cfg_parameters.json'
+                'data/inputs/configs/schemas/cfg_parameters.json'
             ), 
             'r'
         ) as f:
@@ -755,7 +755,7 @@ class Config:
                             traceback.print_exc() 
                             self.logger.error(f"Config for experiment(s) {kwargs.get('experiment_type','experiment_type')} failed.")
                             sys.exit()
-                    elif self.has_sweep(key_path) and isinstance(settings_val,dict):
+                    elif self.has_sweep(key_path) and isinstance(v,dict):
                         # Apply function recursively
                         self.validate_config(
                             v,

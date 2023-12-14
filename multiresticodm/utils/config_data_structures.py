@@ -36,11 +36,13 @@ def instantiate_data_type(
         raise ValueError(f"Data type '{data_type}' not found for {'>'.join(list(map(str,key_path)))}")
 
 
-class Entry():
+class Entry(object):
     def __init__(self,data,schema,key_path):
         self.data = data
         self.schema = schema
         self.key_path = key_path
+
+        self.dtype = object
 
     def __str__(self) -> str:
         return "Entry()"
@@ -66,6 +68,9 @@ class Entry():
                 key_path=self.key_path
             )
         return True
+
+    def check(self):
+        self.check_type()
 #--------------------------------------------------------------------
 #--------------------------------------------------------------------
 #----------------------- Primitive Data Entry -----------------------
@@ -81,7 +86,6 @@ class PrimitiveEntry(Entry):
     
     def check(self):
         pass
-
     
     def check_range(self):
         # print("Check range")
@@ -654,7 +658,7 @@ class Dict(NonPrimitiveEntry):
         self.check_type(data_type = self.dtype)
 
         # Then prep schema for list values
-        # Remove all key prefixes that start with 'list'
+        # Remove all key prefixes that start with 'dict'
         # Remove 'dtype' key
         self.schema = {} 
         for k,v in schema.items():
@@ -663,14 +667,17 @@ class Dict(NonPrimitiveEntry):
             # Remove all non-primitive entry names from preffix
             stored = False
             for name in self.names:
+                # Find first instance of non-primitive entry
+                # and remove non-primitive preffix. 
                 if k.startswith((name+'-')):
                     self.schema[k.replace((name+'-'),'',1)] = v
                     stored = True
                     continue
+            
             # If not done so already, store schema setting
             if not stored:
                 self.schema[k] = v
-
+        
         # Get key schema
         key_schema = {k.replace('key-','',1):v for k,v in self.schema.items() if k.startswith('key-')}
         # Get value schema
@@ -681,9 +688,14 @@ class Dict(NonPrimitiveEntry):
         else:
             # Convert generic value schema to key-specific value schema
             value_schema = {k:value_schema for k in data.keys()}
+        
         # Get all value entries
         self.data = {
-            instantiate_data_type(key,key_schema,key_path) : instantiate_data_type(val,value_schema[key],key_path) \
+            instantiate_data_type(key,key_schema,key_path) : (
+                instantiate_data_type(val,value_schema[key],key_path+[key])
+                if key in value_schema \
+                else instantiate_data_type(val,value_schema,key_path+[key])
+            )
             for key,val in data.items()
         }
 
