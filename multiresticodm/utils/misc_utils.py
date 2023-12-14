@@ -939,7 +939,8 @@ def is_null(v):
     elif isinstance(v,Iterable):
         return any([is_null(val) for val in v])
     else:
-        return v is None or np.isnan(v)
+        
+        return v is None or pd.isna(v)
 
 def dict_inverse(d:dict):
     return {v:k for k,v in d.items()}
