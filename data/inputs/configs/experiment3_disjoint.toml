@@ -102,19 +102,15 @@ seed = 1
     ]
     coupled = true
     target_name = 'loss_name'
-  [neural_network.loss.loss_kwargs.keys.sweep]
-    default = [['noise_variance'],[]]
-    range = [
-      [[]],
-      [['noise_percentage']]
-    ]
+  [neural_network.loss.loss_kwargs.sweep]
     coupled = true
     target_name = 'loss_name'
-  
-  [neural_network.loss.loss_kwargs.keyvals]
-    [neural_network.loss.loss_kwargs.keyvals.noise_variance]
-      loss_key = 'var'
-      loss_value = 0.005
+    [neural_network.loss.loss_kwargs.sweep.default]
+      nokey = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      nokey = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      noise_percentage = nan
 
   [neural_network.hyperparameters]
     num_layers = +1

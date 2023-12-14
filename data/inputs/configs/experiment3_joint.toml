@@ -88,6 +88,7 @@ seed = 1
 
 [neural_network]
   disable_tqdm = true
+
   [neural_network.loss.loss_name.sweep]
     default = ['total_distance_loss']
     range = [
@@ -98,6 +99,7 @@ seed = 1
       ['dest_attraction_ts_likelihood_loss','total_distance_likelihood_loss'],
       ['total_distance_likelihood_loss','table_likelihood_loss']
     ]
+
   [neural_network.loss.loss_function.sweep]
     default = ['gaussiannllloss','custom']
     range = [
@@ -110,21 +112,25 @@ seed = 1
     ]
     coupled = true
     target_name = 'loss_name'
-  [neural_network.loss.loss_kwarg_keys.sweep]
-    default = [[]]
-    range = [
-      [[]],
-      [['noise_variance']],
-      [[]],
-      [['noise_percentage'],[]],
-      [['noise_percentage'],['noise_variance']],
-      [['noise_variance'],[]]
-    ]
+  
+  [neural_network.loss.loss_kwargs.sweep]
     coupled = true
     target_name = 'loss_name'
-  [neural_network.loss.loss_kwarg_keyvals.noise_variance]
-      loss_key = 'var'
-      loss_value = 0.005
+    [neural_network.loss.loss_kwargs.sweep.default]
+      nokey = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      nokey = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      noise_variance = 0.005
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      nokey = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      noise_percentage = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      noise_percentage = nan
+      noise_variance = 0.005
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      noise_variance = 0.005
 
   [neural_network.hyperparameters]
     num_layers = +1
