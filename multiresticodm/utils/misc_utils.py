@@ -14,11 +14,9 @@ import tikzplotlib
 import numpy as np
 import pandas as pd
 import xarray as xr
-import netCDF4 as nc
 import matplotlib.pyplot as plt
 
 
-from pathlib import Path
 from itertools import chain, count
 from difflib import SequenceMatcher
 from typing import Dict, List, Union, Tuple
@@ -443,6 +441,10 @@ def operate(input:object,operations:str,**kwargs):
         else:
             value = OPERATORS[operator](value,kwargs[attr])
     return value
+
+def evaluate(expression:str,locals,globals):
+    return eval(expression,globals,locals)
+    
 
 # https://stackoverflow.com/questions/27265939/comparing-python-dictionaries-and-nested-dictionaries
 def findDiff(d1,d2,path:str="") -> None:
@@ -1178,3 +1180,10 @@ def position_index(active_positions):
             return i
 
     return len(active_positions)
+
+
+def fn_name(fn):
+    try:
+        return re.sub(r'[,.()\[\]]', '', str(fn.__name__))
+    except:
+        return re.sub(r'[,.()\[\]]', '', str(fn))
