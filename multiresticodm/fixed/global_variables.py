@@ -128,30 +128,105 @@ for k,v in RAW_LOSS_DATA_REQUIREMENTS.items():
     new_k = k.split("_loss")[0] + '_likelihood_loss'
     LOSS_DATA_REQUIREMENTS.update({new_k:v})
 
+LOSS_KWARG_OPERATIONS = {
+    "var":  {
+        "function": "var*torch.ones(dim).to(device,dtype)",
+        "kwargs": {
+            "dtype": float32
+        }
+    }
+}
+
 # Pytorch loss functions
 LOSS_FUNCTIONS = {
-    "l1loss": torch.nn.L1Loss,
-    "mseloss": torch.nn.MSELoss,
-    "crossentropyloss": torch.nn.CrossEntropyLoss,
-    "ctcloss": torch.nn.CTCLoss,
-    "nllloss": torch.nn.NLLLoss,
-    "poissonnllloss": torch.nn.PoissonNLLLoss,
-    "gaussiannllloss": torch.nn.GaussianNLLLoss,
-    "kldivloss": torch.nn.KLDivLoss,
-    "bceloss": torch.nn.BCELoss,
-    "bcewithlogitsloss": torch.nn.BCEWithLogitsLoss,
-    "marginrankingloss": torch.nn.MarginRankingLoss,
-    "hingeembeddingloss": torch.nn.HingeEmbeddingLoss,
-    "multilabelmarginloss": torch.nn.MultiLabelMarginLoss,
-    "huberloss": torch.nn.HuberLoss,
-    "smoothl1loss": torch.nn.SmoothL1Loss,
-    "softmarginloss": torch.nn.SoftMarginLoss,
-    "multilabelsoftmarginloss": torch.nn.MultiLabelSoftMarginLoss,
-    "cosineembeddingloss": torch.nn.CosineEmbeddingLoss,
-    "multimarginloss": torch.nn.MultiMarginLoss,
-    "tripletmarginloss": torch.nn.TripletMarginLoss,
-    "tripletmarginwithdistanceloss": torch.nn.TripletMarginWithDistanceLoss,
-    "custom":None
+    "l1loss": {
+        "function":torch.nn.L1Loss,
+        "kwargs_keys":[]
+    },
+    "mseloss": {
+        "function":torch.nn.MSELoss,
+        "kwargs_keys":[]
+    },
+    "crossentropyloss": {
+        "function":torch.nn.CrossEntropyLoss,
+        "kwargs_keys":[]
+    },
+    "ctcloss": {
+        "function":torch.nn.CTCLoss,
+        "kwargs_keys":[]
+    },
+    "nllloss": {
+        "function":torch.nn.NLLLoss,
+        "kwargs_keys":[]
+    },
+    "poissonnllloss": {
+        "function":torch.nn.PoissonNLLLoss,
+        "kwargs_keys":[]
+    },
+    "gaussiannllloss": {
+        "function":torch.nn.GaussianNLLLoss,
+        "kwargs_keys":['var']
+    },
+    "kldivloss": {
+        "function":torch.nn.KLDivLoss,
+        "kwargs_keys":[]
+    },
+    "bceloss": {
+        "function":torch.nn.BCELoss,
+        "kwargs_keys":[]
+    },
+    "bcewithlogitsloss": {
+        "function":torch.nn.BCEWithLogitsLoss,
+        "kwargs_keys":[]
+    },
+    "marginrankingloss": {
+        "function":torch.nn.MarginRankingLoss,
+        "kwargs_keys":[]
+    },
+    "hingeembeddingloss": {
+        "function":torch.nn.HingeEmbeddingLoss,
+        "kwargs_keys":[]
+    },
+    "multilabelmarginloss": {
+        "function":torch.nn.MultiLabelMarginLoss,
+        "kwargs_keys":[]
+    },
+    "huberloss": {
+        "function":torch.nn.HuberLoss,
+        "kwargs_keys":[]
+    },
+    "smoothl1loss": {
+        "function":torch.nn.SmoothL1Loss,
+        "kwargs_keys":[]
+    },
+    "softmarginloss": {
+        "function":torch.nn.SoftMarginLoss,
+        "kwargs_keys":[]
+    },
+    "multilabelsoftmarginloss": {
+        "function":torch.nn.MultiLabelSoftMarginLoss,
+        "kwargs_keys":[]
+    },
+    "cosineembeddingloss": {
+        "function":torch.nn.CosineEmbeddingLoss,
+        "kwargs_keys":[]
+    },
+    "multimarginloss": {
+        "function":torch.nn.MultiMarginLoss,
+        "kwargs_keys":[]
+    },
+    "tripletmarginloss": {
+        "function":torch.nn.TripletMarginLoss,
+        "kwargs_keys":[]
+    },
+    "tripletmarginwithdistanceloss": {
+        "function":torch.nn.TripletMarginWithDistanceLoss,
+        "kwargs_keys":[]
+    },
+    "custom":{
+        "function":None,
+        "kwargs_keys":None
+    }
 }
 
 INPUT_SCHEMA = {
@@ -528,6 +603,8 @@ OPERATORS = {
     "%" : operator.mod,
     "^" : operator.xor,
 }
+SEPARATORS = ['.','[',']','(',')','()']
+
 
 COLORS = {"monte_carlo_sample_degree_one":"tab:blue",
         "monte_carlo_sample_degree_higher":"tab:blue",
