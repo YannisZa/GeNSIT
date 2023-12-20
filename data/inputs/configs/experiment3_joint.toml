@@ -120,16 +120,16 @@ load_experiment = ''
     [[neural_network.loss.loss_kwargs.sweep.range]]
       nokey = nan
     [[neural_network.loss.loss_kwargs.sweep.range]]
-      noise_variance = 0.005
+      var = 0.005
     [[neural_network.loss.loss_kwargs.sweep.range]]
       nokey = nan
     [[neural_network.loss.loss_kwargs.sweep.range]]
       noise_percentage = nan
     [[neural_network.loss.loss_kwargs.sweep.range]]
       noise_percentage = nan
-      noise_variance = 0.005
+      var = 0.005
     [[neural_network.loss.loss_kwargs.sweep.range]]
-      noise_variance = 0.005
+      var = 0.005
 
   [neural_network.hyperparameters]
     num_layers = +1
