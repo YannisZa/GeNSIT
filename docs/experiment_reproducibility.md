@@ -21,7 +21,7 @@ clear; multiresticodm run ./data/inputs/configs/experiment2_joint.toml -sm -et J
 ## Experiment 3
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment3_disjoint.toml -sm -et NonJointTableSIM_NN -nt 5 -nw 6
+clear; multiresticodm run ./data/inputs/configs/experiment3_disjoint.toml -sm -et NonJointTableSIM_NN -nt 6 -nw 5
 clear; multiresticodm run ./data/inputs/configs/experiment3_joint.toml -sm -et JointTableSIM_NN -nt 6 -nw 4
 ```
 
