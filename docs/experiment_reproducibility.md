@@ -67,18 +67,31 @@ clear; multiresticodm summarise -s table -s intensity \
 
 # Plots
 
-## Experiment 2
+## Figure 1
 
-### Figure 4
+```
+clear; multiresticodm plot -x srmse -y dest_attraction_ts_loss \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp1 -et NonJointTableSIM_NN \
+-s dest_attraction_ts_loss -ft 'srmse_vs_dest_attraction_loss' \
+-stat 'srmse' 'signedmean&' 'iter|seed&' \
+-mrkr sample_name -hch sigma -c type -v 0.5 -l title \
+-k seed -k iter -k type -p dss \
+-btt 'iter' 0 100 100 \
+-xlab 'SRMSE' -ylab 'Dest attraction loss' \
+-fs 4 4 -lls 8 -afs 8 -tfs 5 -nw 20
+```
+
+## Figure 3
 
 `pkill -9 -f 'multiresticodm plot'; `
 
 -pdd /home/iz230/MultiResTICODM/data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp2/NonJointTableSIM_NN_SweepedNoise\_\_31_10_2023_09_44_49/paper_figures/ -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
 
 ```
+-et JointTableSIM_NN
 
 clear; multiresticodm plot -y srmse -x 'iter&seed' -x sigma \
--dn cambridge_work_commuter_lsoas_to_msoas/exp2 -et NonJointTableSIM_NN -et JointTableSIM_NN \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp2 -et NonJointTableSIM_NN \
 -s table -s intensity -ft 'srmse_vs_epoch,seed_smrse_and_coverage_prob_tradeoff' \
 -stat 'srmse' 'signedmean&' 'iter|seed&' \
 -stat 'coverage_probability' '&mean|\*1000|floor' '&origin|destination||' \
