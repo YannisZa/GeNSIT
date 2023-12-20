@@ -8,10 +8,9 @@ device = 'cpu'
 in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
-seed = 1
-# [inputs.seed.sweep]
-#   default = 0
-#   range = ["0:29:1"]
+[inputs.seed.sweep]
+  default = 0
+  range = ["0:29:1"]
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta']
   range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
