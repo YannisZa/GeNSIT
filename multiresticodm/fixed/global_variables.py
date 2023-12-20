@@ -490,6 +490,7 @@ AUXILIARY_COORDINATES_DTYPES = {
     "cells":str,
     "loss_name":object,
     "loss_function":object,
+    "loss_kwargs":object,
     "name":str,
     "table_steps": torch.int32,
     "bmax":torch.float32,
