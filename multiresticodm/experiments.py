@@ -157,7 +157,6 @@ class Experiment(object):
 
         # Update current config
         # self.config = self.sim.config.update_recursively(self.config,updated_config,overwrite=True)
-        # print(self.config)
         # Decide how often to print statemtents
         self.store_progress = self.config.get('store_progress',1.0)
         self.print_percentage = min(0.05,self.store_progress)
@@ -172,7 +171,6 @@ class Experiment(object):
         self.device = self.config['inputs']['device']
         # Get tqdm position
         self.position = kwargs.get('position',0)
-        # print('current_device',torch.cuda.current_device())
 
         # Disable tqdm if needed
         self.tqdm_disabled = self.config['experiments'][0].get('disable_tqdm',True)
@@ -485,7 +483,6 @@ class Experiment(object):
                 loss_values = sum([val for val in loss.values()])
                 # Perform gradient update
                 loss_values.backward()
-                # loss_values.backward(retain_graph = True)
                 self.learning_model._neural_net.optimizer.step()
                 self.learning_model._neural_net.optimizer.zero_grad()
 
@@ -1493,7 +1490,8 @@ class JointTableSIM_MCMC(Experiment):
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
             if self.logger.console.isEnabledFor(PROGRESS):
                 print('\n')
-            # Will wall clock time
+            
+            # Write the epoch training time (wall clock time)
             self.write_data(compute_time = time.time() - start_time)
             
         # Update metadata
@@ -1863,7 +1861,6 @@ class SIM_NN(Experiment):
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
             if self.logger.console.isEnabledFor(PROGRESS):
                 print('\n')
-
         
         # Update metadata
         self.show_progress()
@@ -2311,7 +2308,6 @@ class JointTableSIM_NN(Experiment):
                     table_samples.append(table_sample/table_sample.sum())
 
                 # Update losses
-                # print('log_intensity_sample',log_intensity_sample.requires_grad,log_intensity_sample.shape)
                 loss_sample,n_processed_steps = self.learning_model.update_loss(
                     previous_loss = loss_sample,
                     n_processed_steps = n_processed_steps,
@@ -2347,6 +2343,7 @@ class JointTableSIM_NN(Experiment):
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
             if self.logger.console.isEnabledFor(PROGRESS):
                 print('\n')
+
                 
         # Update metadata
         self.show_progress()
@@ -2552,6 +2549,7 @@ class ExperimentSweep():
                 logger = self.logger
             )
             self.logger.debug('New experiment set up')
+            # print(f"{new_experiment.outputs.sweep_id} set up")
 
             # Running experiment
             new_experiment.run()
