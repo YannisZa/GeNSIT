@@ -40,18 +40,18 @@ class Config:
             elif path.endswith('.json'):
                 self.settings = read_json(path)
 
-            # Load schema
-            self.load_schemas()
-            # Load parameter positions
-            self.load_parameters()
-            # Update root
-            self.path_sets_root(**kwargs)
-
         elif settings:
             self.settings = settings
         else:
             self.settings = None
             raise Exception(f'Config not found in {path}')
+
+        # Load schema
+        self.load_schemas()
+        # Load parameter positions
+        self.load_parameters()
+        # Update root
+        self.path_sets_root(**kwargs)
 
 
     def reset(self):
