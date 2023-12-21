@@ -49,23 +49,21 @@ class Outputs(object):
             console_level = level
         )
         # Store output names
-        self.data_names = list(data_names)
-        
-        # Issue error if no sample names are provided
-        if len(self.data_names) <= 0:
-            self.logger.error(f"No sample names provided.")
-
+        self.data_names = None \
+            if (data_names is None) or (len(data_names) <= 0) \
+            else list(data_names)
         # Store settings
         self.settings = settings
 
         # Sample names must be a subset of all data names
-        try:
-            assert set(self.data_names).issubset(set(DATA_SCHEMA.keys()))
-        except Exception:
-            self.logger.error('Some sample names provided are not recognized')
-            self.logger.error(','.join(self.data_names))
-            self.logger.debug(traceback.format_exc())
-            raise InvalidDataNames('Cannot load outputs.')
+        if self.data_names is not None:
+            try:
+                assert set(self.data_names).issubset(set(DATA_SCHEMA.keys()))
+            except Exception:
+                self.logger.error('Some sample names provided are not recognized')
+                self.logger.error(','.join(self.data_names))
+                self.logger.debug(traceback.format_exc())
+                raise InvalidDataNames('Cannot load outputs.')
 
         # Create semi-private xarray data 
         self.data = DataCollection(
@@ -120,9 +118,15 @@ class Outputs(object):
         self.intensity_model_name = self.intensity_model_name['sweep']['range'] \
             if isinstance(self.intensity_model_name,dict) \
             else [self.intensity_model_name]
+        
         # Store sample data requirements
         self.output_names = []
-        for sam in set(self.data_names).intersection(set(list(OUTPUT_SCHEMA.keys()))):
+        # Setup universe of output names
+        avail_output_names = set(self.data_names).intersection(set(list(OUTPUT_SCHEMA.keys()))) \
+            if self.data_names is not None \
+            else set(list(OUTPUT_SCHEMA.keys()))
+
+        for sam in avail_output_names:
             if sam == 'intensity':
 
                 # Add all intensity-related data names
@@ -154,7 +158,7 @@ class Outputs(object):
         # Get input names
         self.input_names = [
             sam for sam in set(self.data_names).intersection(set(list(INPUT_SCHEMA.keys())))
-        ]
+        ] if self.data_names is not None else list(INPUT_SCHEMA.keys())
         
         # Name output sample directory according 
         # to sweep params (if they are provided)
@@ -353,15 +357,6 @@ class Outputs(object):
                    if k in sample_global_dims},
                 **coordinates
             }
-            print(sample_name)
-            print_json(global_coords,newline=True)
-            # print({k:v for k,v in local_coords.items() \
-            #        if k != sample_name}.keys())
-            # print({k:v for k,v in global_coords.items() \
-            #        if k in sample_global_dims}.keys())
-            # print(coordinates.keys())
-            print_json(coordinates,newline=True)
-
             # Populate dictionary 
             xr_dict[sample_name] = {
                 "data": sample_data.reshape(tuple([len(val) for val in coordinates.values()])),
@@ -370,6 +365,7 @@ class Outputs(object):
                     "experiment_id": self.experiment_id
                 }
             }
+
         return xr_dict
     
     def read_h5_file(self,filename,**kwargs):
@@ -397,7 +393,6 @@ class Outputs(object):
                         continue
                     
                     start_idx = 0
-                    print(sample_name,sample_data.shape)
                     if OUTPUT_SCHEMA[sample_name]["is_iterable"]:
                         if 'iter' in global_coords:
                             global_coords.update({
@@ -433,7 +428,7 @@ class Outputs(object):
                                 step=1,
                                 dtype='int32'
                             )
-                    print(global_coords)
+                    # print(global_coords)
                     # Append
                     self.logger.debug(f'Appending {sample_name}')
                     data_vars[sample_name] = np.array([sample_data[:]])
@@ -848,7 +843,7 @@ class Outputs(object):
             # Find sweep dimensions that are not core coordinates
             sweep_dims = [d for d in samples.dims if d not in (list(CORE_COORDINATES_DTYPES.keys()))]
             
-            print(iter_dims,sweep_dims)
+            # print(iter_dims,sweep_dims)
 
             # Stack variables and reorder data
             if len(sweep_dims) > 0 and len(iter_dims) > 0:
@@ -1038,11 +1033,18 @@ class Outputs(object):
 
                         sliced_dim_values = list(map(sigma_to_noise_regime,sliced_dim_values)) \
                         if dim_name == 'sigma' \
-                        else sliced_dim_values
+                        else list(map(parse, sliced_dim_values))
                         
                         # Get indices of dim values so that 
                         # coupled dim values can be sliced accordingly
-                        dim_value_indices = [sliced_dim_values.index(val) for val in dim_values]
+                        try:
+                            dim_value_indices = [sliced_dim_values.index(val) for val in dim_values]
+                        except:
+                            raise MissingData(
+                                missing_data_name = dim_values,
+                                data_names = sliced_dim_values,
+                                location = 'Output Coordinate Slice'
+                            )
                         for coupled_name,target_path in target_paths.items():
                             # Get all coupled dim values
                             all_coupled_values,found = self.config.path_get(
@@ -1143,7 +1145,7 @@ class DataCollection(object):
 
         # Update sample data collection
         for datum in data:
-            self.update_sample(
+            self.group_sample(
                 datum,
                 group_by = kwargs.get('group_by',[])
             )
@@ -1160,7 +1162,7 @@ class DataCollection(object):
                         sample_name
                     )[i] = xr.combine_by_coords(datum,combine_attrs='drop_conflicts')
     
-    def update_sample(self, new_data, group_by:list=[]):
+    def group_sample(self, new_data, group_by:list=[]):
         # Get sample name
         sample_name = new_data.attrs['arr_name']
 
@@ -1214,24 +1216,31 @@ class DataCollection(object):
 
         return self
     
-    def update_sample_sequentially(self,output_datasets,group_by:list=[],):
+    def group_samples_sequentially(self,output_datasets,group_by:list=[]):
         for datasets in tqdm(
             output_datasets,
-            leave=False,
-            miniters=1,
-            position=0              
+            leave = False,
+            miniters = 1,
+            position = 0,
+            desc = 'Binning samples by group id sequentially'
         ):
-            self.update_sample(
+            self.group_sample(
                 new_data = datasets,
                 group_by = group_by
             )
 
     def combine_by_coords_sequentially(self,sample_name:str,combined_dims:list):
-        for i,datasets in enumerate(
-            getattr(
-                self,
-                sample_name
-            )
+        dataset_list = getattr(
+            self,
+            sample_name
+        )
+        for i,datasets in tqdm(
+            enumerate(dataset_list),
+            total = len(dataset_list),
+            leave = False,
+            position = 0,
+            miniters = 1,
+            desc = 'Combining DataArray(s) by coordinates sequentially'
         ):
             getattr(
                 self,
@@ -1247,10 +1256,11 @@ class DataCollection(object):
         # sweep id and sample name
         # Initialise progress bar
         progress = tqdm(
-            total=len(sample_data),
-            leave=False,
-            miniters=1,
-            position=0
+            total = len(sample_data),
+            leave = False,
+            position = 0,
+            miniters = 1,
+            desc = 'Combining DataArray(s) by coordinates concurrently'
         )
         combined_coords = []
         # Create callback function for this index
@@ -1300,10 +1310,10 @@ class DataCollection(object):
             if j == 0:
                 result = datum
             else:
-                result = xr.combine_by_coords([
-                    result,
-                    datum
-                ])
+                result = xr.combine_by_coords(
+                    [result,datum], 
+                    combine_attrs = 'drop_conflicts'
+                )
         return (i,result)
 
     def del_sample(self,sample_name):
@@ -1649,7 +1659,7 @@ class OutputSummary(object):
         output_datasets = []
         for sweep_configuration in tqdm(
             sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)],
-            desc='Collecting h5 data',
+            desc='Collecting h5 data sequentially',
             leave=False,
             position=0
         ):
@@ -1680,14 +1690,21 @@ class OutputSummary(object):
         # Initialise progress bar
         progress = tqdm(
             total=len(sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]),
-            desc='Collecting h5 data',
+            desc='Collecting h5 data in parallel',
             leave=False,
             miniters=1,
             position=0
         )
         def my_callback(fut):
             progress.update()
-            output_datasets.append(fut.result())
+            try:
+                res = fut.result()
+                if len(res) > 0:
+                    output_datasets.append(res)
+            except (MissingFiles,CorruptedFileRead):
+                pass
+            except Exception as exc:
+                raise exc
 
         with BoundedQueueProcessPoolExecutor(max_waiting_tasks = self.settings.get('n_workers',1)) as executor:
             # Start the processes and ignore the results
@@ -1867,7 +1884,7 @@ class OutputSummary(object):
 
         # Load all necessary samples that were not loaded
         if len(samples_not_loaded) > 0:
-            self.logger.info(f"Collecting samples for {', '.join(samples_not_loaded)} in {'parallel' if self.settings.get('n_workers',1) > 1 else 'sequence'}.")
+            self.logger.info(f"Collecting samples {', '.join(samples_not_loaded)}.")
 
             # Do it concurrently
             if self.settings.get('n_workers',1) > 1:
@@ -1892,17 +1909,15 @@ class OutputSummary(object):
                 
                 for sample_name in sorted(samples_not_loaded):
                     
-                    self.logger.note(f"Combining {sample_name} homogeneous DataArray(s) sequentially")
                     # Homogeneous data arrays are the ones that have common coordinates
                     # along all core dimensions and group_by dimensions
-                    outputs.data.update_sample_sequentially(
+                    outputs.data.group_samples_sequentially(
                         output_datasets = [ds.pop(sample_name,None) for ds in output_datasets],
                         group_by = group_by
                     )
                     
                     # Combine coords for each list element of the Data Collection
                     parallel = False#self.settings.get('n_workers',1) > 1
-                    self.logger.note(f"Combining {sample_name} by coords {'concurrently' if parallel else 'sequentially'}.")
                     # if parallel:
                     #     combined_coords = outputs.data.combine_by_coords_concurrently(
                     #         sample_data = getattr(outputs.data,sample_name),
@@ -1999,22 +2014,20 @@ class OutputSummary(object):
             
             # Get sample
             self.logger.progress(f'Getting sample {sample_name}...')
-            # try:
-            samples = outputs.get_sample(sample_name)
-            # Unstack id multi-dimensional index
-            samples = samples.unstack('id') if 'id' in samples.dims else samples
-            # except CoordinateSliceMismatch as exc:
-            #     self.logger.debug(exc)
-            #     continue
-                # sys.exit()
-            # except MissingData as exc:
-            #     self.logger.debug(exc)
-            #     continue
-            #     # sys.exit()
-            # except Exception as exc:
-            #     print(traceback.format_exc())
-            #     self.logger.error(exc)
-            #     sys.exit()
+            try:
+                samples = outputs.get_sample(sample_name)
+                # Unstack id multi-dimensional index
+                samples = samples.unstack('id') if 'id' in samples.dims else samples
+            except CoordinateSliceMismatch as exc:
+                self.logger.debug(exc)
+                continue
+            except MissingData as exc:
+                self.logger.debug(exc)
+                continue
+            except Exception as exc:
+                print(traceback.format_exc())
+                self.logger.error(exc)
+                sys.exit()
             self.logger.progress(f"samples {dict(samples.sizes)}, {samples.dtype}")
             
             # Unstack sweep dims
