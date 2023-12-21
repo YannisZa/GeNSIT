@@ -282,37 +282,76 @@ class Plot(object):
             # Set gridlines
             ax.grid(axis='x',which='both')
             ax.xaxis.remove_overlapping_locs = False
-
             # Create a discrete hashmap
             x_hashmap = dict(zip(
                 unique_x,
                 tick_locations
-                # np.arange(1,len(unique_x)+1)
             ))
-            print(x_hashmap)
+            print('x_hashmap',x_hashmap)
         else:
             ax.set_xticks(fontsize = self.settings['tick_font_size'])
         
         if self.settings.get('y_discrete',False):
-            # Get sorted unique x values
-            unique_y = set(list(flatten([plot_sett['y'] for plot_sett in plot_settings])))
-            unique_y = sorted(list(unique_y))
+            # Sort all y values and keep their ordering
+            all_y = np.array(list(flatten([plot_sett['y_id'] for plot_sett in plot_settings])))
+            sorted_index = all_y.argsort(axis=0)
+            all_y = all_y[sorted_index]
+            # Get unique y values
+            unique_y = np.unique(all_y)
+            # Read y ticks from y
+            yticks = np.array([[suby for suby in plot_sett['y']] for plot_sett in plot_settings]).squeeze()
+            # Sort y ticks based on ordering of unique y
+            yticks = yticks[sorted_index]
+            # make sure ticks are at least 2-dimensional
+            yticks = yticks if len(yticks.shape) > 1 else np.expand_dims(yticks,axis=-1)
+            # For each subtick (up to two subticks - one for major and one for minor ticks)
+            for i,ytick_labels in enumerate(yticks[:,:2].T):
+                # Get tick locations
+                tick_indices = np.arange(
+                    self.settings['y_tick_frequency'][i][0],
+                    len(all_y),
+                    self.settings['y_tick_frequency'][i][1]*len(self.settings.get('sample',[None]))
+                )
+                tick_locations = np.arange(
+                    self.settings['y_tick_frequency'][i][0]+1,
+                    len(all_y)+1,
+                    self.settings['y_tick_frequency'][i][1]
+                )[:len(ytick_labels[tick_indices])]
+
+                print(tick_locations)
+                print(ytick_labels)
+                # Decide on major/minor axis
+                if i == 0:
+                    minor = False
+                else:
+                    minor = True
+                pad = self.settings["y_tick_pad"][i]
+                rotation = self.settings["y_tick_rotation"][i]
+
+                # Plot ticks
+                ax.set_yticks(
+                    ticks = tick_locations,
+                    labels = ytick_labels[tick_indices],
+                    minor = minor
+                )
+                ax.tick_params(
+                    axis='y', 
+                    which=('minor' if minor else 'major'), 
+                    pad=pad,
+                    bottom=True,
+                    labelsize=self.settings['tick_font_size'],
+                    rotation=rotation
+                )
+            # Set gridlines
+            ax.grid(axis='y',which='both')
+            ax.yaxis.remove_overlapping_locs = False
             # Create a discrete hashmap
             y_hashmap = dict(zip(
                 unique_y,
-                range(
-                    1,
-                    len(unique_y)*self.settings['y_tick_frequency']+1,
-                    self.settings['y_tick_frequency']
-                )
+                tick_locations
             ))
-            plt.yticks(
-                ticks = list(y_hashmap.values()),
-                labels = list(y_hashmap.keys()),
-                fontsize = self.settings['tick_font_size']
-            )
         else:
-            plt.yticks(fontsize = self.settings['tick_font_size'])
+            ax.set_yticks(fontsize = self.settings['tick_font_size'])
         
         # 2D scatter plot
         for plot_sett in plot_settings:
@@ -642,9 +681,7 @@ class Plot(object):
         # Decide on figure output dir
         if not self.settings['by_experiment']:
             # Get filename
-            filename = kwargs.get('name','NO_NAME')+'_' + \
-                    f"burnin_{self.settings['burnin']}_" + \
-                    f"thinning_{self.settings['thinning']}"
+            filename = kwargs.get('name','NO_NAME')+'_'+f"{self.settings['burnin_thinning_trimming']}"
             if not isinstance(plot_setting['outputs'].config['training']['N'],dict):
                 filename += f"_N_{plot_setting['outputs'].config['training']['N']}"
             if self.settings.get('label',None) is not None:
@@ -678,8 +715,7 @@ class Plot(object):
             )
             filename = f"table_{'x'.join(list(map(str,list(dims))))}" + \
                     f"_{plot_setting['outputs'].experiment_id[:-21]}_{kwargs.get('name','NO_NAME')}"+ \
-                    f"_burnin_{self.settings.get('burnin',0)}" + \
-                    f"_thinning_{self.settings.get('thinning',1)}" 
+                    f"_{self.settings['burnin_thinning_trimming']}"
             if not plot_setting['outputs'].config['training']['N'].get('sweep',{}):
                 filename += f"_N_{plot_setting['outputs'].config['training']['N']}"
             if self.settings.get('label',None) is not None:
