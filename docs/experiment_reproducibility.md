@@ -72,7 +72,7 @@ clear; multiresticodm summarise -s table -s intensity \
 ```
 clear; multiresticodm plot -x srmse -y dest_attraction_ts_loss \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 -et NonJointTableSIM_NN \
--s dest_attraction_ts_loss -ft 'srmse_vs_dest_attraction_loss' \
+-ft 'srmse_vs_dest_attraction_loss' \
 -stat 'srmse' 'signedmean&' 'iter|seed&' \
 -mrkr sample_name -hch sigma -c type -v 0.5 -l title \
 -k seed -k iter -k type -p dss \
@@ -112,26 +112,13 @@ clear; multiresticodm plot -y srmse -x 'iter&seed' -x sigma \
 
 ```
 
-clear; multiresticodm plot -y total -x table_steps \
+clear; multiresticodm plot -y table_likelihood_loss -x table_steps \
 -et JointTableSIM_NN -dn cambridge_work_commuter_lsoas_to_msoas/exp5_expected_loss \
--p dss -s total -ft 'total_loss_vs_table_steps' \
+-p dss -s table_likelihood_loss -ft 'table_likelihood_loss_vs_table_steps' \
 -stat '' 'mean&' 'iter&' \
 -c title -v 0.5 -sz 20 -l title \
--k iter -b 0 -t 1 -ylim 170000 400000 -xlim 0 42 \
---x_discrete -xlab '(\# Table steps)' -ylab 'Total loss' -xfq 6 10 \
+-k iter -btt 'iter' 0 100 100  -xlim 0 30 \
+--x_discrete -xlab '(\# Table steps)' -ylab 'Table likelihood loss' -xfq 4 8 \
 -fs 4 4 -lls 8 -afs 8 -tfs 5 -nw 6
-
-```
-
-```
-
-clear; multiresticodm plot -y table_likelihood -x table_steps \
--et JointTableSIM_NN -dn cambridge_work_commuter_lsoas_to_msoas/exp5_expected_loss \
--p dss -s table_likelihood -ft 'table_loss_vs_table_steps' \
--stat '' 'mean&' 'iter&' -c title -v 0.5 -sz 20 -l title -b 0 -t 1 \
--xlim 0 42 --x_discrete -xlab '(\# Table steps)' \
--ylab 'Table loss' -xfq 6 10 -fs 4 4 -lls 8 -afs 8 -tfs 5 -nw 6
-
--cs title \_total_constrained
 
 ```
