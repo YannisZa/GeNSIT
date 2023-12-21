@@ -436,7 +436,7 @@ OUTPUT_SCHEMA = {
     "compute_time":{
         "axes":[],
         "dtype":"float32",
-        "is_iterable": False,
+        "is_iterable": True,
     },
     **INTENSITY_SCHEMA,
     **TABLE_SCHEMA
