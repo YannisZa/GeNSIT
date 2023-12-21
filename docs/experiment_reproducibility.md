@@ -30,7 +30,7 @@ clear; multiresticodm run ./data/inputs/configs/experiment3_joint.toml -sm -et J
 ## Experiment 5 (Expected loss)
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml -et JointTableSIM_NN -nw 10 -nt 4 -sm
+clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml -et JointTableSIM_NN -nw 15 -nt 2 -sm
 ```
 
 # Summaries and Metrics
