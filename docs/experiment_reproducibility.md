@@ -42,7 +42,7 @@ Get SRMSEs for all samples and all experiments:
 ```
 -et JointTableSIM_NN
 
-clear; multiresticodm summarise -s table -s intensity \
+clear; multiresticodm summarise -ma table -ma intensity \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
 -et SIM_MCMC -et JointTableSIM_MCMC -et SIM_NN -et NonJointTableSIM_NN \
 -stat 'srmse' 'mean&' 'iter+seed&' \
@@ -56,7 +56,7 @@ Get coverage probabilities for all samples and all experiments
 ```
 -et JointTableSIM_MCMC -et SIM_NN -et NonJointTableSIM_NN -et JointTableSIM_NN
 
-clear; multiresticodm summarise -s table -s intensity \
+clear; multiresticodm summarise -ma table -ma intensity \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
 -et SIM_MCMC \
 -stat 'coverage_probability' '&mean|\*100|rint' '&origin+destination||' \
@@ -70,14 +70,17 @@ clear; multiresticodm summarise -s table -s intensity \
 ## Figure 1
 
 ```
-clear; multiresticodm plot -x srmse -y dest_attraction_ts_loss \
+clear; multiresticodm plot -y srmse -x joint_loss \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 -et NonJointTableSIM_NN \
--ft 'srmse_vs_dest_attraction_loss' \
+-ma intensity -ma table -ma dest_attraction_ts_likelihood_loss \
 -stat 'srmse' 'signedmean&' 'iter|seed&' \
+-e joint_loss 'dest_attraction_ts_likelihood_loss+lossfn(table,torch.log(intensity))' \
+-ea dest_attraction_ts_likelihood_loss -ea table -ea intensity \
+-ea lossfn=outputs.ct_mcmc.table_likelihood_loss \
 -mrkr sample_name -hch sigma -c type -v 0.5 -l title \
 -k seed -k iter -k type -p dss \
--btt 'iter' 0 100 100 \
--xlab 'SRMSE' -ylab 'Dest attraction loss' \
+-btt 'iter' 0 100 100 -cs loss_name "['dest_attraction_ts_likelihood_loss']" \
+-xlab 'SRMSE' -ylab 'Dest attraction likelihood loss' -ft 'srmse_vs_dest_attraction_loss' \
 -fs 4 4 -lls 8 -afs 8 -tfs 5 -nw 20
 ```
 
@@ -92,7 +95,7 @@ clear; multiresticodm plot -x srmse -y dest_attraction_ts_loss \
 
 clear; multiresticodm plot -y srmse -x 'iter&seed' -x sigma \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp2 -et NonJointTableSIM_NN \
--s table -s intensity -ft 'srmse_vs_epoch,seed_smrse_and_coverage_prob_tradeoff' \
+-ma table -ma intensity -ft 'srmse_vs_epoch,seed_smrse_and_coverage_prob_tradeoff' \
 -stat 'srmse' 'signedmean&' 'iter|seed&' \
 -stat 'coverage_probability' '&mean|\*1000|floor' '&origin|destination||' \
 -mrkr sample_name -hch sigma -c type -sz coverage_probability -v 0.5 -or asc coverage_probability -l title \
@@ -114,7 +117,7 @@ clear; multiresticodm plot -y srmse -x 'iter&seed' -x sigma \
 
 clear; multiresticodm plot -y table_likelihood_loss -x table_steps \
 -et JointTableSIM_NN -dn cambridge_work_commuter_lsoas_to_msoas/exp5_expected_loss \
--p dss -s table_likelihood_loss -ft 'table_likelihood_loss_vs_table_steps' \
+-p dss -ma table_likelihood_loss -ft 'table_likelihood_loss_vs_table_steps' \
 -stat '' 'mean&' 'iter&' \
 -c title -v 0.5 -sz 20 -l title \
 -k iter -btt 'iter' 0 100 100  -xlim 0 30 \
