@@ -22,8 +22,22 @@ def set_threads(n_threads):
     os.environ['VECLIB_MAXIMUM_THREADS'] = str(n_threads)
     torch.set_num_threads(n_threads)
 
+def update_settings(setts):
+    # Convert strings to ints
+    setts['n_threads'] = int(setts.get('n_threads',1))
+    setts['n_workers'] = setts.get('n_workers',1)
+
+    # Update sample names
+    if 'metric_args' in setts and 'evaluation_kwargs' in setts:
+        sample_names = list(setts['metric_args']) + \
+            list(setts['evaluation_kwargs'].keys())
+    sample_names = set(sample_names).intersection(DATA_SCHEMA.keys())
+    setts['sample'] = list(sample_names)
+    
+    return setts
+
 # Get total number of threads
-AVAILABLE_CORES = psutil.cpu_count(logical=False)
+AVAILABLE_CORES = psutil.cpu_count(logical=True)
 AVAILABLE_THREADS = psutil.cpu_count(logical=True)
 
 
@@ -248,14 +262,13 @@ def create(
     # Capitalise all single-letter arguments
     settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
 
-    # Convert strings to ints
-    settings['n_threads'] = int(settings.get('n_threads',1))
-    settings['n_workers'] = settings.get('n_workers',1)
+    # Update settings
+    settings = update_settings(settings)
     
     # Update number of workers
     set_threads(settings['n_threads'])
 
-    # Import all modules
+    # Import modules
     from multiresticodm.utils.misc_utils import deep_updates
     from multiresticodm.experiments import ExperimentHandler
 
@@ -415,20 +428,19 @@ def run(
     settings = {k: v for k, v in settings.items() if not hasattr(v,'__len__') or (hasattr(v,'__len__') and len(v) > 0)}
     # Capitalise all single-letter arguments
     settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
-
-    # Convert covariance to 2x2 array
-    if 'covariance' in list(settings.keys()):
-        settings['covariance'] = asarray([float(x) for x in settings['covariance'].split(",")]).reshape((2,2)).tolist()
     
-    # Convert strings to ints
-    settings['n_threads'] = int(settings.get('n_threads',1))
-    settings['n_workers'] = settings.get('n_workers',1)
+    # Update settings
+    settings = update_settings(settings)
     
     # Update number of workers
     set_threads(settings['n_threads'])
 
     # Import all modules
     from numpy import asarray
+    
+    # Convert covariance to 2x2 array
+    if 'covariance' in list(settings.keys()):
+        settings['covariance'] = asarray([float(x) for x in settings['covariance'].split(",")]).reshape((2,2)).tolist()
 
     # Setup logger
     logger = setup_logger(
@@ -452,11 +464,9 @@ _output_options = [
     click.option('--title','-en', multiple=True, type=click.STRING, default = [''], cls=NotRequiredIf, not_required_if='directories'),
     click.option('--exclude','-exc', type=click.STRING, default = [], multiple = True, cls=NotRequiredIf, not_required_if='directories'),
     click.option('--filename_ending', '-fe', default = '', type=click.STRING),
-    click.option('--burnin_thinning_trimming', '-btt', default=[], show_default=True, multiple = True, callback = to_list,
+    click.option('--burnin_thinning_trimming', '-btt', default=[], show_default=True, multiple = True, callback = btt_callback,
                  type=(click.STRING,click.IntRange(min=0),click.IntRange(min=1),click.IntRange(min=1)), 
                  help=f'Sets number of initial samples to discard (burnin), number of samples to skip (thinning) and number of samples to keep (trimming).'),
-    click.option('--sample', '-s', multiple = True, required = False,
-                type=click.Choice(DATA_SCHEMA.keys()), help=f'Sets type of samples to compute metrics over.'),
     click.option('--statistic','-stat', multiple=True, default=None, 
             type = (click.STRING,click.STRING,click.STRING), required=False, callback = unpack_statistics, 
             help='Every argument corresponds to a list of metrics, statistics and their corresponding axes e.g. passing  ("SRMSE", \"mean|sum\",  \"iter|sweep\") corresponds to applying mean across the iter dimension and then sum across sweep dimension before applying SRMSE metric'),
@@ -468,6 +478,13 @@ _output_options = [
             help='Every argument corresponds to a list of sweeped parameters that the outputs will be grouped by.'),
     click.option('--metric','-m', multiple=True, type=click.Choice(METRICS.keys()), required=False, default=None,
                 help=f'Sets list of metrics to compute over samples.'),
+    click.option('--metric_args', '-ma', multiple = True, required = False,
+            type=click.STRING, default=None, callback = to_list, help=f'''Metric keyword arguments.'''),
+    click.option('--evaluate','-e', multiple=True, type=(click.STRING, click.STRING), required=False, default=[], 
+                callback = list_of_lists, help=f'''Evaluates expressions for one or more datasets. 
+                First argument is the name of the evaluation. Second is the evaluation expression'''),
+    click.option('--evaluation_kwargs','-ea', multiple=True, type=click.STRING, required=False, default=None, 
+                callback = evaluate_kwargs_callback, help=f'''Expression evaluation keyword arguments.'''),
     click.option('--dates','-date', type=click.STRING, default=None, multiple=True, required=False),
     click.option('--epsilon_threshold', '-eps', default=0.001, show_default=True,
         type=click.FLOAT, help=f'Sets error norm threshold below which convergence is achieved. Used only in convergence plots.'),
@@ -636,12 +653,14 @@ def plot(
         exclude,
         filename_ending,
         burnin_thinning_trimming,
-        sample,
         statistic,
         coordinate_slice,
         input_slice,
         group_by,
         metric,
+        metric_args,
+        evaluate,
+        evaluation_kwargs,
         dates,
         epsilon_threshold,
         norm,
@@ -737,23 +756,11 @@ def plot(
     # Add context arguments
     undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
 
-    # Convert strings to ints
-    settings['n_threads'] = int(settings.get('n_threads',1))
-    settings['n_workers'] = settings.get('n_workers',1)
-
-    # Convert burnin, thinning, trimming to dictionary
-    if isinstance(burnin_thinning_trimming,list):
-        if len(burnin_thinning_trimming) > 0:
-            settings['burnin_thinning_trimming'] = {
-                v[0]:{"burnin":v[1],"thinning":v[2],"trimming":v[3]}
-                for v in burnin_thinning_trimming
-            }
-        else:
-            settings['burnin_thinning_trimming'] = {}
-
-
     # Add undefined settings to settings
     settings = {**settings, **undefined_settings}
+
+    # Update settings
+    settings = update_settings(settings)
 
     # Update number of workers
     set_threads(settings['n_threads'])
@@ -799,12 +806,14 @@ def summarise(
         exclude,
         filename_ending,
         burnin_thinning_trimming,
-        sample,
         statistic,
         coordinate_slice,
         input_slice,
         group_by,
         metric,
+        metric_args,
+        evaluate,
+        evaluation_kwargs,
         dates,
         epsilon_threshold,
         norm,
@@ -831,22 +840,11 @@ def summarise(
     # Add context arguments
     undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
 
-    # Convert strings to ints
-    settings['n_threads'] = int(settings.get('n_threads',1))
-    settings['n_workers'] = settings.get('n_workers',1)
-
-    # Convert burnin, thinning, trimming to dictionary
-    if isinstance(burnin_thinning_trimming,list):
-        if len(burnin_thinning_trimming) > 0:
-            settings['burnin_thinning_trimming'] = {
-                v[0]:{"burnin":v[1],"thinning":v[2],"trimming":v[3]}
-                for v in burnin_thinning_trimming
-            }
-        else:
-            settings['burnin_thinning_trimming'] = {}
-
     # Add undefined settings to settings
     settings = {**settings, **undefined_settings}
+
+    # Update settings
+    settings = update_settings(settings)
     
     # Update number of workers
     set_threads(settings['n_threads'])
