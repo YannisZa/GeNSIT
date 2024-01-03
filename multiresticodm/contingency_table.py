@@ -16,7 +16,7 @@ from typing import List, Union, Callable
 from multiresticodm.config import Config
 from multiresticodm.fixed.global_variables import *
 from multiresticodm.utils.math_utils import powerset
-from multiresticodm.utils.misc_utils import ndims, setup_logger, unpack_dims, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast
+from multiresticodm.utils.misc_utils import ndims, setup_logger, unpack_dims, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast, print_json
 
 # -> Union[ContingencyTable,None]:
 def instantiate_ct(config: Config, **kwargs):
@@ -28,6 +28,23 @@ def instantiate_ct(config: Config, **kwargs):
         )
     else:
         raise Exception(f"Input class {ct_type} not found")
+
+def map_constraints_to_distribution_name(constraints):
+    # TODO: Generalise this
+
+    # Get all unique axes that appear as singletons
+    unique_axes = set([ax for ax in constraints['constrained_axes'] if len(ax) == 1])
+    
+    if len(constraints['constrained_axes']) == 0:
+        return 'poisson'
+    elif len(unique_axes) == 0:
+        return 'multinomial'
+    elif len(unique_axes) == 1:
+        return 'product_multinomial'
+    elif len(unique_axes) == 2:
+        return 'fishers_hypergeometric'
+    else:
+        raise ValueError(f"Distribution not found for constraints {str(constraints['constrained_axes'])}")
 
 
 class ContingencyTable(object):
@@ -84,8 +101,7 @@ class ContingencyTable(object):
         # Build contingency table
         if config is not None:
             # Store flag for whether to allow sparse margins or not
-            if 'sparse_margins' in list(self.config.settings['contingency_table'].keys()):
-                self.sparse_margins = self.config.settings['contingency_table']['sparse_margins']
+            self.sparse_margins = self.config.settings['contingency_table'].get('sparse_margins',False)
             # Read tabular data
             self.import_tabular_data()
 
@@ -111,7 +127,7 @@ class ContingencyTable(object):
         self.cells = sorted([tuplize(cell) for cell in product(*[range(dim) for dim in unpack_dims(self.data.dims)])])
         
         # Fill in missing margins that can be recovered from existing (user input) margins
-        self.distribution_name = self.update_and_map_margin_constraints_to_distribution_name()
+        self.distribution_name = map_constraints_to_distribution_name(self.constraints)
 
         # Fill in missing cell margins and 
         # Update residual margins based on exhaustive list of cell constraints
@@ -402,8 +418,6 @@ class ContingencyTable(object):
         self.constraints = {}
         constrained_axes,cell_constraints = None, None
         # margin and cell constraints
-        ## Reading config if provided
-
         if self.config is not None:
             if 'constraints' in list(self.config.settings['contingency_table'].keys()):
                 if 'axes' in list(self.config.settings['contingency_table']['constraints'].keys()):
@@ -818,23 +832,6 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 raise Exception(f'{sampler_name} sampler yielded a margin-inadmissible contingency table')
             else:
                 raise Exception('Unrecognized error encountered.')
-    
-    def update_and_map_margin_constraints_to_distribution_name(self):
-        # TODO: Generalise this
-
-        # Get all unique axes that appear as singletons
-        unique_axes = set([ax for ax in self.constraints['constrained_axes'] if len(ax) == 1])
-        
-        if len(self.constraints['constrained_axes']) == 0:
-            return 'poisson'
-        elif len(unique_axes) == 0:
-            return 'multinomial'
-        elif len(unique_axes) == 1:
-            return 'product_multinomial'
-        elif len(unique_axes) == 2:
-            return 'fishers_hypergeometric'
-        else:
-            raise ValueError(f"Distribution not found for constraints {str(self.constraints['constrained_axes'])}")
     
     def margin_import(self, axis, intensity: list = None):
 
