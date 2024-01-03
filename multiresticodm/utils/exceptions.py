@@ -37,9 +37,9 @@ class InvalidDataLength(DataException):
             Data {self.data_name_lens} does not have equal lengths!
         """
 
-
 class DuplicateData(DataException):
     def __init__(self,message:str,len_data:int,len_unique_data:int,**kwargs):
+        super().__init__('',**kwargs)
         self.message = message
         self.len_data = len_data
         self.len_unique_data = len_unique_data
@@ -145,7 +145,7 @@ class InvalidLoggerType(LoggerType):
 #--------------------------------------------------------------------
 
 class EntryException(Exception):
-    def __init__(self,message,**kwargs):
+    def __init__(self,message='',**kwargs):
         super().__init__(message)
         self.message = message
         self.key_path = kwargs.get('key_path',[])
