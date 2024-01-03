@@ -17,11 +17,11 @@ from tqdm.auto import tqdm
 from itertools import product
 from scipy import interpolate
 from argparse import Namespace
-from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
 from statsmodels.graphics.tsaplots import plot_acf
+from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
 
-from multiresticodm.utils.misc_utils import *
 from multiresticodm.config import Config
+from multiresticodm.utils.misc_utils import *
 from multiresticodm.fixed.plot_variables import *
 from multiresticodm.fixed.global_variables import *
 from multiresticodm.outputs import Outputs,OutputSummary
@@ -834,6 +834,12 @@ class Plot(object):
 
                 # Collect outputs from folder's Data Collection
                 outputs = outputs_summary.get_folder_outputs(indx,output_folder)
+
+                # Slice according to coordinate slice
+                outputs.slice_coordinates()
+
+                # Stack sweep and iter dimensions
+                outputs.stack_sweep_and_iter_dims(outputs)
 
                 # Create plot settings
                 plot_sett = {'outputs':outputs}
