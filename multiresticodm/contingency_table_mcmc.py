@@ -273,6 +273,9 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             self.ct.update_margins({ax:margins[ax]})
         return margins
 
+    @property
+    def table_loss(self):
+        return getattr(ProbabilityUtils,f"log_{self.ct.distribution_name}_loss")
 
     def build_table_distribution(self) -> None:
 
@@ -284,10 +287,10 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         self.sample_margins = getattr(self, f'sample_margins_{ndims(self.ct)}way_table')
         
         # Define table loss function
-        table_loss = getattr(ProbabilityUtils,f"log_{self.ct.distribution_name}_pmf_unnormalised")
-        def table_loss_function(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
-            return (-1) * table_loss(table,log_intensity)
-        self.table_loss_function = table_loss_function
+        table_likelihood = getattr(ProbabilityUtils,f"log_{self.ct.distribution_name}_pmf_unnormalised")
+        def table_likelihood_loss(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
+            return (-1) * table_likelihood(table,log_intensity)
+        self.table_likelihood_loss = table_likelihood_loss
 
         if self.proposal_type.lower() == 'direct_sampling':
             self.acceptance_type = 'Direct sampling'
