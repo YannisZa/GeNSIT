@@ -15,7 +15,7 @@ from typing import Any, List, Union
 from multiresticodm.config import Config
 from multiresticodm.utils.exceptions import *
 from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.utils.misc_utils import setup_logger, evaluate, fn_name
+from multiresticodm.utils.misc_utils import setup_logger, fn_name
 from multiresticodm.fixed.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
 
 
@@ -389,15 +389,15 @@ class HarrisWilson_NN:
                     # Reshape loss kwargs if needed
                     for key, value in deepcopy( self.loss_kwargs.get(name,{})).items():
                         if len(LOSS_KWARG_OPERATIONS.get(key,'')):
-                            self.loss_kwargs[name][key] = evaluate(
+                            self.loss_kwargs[name][key] = eval(
                                 expression = LOSS_KWARG_OPERATIONS[key]['function'],
-                                locals = {
+                                {
                                     "dim":np.prod(validation_data['total_cost_by_origin'].shape),
                                     "device":self.physics_model.device,
                                     key:value,
                                     **LOSS_KWARG_OPERATIONS[key]['kwargs']
                                 },
-                                globals = globals()
+                                globals()
                             )
                     
                     # Add to total loss
@@ -414,15 +414,15 @@ class HarrisWilson_NN:
                     # Reshape loss kwargs if needed
                     for key, value in deepcopy( self.loss_kwargs.get(name,{})).items():
                         if len(LOSS_KWARG_OPERATIONS.get(key,'')):
-                            self.loss_kwargs[name][key] = evaluate(
+                            self.loss_kwargs[name][key] = eval(
                                 expression = LOSS_KWARG_OPERATIONS[key]['function'],
-                                locals = {
+                                {
                                     "dim":np.prod(validation_data[validation_dataset].shape),
                                     "device":self.physics_model.device,
                                     key:value,
                                     **LOSS_KWARG_OPERATIONS[key]['kwargs']
                                 },
-                                globals = globals()
+                                globals()
                             )
 
                     # Add to total loss
