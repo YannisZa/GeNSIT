@@ -74,16 +74,6 @@ def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
         else:
             # Group id of interest
             group_id = kwargs.pop('group','')
-            # Find all existing data groups
-            # with nc.Dataset(filepath, mode='r') as nc_file:
-            #     # Get groups
-            #     data_group_ids = read_xr_group_ids(nc_file,list_format=True)
-            #     # Read existing data
-            #     if group_id in data_group_ids:
-            #         del nc_file[group_id]
-            #     else:
-            #         nc_file.createGroup(group_id)
-            # existing_data = read_xr_data(filepath=filepath)
                 
             data.to_netcdf(
                 path = filepath,
@@ -91,6 +81,8 @@ def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
                 mode = 'a',
                 **kwargs
             )
+            # close file
+            data.close()
     except Exception as exc:
         raise H5DataWritingFailed(message=str(exc))
 
@@ -192,16 +184,22 @@ def read_npy(filepath:str,**kwargs:Dict) -> np.ndarray:
     return data
 
 def read_xr_data(filepath:str,**kwargs:Dict) -> xr.DataArray:
-    if len(kwargs.get('group','')) > 0:
-        return xr.open_dataarray(
-            filepath,
-            group = kwargs['group']
-        )
-    else:
-        return xr.open_dataset(
-            filepath,
-            engine = 'h5netcdf'
-        )
+    try:
+        if len(kwargs.get('group','')) > 0:
+            with xr.open_dataarray(
+                filepath,
+                group = kwargs['group']
+            ) as ds:
+                data = ds.load()
+        else:
+            with xr.open_dataset(
+                filepath,
+                engine = 'h5netcdf'
+            ) as ds:
+                data = ds.load()
+        return data
+    except Exception as exc:
+        raise exc
 
 def read_netcdf_group_ids(nc_data:str,key_path=[]):
     for k in nc_data.groups.keys():
@@ -441,9 +439,6 @@ def operate(input:object,operations:str,**kwargs):
         else:
             value = OPERATORS[operator](value,kwargs[attr])
     return value
-
-def evaluate(expression:str,locals,globals):
-    return eval(expression,globals,locals)
     
 
 # https://stackoverflow.com/questions/27265939/comparing-python-dictionaries-and-nested-dictionaries
@@ -671,6 +666,13 @@ def stringify(data):
     else:
         return f"{str(data).replace(' ','')}"
 
+def unstringify(data):
+    try:
+        decoded_data = eval(data)
+    except:
+        decoded_data = data
+    return decoded_data
+
 def stringify_statistic(statistic):
     # Unpack statistic pair
     statistic_name,statistic_dims = statistic
@@ -711,7 +713,7 @@ def update_device(device):
     return device
 
 def set_device_id(device_id):
-    torch.cuda.set_device(device)
+    torch.cuda.set_device(device_id)
 
 
 def tuplize(tup):
