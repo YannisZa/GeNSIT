@@ -53,7 +53,37 @@ class Config:
         # Update root
         self.path_sets_root(**kwargs)
 
-
+    def update(self,new_settings:dict):
+        for key,value in new_settings.items():
+            # Find path
+            all_paths = self.path_find(
+                key = key,
+                settings = self.settings,
+                current_key_path = [],
+                all_key_paths = []
+            )
+            try:
+                assert len(all_paths) > 0
+            except:
+                raise PathNotExistException(
+                    message = f"Cannot find path to {key}",
+                    key_path = [key],
+                    data = self.settings
+                )
+            # Update key path
+            try:
+                assert self.path_set(
+                    settings = self.settings,
+                    value = value,
+                    key_path = all_paths[0]
+                )
+            except:
+                raise PathNotExistException(
+                    message = f"Cannot update {all_paths[0]} as it cannot be found in settings",
+                    key_path = all_paths[0],
+                    data = self.settings
+                )
+    
     def reset(self):
         # Sweep mode activated is set to false
         self.sweep_active = False
@@ -258,9 +288,19 @@ class Config:
         else:
             if overwrite:
                 settings[key_path[0]] = {}
-                value_set = self.path_set(settings[key_path[0]],value,key_path[1:],overwrite)
+                value_set = self.path_set(
+                    settings[key_path[0]],
+                    value,
+                    key_path[1:],
+                    overwrite
+                )
             else: 
-                value_set = self.path_set(settings.get(key_path[0],{}),value,key_path[1:],overwrite)
+                value_set = self.path_set(
+                    settings.get(key_path[0],{}),
+                    value,
+                    key_path[1:],
+                    overwrite
+                )
         
         return value_set
     
@@ -583,7 +623,11 @@ class Config:
                         )
                         # Update settings with sweep default
                         try:
-                            assert self.path_set(settings,settings_child_val,key_path[:-1])
+                            assert self.path_set(
+                                settings,
+                                settings_child_val,
+                                key_path[:-1]
+                            )
                         except:
                             raise Exception(f"""
                                 Key {'>'.join(list(map(str,key_path)))} could not be updated \
@@ -679,7 +723,11 @@ class Config:
                                 """)
                         # Update settings with sweep default
                         try:
-                            assert self.path_set(settings,settings_child_val,key_path[:-1])
+                            assert self.path_set(
+                                settings,
+                                settings_child_val,
+                                key_path[:-1]
+                            )
                         except:
                             raise Exception(f"""
                                 Key {'>'.join(list(map(str,key_path)))} could not be updated \
