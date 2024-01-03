@@ -8,12 +8,11 @@ from copy import deepcopy
 from datetime import datetime
 from torch import float32, uint8
 from multiprocessing import Manager
-from joblib import Parallel, delayed
 
-from multiresticodm.utils.misc_utils import *
 from multiresticodm.config import Config
 from multiresticodm.inputs import Inputs
 from multiresticodm.outputs import Outputs
+from multiresticodm.utils.misc_utils import *
 from multiresticodm.fixed.global_variables import *
 from multiresticodm.utils.math_utils import torch_optimize
 from multiresticodm.contingency_table import instantiate_ct
@@ -2191,7 +2190,7 @@ class JointTableSIM_NN(Experiment):
             neural_net = neural_network,
             loss = dict(
                 **config['neural_network'].pop('loss'),
-                table_likelihood_loss = self.ct_mcmc.table_loss_function
+                table_likelihood_loss = self.ct_mcmc.table_likelihood_loss
             ),
             physics_model = physics_model,
             write_every = self._write_every,
