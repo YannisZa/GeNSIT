@@ -17,8 +17,8 @@ from copy import deepcopy
 from multiresticodm.utils.exceptions import *
 from multiresticodm.config import Config
 from multiresticodm.utils.math_utils import torch_optimize
-from multiresticodm.utils.probability_utils import random_vector
 from multiresticodm.harris_wilson_model import HarrisWilson
+from multiresticodm.utils.probability_utils import random_vector
 from multiresticodm.spatial_interaction_model import instantiate_sim
 from multiresticodm.fixed.global_variables import INPUT_SCHEMA, NUMPY_TO_TORCH_DTYPE, PARAMETER_DEFAULTS,INPUT_SCHEMA,Dataset
 from multiresticodm.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call
