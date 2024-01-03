@@ -1,7 +1,44 @@
 import click
 from copy import deepcopy
 
+from multiresticodm.fixed.global_variables import *
 
+def btt_callback(ctx, param, value):
+    if value is None:
+        return {}
+    else:
+        value = list(value)
+    
+    # Convert burnin, thinning, trimming to dictionary
+    if len(value) > 0:
+        burnin_thinning_trimming = {
+            v[0]:{"burnin":v[1],"thinning":v[2],"trimming":v[3]}
+            for v in value
+        }
+    else:
+        burnin_thinning_trimming = {}
+    return burnin_thinning_trimming
+
+
+def list_of_lists(ctx, param, value):
+    if value is None:
+        return []
+    elif len(value) == 0:
+        return []
+    else:
+        return [list(v) for v in value]
+    
+def evaluate_kwargs_callback(ctx, param, value):
+    if value is None:
+        return {}
+    kwargs = {}
+    for keyval in value:
+        if '=' in keyval:
+            key,val = keyval.split('=')
+            kwargs[key.strip(' ')] = val.strip(' ')
+        else:
+            kwargs[keyval.strip(' ')] = keyval.strip(' ')
+    return kwargs
 
 def to_list(ctx, param, value):
     if value is None:
