@@ -7,8 +7,8 @@ import torch
 from torch import float32
 
 from multiresticodm.config import Config
-from multiresticodm.utils.misc_utils import set_seed, setup_logger, to_json_format
 from multiresticodm.spatial_interaction_model import SpatialInteraction2D
+from multiresticodm.utils.misc_utils import set_seed, setup_logger, to_json_format
 from multiresticodm.fixed.global_variables import PARAMETER_DEFAULTS,DATA_SCHEMA,Dataset
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
