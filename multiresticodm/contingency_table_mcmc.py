@@ -82,8 +82,8 @@ class ContingencyTableMarkovChainMonteCarlo(object):
                 # Instantiate markov basis object
                 self.markov_basis = instantiate_markov_basis(
                     self.ct, 
-                    log_to_console = self.logger.disabled,
-                    logger=self.logger
+                    monitor_progress = False,
+                    logger = self.logger
                 )
                 self.ct.config['markov_basis_len'] = int(len(self.markov_basis))
 
@@ -188,6 +188,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             margins=margins,
             ct_mcmc=self
         )
+        self.logger.debug(table0)
         
         return table0
     
@@ -402,10 +403,10 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
         if len(fixed_cells) > 0:
-            # Extract indices,
-            fixed_indices = [ fixed_cells[:,i] for i in range(ndims(self.ct)) ]
+            # Extract indices
+            fixed_indices = np.ravel_multi_index(fixed_cells.T, self.ct.dims)
             # Fix table cells
-            table_new[ fixed_indices ] = self.ct.data.ground_truth_table[ fixed_indices ]
+            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.view(-1)[fixed_indices]
 
         # Non fixed (free) indices
         free_cells = np.array(self.ct.cells)
@@ -427,10 +428,10 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
         if len(fixed_cells) > 0:
-            # Extract indices,
-            fixed_indices = [ fixed_cells[:,i] for i in range(ndims(self.ct)) ]
+            # Extract indices
+            fixed_indices = np.ravel_multi_index(fixed_cells.T, self.ct.dims)
             # Fix table cells
-            table_new[ fixed_indices ] = self.ct.data.ground_truth_table[ fixed_indices ]
+            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.view(-1)[fixed_indices]
 
         # Non fixed (free) indices
         free_cells = np.array(self.ct.cells)
@@ -463,10 +464,10 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
         if len(fixed_cells) > 0:
-            # Extract indices,
-            fixed_indices = [ fixed_cells[:,i] for i in range(ndims(self.ct)) ]
+            # Extract indices
+            fixed_indices = np.ravel_multi_index(fixed_cells.T, self.ct.dims)
             # Fix table cells
-            table_new[ fixed_indices ] = self.ct.data.ground_truth_table[ fixed_indices ]
+            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.view(-1)[fixed_indices]
 
         # Non fixed (free) indices
         free_cells = np.array(self.ct.cells)
