@@ -204,6 +204,8 @@ def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
         Standardised root mean square error of t_hat.
 
     """
+    # print('prediction total',prediction.sum(['origin','destination']).values.tolist())
+    # print('ground truth total',ground_truth.sum(['origin','destination']).values.tolist())
     prediction = prediction.astype('float32')
     ground_truth = ground_truth.astype('float32')
     prediction,ground_truth = xr.broadcast(prediction,ground_truth)
@@ -212,6 +214,12 @@ def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
     denominator = ground_truth.sum(dim=['origin','destination']) / ground_truth.size
     srmse = numerator / denominator
     
+    # print('prediction',prediction.size)
+    # print(prediction.values.flatten())
+    # print('ground_truth',ground_truth.size)
+    # print(ground_truth.values.flatten())
+    # print('numerator:',numerator.values.tolist(), 'denominator:',denominator.values.tolist())
+    # print('srmse',srmse.values.tolist())
     return srmse
 
 def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
@@ -378,3 +386,4 @@ def logfactorialsum(arr, dim=None):
         return gammaln(arr+1).sum()
     else:
         return gammaln(arr+1).sum(dim = dim)
+    
