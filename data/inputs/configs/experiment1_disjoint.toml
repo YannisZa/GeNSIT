@@ -36,13 +36,13 @@ load_experiment = ''
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
     default = [[]]
-    range = [[], [[+0,+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
+    range = [[], [[+0,+1]], [[+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'
   [contingency_table.constraints.cells.sweep]
     default = ''
     range = [
-      '','','','','cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt','cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
+      '','','','','','constraints/cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt','constraints/cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
     ]
     coupled = true
     target_name = 'title'
@@ -50,16 +50,13 @@ load_experiment = ''
 [spatial_interaction_model]
   [spatial_interaction_model.name.sweep]
     default = 'TotallyConstrained'
-    range = ['TotallyConstrained','TotallyConstrained','ProductionConstrained',
-    'ProductionConstrained','TotallyConstrained','TotallyConstrained']
+    range =   ['TotallyConstrained','TotallyConstrained','TotallyConstrained','ProductionConstrained',
+    'TotallyConstrained','TotallyConstrained','TotallyConstrained']
     coupled = true
     target_name = 'title'
-    
   grand_total = +33704
   [spatial_interaction_model.parameters]
     bmax = +1.0
-    alpha = +1.0
-    beta = +1.0
   
 [harris_wilson_model]
   dt = +0.001
@@ -81,9 +78,14 @@ load_experiment = ''
     
     [mcmc.contingency_table]
       table_steps = +1
-      proposal = 'direct_sampling'
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
+      [mcmc.contingency_table.proposal.sweep]
+        default = 'direct_sampling'
+        range = ['direct_sampling','direct_sampling','direct_sampling','direct_sampling',
+        'degree_higher','degree_higher','degree_higher']
+        coupled = true
+        target_name = 'title'
 
     [mcmc.parameters]
       theta_steps = 1
@@ -153,6 +155,7 @@ load_experiment = ''
   export_samples = true
   export_metadata = true
   overwrite = true
+  validate_samples = false
 
 [[experiments]]
   type = 'NonJointTableSIM_NN'
@@ -161,6 +164,7 @@ load_experiment = ''
   export_samples = true
   export_metadata = true
   overwrite = true
+  validate_samples = false
 
 [[experiments]]
   type = 'SIM_MCMC'
@@ -169,6 +173,7 @@ load_experiment = ''
   export_samples = true
   export_metadata = true
   overwrite = true
+  validate_samples = false
 
 [outputs]
     chunk_size = +20_000
@@ -178,4 +183,4 @@ load_experiment = ''
     out_group = 'exp1'
     [outputs.title.sweep]
       default = '_unconstrained'
-      range = ['_unconstrained','_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      range = ['_unconstrained','_total_constrained','_total_intensity_row_table_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
