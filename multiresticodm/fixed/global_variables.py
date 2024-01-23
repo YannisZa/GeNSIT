@@ -264,7 +264,7 @@ INPUT_SCHEMA = {
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
         "dims":["destination","time"],
-        "cast_to_xarray":False
+        "cast_to_xarray":True
     },
     "cost_matrix":{
         "axes":[0,1],
@@ -300,9 +300,10 @@ INPUT_SCHEMA = {
         "funcs":[],
         "args_dtype":[],
         "dims":[],
-
         "cast_to_xarray":False
     },
+    "margins":{},
+    "cells_subset":{},
     "dims":{},
     "to_learn":{},
     "true_parameters":{},
@@ -682,3 +683,4 @@ OPTIMIZERS = {
 
 class Dataset(object):
     pass
+

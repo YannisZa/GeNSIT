@@ -10,19 +10,23 @@ def cmap_exists(name):
     return True
 
 
-PLOT_COORDINATES = ['x','y','z']
+PLOT_COORDINATES = ["x","y","z"]
+PLOT_AUX_COORDINATES = ["x_group","y_group","z_group"]
+PLOT_ALL_COORDINATES = PLOT_COORDINATES+PLOT_AUX_COORDINATES
+
 PLOT_CORE_FEATURES = {
-    'marker': {'dtype': str},
-    'label': {'dtype': str},
-    'hatch': {'dtype': str},
-    'visibility': {'dtype': float},
-    'colour': {'dtype': str},
-    'size': {'dtype': float},
-    'zorder': {'dtype': float},
+    "size": {"dtype": float},
+    "style": {"dtype": str},
+    "colour": {"dtype": str},
+    "visibility": {"dtype": float},
+    "zorder": {"dtype": float},
+    "label": {"dtype": str},
+    "marker": {"dtype": str},
+    "hatch": {"dtype": str},
 }
 PLOT_AUX_FEATURES = {}
 
-DERIVATIVES = ['_id']
+DERIVATIVES = ["_id"]
 
 PLOT_DERIVATIVES = []
 
@@ -30,41 +34,57 @@ for var in PLOT_COORDINATES:
     for derivative in DERIVATIVES:
         PLOT_DERIVATIVES.append(var+derivative)
 
-PLOT_VARIABLES = PLOT_COORDINATES +\
+PLOT_VARIABLES = PLOT_ALL_COORDINATES +\
     list(PLOT_CORE_FEATURES.keys()) +\
     list(PLOT_AUX_FEATURES.keys())
     
 PLOT_VARIABLES_AND_DERIVATIVES = PLOT_VARIABLES + PLOT_DERIVATIVES
 
 # Type of plots
-PLOT_HASHMAP = {
-        'dss':'data_plot_2d_scatter',
-        '01':'colsum_posterior_mean_convergence_fixed_intensity',
-        '02':'table_posterior_mean_convergence',
-        '10':'table_distribution_low_dimensional_embedding',
-        '20':'parameter_mixing',
-        '21':'parameter_2d_contours',
-        '22':'parameter_histogram',
-        '23':'parameter_acf',
-        '24':'r2_parameter_grid_plot',
-        '25':'log_target_parameter_grid_plot',
-        '26':'absolute_error_parameter_grid_plot',
-        '30':'destination_attraction_mixing',
-        '31':'destination_attraction_predictions',
-        '32':'destination_attraction_residuals',
-        '40':'origin_destination_table_tabular',
-        '41':'origin_destination_table_spatial',
-        '42':'origin_destination_table_colorbars'
+PLOT_VIEWS = {
+        "2d":"plot_2d",
+        "01":"colsum_posterior_mean_convergence_fixed_intensity",
+        "02":"table_posterior_mean_convergence",
+        "10":"table_distribution_low_dimensional_embedding",
+        "20":"parameter_mixing",
+        "21":"parameter_2d_contours",
+        "22":"parameter_histogram",
+        "23":"parameter_acf",
+        "24":"r2_parameter_grid_plot",
+        "25":"log_target_parameter_grid_plot",
+        "26":"absolute_error_parameter_grid_plot",
+        "30":"destination_attraction_mixing",
+        "31":"destination_attraction_predictions",
+        "32":"destination_attraction_residuals",
+        "40":"origin_destination_table_tabular",
+        "41":"origin_destination_table_spatial",
+        "42":"origin_destination_table_colorbars"
+}
+
+PLOT_TYPES = {
+    "empty":"",
+    "line": "plot",
+    "scatter" : "scatter"
 }
 
 PLOT_MARKERS = {
     "sample_name": {
+        "else":".",
         "table": "s",
-        "intensity":"^" 
+        "intensity":"^",
     },
-    "loss": {
-        "table": "s",
-        "intensity":"^" 
+    "type": {
+        "else":".",
+        "SIM_MCMC": "o",
+        "JointTableSIM_MCMC": "s",
+        "SIM_NN": "^",
+        "NonJointTableSIM_NN": "P",
+        "JointTableSIM_NN": "*",
+    },
+    "sigma":{
+        "else":">",
+        "low":"v",
+        "high":"^"
     }
 }
 
@@ -90,9 +110,9 @@ PLOT_COLOURS = {
         "JointTableSIM_NN":COLOR_NAMES["darkgreen"],
     },
     "title": {
-        "_unconstrained":COLOR_NAMES["yellow"],
+        "_unconstrained":COLOR_NAMES["orange"],
         "_total_constrained":COLOR_NAMES["lightbrown"],
-        "_row_constrained":COLOR_NAMES["orange"],
+        "_row_constrained":COLOR_NAMES["yellow"],
         "_doubly_constrained":COLOR_NAMES["red"],
         "_doubly_10%_cell_constrained":COLOR_NAMES["darkgreen"],
         "_doubly_20%_cell_constrained":COLOR_NAMES["darkblue"],
@@ -101,17 +121,44 @@ PLOT_COLOURS = {
 
 PLOT_HATCHES = {
     "sigma": {
-        "learned": "***",
-        "variable": "***",
+        "else": "***",
         "high": "+++",
         "low": "OOO"
+    },
+    "type": {
+        "else":".",
+        "SIM_MCMC": "oo",
+        "JointTableSIM_MCMC": "..",
+        "SIM_NN": "-",
+        "NonJointTableSIM_NN": "++",
+        "JointTableSIM_NN": "**",
     }
+}
+
+PLOT_LINESTYLES = {
+    ''
+}
+
+MATH_EXPRESSIONS = {
+    "title": {
+        "_unconstrained":r"$\emtpyset$",
+        "_total_constrained":r"$T_{++}$",
+        "_row_constrained":r"$\mathbf{T}_{+\cdot}$",
+        "_doubly_constrained":r"$\mathbf{T}_{+\cdot},\mathbf{T}_{\cdot+}$",
+        "_doubly_10%_cell_constrained":r"$\mathbf{T}_{+\cdot},\mathbf{T}_{\cdot+},\mathbf{T}_{\mathcal{X}_1}$",
+        "_doubly_20%_cell_constrained":r"$\mathbf{T}_{+\cdot},\mathbf{T}_{\cdot+},\mathbf{T}_{\mathcal{X}_2}$"
+    },
+    "name": {
+        "TotallyConstrained":r"$\Lambda_{++}$",
+        "ProductionConstrained":r"$\boldsymbol{\Lambda}_{+\cdot}$"
+    },
+    "sigma": r'\sigma'
 }
 
 
 # Register colormaps
 bluegreen = LinearSegmentedColormap.from_list(
-        'bluegreen',
+        "bluegreen",
         list(
             zip(
                 [0.0,0.2,0.4,0.6,0.8,1.0],
@@ -128,11 +175,11 @@ bluegreen = LinearSegmentedColormap.from_list(
         N=256
 )
 bluegreen.set_bad((0,0,0,1))
-if not cmap_exists('bluegreen'):
-    cm.register_cmap(cmap=bluegreen, name='bluegreen')
+if not cmap_exists("bluegreen"):
+    cm.register_cmap(cmap=bluegreen, name="bluegreen")
 
 yellowpurple = LinearSegmentedColormap.from_list(
-        'yellowpurple',
+        "yellowpurple",
         list(
             zip(
                 [0.0,0.14,0.29,0.43,0.57,0.71,0.86,1.0],
@@ -151,13 +198,13 @@ yellowpurple = LinearSegmentedColormap.from_list(
         N=256
 )
 yellowpurple.set_bad((0,0,0,1))
-if not cmap_exists('yellowpurple'):
-    cm.register_cmap(cmap=yellowpurple, name='yellowpurple')
+if not cmap_exists("yellowpurple"):
+    cm.register_cmap(cmap=yellowpurple, name="yellowpurple")
 
 
 
 yellowblue = LinearSegmentedColormap.from_list(
-        'yellowblue',
+        "yellowblue",
         list(
             zip(
                 # ["orange", "yellow", "lightyellow", "white", "lightblue", "blue", "darkblue"]
@@ -172,12 +219,12 @@ yellowblue = LinearSegmentedColormap.from_list(
         ),
         N=256
 )
-if not cmap_exists('yellowblue'):
-    cm.register_cmap(cmap=yellowblue, name='yellowblue')
+if not cmap_exists("yellowblue"):
+    cm.register_cmap(cmap=yellowblue, name="yellowblue")
 
 
 redgreen = LinearSegmentedColormap.from_list(
-        'redgreen',
+        "redgreen",
         list(
             zip(
                 # ["darkred","red","lightcoral","white","palegreen","green","darkgreen"]
@@ -193,8 +240,8 @@ redgreen = LinearSegmentedColormap.from_list(
         ),
         N=256
 )
-if not cmap_exists('redgreen'):
-    cm.register_cmap(cmap=redgreen, name='redgreen')
+if not cmap_exists("redgreen"):
+    cm.register_cmap(cmap=redgreen, name="redgreen")
 
 cblue = LinearSegmentedColormap.from_list(
         "cblue", 
@@ -203,8 +250,8 @@ cblue = LinearSegmentedColormap.from_list(
             (0./255.,120/255.,255./255.),
         ]
 )
-if not cmap_exists('cblue'):
-    cm.register_cmap(cmap=cblue, name='cblue')
+if not cmap_exists("cblue"):
+    cm.register_cmap(cmap=cblue, name="cblue")
 
 cgreen = LinearSegmentedColormap.from_list(
         "cgreen", 
@@ -213,8 +260,8 @@ cgreen = LinearSegmentedColormap.from_list(
             (0./255.,255./255.,0./255.)
         ]
 )
-if not cmap_exists('cgreen'):
-    cm.register_cmap(cmap=cgreen, name='cgreen')
+if not cmap_exists("cgreen"):
+    cm.register_cmap(cmap=cgreen, name="cgreen")
 
 cred = LinearSegmentedColormap.from_list(
     "cred", 
@@ -223,5 +270,5 @@ cred = LinearSegmentedColormap.from_list(
         (255./255.,0/255.,0./255.),
     ]
 )
-if not cmap_exists('cred'):
-    cm.register_cmap(cmap=cred, name='cred')
+if not cmap_exists("cred"):
+    cm.register_cmap(cmap=cred, name="cred")
