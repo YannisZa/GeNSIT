@@ -174,6 +174,9 @@ class Experiment(object):
         # Disable tqdm if needed
         self.tqdm_disabled = self.config['experiments'][0].get('disable_tqdm',True)
 
+        # Flag for validating samples
+        self.samples_validated = self.config['experiments'][0].get('validate_samples',False)
+
         # Count the number of gradient descent steps
         self._time = 0
         self._write_every = self.config['outputs'].get('write_every',1)
@@ -589,6 +592,47 @@ class Experiment(object):
             loss_names = loss_names if len(loss_names) <= 1 else loss_names+['total_loss']
             for loss_name in loss_names:
                 self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:][-1]}')
+
+    def validate_samples(self,**kwargs):
+        if 'r2' in self.output_names:
+            try:
+                assert getattr(self,'r2')[kwargs['index']] >= 0 \
+                    and getattr(self,'r2')[kwargs['index']] <= 1
+            except:
+                raise InvalidDataRange(data = getattr(self,'r2')[kwargs['index']], rang = 'in [0,1]')
+            
+        if 'log_destination_attraction' in self.output_names:
+            try:
+                assert np.absolute(np.exp(getattr(self,'log_destination_attraction')[-1]).sum() - 1.0) <= 1e-3
+            except:
+                raise InvalidDataRange(data = np.exp(getattr(self,'log_destination_attraction')[-1].squeeze()).sum(), rang = 'equal to 1')
+            
+        if 'sign' in self.output_names:
+            try:
+                assert np.absolute(getattr(self,'sign')[-1]) <= 1e-3 or np.absolute(getattr(self,'sign')[-1] - 1.0) <= 1e-3
+            except:
+                raise InvalidDataRange(data = getattr(self,'sign')[-1], rang = 'equal to 0 or 1')
+            
+        if 'table' in self.output_names:
+            table_sample = torch.tensor(getattr(self,'table')[-1].squeeze())
+            try:
+                assert self.ct_mcmc.ct.table_admissible(table_sample)
+            except:
+                self.logger.error(f"Margins admissible {self.ct_mcmc.ct.table_margins_admissible(table_sample)}")
+                self.logger.error(f"Cells admissible {self.ct_mcmc.ct.table_cells_admissible(table_sample)}")
+                self.logger.error(f"Table margins {self.ct_mcmc.ct.table_constrained_margins_summary_statistic(table_sample)}")
+                self.logger.error(f"""
+                    Fixed margins {torch.cat([self.ct_mcmc.ct.data.margins[tuplize(ax)] 
+                    for ax in sorted(self.ct_mcmc.ct.constraints['constrained_axes'])],dim=0)}
+                """)
+                raise InvalidDataRange(data = getattr(self,'table')[-1], rang = 'not admissible')
+            
+            self.logger.info(f"""
+                Table admissible using {self.ct_mcmc.proposal_type} proposal
+                axes: {self.ct_mcmc.ct.constraints['constrained_axes']},
+                # cells: {len(self.ct_mcmc.ct.constraints['cells'])}
+            """)
+            
 
 class DataGeneration(Experiment):
 
@@ -1578,7 +1622,7 @@ class Table_MCMC(Experiment):
                     log_true_destination_attraction = sim.log_destination_attraction,
                     alpha = sim.alpha,
                     beta = sim.beta*sim.bmax,
-                    grand_total = ct.margins[tuplize(range(ct.ndims()))].item()
+                    grand_total = ct.margins[tuplize(range(ndims(ct)))].item()
                 )
             except:
                 raise Exception('No ground truth or table provided to construct table intensities.')
@@ -1981,6 +2025,7 @@ class NonJointTableSIM_NN(Experiment):
         self.logger.note(f"{self.learning_model}")
         self.logger.note(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+
         
     def run(self,**kwargs) -> None:
 
@@ -2089,6 +2134,9 @@ class NonJointTableSIM_NN(Experiment):
                     data_size = len(training_data),
                     **self.config['training']
                 )
+                
+                if self.samples_validated:
+                    self.validate_samples()
             
             # print statements
             self.show_progress()
