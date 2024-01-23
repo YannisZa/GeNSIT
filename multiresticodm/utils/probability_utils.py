@@ -7,6 +7,7 @@ import torch.distributions as distr
 
 from typing import Union, Tuple
 from torch import int32, float32
+from scipy.stats import gaussian_kde
 
 from multiresticodm.utils.misc_utils import set_seed
 from multiresticodm.utils.math_utils import log_factorial_sum, logfactorialsum, logsumexp
@@ -53,21 +54,18 @@ def log_odds_ratio_wrt_intensity(log_intensity: torch.tensor):
     return log_or
 
 def log_odds_ratio_wrt_intensity_xarray(log_intensity: torch.tensor):
-    # Extract dimensions of intensity
-    origins = log_intensity.coords['origin'].values
-    destinations = log_intensity.sizes['destination'].values
     # Computes log of odds ratio of intensity
-    log_intensity_rowsums = logsumexp(log_intensity,dim=['destination']).expand_dims(dim={'origins':origins})
-    log_intensity_colsums = logsumexp(log_intensity,dim=['origin']).expand_dims(dim={'destination':destinations})
-    log_intensity, 
-    log_intensity_rowsums,
+    log_intensity_rowsums = logsumexp(log_intensity,dim=['destination'])
+    log_intensity_colsums = logsumexp(log_intensity,dim=['origin'])
+    log_intensity_total = logsumexp(log_intensity,dim=['origin','destination'])
+    # Align all data
+    log_intensity, \
+    log_intensity_rowsums, \
     log_intensity_colsums = xr.align(
         log_intensity,
         log_intensity_rowsums,
-        log_intensity_colsums,
-        join='override'
+        log_intensity_colsums
     )
-    log_intensity_total = logsumexp(log_intensity_rowsums,dim=['origin','destination'])
     # Computes log of odds ratio of intensity
     log_or = log_intensity + \
         log_intensity_total - \
@@ -90,7 +88,7 @@ def log_poisson_loss(table:xr.DataArray,log_intensity:xr.DataArray,**kwargs) -> 
     # Compute negative log pmf
     term1 = log_intensity.sum(['origin','destination'])
     term2 = -(table.astype('float32') * log_intensity).sum(['origin','destination']) 
-    term3 = logfactorialsum(table,['origin','destination'])
+    term3 = logfactorialsum(table,dim=['origin','destination'])
     term1,term2,term3 = xr.align(term1,term2,term3, join = 'override')
     return term1 + term2 + term3
 
@@ -105,7 +103,7 @@ def poisson_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:
 
 def log_multinomial_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
     # Normalise log intensites by log rowsums to create multinomial probabilities
-    log_probabilities = (log_intensity - torch.logsumexp(log_intensity.ravel()))
+    log_probabilities = (log_intensity - torch.logsumexp(log_intensity.ravel(),dim=0))
     # Compute log pmf
     return (table.to(dtype=float32).ravel()*log_probabilities.ravel()).sum() - log_factorial_sum(table.ravel())
 
@@ -116,7 +114,7 @@ def log_multinomial_loss(table:xr.DataArray,log_intensity:xr.DataArray,**kwargs)
     table = table.astype('float32')
     
     term1 = -(table*log_probabilities).sum(['origin','destination']) 
-    term2 = logfactorialsum(table,['origin','destination'])
+    term2 = logfactorialsum(table,dim=['origin','destination'])
     term1,term2 = xr.align(term1,term2, join = 'override')
     return term1 + term2
 
@@ -146,7 +144,7 @@ def log_product_multinomial_loss(table:xr.DataArray,log_intensity:xr.DataArray,*
     log_probabilities = (log_intensity - log_rowsums)
     # Compute log pmf
     term1 = -(table.astype('float32')*log_probabilities).sum(['origin','destination']) 
-    term2 = logfactorialsum(table,['origin','destination'])
+    term2 = logfactorialsum(table,dim=['origin','destination'])
     term1,term2 = xr.align(term1,term2, join = 'override')
     return term1 + term2
 
@@ -184,7 +182,7 @@ def log_fishers_hypergeometric_loss(table:xr.DataArray,log_intensity:xr.DataArra
     table,log_or_probabilities = xr.align(table,log_or_probabilities,join='override')
     # Compute log pmf
     term1 = -(table.astype('float32') * log_or_probabilities).sum(['origin','destination'])
-    term2 = logfactorialsum(table,['origin','destination'])
+    term2 = logfactorialsum(table,dim=['origin','destination'])
     term1,term2 = xr.align(term1,term2, join = 'override')
     return term1 + term2
 
@@ -354,3 +352,12 @@ def sample_multinomial_row(i,msum,margin_probabilities,free_cells,axis_uncostrai
     ).sample()
     # Update free cells
     return updated_cells.to(device=device,dtype=int32)
+
+def kernel_density(y,**kwargs):
+    # Kernel density estimation
+    density = gaussian_kde(y)
+    density.covariance_factor = lambda : kwargs.get('cov',0.25)
+    density._compute_covariance()
+    
+    res = density(kwargs['x'])
+    return res
