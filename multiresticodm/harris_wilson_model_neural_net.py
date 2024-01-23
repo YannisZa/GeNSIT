@@ -390,7 +390,7 @@ class HarrisWilson_NN:
                     for key, value in deepcopy( self.loss_kwargs.get(name,{})).items():
                         if len(LOSS_KWARG_OPERATIONS.get(key,'')):
                             self.loss_kwargs[name][key] = eval(
-                                expression = LOSS_KWARG_OPERATIONS[key]['function'],
+                                LOSS_KWARG_OPERATIONS[key]['function'],
                                 {
                                     "dim":np.prod(validation_data['total_cost_by_origin'].shape),
                                     "device":self.physics_model.device,
@@ -415,7 +415,7 @@ class HarrisWilson_NN:
                     for key, value in deepcopy( self.loss_kwargs.get(name,{})).items():
                         if len(LOSS_KWARG_OPERATIONS.get(key,'')):
                             self.loss_kwargs[name][key] = eval(
-                                expression = LOSS_KWARG_OPERATIONS[key]['function'],
+                                LOSS_KWARG_OPERATIONS[key]['function'],
                                 {
                                     "dim":np.prod(validation_data[validation_dataset].shape),
                                     "device":self.physics_model.device,
