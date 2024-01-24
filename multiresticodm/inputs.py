@@ -258,9 +258,9 @@ class Inputs:
                     obj,func = schema['funcs'][i]
                     # Create coordinate ranges based on schema
                     coordinates[schema["dims"][i]] = deep_call(
-                        globals()[obj],
-                        func,
-                        None,
+                        input=globals()[obj],
+                        expressions=func,
+                        defaults=None,
                         start=1,
                         stop=d+1,
                         step=1

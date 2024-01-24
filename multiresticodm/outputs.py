@@ -39,12 +39,12 @@ from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMon
 OUTPUTS_MODULE = sys.modules[__name__]
 
 class Outputs(object):
-
     def __init__(self,
                  config:Config, 
                  settings:dict={},
-                 data_names:list=['ground_truth_table'],
+                 data_names:list=None,
                  sweep_params:dict={},
+                 inputs:Inputs = None,
                  **kwargs):
         # Setup logger
         level = kwargs.get('level',None)
@@ -57,11 +57,15 @@ class Outputs(object):
             console_level = level
         )
         # Store output names
-        self.data_names = None \
+        self.data_names = settings.get('sample',[]) \
             if (data_names is None) or (len(data_names) <= 0) \
             else list(data_names)
+        
         # Store settings
         self.settings = settings
+
+        # Store inputs
+        self.inputs = inputs
 
         # Sample names must be a subset of all data names
         if self.data_names is not None:
@@ -625,6 +629,119 @@ class Outputs(object):
             self.logger.debug(traceback.format_exc())
             raise CorruptedFileRead(f'Cannot read file {filename}')
         return local_coords,global_coords,data_vars
+
+    def load(self,indx:int,sweep_configurations:list,sweep_params:dict):
+
+        # Gather sweep dimension names
+        sweep_dims = list(sweep_params['isolated'].keys())
+        sweep_dims += list(sweep_params['coupled'].keys())
+
+        # Additionally group data collection by these attributes
+        group_by,combined_dims = self.get_data_collection_group_by(
+            sweep_dims = sweep_dims,
+            sweep_params = sweep_params
+        )
+
+        # Attempt to load all samples
+        # Keep track of samples not loaded
+        samples_not_loaded = self.read_data_collection(
+            group_by = group_by
+        )
+
+        # Load all necessary samples that were not loaded
+        if len(samples_not_loaded) > 0:
+            self.logger.info(f"Collecting samples {', '.join(sorted(samples_not_loaded))}.")
+
+            # cli = Client(
+            #     n_workers = self.settings.get('n_workers',1), 
+            #     threads_per_worker = self.settings.get('n_threads',1),
+            #     memory_limit = "1GB"
+            # )
+            
+            # def convert_netcdf4_to_xarray_format(x):
+            #     ncf = nc.Dataset(x.encoding["source"], diskless=True, persist=False)
+            #     firstkey = list(ncf.groups.keys())[0]
+            #     return xr.backends.NetCDF4DataStore(ncf[firstkey])
+
+
+
+            # datafiles = list(Path(f"{self.outputs_path}/samples").rglob("*data.h5"))
+            # datasets = xr.open_mfdataset(
+            #     list(datafiles),
+            #     parallel=True,
+            #     combine='nested',
+            #     preprocess=convert_netcdf4_to_xarray_format
+            # )
+            # print(datasets[0])
+            # print(datasets.keys())
+            # print(type(datasets))
+            # sys.exit()
+
+
+            # Do it concurrently
+            if self.settings.get('n_workers',1) > 1:
+                output_datasets = self.get_sweep_outputs_concurrently(
+                    sweep_configurations = sweep_configurations,
+                    sweep_params = sweep_params,
+                    sample_names = samples_not_loaded,
+                    inputs = self.inputs,
+                    group_by = group_by
+                )
+
+            # Do it sequentially
+            else:
+                output_datasets = self.get_sweep_outputs_sequentially(
+                    sweep_configurations = sweep_configurations,
+                    sweep_params = sweep_params,
+                    sample_names = samples_not_loaded,
+                    inputs = self.inputs,
+                    group_by = group_by
+                )
+
+            # Create xarray dataset
+            try:
+                self.logger.info(f"Creating xarray(s) for {', '.join(sorted(samples_not_loaded))}.")
+                
+                for sample_name in sorted(samples_not_loaded):
+                    
+                    # Homogeneous data arrays are the ones that have common coordinates
+                    # along all core dimensions and group_by dimensions
+                    self.data.group_samples_sequentially(
+                        output_datasets = [x for x in [ds.pop(sample_name,None) for ds in output_datasets] if x is not None],
+                        sample_name = sample_name,
+                        group_by = group_by
+                    )
+                    
+                    # Combine coords for each list element of the Data Collection
+                    parallel = False #self.settings.get('n_workers',1) > 1
+                    if parallel:
+                        combined_coords = self.data.combine_by_coords_concurrently(
+                            indx = indx,
+                            sample_name = sample_name,
+                            combined_dims = combined_dims,
+                            n_workers = self.settings.get('n_workers',1)
+                        )
+                        # Add results to self
+                        for cc in combined_coords:
+                            getattr(
+                                self.data,
+                                sample_name
+                            )[cc[0]] = cc[1]
+                    else:
+                        self.data.combine_by_coords_sequentially(
+                            sample_name = sample_name,
+                            combined_dims = combined_dims
+                        )
+                
+                    # Write sample data collection to file
+                    filepath = self.write_data_collection(
+                        sample_names = [sample_name]
+                    )
+                
+                self.logger.info(f'Wrote output collection to {filepath}')
+            except Exception as exc:
+                self.logger.error(traceback.format_exc())
+                sys.exit()
         
     def update_experiment_directory_id(self,sweep_experiment_id:str=None):
 
@@ -930,7 +1047,167 @@ class Outputs(object):
         except Exception as exc:
             traceback.print_exc()
             self.logger.error(exc)
-            return {"None":None}    
+            return {"None":None}
+        
+    def get_sweep_outputs_sequentially(
+        self,
+        sweep_configurations:list,
+        sweep_params:dict = {},
+        sample_names:list = [],
+        inputs: Inputs = None,
+        group_by: list = [],
+        **kwargs
+    ):
+        output_datasets = []
+        for sweep_configuration in tqdm(
+            sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)],
+            desc='Collecting h5 data sequentially',
+            leave=False,
+            position=0
+        ):
+            # Get metric data for sweep dataset
+            res = self.get_sweep_outputs(
+                base_config = self.config,
+                sweep_configuration = sweep_configuration,
+                sweep_params = sweep_params,
+                sample_names = sample_names,
+                inputs = inputs,
+                group_by = group_by
+            )
+            if len(res) > 0:
+                output_datasets.append(res)
+        return output_datasets
+    
+    def get_sweep_outputs_concurrently(
+            self,
+            sweep_configurations:list,
+            sweep_params:dict = {},
+            sample_names:list = [],
+            inputs: Inputs = None,
+            group_by: list = [],
+            **kwargs
+        ):
+        # Gather h5 data from multiple files
+        # and store them in xarray-type dictionaries
+        output_datasets = []
+    
+        # Initialise progress bar
+        progress = tqdm(
+            total=len(sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]),
+            desc='Collecting h5 data in parallel',
+            leave=False,
+            miniters=1,
+            position=0
+        )
+        def my_callback(fut):
+            progress.update()
+            try:
+                res = fut.result()
+                if len(res) > 0:
+                    output_datasets.append(res)
+            except (MissingFiles,CorruptedFileRead):
+                pass
+            except Exception as exc:
+                raise ValueError("Getting sweep outputs failed") from exc
+
+        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = 2*self.settings.get('n_workers',1)) as executor:
+            # Start the processes and ignore the results
+            for sweep_configuration in sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]:
+                try:
+                    future = executor.submit(
+                        self.get_sweep_outputs,
+                        base_config = self.config,
+                        sweep_configuration = sweep_configuration,
+                        sweep_params = sweep_params,
+                        sample_names = sample_names,
+                        inputs = inputs,
+                        group_by = group_by
+                    )
+                    future.add_done_callback(my_callback)
+                except:
+                    traceback.print_exc()
+                    raise MultiprocessorFailed(
+                        'Getting sweep outputs failed.',
+                        name = 'get_sweep_outputs_concurrently'
+                    )
+
+            # Delete executor and progress bar
+            progress.close()
+            safe_delete(progress)
+            executor.shutdown(wait=True)
+            safe_delete(executor)
+
+        return output_datasets
+
+    def get_sweep_outputs(
+        self,
+        base_config:Config,
+        sweep_configuration:list,
+        sweep_params:dict,
+        sample_names:list,
+        inputs:Inputs=None,
+        group_by:list=[]
+    ):
+        # Get specific sweep config 
+        new_config,sweep = base_config.prepare_experiment_config(
+            sweep_params = sweep_params,
+            sweep_configuration = sweep_configuration
+        )
+        print('sweep',sweep)
+        # Get outputs and unpack its statistics
+        # This is the case where there are SOME input slices provided
+        outputs = Outputs(
+            config = new_config,
+            settings = self.settings,
+            data_names = self.settings['sample'],
+            base_dir = self.outputs_path,
+            sweep_params = sweep,
+            console_handling_level = self.settings['logging_mode'],
+            print_slice = False,
+            logger = self.logger
+        )
+        # Load inputs
+        if inputs is None:
+            # Import all input data
+            outputs.inputs = Inputs(
+                config = new_config,
+                synthetic_data = False,
+                logger = self.logger
+            )
+        else:
+            outputs.inputs = inputs
+        # Cast to xr DataArray
+        outputs.inputs.cast_to_xarray()
+
+        # Get dictionary output data to be passed into xarray
+        xr_dict_data = outputs.load_h5_data(sample_names)
+
+        data_arr,slice_dict = {},{}
+        for sample_name,xr_data in xr_dict_data.items():
+            # Get sample xr_data
+            data = xr_data.pop('data')
+            # Coordinates of output dataset
+            coords = xr_data.pop('coordinates')
+            # Create slice dictionary
+            slice_dict = {
+                k: [stringify_coordinate(parse(elem)) for elem in coords[k]]
+                for k in coords.keys()
+            }
+            data_arr[sample_name] = xr.DataArray(
+                data = data,
+                coords = slice_dict,
+                # dims = (sweep_dims+sample_dims),
+                attrs = dict(
+                    arr_name = sample_name,
+                    experiment_id = outputs.experiment_id,
+                    sweep_id = outputs.sweep_id,
+                    **{
+                        k:stringify_coordinate(parse(sweep[k])) for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
+                        if k in sweep and k != 'seed' and k not in slice_dict
+                    }
+                )
+            )
+        return data_arr
         
     def create_filename(self,sample=None):
         # Decide on filename
@@ -1720,9 +1997,11 @@ class DataCollection(object):
 
 class OutputSummary(object):
 
-    def __init__(self,
-                 settings:dict={}, 
-                 **kwargs):
+    def __init__(
+        self,
+        settings:dict={},
+        **kwargs
+    ):
         
         # Setup logger
         level = kwargs.get('level',None)
@@ -2027,197 +2306,23 @@ class OutputSummary(object):
         
         # Add useful metadata to metric and operation data
         all_data_df = all_data_df.assign(
-            folder = os.path.join(self.base_dir),
+            folder = os.path.join(outputs.outputs_path),
             **useful_metadata
         )
 
         # Return all data as list of dictionaries
         return all_data_df.to_dict('records')
 
-    def get_sweep_outputs_sequentially(
-        self,
-        sweep_configurations:list,
-        outputs: Outputs,
-        inputs: Inputs,
-        sample_names:list = [],
-        group_by: list = [],
-        **kwargs
-    ):
-        output_datasets = []
-        for sweep_configuration in tqdm(
-            sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)],
-            desc='Collecting h5 data sequentially',
-            leave=False,
-            position=0
-        ):
-            # Get metric data for sweep dataset
-            res = self.get_sweep_outputs(
-                base_config = outputs.config,
-                sweep_configuration = sweep_configuration,
-                sample_names = sample_names,
-                inputs = inputs,
-                group_by = group_by
-            )
-            if len(res) > 0:
-                output_datasets.append(res)
-        return output_datasets
-    
-    def get_sweep_outputs_concurrently(
-            self,
-            sweep_configurations:list,
-            outputs: Outputs,
-            inputs: Inputs,
-            sample_names:list = [],
-            group_by: list = [],
-            **kwargs
-        ):
-        # Gather h5 data from multiple files
-        # and store them in xarray-type dictionaries
-        output_datasets = []
-    
-        # Initialise progress bar
-        progress = tqdm(
-            total=len(sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]),
-            desc='Collecting h5 data in parallel',
-            leave=False,
-            miniters=1,
-            position=0
-        )
-        def my_callback(fut):
-            progress.update()
-            try:
-                res = fut.result()
-                if len(res) > 0:
-                    output_datasets.append(res)
-            except (MissingFiles,CorruptedFileRead):
-                pass
-            except Exception as exc:
-                raise ValueError("Getting sweep outputs failed") from exc
-
-        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = 2*self.settings.get('n_workers',1)) as executor:
-            # Start the processes and ignore the results
-            for sweep_configuration in sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]:
-                try:
-                    future = executor.submit(
-                        self.get_sweep_outputs,
-                        base_config = outputs.config,
-                        sweep_configuration = sweep_configuration,
-                        sample_names = sample_names,
-                        inputs = inputs,
-                        group_by = group_by
-                    )
-                    future.add_done_callback(my_callback)
-                except:
-                    traceback.print_exc()
-                    raise MultiprocessorFailed(
-                        'Getting sweep outputs failed.',
-                        name = 'get_sweep_outputs_concurrently'
-                    )
-
-            # Delete executor and progress bar
-            progress.close()
-            safe_delete(progress)
-            executor.shutdown(wait=True)
-            safe_delete(executor)
-
-        return output_datasets
-
-    def get_sweep_outputs(
-        self,
-        base_config:Config,
-        sweep_configuration:list,
-        sample_names:list,
-        inputs:Inputs=None,
-        group_by:list=[]
-    ):
-        # Get specific sweep config 
-        new_config,sweep = base_config.prepare_experiment_config(
-            sweep_params = self.sweep_params,
-            sweep_configuration = sweep_configuration
-        )
-        # Get outputs and unpack its statistics
-        # This is the case where there are SOME input slices provided
-        outputs = Outputs(
-            config = new_config,
-            settings = self.settings,
-            data_names = self.settings['sample'],
-            base_dir = self.base_dir,
-            sweep_params = sweep,
-            console_handling_level = self.settings['logging_mode'],
-            print_slice = False,
-            logger = self.logger
-        )
-        # Load inputs
-        if inputs is None:
-            # Import all input data
-            outputs.inputs = Inputs(
-                config = new_config,
-                synthetic_data = False,
-                logger = self.logger
-            )
-        else:
-            outputs.inputs = inputs
-        # Cast to xr DataArray
-        outputs.inputs.cast_to_xarray()
-
-        # Get dictionary output data to be passed into xarray
-        xr_dict_data = outputs.load_h5_data(sample_names)
-
-        data_arr,slice_dict = {},{}
-        for sample_name,xr_data in xr_dict_data.items():
-            # Get sample xr_data
-            data = xr_data.pop('data')
-            # Coordinates of output dataset
-            coords = xr_data.pop('coordinates')
-            # Create slice dictionary
-            slice_dict = {
-                k: [stringify_coordinate(parse(elem)) for elem in coords[k]]
-                for k in coords.keys()
-            }
-            data_arr[sample_name] = xr.DataArray(
-                data = data,
-                coords = slice_dict,
-                # dims = (sweep_dims+sample_dims),
-                attrs = dict(
-                    arr_name = sample_name,
-                    experiment_id = outputs.experiment_id,
-                    sweep_id = outputs.sweep_id,
-                    **{
-                        k:stringify_coordinate(parse(sweep[k])) for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
-                        if k in sweep and k != 'seed' and k not in slice_dict
-                    }
-                )
-            )
-        return data_arr
-
-    def get_folder_outputs(self,indx:str,output_folder):
+    def get_folder_outputs(self,indx:str,output_folder:str):
             
         # Read metadata config
         config = Config(
             path = os.path.join(output_folder,"config.json"),
             logger = self.logger
         )
-        config.find_sweep_key_paths()
 
-        # Parse sweep configurations
-        self.sweep_params = config.parse_sweep_params()
-
-        # Get all sweep configurations
-        sweep_configurations, \
-        param_sizes_str, \
-        total_size_str = config.prepare_sweep_configurations(self.sweep_params)
-        # Get output folder
-        self.base_dir = output_folder.split(
-            'samples/'
-        )[0]
-        output_folder_succinct = self.base_dir.split(
-            config['inputs']['dataset']
-        )[-1]
-        self.logger.info("----------------------------------------------------------------------------------")
-        self.logger.info(f'{output_folder_succinct}')
-        self.logger.info(f"Parameter space size: {param_sizes_str}")
-        self.logger.info(f"Total = {total_size_str}.")
-        self.logger.info("----------------------------------------------------------------------------------")
+        # Gather all sweep-related config data
+        sweep_params,sweep_configurations = config.get_sweep_data(output_folder)
         
         # If sweep is over input data
         input_sweep_param_names = set(config.sweep_param_names).intersection(
@@ -2245,125 +2350,17 @@ class OutputSummary(object):
             config = config,
             settings = self.settings,
             data_names = self.settings['sample'],
-            base_dir = self.base_dir,
+            inputs = passed_inputs,
             console_handling_level = self.settings['logging_mode'],
             logger = self.logger
         )
         
-        # Attach inputs to outputs object
-        outputs.inputs = passed_inputs
-        safe_delete(passed_inputs)
-
-        # Gather sweep dimension names
-        sweep_dims = list(self.sweep_params['isolated'].keys())
-        sweep_dims += list(self.sweep_params['coupled'].keys())
-
-        # Additionally group data collection by these attributes
-        group_by,combined_dims = outputs.get_data_collection_group_by(
-            sweep_dims = sweep_dims,
-            sweep_params = self.sweep_params
+        # Load all sweep-related data to outputs
+        outputs.load(
+            indx = indx,
+            sweep_configurations = sweep_configurations,
+            sweep_params = sweep_params
         )
-
-        # Attempt to load all samples
-        # Keep track of samples not loaded
-        samples_not_loaded = outputs.read_data_collection(
-            group_by = group_by
-        )
-
-        # Load all necessary samples that were not loaded
-        if len(samples_not_loaded) > 0:
-            self.logger.info(f"Collecting samples {', '.join(sorted(samples_not_loaded))}.")
-
-            # cli = Client(
-            #     n_workers = self.settings.get('n_workers',1), 
-            #     threads_per_worker = self.settings.get('n_threads',1),
-            #     memory_limit = "1GB"
-            # )
-            
-            # def convert_netcdf4_to_xarray_format(x):
-            #     ncf = nc.Dataset(x.encoding["source"], diskless=True, persist=False)
-            #     firstkey = list(ncf.groups.keys())[0]
-            #     return xr.backends.NetCDF4DataStore(ncf[firstkey])
-
-
-
-            # datafiles = list(Path(f"{self.outputs_path}/samples").rglob("*data.h5"))
-            # datasets = xr.open_mfdataset(
-            #     list(datafiles),
-            #     parallel=True,
-            #     combine='nested',
-            #     preprocess=convert_netcdf4_to_xarray_format
-            # )
-            # print(datasets[0])
-            # print(datasets.keys())
-            # print(type(datasets))
-            # sys.exit()
-
-
-            # Do it concurrently
-            if self.settings.get('n_workers',1) > 1:
-                output_datasets = self.get_sweep_outputs_concurrently(
-                    sweep_configurations = sweep_configurations,
-                    outputs = outputs,
-                    inputs = passed_inputs,
-                    sample_names = samples_not_loaded,
-                    group_by = group_by
-                )
-
-            # Do it sequentially
-            else:
-                output_datasets = self.get_sweep_outputs_sequentially(
-                    sweep_configurations = sweep_configurations,
-                    outputs = outputs,
-                    inputs = passed_inputs,
-                    sample_names = samples_not_loaded,
-                    group_by = group_by
-                )
-
-            # Create xarray dataset
-            try:
-                self.logger.info(f"Creating xarray(s) for {', '.join(sorted(samples_not_loaded))}.")
-                
-                for sample_name in sorted(samples_not_loaded):
-                    
-                    # Homogeneous data arrays are the ones that have common coordinates
-                    # along all core dimensions and group_by dimensions
-                    outputs.data.group_samples_sequentially(
-                        output_datasets = [x for x in [ds.pop(sample_name,None) for ds in output_datasets] if x is not None],
-                        sample_name = sample_name,
-                        group_by = group_by
-                    )
-                    
-                    # Combine coords for each list element of the Data Collection
-                    parallel = False #self.settings.get('n_workers',1) > 1
-                    if parallel:
-                        combined_coords = outputs.data.combine_by_coords_concurrently(
-                            indx = indx,
-                            sample_name = sample_name,
-                            combined_dims = combined_dims,
-                            n_workers = self.settings.get('n_workers',1)
-                        )
-                        # Add results to self
-                        for cc in combined_coords:
-                            getattr(
-                                outputs.data,
-                                sample_name
-                            )[cc[0]] = cc[1]
-                    else:
-                        outputs.data.combine_by_coords_sequentially(
-                            sample_name = sample_name,
-                            combined_dims = combined_dims
-                        )
-                
-                    # Write sample data collection to file
-                    filepath = outputs.write_data_collection(
-                        sample_names = [sample_name]
-                    )
-                
-                self.logger.info(f'Wrote output collection to {filepath}')
-            except Exception as exc:
-                self.logger.error(traceback.format_exc())
-                sys.exit()
 
         return outputs
 

@@ -31,7 +31,7 @@ class Config:
         self.reset()
 
         # Load config
-        if path:
+        if bool(path) and os.path.isfile(path) and os.path.exists(path):
 
             self.logger.debug(f' Loading config from {path}')
 
@@ -44,7 +44,7 @@ class Config:
             self.settings = settings
         else:
             self.settings = None
-            raise Exception(f'Config not found in {path}')
+            raise Exception(f'Config file (ending in .json or .toml) not found in {path}')
 
         # Load schema
         self.load_schemas()
@@ -96,9 +96,29 @@ class Config:
 
     def __str__(self,settings=None):
         if settings is not None:
-            return json.dumps(settings,indent=2)
+            try:
+                res_str = json.dumps(settings,indent=2)
+                return res_str
+            except Exception as exc:
+                self.logger.error(
+                    json.dumps(
+                        deep_apply(deepcopy(settings),type),
+                        indent=2
+                    )
+                )
+                raise exc
         else:
-            return json.dumps(self.settings,indent=2)
+            try:
+                res_str = json.dumps(self.settings,indent=2)
+                return res_str
+            except Exception as exc:
+                self.logger.error(
+                    json.dumps(
+                        deep_apply(deepcopy(self.settings),type),
+                        indent=2
+                    )
+                )
+                raise exc
 
     def load_schemas(self):
         # Load base schema
@@ -1000,3 +1020,33 @@ class Config:
                 i += 1
         # Return config and sweep params
         return new_config,sweep
+
+
+    def get_sweep_data(self):
+        
+        # Find config paths to sweeped parameters
+        self.find_sweep_key_paths()
+
+        # Parse sweep configurations
+        sweep_params = self.parse_sweep_params()
+
+        # Get all sweep configurations
+        sweep_configurations, \
+        param_sizes_str, \
+        total_size_str = self.prepare_sweep_configurations(sweep_params)
+
+        # Get output folder
+        self.base_dir = self.out_directory.split(
+            'samples/'
+        )[0]
+
+        output_folder_succinct = self.base_dir.split(
+            self['inputs']['dataset']
+        )[-1]
+        self.logger.info("----------------------------------------------------------------------------------")
+        self.logger.info(f'{output_folder_succinct}')
+        self.logger.info(f"Parameter space size: {param_sizes_str}")
+        self.logger.info(f"Total = {total_size_str}.")
+        self.logger.info("----------------------------------------------------------------------------------")
+
+        return sweep_params,sweep_configurations

@@ -383,7 +383,7 @@ def deep_call(input:object,expressions:str,defaults:object,**kwargs):
                     continue 
                 else:
                     raise ValueError(f'Separator character {latest_separator} not recognized')
-    elif hasattr(expressions,'__len__'):
+    elif isinstance(expressions,Iterable):
         value = []
         for i,expr in enumerate(expressions):
             value.append(
@@ -394,6 +394,9 @@ def deep_call(input:object,expressions:str,defaults:object,**kwargs):
                     kwargs=kwargs
                 )
             )
+    else:
+        value = defaults
+    
     return value
 
 def operate(input:object,operations:str,**kwargs):
