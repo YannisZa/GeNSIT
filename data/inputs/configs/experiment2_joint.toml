@@ -10,7 +10,8 @@ dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
   default = 1
-  range = ["1:11111:1"]
+  range = ["1:10000:1","1:1000:1","1:100:1","1:10:1","1:1:1"]
+  # ["1:11111:1"]
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta'] 
   range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
