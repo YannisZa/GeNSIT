@@ -82,8 +82,8 @@ class ContingencyTableMarkovChainMonteCarlo(object):
                 # Instantiate markov basis object
                 self.markov_basis = instantiate_markov_basis(
                     self.ct, 
-                    log_to_console = self.logger.disabled,
-                    logger=self.logger
+                    monitor_progress = False,
+                    logger = self.logger
                 )
                 self.ct.config['markov_basis_len'] = int(len(self.markov_basis))
 
@@ -188,6 +188,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             margins=margins,
             ct_mcmc=self
         )
+        self.logger.debug(table0)
         
         return table0
     
@@ -273,6 +274,9 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             self.ct.update_margins({ax:margins[ax]})
         return margins
 
+    @property
+    def table_loss(self):
+        return getattr(ProbabilityUtils,f"log_{self.ct.distribution_name}_loss")
 
     def build_table_distribution(self) -> None:
 
@@ -284,10 +288,10 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         self.sample_margins = getattr(self, f'sample_margins_{ndims(self.ct)}way_table')
         
         # Define table loss function
-        table_loss = getattr(ProbabilityUtils,f"log_{self.ct.distribution_name}_pmf_unnormalised")
-        def table_loss_function(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
-            return (-1) * table_loss(table,log_intensity)
-        self.table_loss_function = table_loss_function
+        table_likelihood = getattr(ProbabilityUtils,f"log_{self.ct.distribution_name}_pmf_unnormalised")
+        def table_likelihood_loss(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
+            return (-1) * table_likelihood(table,log_intensity)
+        self.table_likelihood_loss = table_likelihood_loss
 
         if self.proposal_type.lower() == 'direct_sampling':
             self.acceptance_type = 'Direct sampling'
@@ -399,10 +403,10 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
         if len(fixed_cells) > 0:
-            # Extract indices,
-            fixed_indices = [ fixed_cells[:,i] for i in range(ndims(self.ct)) ]
+            # Extract indices
+            fixed_indices = np.ravel_multi_index(fixed_cells.T, self.ct.dims)
             # Fix table cells
-            table_new[ fixed_indices ] = self.ct.data.ground_truth_table[ fixed_indices ]
+            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.view(-1)[fixed_indices]
 
         # Non fixed (free) indices
         free_cells = np.array(self.ct.cells)
@@ -424,10 +428,10 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
         if len(fixed_cells) > 0:
-            # Extract indices,
-            fixed_indices = [ fixed_cells[:,i] for i in range(ndims(self.ct)) ]
+            # Extract indices
+            fixed_indices = np.ravel_multi_index(fixed_cells.T, self.ct.dims)
             # Fix table cells
-            table_new[ fixed_indices ] = self.ct.data.ground_truth_table[ fixed_indices ]
+            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.view(-1)[fixed_indices]
 
         # Non fixed (free) indices
         free_cells = np.array(self.ct.cells)
@@ -460,10 +464,10 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
         if len(fixed_cells) > 0:
-            # Extract indices,
-            fixed_indices = [ fixed_cells[:,i] for i in range(ndims(self.ct)) ]
+            # Extract indices
+            fixed_indices = np.ravel_multi_index(fixed_cells.T, self.ct.dims)
             # Fix table cells
-            table_new[ fixed_indices ] = self.ct.data.ground_truth_table[ fixed_indices ]
+            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.view(-1)[fixed_indices]
 
         # Non fixed (free) indices
         free_cells = np.array(self.ct.cells)

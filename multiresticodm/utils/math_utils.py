@@ -7,6 +7,7 @@ from numpy import shape
 from copy import deepcopy
 from scipy import optimize
 from torch import int32, float32
+from scipy.special import gammaln
 from itertools import chain, combinations
 
 from multiresticodm.utils.misc_utils import flatten,is_sorted
@@ -203,6 +204,8 @@ def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
         Standardised root mean square error of t_hat.
 
     """
+    # print('prediction total',prediction.sum(['origin','destination']).values.tolist())
+    # print('ground truth total',ground_truth.sum(['origin','destination']).values.tolist())
     prediction = prediction.astype('float32')
     ground_truth = ground_truth.astype('float32')
     prediction,ground_truth = xr.broadcast(prediction,ground_truth)
@@ -211,6 +214,12 @@ def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
     denominator = ground_truth.sum(dim=['origin','destination']) / ground_truth.size
     srmse = numerator / denominator
     
+    # print('prediction',prediction.size)
+    # print(prediction.values.flatten())
+    # print('ground_truth',ground_truth.size)
+    # print(ground_truth.values.flatten())
+    # print('numerator:',numerator.values.tolist(), 'denominator:',denominator.values.tolist())
+    # print('srmse',srmse.values.tolist())
     return srmse
 
 def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
@@ -368,11 +377,13 @@ def calculate_min_interval(x, alpha):
     return hdi_min, hdi_max
 
 
-def logsumexp(input, dim=None, keepdim=False):
-    max_val, _ = input.max(dim=dim, keepdim=True)
-    output = max_val + (input - max_val).exp().sum(dim=dim, keepdim=True).log()
+def logsumexp(input, dim=None):
+    max_val = input.max(dim = dim)
+    return max_val + np.log((np.exp((input - max_val)).sum(dim = dim)))
+
+def logfactorialsum(arr, dim=None):
+    if dim is None or len(dim) <= 0:
+        return gammaln(arr+1).sum()
+    else:
+        return gammaln(arr+1).sum(dim = dim)
     
-    if not keepdim:
-        output = output.squeeze(dim)
-    
-    return output

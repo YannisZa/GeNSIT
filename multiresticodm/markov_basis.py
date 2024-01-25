@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from torch import int32
 from typing import Dict,Tuple,List
 
-from multiresticodm.utils.misc_utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string
+from multiresticodm.utils.misc_utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string, unpack_dims, ndims
 from multiresticodm.contingency_table import ContingencyTable
 
 def instantiate_markov_basis(ct:ContingencyTable,**kwargs): #-> Union[MarkovBasis,None]:
@@ -23,19 +23,23 @@ class MarkovBasis(object):
         # Setup logger
         level = kwargs.get('level',None)
         self.logger = setup_logger(
-            __name__+kwargs.get('instance',''),
+            __name__,
             console_level = level,
-            log_to_console=kwargs.get('log_to_console',True),
+            
         ) if kwargs.get('logger',None) is None else kwargs['logger']
-
+        # Update logger level
+        self.logger.setLevels(
+            console_level = level
+        )
+        
         # Enable/disable tqdm
-        self.tqdm_disabled = not kwargs.get('log_to_console',False)
+        self.tqdm_disabled = not kwargs.get('monitor_progress',False)
 
         # Get contingency table
         self.ct = ct
         
         # Raise implementation error if more constraints are provided than implemented
-        if self.ct.ndims() > 2:
+        if ndims(self.ct) > 2:
             self.logger.error('Markov Bases for multi-way tables has not been implemented yet.')
             raise Exception('Markov Bases cannot be constructed.')
         
@@ -108,9 +112,9 @@ class MarkovBasis(object):
         # and finally checks that that the markov basis does not change any of the fixed cells
         tab = torch.tensor(f_to_array(f),dtype=int32)
         # basis fully expanded to match table dims
-        full_tab = torch.tensor(f_to_array(f,shape=self.ct.dims),dtype=int32)
+        full_tab = torch.tensor(f_to_array(f,shape=unpack_dims(self.ct.data.dims,time_dims=False)),dtype=int32)
 
-        return (not torch.any(self.ct.table_constrained_margin_summary_statistic(tab))) and \
+        return (not torch.any(self.ct.table_constrained_margins_summary_statistic(tab))) and \
                 (torch.any(tab)) and \
                 torch.all(self.ct.table_cell_constraint_summary_statistic(full_tab)==0)
         
@@ -265,16 +269,22 @@ class MarkovBasis(object):
         # WITH NO CELL CONSTRAINTS AND THEN DISREGARD MOVES INCOMPATIBLE WITH CONSTRAINTS PROVIDED.
 
         # Check if output directory is provided
-        if not 'outputs' in list(self.ct.config.settings.keys()) or not 'directory' in list(self.ct.config.settings['outputs'].keys()) or self.ct.config.settings['outputs']['directory'] == '':
+        if not 'outputs' in list(self.ct.config.settings.keys()) or \
+            not 'out_directory' in list(self.ct.config.settings['outputs'].keys()) or \
+            self.ct.config.settings['outputs']['out_directory'] == '':
             self.logger.warning(f'Output directory not provided. Markov bases cannot be found.')
             # Set export flag to false
             self.export = False
             return False
         # Define filepath
-        dirpath = os.path.join(self.ct.config.settings['outputs']['directory'],'markov_basis/')
+        dirpath = os.path.join(
+            self.config['outputs']['out_directory'],
+            'markov_basis/'
+        )
         
         # Create filepath
-        table_dims = 'x'.join(list(map(str,self.ct.dims)))
+        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims=False)
+        table_dims = 'x'.join(list(map(str,unpacked_dims)))
         axes = '_'.join(sorted([str(ax).replace(' ','') for ax in self.ct.constraints['constrained_axes']]))
         filepath = os.path.join(
             dirpath,
@@ -299,14 +309,20 @@ class MarkovBasis(object):
 
     def export_markov_basis(self) -> None:
         # Export markov bases to file
-        table_dims = 'x'.join(list(map(str,self.ct.dims)))
+        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims=False)
+        table_dims = 'x'.join(list(map(str,unpacked_dims)))
 
-        if not 'outputs' in list(self.ct.config.settings.keys()) or not 'directory' in list(self.ct.config.settings['outputs'].keys()) or self.ct.config.settings['outputs']['directory'] is None:
+        if not 'outputs' in list(self.ct.config.settings.keys()) or \
+            not 'out_directory' in list(self.ct.config.settings['outputs'].keys()) or \
+            self.ct.config.settings['outputs']['out_directory'] == '':
             self.logger.warning(f'Output directory not provided. Markov bases cannot be exported.')
             return
 
         # Define filepath
-        dirpath = os.path.join(self.ct.config.settings['outputs']['directory'],'markov_basis/')
+        dirpath = os.path.join(
+            self.ct.config.settings['outputs']['out_directory'],
+            'markov_basis/'
+        )
         # Create filepath
         axes = '_'.join(sorted([str(ax).replace(' ','') for ax in self.ct.constraints['constrained_axes']]))
         filepath = os.path.join(
@@ -346,18 +362,19 @@ class MarkovBasis1DTable(MarkovBasis):
         self.build()
 
     def true_markov_basis_length(self):
-        if self.ct.dims[0] == 1:
-            return int(self.ct.dims[1]*(self.ct.dims[1]-1)/2)
-        elif self.ct.dims[1] == 1:
-            return int(self.ct.dims[0]*(self.ct.dims[0]-1)/2)
+        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims=False)
+        if unpacked_dims[0] == 1:
+            return int(unpacked_dims[1]*(unpacked_dims[1]-1)/2)
+        elif unpacked_dims[1] == 1:
+            return int(unpacked_dims[0]*(unpacked_dims[0]-1)/2)
         else:
-            raise Exception(f'Unexpected table size {self.ct.dims} for MarkovBasis1DTable.')
+            raise Exception(f'Unexpected table size {unpacked_dims} for MarkovBasis1DTable.')
 
     def generate(self) -> None:
         if len(self.ct.constraints['constrained_axes']) == 1:
             self.generate_one_margin_preserving_markov_basis()
         else:
-            raise Exception(f'Unexpected table size {self.ct.dims} for MarkovBasis1DTable.')
+            raise Exception(f'Unexpected table size {unpack_dims(self.ct.data.dims,time_dims=False)} for MarkovBasis1DTable.')
 
 
 
@@ -371,12 +388,13 @@ class MarkovBasis2DTable(MarkovBasis):
         self.build()
 
     def true_markov_basis_length(self):
+        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims=False)
         if np.array_equal(self.ct.constraints['constrained_axes'],np.asarray([[1],[0,1]],dtype='int32')):
-            return int(self.ct.dims[1]*(self.ct.dims[1]-1)*self.ct.dims[0]/2)
+            return int(unpacked_dims[1]*(unpacked_dims[1]-1)*unpacked_dims[0]/2)
         elif np.array_equal(self.ct.constraints['constrained_axes'],np.asarray([[0],[0,1]],dtype='int32')):
-            return int(self.ct.dims[0]*(self.ct.dims[0]-1)*self.ct.dims[1]/2)
+            return int(unpacked_dims[0]*(unpacked_dims[0]-1)*unpacked_dims[1]/2)
         else:
-            return int(self.ct.dims[1]*(self.ct.dims[1]-1)*self.ct.dims[0]*(self.ct.dims[0]-1)/4)
+            return int(unpacked_dims[1]*(unpacked_dims[1]-1)*unpacked_dims[0]*(unpacked_dims[0]-1)/4)
 
     def generate(self) -> None:
         if len(self.ct.constraints['constrained_axes']) == 2:

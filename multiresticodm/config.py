@@ -31,7 +31,7 @@ class Config:
         self.reset()
 
         # Load config
-        if path:
+        if bool(path) and os.path.isfile(path) and os.path.exists(path):
 
             self.logger.debug(f' Loading config from {path}')
 
@@ -40,20 +40,50 @@ class Config:
             elif path.endswith('.json'):
                 self.settings = read_json(path)
 
-            # Load schema
-            self.load_schemas()
-            # Load parameter positions
-            self.load_parameters()
-            # Update root
-            self.path_sets_root(**kwargs)
-
         elif settings:
             self.settings = settings
         else:
             self.settings = None
-            raise Exception(f'Config not found in {path}')
+            raise Exception(f'Config file (ending in .json or .toml) not found in {path}')
 
+        # Load schema
+        self.load_schemas()
+        # Load parameter positions
+        self.load_parameters()
+        # Update root
+        self.path_sets_root(**kwargs)
 
+    def update(self,new_settings:dict):
+        for key,value in new_settings.items():
+            # Find path
+            all_paths = self.path_find(
+                key = key,
+                settings = self.settings,
+                current_key_path = [],
+                all_key_paths = []
+            )
+            try:
+                assert len(all_paths) > 0
+            except:
+                raise PathNotExistException(
+                    message = f"Cannot find path to {key}",
+                    key_path = [key],
+                    data = self.settings
+                )
+            # Update key path
+            try:
+                assert self.path_set(
+                    settings = self.settings,
+                    value = value,
+                    key_path = all_paths[0]
+                )
+            except:
+                raise PathNotExistException(
+                    message = f"Cannot update {all_paths[0]} as it cannot be found in settings",
+                    key_path = all_paths[0],
+                    data = self.settings
+                )
+    
     def reset(self):
         # Sweep mode activated is set to false
         self.sweep_active = False
@@ -66,9 +96,29 @@ class Config:
 
     def __str__(self,settings=None):
         if settings is not None:
-            return json.dumps(settings,indent=2)
+            try:
+                res_str = json.dumps(settings,indent=2)
+                return res_str
+            except Exception as exc:
+                self.logger.error(
+                    json.dumps(
+                        deep_apply(deepcopy(settings),type),
+                        indent=2
+                    )
+                )
+                raise exc
         else:
-            return json.dumps(self.settings,indent=2)
+            try:
+                res_str = json.dumps(self.settings,indent=2)
+                return res_str
+            except Exception as exc:
+                self.logger.error(
+                    json.dumps(
+                        deep_apply(deepcopy(self.settings),type),
+                        indent=2
+                    )
+                )
+                raise exc
 
     def load_schemas(self):
         # Load base schema
@@ -258,9 +308,19 @@ class Config:
         else:
             if overwrite:
                 settings[key_path[0]] = {}
-                value_set = self.path_set(settings[key_path[0]],value,key_path[1:],overwrite)
+                value_set = self.path_set(
+                    settings[key_path[0]],
+                    value,
+                    key_path[1:],
+                    overwrite
+                )
             else: 
-                value_set = self.path_set(settings.get(key_path[0],{}),value,key_path[1:],overwrite)
+                value_set = self.path_set(
+                    settings.get(key_path[0],{}),
+                    value,
+                    key_path[1:],
+                    overwrite
+                )
         
         return value_set
     
@@ -583,7 +643,11 @@ class Config:
                         )
                         # Update settings with sweep default
                         try:
-                            assert self.path_set(settings,settings_child_val,key_path[:-1])
+                            assert self.path_set(
+                                settings,
+                                settings_child_val,
+                                key_path[:-1]
+                            )
                         except:
                             raise Exception(f"""
                                 Key {'>'.join(list(map(str,key_path)))} could not be updated \
@@ -679,7 +743,11 @@ class Config:
                                 """)
                         # Update settings with sweep default
                         try:
-                            assert self.path_set(settings,settings_child_val,key_path[:-1])
+                            assert self.path_set(
+                                settings,
+                                settings_child_val,
+                                key_path[:-1]
+                            )
                         except:
                             raise Exception(f"""
                                 Key {'>'.join(list(map(str,key_path)))} could not be updated \
@@ -952,3 +1020,33 @@ class Config:
                 i += 1
         # Return config and sweep params
         return new_config,sweep
+
+
+    def get_sweep_data(self):
+        
+        # Find config paths to sweeped parameters
+        self.find_sweep_key_paths()
+
+        # Parse sweep configurations
+        sweep_params = self.parse_sweep_params()
+
+        # Get all sweep configurations
+        sweep_configurations, \
+        param_sizes_str, \
+        total_size_str = self.prepare_sweep_configurations(sweep_params)
+
+        # Get output folder
+        self.base_dir = self.out_directory.split(
+            'samples/'
+        )[0]
+
+        output_folder_succinct = self.base_dir.split(
+            self['inputs']['dataset']
+        )[-1]
+        self.logger.info("----------------------------------------------------------------------------------")
+        self.logger.info(f'{output_folder_succinct}')
+        self.logger.info(f"Parameter space size: {param_sizes_str}")
+        self.logger.info(f"Total = {total_size_str}.")
+        self.logger.info("----------------------------------------------------------------------------------")
+
+        return sweep_params,sweep_configurations

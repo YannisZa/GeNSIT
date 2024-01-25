@@ -1,7 +1,55 @@
 import click
 from copy import deepcopy
 
+from multiresticodm.fixed.global_variables import *
 
+def btt_callback(ctx, param, value):
+    if value is None:
+        return {}
+    else:
+        value = list(value)
+
+    # Convert burnin, thinning, trimming to dictionary
+    if len(value) > 0:
+        burnin_thinning_trimming = []
+        for v in value:
+            burnin_thinning_trimming.append({
+                v[0]:{"burnin":v[1],"thinning":v[2],"trimming":v[3]}
+            })
+    else:
+        burnin_thinning_trimming = []
+    return burnin_thinning_trimming
+
+
+def list_of_lists(ctx, param, value):
+    if value is None:
+        return []
+    elif len(value) == 0:
+        return []
+    else:
+        return [list(v) for v in value]
+    
+def evaluate_kwargs_callback(ctx, param, value):
+    if value is None:
+        return {}
+    kwargs = []
+    for keyval in value:
+        if '=' in keyval:
+            # Split on first occurence of = sign
+            key,val = keyval.split('=',1)
+            kwargs.append((key.strip(' '),val.strip(' ')))
+        else:
+            kwargs.append((keyval.strip(' '),keyval.strip(' ')))
+    return kwargs
+
+def list_of_str(ctx, param, value):
+    if value is None:
+        return []
+    elif len(value) == 0:
+        return []
+    else:
+        return list(map(str,list(value)))
+    
 
 def to_list(ctx, param, value):
     if value is None:
@@ -23,12 +71,26 @@ def split_to_list(ctx, param, value):
     if value is None:
         return None
     else:
-        return [list(v.split("&")) for v in list(value)]
+        return [list(v.split("&")) for v in list(value) if v is not None]
+    
+def dims_to_list(ctx, param, value):
+    if value is None:
+        return None
+    else:
+        res = []
+        for item in value:
+            for v in list(item[1:]):
+                tup = []
+                if v is None or v == '':
+                    continue
+                tup.append(list(v.split("&")))
+            res.append((item[0],*tup)) 
+    return res
 
 def coordinate_slice_callback(ctx, param, value):
     result = []
     for v in value:
-        result.append([v[0],v[1].split(',')])
+        result.append([v[0],v[1],v[2].split(',')])
     return result
 
 def unpack_statistics(ctx, param, value):

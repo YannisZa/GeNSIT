@@ -125,6 +125,17 @@
           "value": true
         }
       ],
+      "cells_subset": [
+        {
+          "file": {
+            "sweep": {
+              "default": true,
+              "range": true
+            }
+          },
+          "value": true
+        }
+      ],
       "dims": {
         "time": {
           "sweep": {
@@ -400,6 +411,7 @@
       "export_samples": true,
       "export_metadata": true,
       "overwrite": true,
+      "validate_samples": true,
       "grid_ranges": {
         "alpha": true,
         "beta": true

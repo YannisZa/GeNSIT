@@ -847,6 +847,41 @@
             "default-value": []
           }
         }
+      ],
+      "cells_subset": [
+        {
+          "file": {
+            "sweepable": true,
+            "optional": true,
+            "exclude": false,
+
+            "sweep": {
+              "default": {
+                "dtype": "file",
+                "file-extension": "json",
+                "default-value": "cells_subset.json"
+              },
+              "range": {
+                "dtype": "list",
+                "list-dtype": "file",
+                "file-extension": "json",
+                "default-value": "cells_subset.json"
+              }
+            }
+          },
+          "value": {
+            "sweepable": false,
+            "optional": true,
+            "exclude": false,
+
+            "dtype": "list",
+            "list-dtype": "dict",
+            "dict-key-dtype": "str",
+            "dict-value-dtype": "int",
+            "default-value": {},
+            "value-valid-range": [0, null]
+          }
+        }
       ]
     }
   },
@@ -897,16 +932,14 @@
         "sweep": {
           "default": {
             "dtype": "file",
-            "file-exists": false,
             "file-extension": "txt",
-            "default-value": ""
+            "default-value": "cells.txt"
           },
           "range": {
             "dtype": "list",
             "list-dtype": "file",
-            "file-exists": false,
             "file-extension": "txt",
-            "default-value": ""
+            "default-value": "cells.txt"
           }
         }
       }
@@ -1925,6 +1958,14 @@
         "exclude": false,
         "dtype": "bool",
         "default-value": true
+      },
+      "validate_samples": {
+        "sweepable": false,
+        "optional": true,
+        "exclude": false,
+
+        "dtype": "bool",
+        "default-value": false
       },
       "grid_ranges": {
         "sweepable": false,

@@ -16,7 +16,7 @@ from typing import List, Union, Callable
 from multiresticodm.config import Config
 from multiresticodm.fixed.global_variables import *
 from multiresticodm.utils.math_utils import powerset
-from multiresticodm.utils.misc_utils import ndims, setup_logger, unpack_dims, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast
+from multiresticodm.utils.misc_utils import ndims, setup_logger, unpack_dims, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast, print_json
 
 # -> Union[ContingencyTable,None]:
 def instantiate_ct(config: Config, **kwargs):
@@ -28,6 +28,23 @@ def instantiate_ct(config: Config, **kwargs):
         )
     else:
         raise Exception(f"Input class {ct_type} not found")
+
+def map_constraints_to_distribution_name(constraints):
+    # TODO: Generalise this
+
+    # Get all unique axes that appear as singletons
+    unique_axes = set([ax for ax in constraints['constrained_axes'] if len(ax) == 1])
+    
+    if len(constraints['constrained_axes']) == 0:
+        return 'poisson'
+    elif len(unique_axes) == 0:
+        return 'multinomial'
+    elif len(unique_axes) == 1:
+        return 'product_multinomial'
+    elif len(unique_axes) == 2:
+        return 'fishers_hypergeometric'
+    else:
+        raise ValueError(f"Distribution not found for constraints {str(constraints['constrained_axes'])}")
 
 
 class ContingencyTable(object):
@@ -84,8 +101,7 @@ class ContingencyTable(object):
         # Build contingency table
         if config is not None:
             # Store flag for whether to allow sparse margins or not
-            if 'sparse_margins' in list(self.config.settings['contingency_table'].keys()):
-                self.sparse_margins = self.config.settings['contingency_table']['sparse_margins']
+            self.sparse_margins = self.config.settings['contingency_table'].get('sparse_margins',False)
             # Read tabular data
             self.import_tabular_data()
 
@@ -100,6 +116,7 @@ class ContingencyTable(object):
             # Update table properties
             self.update_table_properties_from_table()
 
+
         else:
             self.logger.error('Neither table nor config provided.')
             raise Exception('Cannot initialise Contingency table.')
@@ -108,10 +125,10 @@ class ContingencyTable(object):
         self.read_constraints(**kwargs)
 
         # Create cell_locations
-        self.cells = sorted([tuplize(cell) for cell in product(*[range(dim) for dim in unpack_dims(self.data.dims)])])
+        self.cells = sorted([tuplize(cell) for cell in product(*[range(dim) for dim in self.dims])])
         
         # Fill in missing margins that can be recovered from existing (user input) margins
-        self.distribution_name = self.update_and_map_margin_constraints_to_distribution_name()
+        self.distribution_name = map_constraints_to_distribution_name(self.constraints)
 
         # Fill in missing cell margins and 
         # Update residual margins based on exhaustive list of cell constraints
@@ -126,6 +143,9 @@ class ContingencyTable(object):
 
         self.logger.info(f"margin constraints over axes {','.join([str(ax) for ax in self.constraints['constrained_axes']])} provided")
 
+    @property
+    def dims(self):
+        return unpack_dims(self.data.dims,time_dims=False)
 
     def axes_complement(self, axes, same_length:bool=False):
         if hasattr(axes,'__len__') and depth(axes) > 1:
@@ -148,15 +168,24 @@ class ContingencyTable(object):
     
     # Compute summary statistics for given function
     def table_margins_summary_statistic(self, tab: torch.tensor) -> List:
-        return torch.cat(tuple([self.table_axis_margin_summary_statistic(tab=tab,ax=ax) for ax in self.constraints['all_axes']]), dim=0)
+        return torch.cat(tuple([
+            self.table_axis_margin_summary_statistic(tab=tab,ax=ax) 
+            for ax in self.constraints['all_axes']
+        ]), dim=0)
     
     def table_axis_margin_summary_statistic(self, tab: torch.tensor, ax:int = None) -> List:
         return tab.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten()
 
     # Compute margin summary statistics for given function
-    def table_constrained_margin_summary_statistic(self, tab: torch.tensor) -> List:
+    def table_constrained_margins_summary_statistic(self, tab: torch.tensor) -> List:
         if len(self.constraints['constrained_axes']) > 0:
-            return torch.cat(tuple([tab.sum(dim=tuplize(ax), keepdims=True, dtype=int32).flatten() for ax in sorted(self.constraints['constrained_axes'])]), dim=0)
+            return torch.cat(tuple([
+                tab.sum(
+                        dim=tuplize(ax), 
+                        keepdims=True, 
+                        dtype=int32
+                ).flatten() for ax in sorted(self.constraints['constrained_axes'])
+            ]), dim=0)
         else:
             return torch.empty(1)
 
@@ -183,7 +212,7 @@ class ContingencyTable(object):
     def table_margins_admissible(self, tab) -> bool:
         if len(self.constraints['constrained_axes']) > 0:
             return torch.equal(
-                self.table_constrained_margin_summary_statistic(tab),
+                self.table_constrained_margins_summary_statistic(tab),
                 torch.cat(
                     [self.data.margins[tuplize(ax)] for ax in sorted(self.constraints['constrained_axes'])],
                     dim=0
@@ -268,10 +297,10 @@ class ContingencyTable(object):
             return 'Empty Table'
 
     def __repr__(self):
-        return f"{'x'.join([str(dim) for dim in unpack_dims(self.data.dims)])} ContingencyTable{ndims(self)}(Config)"
+        return f"{'x'.join([str(dim) for dim in self.dims])} ContingencyTable{ndims(self)}(Config)"
 
     def __len__(self):
-        return np.prod([dim for dim in unpack_dims(self.data.dims) if dim > 0])
+        return np.prod([dim for dim in self.dims if dim > 0])
     
     def reset(self, config, **kwargs) -> None:
         # Rebuild table
@@ -316,15 +345,24 @@ class ContingencyTable(object):
             return 'Empty Table'
 
     def import_tabular_data(self) -> None:
-        # Based on filepath read txt or csv
+        # Inherit data from margins
+        partial_ground_truth = True
         if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:
-            # Update table properties
-            self.update_table_properties_from_table()
-        else:
-            self.logger.warning('Valid contingency table was not provided. One will be randomly generated.')
+            # Check to see if partial data are provided
+            if torch.any(self.data.ground_truth_table < 0):
+                partial_ground_truth = True
+                # Update only dimensions
+                self.data.dims = dict(zip(self.dim_names,np.asarray(np.shape(self.data.ground_truth_table), dtype='uint8')))
+            else:
+                partial_ground_truth = False
+                # Update all table properties
+                self.update_table_properties_from_table()
+        
+        if partial_ground_truth:
+            self.logger.warning('Fully valid contingency table was not provided. One will be randomly generated.')
             if not hasattr(self.data,'dims') or len(self.data.dims) <= 0:
                 raise Exception("Cannot read table dimensions.")
-            # Copy residual margins
+            # Copy to residual margins
             if hasattr(self.data,'margins') and self.data.margins is not None:
                 self.data.residual_margins = deepcopy(self.data.margins)
             else:
@@ -341,7 +379,7 @@ class ContingencyTable(object):
                     except:
                         raise Exception(f"margin for axis {axis} is not unidimensional.")
                 # Assert all margin axis match dimensions
-                if np.sum(list(unpack_dims(self.data.dims))) > 0:
+                if np.sum(list(self.dims)) > 0:
                     axis_inverse = np.array([i for i in range(ndims(self)) if i not in list(tuplize(axis))])
                     if len(axis_inverse) > 0:
                         try:
@@ -362,12 +400,11 @@ class ContingencyTable(object):
                     raise Exception('Imported inconsistent margins.')
             # No dim must be zero
             try:
-                assert (self.__len__() > 0) and (len(unpack_dims(self.data)) > 0)
+                assert (self.__len__() > 0) and (len(self.dims) > 0)
             except AssertionError:
                 self.logger.error('Dims provided are not valid.')
                 raise Exception('Tabular data could not be imported')
             # Randomly initialise margins not provided
-            print
             for axis in sorted(list(powerset(range(ndims(self)))), key=len, reverse=True):
                 if not tuplize(axis) in self.data.margins.keys():
                     if tuplize(axis) == tuplize(range(ndims(self))):
@@ -390,8 +427,10 @@ class ContingencyTable(object):
                         self.logger.debug(f"Randomly initialising margin for axis {tuplize(axis)}")
             # Copy residal margins
             self.residual_margins = deepcopy(self.data.margins)
-            # Initialise table
-            self.data.ground_truth_table = -torch.ones(tuple(list(unpack_dims(self.data.dims))))
+            # Initialise table only if none is provided
+            if self.data.ground_truth_table is not None:
+                self.data.ground_truth_table = -torch.ones(tuple(list(self.dims)))
+            # Otherwise a partially observed table has already been provided
             # Initialise constraints
             self.constraints = {}
             self.constraints['constrained_axes'] = []
@@ -402,8 +441,6 @@ class ContingencyTable(object):
         self.constraints = {}
         constrained_axes,cell_constraints = None, None
         # margin and cell constraints
-        ## Reading config if provided
-
         if self.config is not None:
             if 'constraints' in list(self.config.settings['contingency_table'].keys()):
                 if 'axes' in list(self.config.settings['contingency_table']['constraints'].keys()):
@@ -411,6 +448,7 @@ class ContingencyTable(object):
                 if 'cells' in list(self.config.settings['contingency_table']['constraints'].keys()):
                     if isinstance(self.config.settings['contingency_table']['constraints']['cells'],str):
                         cell_constraints = os.path.join(
+                            self.config.settings['inputs']['in_directory'],
                             self.config.settings['inputs']['dataset'],
                             self.config.settings['contingency_table']['constraints']['cells']
                         )
@@ -423,6 +461,7 @@ class ContingencyTable(object):
             if 'cells' in list(kwargs['constraints'].keys()):
                 if isinstance(kwargs['constraints']['cells'],str):
                     cell_constraints = os.path.join(
+                        kwargs['inputs']['in_directory'],
                         kwargs['inputs']['dataset'],
                         kwargs['constraints']['cells']
                     )
@@ -453,9 +492,9 @@ class ContingencyTable(object):
                     # Load cell constraints from file
                     cells = np.loadtxt(cell_constraints, dtype='uint8')
                     # Reshape cells
-                    cells = cells.reshape(np.size(self.constraints['cells'])//ndims(self), ndims(self)).tolist()
+                    cells = cells.reshape(np.size(cells)//ndims(self), ndims(self)).tolist()
                     # Remove invalid cells (i.e. cells than do not have the right number of dims or are out of bounds)
-                    cells = sorted([tuplize(c) for c in cells if (len(c) == ndims(self) and (c < np.asarray(list(unpack_dims(self.data.dims)))).all())])
+                    cells = sorted([tuplize(c) for c in cells if (len(c) == ndims(self) and (c < np.asarray(list(self.dims))).all())])
                     self.constraints['cells'] = [tuplize(c) for c in cells]
                     self.logger.info(f"Cell constraints {','.join([str(c) for c in cells])} provided")
                 else:
@@ -463,8 +502,6 @@ class ContingencyTable(object):
             elif isinstance(cell_constraints,(list,np.ndarray)):
                 self.constraints['cells'] = [tuplize(c) for c in cell_constraints]
             else:
-                print('cell constraints')
-                print(cell_constraints)
                 self.logger.error(f"Cell constraints of type {type(cell_constraints)}")
                 raise Exception('Cell constraints could not be recognised')
         else:
@@ -509,19 +546,18 @@ class ContingencyTable(object):
 
     def update_residual_margins_from_cell_constraints(self, constrained_cells=None):
         # Update residual margins
-        residual_margins = self.update_residual_margins_from_cells(
-            residual_margins=self.residual_margins,
-            axes=self.constraints['all_axes'],
-            constrained_cells=constrained_cells,
-            table=self.data.ground_truth_table
+        self.residual_margins = self.update_margins_from_cells(
+            margins = self.residual_margins,
+            axes = self.constraints['all_axes'],
+            constrained_cells = constrained_cells,
+            table = self.data.ground_truth_table
         )
         # Update cells though
         self.cells = sorted(list(set(self.cells) - set(constrained_cells)))
-        return residual_margins
 
-    def update_residual_margins_from_cells(self,residual_margins=None, axes=None, constrained_cells=None, table=None):
+    def update_margins_from_cells(self,margins, axes=None, constrained_cells=None, table=None):
         constrained_cells = self.constraints['cells'] if constrained_cells is None or len(constrained_cells) <= 0 else constrained_cells
-        residual_margins = deepcopy(self.residual_margins) if deepcopy(residual_margins) is None else residual_margins
+        margins = deepcopy(margins)
         table = self.data.ground_truth_table if table is None else table
         axes = self.constraints['all_axes'] if axes is None else axes
 
@@ -532,11 +568,13 @@ class ContingencyTable(object):
                     axc = self.axes_complement([ax],same_length=True)
                     axc = axc[0]
                     # Subtract non-total margins
-                    residual_margins[ax][cell_arr[axc]] -= table[tuplize(cell)]
+                    # print('ax update',ax,cell_arr[axc],table[tuplize(cell)], residual_margins[ax][cell_arr[axc]],residual_margins[ax][cell_arr[axc]]-table[tuplize(cell)])
+                    margins[ax][cell_arr[axc]] -= table[tuplize(cell)]
                 else:
                     # Subtract cell values from grand total (only once)
-                    residual_margins[ax] -= table[tuplize(cell)] 
-        return residual_margins
+                    # print('grand total update',ax,table[tuplize(cell)], residual_margins[ax],residual_margins[ax]-table[tuplize(cell)])
+                    margins[ax] -= table[tuplize(cell)] 
+        return margins
 
 
     def update_cell_constraints_deterministically(self):
@@ -641,16 +679,15 @@ class ContingencyTable(object):
 
     def update_margins_from_table(self, table):
         for axes in powerset(range(ndims(self))):
-            self.data.margins[tuplize(axes)] = table.sum( 
+            margin_data = table.sum( 
                 dim=tuplize(axes), 
                 keepdims=True, 
                 dtype=int32
             ).flatten().to(device=self.device)
-            self.residual_margins[tuplize(axes)] = table.sum(
-                dim=tuplize(axes), 
-                keepdims=True, 
-                dtype=int32
-            ).flatten().to(device=self.device)
+            # Update margins iff they are non-negative
+            if torch.all(margin_data >= 0):
+                self.data.margins[tuplize(axes)] = margin_data
+                self.residual_margins[tuplize(axes)] = margin_data
     
     def update_unconstrained_margins(self, margins: dict = {}):
         return self.update_margins({
@@ -666,9 +703,9 @@ class ContingencyTable(object):
     
     def update_table(self, tab: torch.tensor) -> None:
         try:
-            assert np.array_equal(np.shape(tab), np.asarray(list(unpack_dims(self.data.dims))))
+            assert np.array_equal(np.shape(tab), np.asarray(list(self.dims)))
         except:
-            self.logger(f"Cannot update table of dims {np.asarray(list(unpack_dims(self.data.dims)))} to table of dims {np.shape(tab)}")
+            self.logger(f"Cannot update table of dims {np.asarray(list(self.dims))} to table of dims {np.shape(tab)}")
             raise Exception('Table update failed.')
         # Update table
         if not torch.is_tensor(tab):
@@ -819,23 +856,6 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             else:
                 raise Exception('Unrecognized error encountered.')
     
-    def update_and_map_margin_constraints_to_distribution_name(self):
-        # TODO: Generalise this
-
-        # Get all unique axes that appear as singletons
-        unique_axes = set([ax for ax in self.constraints['constrained_axes'] if len(ax) == 1])
-        
-        if len(self.constraints['constrained_axes']) == 0:
-            return 'poisson'
-        elif len(unique_axes) == 0:
-            return 'multinomial'
-        elif len(unique_axes) == 1:
-            return 'product_multinomial'
-        elif len(unique_axes) == 2:
-            return 'fishers_hypergeometric'
-        else:
-            raise ValueError(f"Distribution not found for constraints {str(self.constraints['constrained_axes'])}")
-    
     def margin_import(self, axis, intensity: list = None):
 
         margin0 = None
@@ -855,7 +875,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                     )
             # If it is an array/list make sure it has the
             elif isinstance(initialisation, (list, torch.tensor)) and \
-                    np.any([(len(initialisation) == dim) for dim in unpack_dims(self.data.dims)]):
+                    np.any([(len(initialisation) == dim) for dim in self.dims]):
                 margin0 = initialisation
             else:
                 self.logger.error(f"Initial table margin {initialisation} is neither a list nor a valid filepath.")
@@ -877,9 +897,9 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         # Create uniform probs if none are provided
         if intensity is None:
             intensity = np.repeat(
-                1./np.prod(list(unpack_dims(self.data.dims))), 
-                np.prod(list(unpack_dims(self.data.dims)))
-            ).reshape(np.asarray(list(unpack_dims(self.data.dims))))
+                1./np.prod(list(self.dims)), 
+                np.prod(list(self.dims))
+            ).reshape(np.asarray(list(self.dims)))
         # Sum probabilities to one in the case of multinomial sampling
         if len(axis) < ndims(self):
             intensity /= intensity.sum()
@@ -927,7 +947,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             # If both rowsums and colsums are provided
             if len(ax_constraints) == ndims(self) + 1:
                 updated_cells = np.minimum(
-                    *[broadcast(residual_margins[tuplize((ax,))],tuple(list(unpack_dims(self.data.dims)))) for ax in range(ndims(self))]
+                    *[broadcast(residual_margins[tuplize((ax,))],tuple(list(self.dims))) for ax in range(ndims(self))]
                 )
                 updated_cells = torch.tensor(updated_cells,dtype=int32)
                 # Update cells at locations where there is residual value left
@@ -935,7 +955,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             else:
                 # Find singleton axis that is constraints
                 ax = min(ax_constraints,key=len)
-                updated_cells = broadcast(residual_margins[ax],tuple(list(unpack_dims(self.data.dims))))
+                updated_cells = broadcast(residual_margins[ax],tuple(list(self.dims)))
                 updated_cells = torch.tensor(updated_cells,dtype=int32)
                 # Update cells at locations where there is residual value left
                 min_residual[min_residual > 0] = updated_cells[min_residual > 0]
@@ -977,7 +997,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         constrained_axis2 = (0,)
         
         # Initialise table to zero
-        table0 = torch.zeros(tuple(list(unpack_dims(self.data.dims))), dtype=int32)
+        table0 = torch.zeros(tuple(list(self.dims)), dtype=int32)
 
         # Get N (sum or row or column sums)
         N = self.residual_margins[tuplize(range(ndims(self)))].detach().cpu().numpy()[0]
@@ -1038,7 +1058,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                     )
             # If it is an array/list make sure it has the
             elif isinstance(initialisation, (list, torch.tensor)) and \
-                    (np.shape(initialisation) == tuple(list(unpack_dims(self.data.dims)))):
+                    (np.shape(initialisation) == tuple(list(self.dims))):
                 table0 = initialisation
             else:
                 self.logger.warning(
@@ -1059,7 +1079,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             raise Exception ('table_random_sample is only used by tables with no margin constraints')
         
         # Initialise table to zero
-        table0 = torch.zeros(tuple(list(unpack_dims(self.data.dims))), dtype=int32)
+        table0 = torch.zeros(tuple(list(self.dims)), dtype=int32)
         min_cell_value,max_cell_value = 0,1
         for cell in self.constraints['cells']:
             table0[cell] = self.data.ground_truth_table[cell].to(int32)
@@ -1095,32 +1115,35 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             self.update_margins(margins)
 
         # Initialise table to zero
-        table0 = torch.zeros(tuple(list(unpack_dims(self.data.dims)))).to(dtype=int32)
+        table0 = torch.zeros(tuple(list(self.dims))).to(dtype=int32)
         # Minimum residual table
-        min_residual = np.iinfo(np.int32).max*np.ones(tuple(list(unpack_dims(self.data.dims))),dtype='int32')
+        min_residual = np.iinfo(np.int32).max*np.ones(tuple(list(self.dims)),dtype='int32')
 
         # Get fixed cells
         fixed_cells = np.array(self.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
         if len(fixed_cells) > 0:
             # Extract indices,
-            fixed_indices = [ fixed_cells[:,i] for i in range(ndims(self)) ]
+            fixed_indices = np.ravel_multi_index(fixed_cells.T, self.dims)
             # Fix table cells
-            table0[ fixed_indices ] = self.data.ground_truth_table[ fixed_indices ]
+            table0.view(-1)[fixed_indices] = self.data.ground_truth_table.view(-1)[fixed_indices]
             # Set minimum residual to zero
-            min_residual[fixed_indices] = 0
+            np.put(min_residual, fixed_indices, 0)
 
         # Keep a copy of row and column sums
         residual_margins = deepcopy(self.residual_margins)
         # Get only constrained residual margins
         residual_margins = {k:v for k,v in residual_margins.items() if k in self.constraints['constrained_axes']}
-
+        
         # Update minimum residual
-        min_residual = torch.tensor(self.minres_given_constraints(min_residual,residual_margins),dtype=int32)
+        min_residual = torch.tensor(
+            self.minres_given_constraints(min_residual,residual_margins),
+            dtype=int32
+        )
         
         # Count number of steps run max entropy updates
         counter = 0
-
+        
         while not self.table_admissible(table0):
             # In first iteration
             if counter == 0:
@@ -1130,8 +1153,8 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 # Update table
                 table0[indices] += (min_residual[indices]).to(dtype=int32,device=self.device)
                 # Update residual margins
-                residual_margins = self.update_residual_margins_from_cells(
-                    residual_margins=residual_margins, 
+                residual_margins = self.update_margins_from_cells(
+                    margins=residual_margins, 
                     axes=list(residual_margins.keys()), 
                     constrained_cells=self.cells,
                     table=table0
@@ -1162,8 +1185,8 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 table0[smallest_value_cell] += np.int32(min_residual[smallest_value_cell])
                 
                 # Update residual margins
-                residual_margins = self.update_residual_margins_from_cells(
-                    residual_margins=residual_margins, 
+                residual_margins = self.update_margins_from_cells(
+                    margins=residual_margins, 
                     axes=list(residual_margins.keys()),
                     constrained_cells=[smallest_value_cell],
                     table={smallest_value_cell:min_residual[smallest_value_cell]}
@@ -1180,6 +1203,11 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
 
             # Increment counter
             counter += 1
+            # print(residual_margins)
+            # print(self.data.margins)
+            # print({ax:self.table_axis_margin_summary_statistic(table0,ax=ax) for ax in sorted(self.constraints['constrained_axes'])})
+            # print(self.table_margins_admissible(table0),self.table_cells_admissible(table0))
+            # print('\n')
 
         self.admissibility_debugging('Maximum entropy solution',table0)
         return table0.to(device=self.device,dtype=int32)

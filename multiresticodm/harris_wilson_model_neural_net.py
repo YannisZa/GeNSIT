@@ -6,6 +6,7 @@
 from copy import deepcopy
 import sys
 import torch
+import inspect
 import numpy as np
 
 from torch import nn, float32
@@ -13,9 +14,9 @@ from typing import Any, List, Union
 
 from multiresticodm.config import Config
 from multiresticodm.utils.exceptions import *
-from multiresticodm.utils.misc_utils import setup_logger, print_json
 from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.fixed.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS
+from multiresticodm.utils.misc_utils import setup_logger, fn_name
+from multiresticodm.fixed.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
 
 
 def get_architecture(
@@ -271,35 +272,35 @@ class HarrisWilson_NN:
             # Construct kwargs from key names
             fn_kwargs = {}
             for key,value in loss['loss_kwargs'].items():
+                
                 # If empty key provided move on
                 if len(key) <= 0 or key == 'nokey':
                     continue
                 
-                # Set key to value if value is not null
-                if value is not None:
-                    fn_kwargs[key] = value
-                else:
-                    # Find path to key
-                    key_path = list(self.config.path_find(key))
-                    key_path = key_path[0] if len(key_path) > 0 else []
-                    # Get value of key
-                    key_val,key_found = self.config.path_get(
-                        key_path = key_path
-                    )
-                    try:
-                        assert key_found
-                    except:
-                        raise Exception(f"""
-                            Could not find {name} keyword argument {key} for {function} in settings.
-                        """)
-                    
-                    # Update value
+                # Find path to key
+                key_path = list(self.config.path_find(key))
+                key_path = key_path[0] if len(key_path) > 0 else []
+                # Get value of key
+                key_val,key_found = self.config.path_get(
+                    key_path = key_path
+                )
+                
+                try:
+                    assert key_found or (value is not None)
+                except:
+                    raise Exception(f"""
+                        Could not find {name} keyword argument {key} for {function} in settings or
+                        {value} provided is invalid.
+                    """)
+                # Update value based on config key
+                if key_found:
                     fn_kwargs[key] = key_val
-            
-            # print(name,function,fn_kwargs)
+                # Set key to value if value is not null
+                else:
+                    fn_kwargs[key] = value
             
             # Get loss function from global variables (standard torch loss functions)
-            loss_func = LOSS_FUNCTIONS.get(function.lower(),None)
+            loss_func = LOSS_FUNCTIONS.get(function.lower(),{}).get('function',None)
             # if failed get loss function from loss dictionary provided
             loss_func = loss.get(name,loss_func) if loss_func is None else loss_func()
             # if failed get loss function from physics model defined functions
@@ -366,29 +367,70 @@ class HarrisWilson_NN:
             # Number of MC samples
             N_samples = list(prediction_data_sizes.values())[0]
             total_loss = []
+
+            # Get loss function name
+            loss_fn_name = LOSS_FUNCTIONS.get(fn_name(self.loss_functions[name]).lower(),{})
+            loss_fn_name_keys = loss_fn_name.get('kwargs_keys',None)
+            loss_fn_name_keys = loss_fn_name_keys if loss_fn_name_keys is not None else list(self.loss_kwargs[name].keys())
+            
+            # print(name,fn_name(self.loss_functions[name]).lower())
+            # print(list(self.loss_kwargs[name].keys()),loss_fn_name_keys)
+
             for n in range(N_samples):
-                if name == 'total_distance_travelled_loss':
+                if name in ['total_distance_loss','total_distance_likelihood_loss']:
                     # Calculate total cost incurred by travelling from every origin
-                    total_cost_predicted = torch.tensordot(
-                        prediction_data[pred_dataset]['table'][n].to(dtype=float32),
+                    total_cost_predicted = torch.mul(
+                        prediction_data['table'][n].to(dtype=float32),
                         validation_data['cost_matrix']
-                    ).sum(dim=0)
+                    ).sum(dim=1)
                     # Normalise to 1
                     normalised_total_cost_predicted = total_cost_predicted / total_cost_predicted.sum(dim=0)
+                    
+                    # Reshape loss kwargs if needed
+                    for key, value in deepcopy( self.loss_kwargs.get(name,{})).items():
+                        if len(LOSS_KWARG_OPERATIONS.get(key,'')):
+                            self.loss_kwargs[name][key] = eval(
+                                LOSS_KWARG_OPERATIONS[key]['function'],
+                                {
+                                    "dim":np.prod(validation_data['total_cost_by_origin'].shape),
+                                    "device":self.physics_model.device,
+                                    key:value,
+                                    **LOSS_KWARG_OPERATIONS[key]['kwargs']
+                                },
+                                globals()
+                            )
+                    
                     # Add to total loss
                     res = self.loss_functions[name](
                         normalised_total_cost_predicted,
                         validation_data['total_cost_by_origin'],
-                        **self.loss_kwargs.get(name,{})
+                        **{k:v for k,v in self.loss_kwargs[name].items() \
+                           if k in loss_fn_name_keys}
                     )
                 else:
                     # Add to total loss
                     pred_dataset = LOSS_DATA_REQUIREMENTS[name]['prediction_data'][0]
                     validation_dataset = LOSS_DATA_REQUIREMENTS[name]['validation_data'][0]
+                    # Reshape loss kwargs if needed
+                    for key, value in deepcopy( self.loss_kwargs.get(name,{})).items():
+                        if len(LOSS_KWARG_OPERATIONS.get(key,'')):
+                            self.loss_kwargs[name][key] = eval(
+                                LOSS_KWARG_OPERATIONS[key]['function'],
+                                {
+                                    "dim":np.prod(validation_data[validation_dataset].shape),
+                                    "device":self.physics_model.device,
+                                    key:value,
+                                    **LOSS_KWARG_OPERATIONS[key]['kwargs']
+                                },
+                                globals()
+                            )
+
+                    # Add to total loss
                     res = self.loss_functions[name](
                         prediction_data[pred_dataset][n].to(dtype=float32),
                         validation_data[validation_dataset].to(dtype=float32),
-                        **self.loss_kwargs.get(name,{})
+                        **{k:v for k,v in self.loss_kwargs[name].items() \
+                            if k in loss_fn_name_keys}
                     )
                 # Gather current Monte Carlo total loss
                 total_loss.append(res)

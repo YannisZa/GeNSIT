@@ -14,14 +14,14 @@ import torch.multiprocessing as mp
 
 from copy import deepcopy
 
-from multiresticodm.utils.exceptions import *
 from multiresticodm.config import Config
+from multiresticodm.utils.exceptions import *
 from multiresticodm.utils.math_utils import torch_optimize
-from multiresticodm.utils.probability_utils import random_vector
 from multiresticodm.harris_wilson_model import HarrisWilson
+from multiresticodm.utils.probability_utils import random_vector
 from multiresticodm.spatial_interaction_model import instantiate_sim
 from multiresticodm.fixed.global_variables import INPUT_SCHEMA, NUMPY_TO_TORCH_DTYPE, PARAMETER_DEFAULTS,INPUT_SCHEMA,Dataset
-from multiresticodm.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call
+from multiresticodm.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims
 
 class Inputs:
     def __init__(
@@ -79,6 +79,7 @@ class Inputs:
                             assert list(getattr(self.data,attr).shape)[ax] == self.data.dims[dim]
                         except:
                             raise Exception(f"{attr.replace('_',' ').capitalize()} has dim {list(getattr(self.data,attr).shape)[ax]} instead of {getattr(self.data,'dims')[dim]}.")
+                        
     
     def read_data(self):
         
@@ -95,34 +96,32 @@ class Inputs:
 
         # Import all data
         for attr,schema in self.schema.items():
-            if len(schema) > 0:
-                if attr in list(self.config.settings['inputs']['data'].keys()):
-                    filename = self.config.settings['inputs']['data'][attr]
-                    filename = filename.get('file','') if isinstance(filename,dict) else filename
-                    filepath = os.path.join(
-                        self.config.in_directory,
-                        self.config.settings['inputs']['dataset'],
-                        filename
-                    )
-                    if os.path.isfile(filepath):
-                        # Import data
-                        data = np.loadtxt(filepath,dtype=schema['dtype'], ndmin=schema['ndmin'])
-                        setattr(self.data,attr,data)
-                        # Check to see see that they are all positive
-                        if schema.get('positive',True) and (getattr(self.data,attr) < 0).any():
-                            raise Exception(f"{attr.replace('_',' ').capitalize()} {getattr(self.data,attr)} are NOT positive")
-                        # Update dims
-                        for ax,dim in zip(schema["axes"],schema["dims"]):
-                            if getattr(self.data,attr) is not None:
-                                self.data.dims[dim] = int(np.shape(getattr(self.data,attr))[ax])
-                    else:
-                        raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
-                # else:
-                    # raise Exception(f"{attr.replace('_',' ').capitalize()} filepath NOT provided")
-        # Import table margin constraints
+            if len(schema) > 0 and attr in list(self.config.settings['inputs']['data'].keys()):
+                filename = self.config.settings['inputs']['data'][attr]
+                filename = filename.get('file','') if isinstance(filename,dict) else filename
+                filepath = os.path.join(
+                    self.config.in_directory,
+                    self.config.settings['inputs']['dataset'],
+                    filename
+                )
+                if os.path.isfile(filepath):
+                    # Import data
+                    data = np.loadtxt(filepath,dtype=schema['dtype'], ndmin=schema['ndmin'])
+                    setattr(self.data,attr,data)
+                    # Check to see see that they are all positive
+                    if schema.get('positive',True) and (getattr(self.data,attr) < 0).any():
+                        raise Exception(f"{attr.replace('_',' ').capitalize()} {getattr(self.data,attr)} are NOT positive")
+                    # Update dims
+                    for ax,dim in zip(schema["axes"],schema["dims"]):
+                        if getattr(self.data,attr) is not None:
+                            self.data.dims[dim] = int(np.shape(getattr(self.data,attr))[ax])
+                else:
+                    raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
+        
+        # Import table margin data
         self.import_margins()
-        # Import table cell constraints
-        self.import_cells()
+        # Import partial table cell data
+        self.import_cells_subset()
         # Validate dimensions
         self.validate_dims()
         
@@ -259,9 +258,9 @@ class Inputs:
                     obj,func = schema['funcs'][i]
                     # Create coordinate ranges based on schema
                     coordinates[schema["dims"][i]] = deep_call(
-                        globals()[obj],
-                        func,
-                        None,
+                        input=globals()[obj],
+                        expressions=func,
+                        defaults=None,
                         start=1,
                         stop=d+1,
                         step=1
@@ -340,24 +339,33 @@ class Inputs:
         else:
             self.logger.note('Margins not provided')
     
-    def import_cells(self):
-        if 'cells' in list(self.config.settings['inputs']['data'].keys()):
+    def import_cells_subset(self):
+        if 'cells_subset' in self.config.settings['inputs']['data'] and \
+            getattr(self.data,'ground_truth_table',None) is None:
+            
             cell_filename = os.path.join(
                 self.config.settings['inputs']['dataset'],
-                self.config.settings['inputs']['data']['cells']
+                self.config.settings['inputs']['data']['cells_subset']
             )
             if os.path.isfile(cell_filename):
+                # Initialise ground truth table
+                self.data.ground_truth_table = -np.ones(
+                    tuple([d for d in self.schema['ground_truth_table']['dims']]),
+                    dtype = self.schema['ground_truth_table']['dtype']
+                )
                 # Import all cells
                 cells = read_json(cell_filename)
                 # Check to see see that they are all positive
                 if (cells.values() < 0).any():
                     self.logger.error(f'Cell values{cells.values()} are not strictly positive')
                 # Check that no cells exceed any of the margins
-                for cell, value in cells.items():
+                for cell_str, value in cells.items():
+                    # Convert string key to tuple
+                    cell = tuple(eval(cell_str))
                     try:
-                        assert len(cell) == self.ndims() and cell < np.asarray(list(unpack_dims(self.data.dims,time_dims=False)))
+                        assert len(cell) == ndims(self) and cell < np.asarray(list(unpack_dims(self.data.dims,time_dims=False)))
                     except:
-                        self.logger.error(f"Cell has length {len(cell)}. The number of table dims are {self.ndims()}")
+                        self.logger.error(f"Cell has length {len(cell)}. The number of table dims are {ndims(self)}")
                         self.logger.error(f"Cell is equal to {cell}. The cell bounds are {np.asarray(list(unpack_dims(self.data.dims,time_dims=False)))}")
                     for ax in cell:
                         if tuplize(ax) in self.margins.keys():
@@ -369,13 +377,13 @@ class Inputs:
                                     assert self.data.margins[tuplize(ax)][cell[ax]] > value
                             except:
                                 self.logger.error(f"margin for ax = {','.join([str(a) for a in ax])} is less than specified cell value {value}")
-                                raise Exception('Cannot import cells.')
+                                raise Exception('Cannot import cells subset.')
                     # Update table
                     self.data.ground_truth_table[cell] = value
                 else:
-                    raise Exception(f"Cell values not found in {cell_filename}.")
+                    raise Exception(f"Cells subset values not found in {cell_filename}.")
         else:
-            self.logger.note(f"Cells file not provided")
+            self.logger.note(f"Cells subset values file not provided")
 
     def receive_from_device(self):
         
@@ -784,6 +792,10 @@ class Inputs:
         table = Path(table['file']).stem if isinstance(table,dict) else table
         total_cost_by_origin = self.config.settings['inputs']['data'].get('total_cost_by_origin','not-found')
         total_cost_by_origin = Path(total_cost_by_origin['file']).stem if isinstance(total_cost_by_origin,dict) else total_cost_by_origin
+        margins = self.config.settings['inputs']['data'].get('margins','not-found')
+        margins = Path(margins['file']).stem if isinstance(margins,dict) else margins
+        cells_subset = self.config.settings['inputs']['data'].get('cells_subset','not-found')
+        cells_subset = Path(cells_subset['file']).stem if isinstance(cells_subset,dict) else cells_subset
 
         return f"""
             Dataset: {Path(self.config.settings['inputs']['dataset']).stem}
@@ -794,4 +806,6 @@ class Inputs:
             Origin attraction time series: {oats}
             Destination attraction time series: {dats}
             Ground truth table: {table}
+            Ground truth table margins: {margins}
+            Ground truth table cell subset: {cells_subset}
         """

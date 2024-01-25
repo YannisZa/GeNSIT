@@ -3,12 +3,13 @@
 """
 import sys
 import torch
+import xarray as xr
 
 from torch import float32
 
 from multiresticodm.config import Config
-from multiresticodm.utils.misc_utils import set_seed, setup_logger, to_json_format
 from multiresticodm.spatial_interaction_model import SpatialInteraction2D
+from multiresticodm.utils.misc_utils import set_seed, setup_logger, to_json_format
 from multiresticodm.fixed.global_variables import PARAMETER_DEFAULTS,DATA_SCHEMA,Dataset
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
@@ -18,11 +19,10 @@ class HarrisWilson:
     def __init__(
         self,
         *,
-        intensity_model: SpatialInteraction2D = None,
         config: Config = None,
+        intensity_model: SpatialInteraction2D = None,
         dt: float = 0.001,
         true_parameters: dict = None,
-        device: str = None,
         **kwargs
     ):
         """The Harris and Wilson model of economic activity.
@@ -30,7 +30,6 @@ class HarrisWilson:
         :param sim: the Spatial interaction model with all necessary data
         :param dt: (optional) the time differential to use for the solver
         :param true_parameters: (optional) a dictionary of the true parameters
-        :param device: the training device to use
         """
 
         # Setup logger
@@ -61,6 +60,12 @@ class HarrisWilson:
             if value is None and key not in self.config.settings['inputs']['to_learn']:
                 self.config.settings['inputs']['to_learn'].append(key)
         
+        # Store noise variance
+        self.noise_var = self.obs_noise_percentage_to_var(
+            self.config['harris_wilson_model']['parameters']['noise_percentage']
+        )
+        # print('noise_percentage',self.config['harris_wilson_model']['parameters']['noise_percentage'])
+
         # Check that learnable parameters are in valid set
         try:
             assert set(self.config.settings['inputs']['to_learn']).issubset(set(self.param_names))
@@ -83,7 +88,7 @@ class HarrisWilson:
                 setattr(
                     self.params,
                     param,
-                    torch.tensor(true_param).to(device=device,dtype=float32)
+                    torch.tensor(true_param).to(device=self.device,dtype=float32)
                 )
                 if self.config is not None:
                     self.config.settings['harris_wilson_model']['parameters'][param] = to_json_format(
@@ -94,7 +99,7 @@ class HarrisWilson:
             self.params.gamma = 2/(self.params.sigma)**2
         
         # Time discretisation step size
-        self.dt = torch.tensor(dt).float().to(device)
+        self.dt = torch.tensor(dt).float().to(self.device)
 
         # Update noise regime
         self.noise_regime = self.config['harris_wilson_model']['parameters'].get('sigma',None)
@@ -189,18 +194,17 @@ class HarrisWilson:
         """
         # Update input kwargs if required
         self.intensity_model.check_sample_availability(
-            ['log_destination_attraction_ts','log_destination_attraction_pred','noise_percentage'],
+            ['log_destination_attraction_ts','log_destination_attraction_pred'],
             kwargs
         )
 
         log_destination_attraction_ts = kwargs['log_destination_attraction_ts']
         log_destination_attraction_pred = kwargs['log_destination_attraction_pred']
-        noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage'])
 
         # Compute difference
         diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
         # Compute log likelihood (without constant factor) and its gradient
-        return 0.5*(1./noise_var)*(diff.dot(diff)), (1./noise_var)*diff
+        return 0.5*(1./self.noise_var)*(diff.dot(diff)), (1./self.noise_var)*diff
     
     
     def negative_destination_attraction_log_likelihood(self,**kwargs):
@@ -208,17 +212,35 @@ class HarrisWilson:
         """
         # Update input kwargs if required
         self.intensity_model.check_sample_availability(
-            ['log_destination_attraction_ts','log_destination_attraction_pred','noise_percentage'],
+            ['log_destination_attraction_ts','log_destination_attraction_pred'],
             kwargs
         )
         log_destination_attraction_ts = kwargs['log_destination_attraction_ts']
         log_destination_attraction_pred = kwargs['log_destination_attraction_pred']
-        noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage'])
+        noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage']) \
+                    if kwargs.get('noise_percentage',None) is not None \
+                    else self.noise_var
+        # print(noise_var,kwargs['noise_percentage'])
 
-        # Compute difference
-        diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
-        # Compute log likelihood (without constant factor)
-        return 0.5*(1./noise_var)*(diff.dot(diff))
+        if torch.is_tensor(log_destination_attraction_pred) and \
+            torch.is_tensor(log_destination_attraction_ts):
+            # Compute difference
+            diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
+            # Compute log likelihood (without constant factor)
+            return 0.5*(1./noise_var)*(diff.dot(diff))
+        elif isinstance(log_destination_attraction_pred,(xr.DataArray,xr.Dataset)) or \
+            isinstance(log_destination_attraction_ts,(xr.DataArray,xr.Dataset)):
+            # Compute difference
+            # log_destination_attraction_pred,
+            # log_destination_attraction_ts = xr.align(
+            #     log_destination_attraction_pred,
+            #     log_destination_attraction_ts
+            # )
+            diff = (log_destination_attraction_pred - log_destination_attraction_ts)
+            # Compute log likelihood (without constant factor)
+            return 0.5*(1./noise_var.cpu().detach())*xr.dot(diff,diff,dims=['destination','time'])
+        else:
+            raise Exception(f"Did not recognise types {type(log_destination_attraction_pred)} and/or {type(log_destination_attraction_ts)}")
 
 
     def negative_destination_attraction_log_likelihood_gradient(self,**kwargs):
@@ -226,18 +248,17 @@ class HarrisWilson:
         """
         # Update input kwargs if required
         self.intensity_model.check_sample_availability(
-            ['log_destination_attraction_ts','log_destination_attraction_pred','noise_percentage'],
+            ['log_destination_attraction_ts','log_destination_attraction_pred'],
             kwargs
         )
 
         log_destination_attraction_ts = kwargs['log_destination_attraction_ts']
         log_destination_attraction_pred = kwargs['log_destination_attraction_pred']
-        noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage'])
 
         # Compute difference
         diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
         # Compute gradient of log likelihood
-        return (1./noise_var) * diff
+        return (1./self.noise_var) * diff
     
     def dest_attraction_ts_likelihood_loss(
             self,

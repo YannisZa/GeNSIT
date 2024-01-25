@@ -10,15 +10,14 @@ import random
 import numexpr
 import logging
 import operator
+import traceback
 import tikzplotlib
 import numpy as np
 import pandas as pd
 import xarray as xr
-import netCDF4 as nc
 import matplotlib.pyplot as plt
 
 
-from pathlib import Path
 from itertools import chain, count
 from difflib import SequenceMatcher
 from typing import Dict, List, Union, Tuple
@@ -76,16 +75,6 @@ def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
         else:
             # Group id of interest
             group_id = kwargs.pop('group','')
-            # Find all existing data groups
-            # with nc.Dataset(filepath, mode='r') as nc_file:
-            #     # Get groups
-            #     data_group_ids = read_xr_group_ids(nc_file,list_format=True)
-            #     # Read existing data
-            #     if group_id in data_group_ids:
-            #         del nc_file[group_id]
-            #     else:
-            #         nc_file.createGroup(group_id)
-            # existing_data = read_xr_data(filepath=filepath)
                 
             data.to_netcdf(
                 path = filepath,
@@ -93,6 +82,8 @@ def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
                 mode = 'a',
                 **kwargs
             )
+            # close file
+            data.close()
     except Exception as exc:
         raise H5DataWritingFailed(message=str(exc))
 
@@ -129,22 +120,14 @@ def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_ty
     
     for plot_sett in plot_settings:
         # Keys must be included in figure data
-        assert set(key_type.keys()).issubset(set(list(plot_sett.keys())))
-
-        print_json({k:np.shape(plot_sett.get(k)) for k in (list(key_type.keys())+aux_keys) if k != 'outputs'},newline=True)
-        # print('\n\n')
-        # print_json({k:(
-        #     plot_sett.get(k,np.array([])).tolist() 
-        #     if isinstance(plot_sett.get(k),np.ndarray)
-        #     else plot_sett.get(k,None)
-        # ) for k in (list(key_type.keys())+aux_keys) if k != 'outputs'})
+        assert set(key_type.keys()).issubset(set(list(plot_sett.keys())))            
         
         if settings.get('data_format','dat') == 'dat':
             # Write dat file
             write_tex_data(
                 key_type=key_type,
                 data=list(zip(*[np.asarray(plot_sett[k],dtype=key_type[k]) for k in key_type.keys()])),
-                filepath=filepath,
+                filepath=filepath+'_data.dat',
                 precision=settings.get('data_precision',19)
             )
         elif settings.get('data_format','dat') == 'json':
@@ -155,7 +138,7 @@ def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_ty
                     if k != 'outputs'
                     else plot_sett.get(k,None).config.settings
                 for k in list(key_type.keys())+aux_keys},
-                filepath
+                filepath+'_data.json'
             )
         elif settings.get('data_format','dat') == 'csv':
             write_csv(
@@ -167,7 +150,7 @@ def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_ty
                     )
                     for k in list(key_type.keys())+aux_keys}
                 ),
-                filepath
+                filepath+'_data.csv'
             )
         # Write plot settings to file
         write_json(
@@ -192,18 +175,6 @@ def read_npy(filepath:str,**kwargs:Dict) -> np.ndarray:
     # Write array to npy format
     data = np.load(filepath).astype('float32')
     return data
-
-def read_xr_data(filepath:str,**kwargs:Dict) -> xr.DataArray:
-    if len(kwargs.get('group','')) > 0:
-        return xr.open_dataarray(
-            filepath,
-            group = kwargs['group']
-        )
-    else:
-        return xr.open_dataset(
-            filepath,
-            engine = 'h5netcdf'
-        )
 
 def read_netcdf_group_ids(nc_data:str,key_path=[]):
     for k in nc_data.groups.keys():
@@ -322,9 +293,9 @@ def get_dims(data):
         res = list(data.dims)
     return res
 
-def parse(value,default=None):
+def parse(value,default:str='none',ndigits:int=5):
     if value is None:
-        return 'none'
+        return default
     elif isinstance(value,str):
         if len(value) <= 0:
             return default
@@ -335,7 +306,7 @@ def parse(value,default=None):
     elif hasattr(value,'__len__'):
         return np.array2string(np.array(value))
     elif isinstance(value,float):
-        return np.float32(np.round(value,5))
+        return np.float32(np.round(value,ndigits))
     
     return value
 
@@ -412,7 +383,7 @@ def deep_call(input:object,expressions:str,defaults:object,**kwargs):
                     continue 
                 else:
                     raise ValueError(f'Separator character {latest_separator} not recognized')
-    elif hasattr(expressions,'__len__'):
+    elif isinstance(expressions,Iterable):
         value = []
         for i,expr in enumerate(expressions):
             value.append(
@@ -423,6 +394,9 @@ def deep_call(input:object,expressions:str,defaults:object,**kwargs):
                     kwargs=kwargs
                 )
             )
+    else:
+        value = defaults
+    
     return value
 
 def operate(input:object,operations:str,**kwargs):
@@ -443,6 +417,7 @@ def operate(input:object,operations:str,**kwargs):
         else:
             value = OPERATORS[operator](value,kwargs[attr])
     return value
+    
 
 # https://stackoverflow.com/questions/27265939/comparing-python-dictionaries-and-nested-dictionaries
 def findDiff(d1,d2,path:str="") -> None:
@@ -669,6 +644,13 @@ def stringify(data):
     else:
         return f"{str(data).replace(' ','')}"
 
+def unstringify(data):
+    try:
+        decoded_data = eval(data)
+    except:
+        decoded_data = data
+    return decoded_data
+
 def stringify_statistic(statistic):
     # Unpack statistic pair
     statistic_name,statistic_dims = statistic
@@ -709,7 +691,7 @@ def update_device(device):
     return device
 
 def set_device_id(device_id):
-    torch.cuda.set_device(device)
+    torch.cuda.set_device(device_id)
 
 
 def tuplize(tup):
@@ -1008,7 +990,8 @@ def setup_logger(
         console_level:str=None,
         file_level:str=None,
     ):
-    print('setting up new logger',name)
+    # print('setting up new logger',name)
+    # traceback.print_stack()
 
     # Silence warnings from other packages
     numba_logger = logging.getLogger('numba')
@@ -1118,6 +1101,8 @@ def to_json_format(x):
             x = x.cpu().detach().numpy()
     if isinstance(x,np.ndarray):
         x = x.tolist()
+    if isinstance(x,np.generic):
+        x = x.item()
     return x
 
 def tuple_dim(x,dims=()):
@@ -1178,3 +1163,44 @@ def position_index(active_positions):
             return i
 
     return len(active_positions)
+
+
+def fn_name(fn):
+    try:
+        return re.sub(r'[,.()\[\]]', '', str(fn.__name__))
+    except:
+        return re.sub(r'[,.()\[\]]', '', str(fn))
+    
+def tidy_label(label:str):
+    # Replace _ with space
+    label = label.replace('_',' ')
+    # Replace , with _
+    label = label.replace(',','_')
+    # Replace double space with single space
+    label = label.replace('  ',' ')
+    return label
+
+
+def lexicographic_sort(arr):
+    # Get the shape of the array
+    shape = arr.shape
+    
+    # Create an array of indices for each dimension
+    indices = [np.arange(dim) for dim in shape]
+    
+    # Create a meshgrid from the indices
+    meshgrid = np.meshgrid(*indices, indexing='ij')
+    
+    # Reshape the meshgrid to match the shape of the original array
+    reshaped_meshgrid = [grid.reshape(-1) for grid in meshgrid]
+    
+    # Create an array of tuples representing the indices along each dimension
+    tuples = np.vstack(reshaped_meshgrid).T
+    
+    # Use lexsort to get the sorting order based on each dimension
+    sorting_order = np.lexsort(tuple(arr[tuple(t)] for t in tuples.T))
+    
+    # Apply the sorting order to the original array
+    sorted_array = arr.reshape(-1, arr.shape[-1])[sorting_order].reshape(arr.shape)
+    
+    return sorted_array

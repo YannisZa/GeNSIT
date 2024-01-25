@@ -10,7 +10,7 @@ dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
   default = 0
-  range = ["0:29:1"]
+  range = ["0:99:1"]
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta', 'sigma']
   # range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
@@ -75,7 +75,7 @@ load_experiment = ''
 [training]
   num_steps = +1
   batch_size = +1
-  N = 10000
+  N = 1000
 
 [mcmc]
     disable_tqdm = true
@@ -96,16 +96,16 @@ load_experiment = ''
     default = ['table_likelihood_loss']
     range = [
       ['table_likelihood_loss'],
-      ['dest_attraction_ts_likelihood_loss'],
-      ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+      ['total_distance_loss'],
+      ['total_distance_likelihood_loss']
     ]
 
   [neural_network.loss.loss_function.sweep]
     default = ['custom']
     range = [
       ['custom'],
-      ['custom'],
-      ['custom','custom'],
+      ['mseloss'],
+      ['gaussiannllloss'],
     ]
     coupled = true
     target_name = 'loss_name'
@@ -118,9 +118,9 @@ load_experiment = ''
     [[neural_network.loss.loss_kwargs.sweep.range]]
       nokey = nan
     [[neural_network.loss.loss_kwargs.sweep.range]]
-      noise_percentage = nan
+      nokey = nan
     [[neural_network.loss.loss_kwargs.sweep.range]]
-      noise_percentage = nan
+      var = 0.005
 
   [neural_network.hyperparameters]
     num_layers = +1
