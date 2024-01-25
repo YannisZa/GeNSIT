@@ -618,7 +618,6 @@ class Outputs(object):
             if self.settings.get('n_workers',1) > 1:
                 output_datasets = self.get_sweep_outputs_concurrently(
                     sample_names = samples_not_loaded,
-                    inputs = self.inputs,
                     group_by = group_by
                 )
 
@@ -626,7 +625,6 @@ class Outputs(object):
             else:
                 output_datasets = self.get_sweep_outputs_sequentially(
                     sample_names = samples_not_loaded,
-                    inputs = self.inputs,
                     group_by = group_by
                 )
 
@@ -997,7 +995,6 @@ class Outputs(object):
     def get_sweep_outputs_sequentially(
         self,
         sample_names:list = [],
-        inputs: Inputs = None,
         group_by: list = [],
         **kwargs
     ):
@@ -1013,7 +1010,6 @@ class Outputs(object):
                 base_config = self.config,
                 sweep_configuration = sweep_configuration,
                 sample_names = sample_names,
-                inputs = inputs,
                 group_by = group_by
             )
             if len(res) > 0:
@@ -1023,7 +1019,6 @@ class Outputs(object):
     def get_sweep_outputs_concurrently(
             self,
             sample_names:list = [],
-            inputs: Inputs = None,
             group_by: list = [],
             **kwargs
         ):
@@ -1059,7 +1054,6 @@ class Outputs(object):
                         base_config = self.config,
                         sweep_configuration = sweep_configuration,
                         sample_names = sample_names,
-                        inputs = inputs,
                         group_by = group_by
                     )
                     future.add_done_callback(my_callback)
@@ -1083,7 +1077,6 @@ class Outputs(object):
         base_config:Config,
         sweep_configuration:list,
         sample_names:list,
-        inputs:Inputs=None,
         group_by:list=[]
     ):
         # Get specific sweep config 
@@ -1103,7 +1096,7 @@ class Outputs(object):
             logger = self.logger
         )
         # Load inputs
-        if inputs is None:
+        if self.inputs is None:
             # Import all input data
             outputs.inputs = Inputs(
                 config = new_config,
@@ -1111,7 +1104,7 @@ class Outputs(object):
                 logger = self.logger
             )
         else:
-            outputs.inputs = inputs
+            outputs.inputs = self.inputs
         # Cast to xr DataArray
         outputs.inputs.cast_to_xarray()
 
@@ -1236,15 +1229,24 @@ class Outputs(object):
             
 
     def get_sample(self,sample_name:str):
+        
+        # NOTE: This function is applied to data with only one sweep!
+
+        # Instantiate inputs if required
+        if getattr(self,'inputs',None) is None:
+            self.inputs = Inputs(
+                config = self.config,
+                synthetic_data = False,
+                logger = self.logger
+            )
 
         if sample_name == 'intensity':
             # Get sim model 
             self.logger.debug('getting sim model')
+            
             # Read from config
             intensity_name = self.config.settings[self.intensity_model_class]['name']
-            # Otherwise read from coords of first dataarray
-            first_da = self.get_sample(self.output_names[0])
-            intensity_name = intensity_name if isinstance(intensity_name,str) else first_da.coords['name'].item()
+
             # Get intensity model
             IntensityModelClass = globals()[intensity_name+'SIM']
             
@@ -1307,9 +1309,8 @@ class Outputs(object):
                     )
                 )
             else:
-                samples = torch.tensor(
-                    getattr(self.inputs.data,sample_name), 
-                    dtype=NUMPY_TO_TORCH_DTYPE[INPUT_SCHEMA[sample_name]['dtype']]
+                samples = getattr(self.inputs.data,sample_name).astype(
+                    dtype=INPUT_SCHEMA[sample_name]['dtype']
                 )
 
         else:
@@ -1348,11 +1349,10 @@ class Outputs(object):
                 'sign' in EXPERIMENT_OUTPUT_NAMES[self.config.settings['experiment_type']]:
                 # Get sign samples
                 signs = self.get_sample('sign')
-                # Unstack dimensions
-                signs = unstack_dims(signs,['id'])
                 # Compute moments
-                numerator = data.dot(signs,dims=['iter'])
-                denominator = signs.sum('iter')
+                data,signs = xr.align(data,signs, join='exact')
+                numerator = data.dot(signs,dims=kwargs['dim'])
+                denominator = signs.sum(kwargs['dim'])
                 numerator,denominator = xr.align(numerator,denominator, join='exact')
                 return numerator/denominator
             else:
@@ -1367,8 +1367,6 @@ class Outputs(object):
                 samples_mean = self.compute_statistic(data,sample_name,'signedmean',**kwargs)
                 # Get sign samples
                 signs = self.get_sample('sign')
-                # Unstack dimensions
-                signs = unstack_dims(signs,['id'])
                 # Compute moments
                 numerator = (data**2).dot(signs,dims=['iter'])
                 denominator = signs.sum('iter')
@@ -1681,8 +1679,6 @@ class DataCollection(object):
                     self,
                     sample_name
                 ).append([new_data])
-
-        return self
     
     def group_samples_sequentially(self,output_datasets,sample_name:str,group_by:list=[]):
         for datasets in tqdm(

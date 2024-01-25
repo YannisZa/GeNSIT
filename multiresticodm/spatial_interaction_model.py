@@ -31,16 +31,8 @@ def instantiate_sim(
     
     
 class SpatialInteraction():
-    def export(self):
-        pass
-
-class SpatialInteraction2D():
-    REQUIRED_INPUTS = []
-    REQUIRED_OUTPUTS = []
     def __init__(
             self,
-            config: Config = None,
-            true_parameters: dict = {},
             **kwargs
     ):
         '''  Constructor '''
@@ -55,9 +47,24 @@ class SpatialInteraction2D():
         self.logger.setLevels(
             console_level = level
         )
+        
+    def export(self):
+        pass
 
+class SpatialInteraction2D(SpatialInteraction):
+    REQUIRED_INPUTS = []
+    REQUIRED_OUTPUTS = []
+    def __init__(
+            self,
+            config: Config = None,
+            true_parameters: dict = {},
+            **kwargs
+    ):
+        '''  Constructor '''
+        super().__init__(**kwargs)
         # SIM name
         self.dims_names = ['origin','destination']
+        print('self.dim_names',self.dims_names)
         
         # Configuration settings
         if config is not None:
@@ -100,7 +107,11 @@ class SpatialInteraction2D():
         if self.dims is None and \
             hasattr(self.data,'cost_matrix') and \
             self.data.cost_matrix is not None:
-            self.dims = dict(zip(self.dims_names,array(list(self.data.cost_matrix.size()))))
+            if torch.is_tensor(self.data.cost_matrix):
+                dims = list(self.data.cost_matrix.size())
+            else:
+                dims = [self.data.cost_matrix.sizes[d] for d in self.dim_names]
+            self.dims = dict(zip(self.dims_names,dims))
         # Update config
         self.config.settings['inputs']['dims'] = self.dims
 
