@@ -84,9 +84,15 @@ class DataCollectionException(DataException):
         super(DataException,self).__init__(message,**kwargs)
 
 class IrregularDataCollectionSize(DataCollectionException):
-    def __init__(self,message:str='',**kwargs):
-        super(DataException,self).__init__(message,**kwargs)
+    def __init__(self,message:str='',sizes:dict={},**kwargs):
+        super(DataCollectionException,self).__init__('',**kwargs)
+        self.sizes = sizes
 
+    def __str__(self):
+        return f"""
+            Irregular DataCollection
+            {self.sizes}
+        """
 # ---
 
 class MultiprocessorFailed(Exception):

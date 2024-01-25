@@ -84,7 +84,7 @@ class ExperimentHandler(object):
             # Reset config variables
             experiment_config.reset()
             # Validate experiment-specific config
-            experiment_config.experiment_validate_config()
+            experiment_config.experiment_validate()
 
             if self.config.settings['inputs'].get('dataset',None) is None:
                 raise Exception(f'No dataset found for experiment type {experiment_type}')
@@ -196,9 +196,11 @@ class Experiment(object):
                     path = self.config['inputs'].get('load_experiment',''),
                     logger = self.logger
                 )
-            except:
+                # Get sweep-related data
+                config.get_sweep_data()
                 return config
-            return None
+            except:
+                return None
         return None            
 
     def reset(self,metadata:bool=False) -> None:
@@ -2444,21 +2446,14 @@ class ExperimentSweep():
         
         self.logger.info(f"Performing parameter sweep for {self.config.settings['experiment_type']}")
 
-        # Parse sweep configurations
-        self.sweep_params = self.config.parse_sweep_params()
-
-        # Create sweep configurations
-        sweep_configurations, \
-        self.param_sizes_str, \
-        self.total_size_str = self.config.prepare_sweep_configurations(self.sweep_params)
+        # Get sweep-related data
+        self.config.get_sweep_data()
 
         # If outputs should be loaded and appended
         if not self.config.settings['load_data']:
             # Store one datetime
             # for all sweeps
             self.config.settings['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-            # Store all sweep configurations
-            self.sweep_configurations = sweep_configurations
 
         # Temporarily disable sample output writing
         export_samples = deepcopy(self.config['experiments'][0]['export_samples'])
@@ -2483,11 +2478,8 @@ class ExperimentSweep():
         # and remove them from sweep configurations
         if self.config.settings['load_data']:
             # Update sweep configurations
-            self.sweep_configurations = list(
-                self.outputs.trim_sweep_configurations(
-                    sweep_configurations = sweep_configurations,
-                    sweep_params = self.sweep_params
-                )
+            self.outputs.config = list(
+                self.outputs.config.trim_sweep_configurations()
             )
         
         # Prepare writing to file
@@ -2528,7 +2520,9 @@ class ExperimentSweep():
                 )
                 # Validate preloaded config
                 # This does a bunch of useful stuff
-                config.validate_config()
+                config.validate()
+                # Get sweep-related data
+                config.get_sweep_data()
                 return config
             except:
                 return None
