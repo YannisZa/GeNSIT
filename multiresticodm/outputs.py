@@ -43,7 +43,7 @@ class Outputs(object):
                  config:Config, 
                  settings:dict={},
                  data_names:list=None,
-                 sweep_params:dict={},
+                 sweep:dict={},
                  inputs:Inputs = None,
                  **kwargs):
         # Setup logger
@@ -115,6 +115,8 @@ class Outputs(object):
                 path = os.path.join(config,"config.json"),
                 logger = self.logger
             )
+            # Get sweep-related data
+            config.get_sweep_data()
 
             # Get intensity model class
             self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
@@ -172,7 +174,7 @@ class Outputs(object):
         
         # Name output sample directory according 
         # to sweep params (if they are provided)
-        self.sweep_id = self.config.get_sweep_id(sweep_params = sweep_params)
+        self.sweep_id = self.config.get_sweep_id(sweep = sweep)
 
         if kwargs.get('print_slice',True):
         
@@ -332,40 +334,7 @@ class Outputs(object):
             progress.close()
 
     def data_vars(self):
-        return {k:v for k,v in self.data._vars_().items() if k in DATA_SCHEMA}
-
-    def trim_sweep_configurations(self,sweep_configurations:list=[],sweep_params:dict={}):
-        # Loop through each sweep configuration
-        for sweep_conf in sweep_configurations:
-            # Extract sweep params for this configuration
-            _,sweep = self.config.prepare_experiment_config(
-                sweep_params,
-                sweep_conf
-            )
-            # Get sweep id
-            sweep_id = self.config.get_sweep_id(sweep_params = sweep)
-            # Check if 'metadata.json' or 'config.json' and 'data.h5' and 'outputs.log'
-            # exist in output directory
-            file_exists = {}
-            for file in ['metadata.json','data.h5','outputs.log']:
-                # Create filepath
-                filepath = os.path.join(
-                    self.outputs_path,
-                    'samples',
-                    sweep_id,
-                    f"outputs.log"
-                )
-                # Check if path exists and filepath corresponds to a file
-                file_exists[file] = os.path.exists(filepath) and os.path.isfile(filepath)
-            # Check if necessary data exists 
-            data_exists = file_exists['metadata.json'] and \
-                file_exists['data.h5'] and \
-                file_exists['outputs.log']
-            # If necessary data does not exist
-            # Add sweep configurations that need to be run
-            if not data_exists:
-                yield sweep_conf
-                
+        return {k:v for k,v in self.data._vars_().items() if k in DATA_SCHEMA}            
 
     def samples(self):
         if hasattr(self,'data') and isinstance(self.data,DataCollection):
@@ -630,17 +599,10 @@ class Outputs(object):
             raise CorruptedFileRead(f'Cannot read file {filename}')
         return local_coords,global_coords,data_vars
 
-    def load(self,indx:int,sweep_configurations:list,sweep_params:dict):
-
-        # Gather sweep dimension names
-        sweep_dims = list(sweep_params['isolated'].keys())
-        sweep_dims += list(sweep_params['coupled'].keys())
+    def load(self,indx:int):
 
         # Additionally group data collection by these attributes
-        group_by,combined_dims = self.get_data_collection_group_by(
-            sweep_dims = sweep_dims,
-            sweep_params = sweep_params
-        )
+        group_by,combined_dims = self.config.get_group_id()
 
         # Attempt to load all samples
         # Keep track of samples not loaded
@@ -652,37 +614,9 @@ class Outputs(object):
         if len(samples_not_loaded) > 0:
             self.logger.info(f"Collecting samples {', '.join(sorted(samples_not_loaded))}.")
 
-            # cli = Client(
-            #     n_workers = self.settings.get('n_workers',1), 
-            #     threads_per_worker = self.settings.get('n_threads',1),
-            #     memory_limit = "1GB"
-            # )
-            
-            # def convert_netcdf4_to_xarray_format(x):
-            #     ncf = nc.Dataset(x.encoding["source"], diskless=True, persist=False)
-            #     firstkey = list(ncf.groups.keys())[0]
-            #     return xr.backends.NetCDF4DataStore(ncf[firstkey])
-
-
-
-            # datafiles = list(Path(f"{self.outputs_path}/samples").rglob("*data.h5"))
-            # datasets = xr.open_mfdataset(
-            #     list(datafiles),
-            #     parallel=True,
-            #     combine='nested',
-            #     preprocess=convert_netcdf4_to_xarray_format
-            # )
-            # print(datasets[0])
-            # print(datasets.keys())
-            # print(type(datasets))
-            # sys.exit()
-
-
             # Do it concurrently
             if self.settings.get('n_workers',1) > 1:
                 output_datasets = self.get_sweep_outputs_concurrently(
-                    sweep_configurations = sweep_configurations,
-                    sweep_params = sweep_params,
                     sample_names = samples_not_loaded,
                     inputs = self.inputs,
                     group_by = group_by
@@ -691,8 +625,6 @@ class Outputs(object):
             # Do it sequentially
             else:
                 output_datasets = self.get_sweep_outputs_sequentially(
-                    sweep_configurations = sweep_configurations,
-                    sweep_params = sweep_params,
                     sample_names = samples_not_loaded,
                     inputs = self.inputs,
                     group_by = group_by
@@ -741,7 +673,20 @@ class Outputs(object):
                 self.logger.info(f'Wrote output collection to {filepath}')
             except Exception as exc:
                 self.logger.error(traceback.format_exc())
-                sys.exit()
+                raise exc
+            
+        # Slice according to coordinate and index slice
+        self.slice_coordinates()
+
+        # If output dataset is empty raise Error
+        if self.data.size() <= 0:
+            raise EmptyData(
+                message = 'Outputs data is empty after slicing by coordinates and/or indices',
+                data_names = 'all'
+            )
+
+        # Stack sweep and iter dimensions
+        self.stack_sweep_and_iter_dims(self)
         
     def update_experiment_directory_id(self,sweep_experiment_id:str=None):
 
@@ -1051,8 +996,6 @@ class Outputs(object):
         
     def get_sweep_outputs_sequentially(
         self,
-        sweep_configurations:list,
-        sweep_params:dict = {},
         sample_names:list = [],
         inputs: Inputs = None,
         group_by: list = [],
@@ -1060,7 +1003,7 @@ class Outputs(object):
     ):
         output_datasets = []
         for sweep_configuration in tqdm(
-            sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)],
+            self.config.sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)],
             desc='Collecting h5 data sequentially',
             leave=False,
             position=0
@@ -1069,7 +1012,6 @@ class Outputs(object):
             res = self.get_sweep_outputs(
                 base_config = self.config,
                 sweep_configuration = sweep_configuration,
-                sweep_params = sweep_params,
                 sample_names = sample_names,
                 inputs = inputs,
                 group_by = group_by
@@ -1080,8 +1022,6 @@ class Outputs(object):
     
     def get_sweep_outputs_concurrently(
             self,
-            sweep_configurations:list,
-            sweep_params:dict = {},
             sample_names:list = [],
             inputs: Inputs = None,
             group_by: list = [],
@@ -1093,7 +1033,7 @@ class Outputs(object):
     
         # Initialise progress bar
         progress = tqdm(
-            total=len(sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]),
+            total=len(self.config.sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]),
             desc='Collecting h5 data in parallel',
             leave=False,
             miniters=1,
@@ -1112,13 +1052,12 @@ class Outputs(object):
 
         with BoundedQueueProcessPoolExecutor(max_waiting_tasks = 2*self.settings.get('n_workers',1)) as executor:
             # Start the processes and ignore the results
-            for sweep_configuration in sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]:
+            for sweep_configuration in self.config.sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]:
                 try:
                     future = executor.submit(
                         self.get_sweep_outputs,
                         base_config = self.config,
                         sweep_configuration = sweep_configuration,
-                        sweep_params = sweep_params,
                         sample_names = sample_names,
                         inputs = inputs,
                         group_by = group_by
@@ -1143,17 +1082,14 @@ class Outputs(object):
         self,
         base_config:Config,
         sweep_configuration:list,
-        sweep_params:dict,
         sample_names:list,
         inputs:Inputs=None,
         group_by:list=[]
     ):
         # Get specific sweep config 
         new_config,sweep = base_config.prepare_experiment_config(
-            sweep_params = sweep_params,
             sweep_configuration = sweep_configuration
         )
-        print('sweep',sweep)
         # Get outputs and unpack its statistics
         # This is the case where there are SOME input slices provided
         outputs = Outputs(
@@ -1161,7 +1097,7 @@ class Outputs(object):
             settings = self.settings,
             data_names = self.settings['sample'],
             base_dir = self.outputs_path,
-            sweep_params = sweep,
+            sweep = sweep,
             console_handling_level = self.settings['logging_mode'],
             print_slice = False,
             logger = self.logger
@@ -1311,6 +1247,7 @@ class Outputs(object):
             intensity_name = intensity_name if isinstance(intensity_name,str) else first_da.coords['name'].item()
             # Get intensity model
             IntensityModelClass = globals()[intensity_name+'SIM']
+            
             # Check that required data is available
             self.logger.debug('checking sim data availability')
             self.check_data_availability(
@@ -1383,7 +1320,12 @@ class Outputs(object):
                     location = 'Outputs'
                 )
             elif self.data.sizes(dim = sample_name) > 1:
-                raise IrregularDataCollectionSize(f"Cannot process {sample_name} Data Collection of size {self.data.sizes(dim = sample_name)} > 1.")
+                raise IrregularDataCollectionSize(
+                    message = f"""
+                        Cannot process {sample_name} Data Collection of size > 1.
+                    """,
+                    sizes = {sample_name: self.data.sizes(dim=sample_name)}
+                )
             else:
                 # Get xarray
                 samples = getattr(self.data,sample_name)
@@ -1518,48 +1460,6 @@ class Outputs(object):
         
         # Store as global var
         self.coordinate_slice = coordinate_slice
-    
-    def get_data_collection_group_by(self,sweep_dims:list,sweep_params:dict):
-        group_by = []
-        combined_dims = []
-        # Get all non-core sweep dims
-        non_core_sweep_dims = [k for k in sweep_dims if k not in CORE_COORDINATES_DTYPES]
-        for gb in list(self.settings.get('group_by',[]))+non_core_sweep_dims:
-            # If this is an isolated sweep parameter
-            # add it to the group by
-            if gb in sweep_params['isolated']:
-                group_by.append(gb)
-            # If it is a coupled sweep parameter
-            # add the coupled parameters too
-            if gb in sweep_params['coupled']:
-                group_by.append(gb)
-                # If this parameter is the target name
-                # add its coupled parameters to the group by
-                for coupled_param in sweep_params['coupled'].get(gb,[]):
-                    # Make sure there are no duplicate group by params
-                    if coupled_param['var'] not in group_by:
-                        group_by.append(coupled_param['var'])
-            # If this parameter is the coupled parameter
-            # of a target name add the target name and 
-            # the rest of the coupled parameters to the group by
-            target_name = self.config.target_names_by_sweep_var.get(gb,'none')
-            if target_name != 'none':
-                for coupled_param in sweep_params['coupled'].get(target_name,[]):
-                    # Add target name
-                    if target_name not in group_by:
-                        group_by.append(target_name)
-                    # Add rest of coupled params
-                    if coupled_param['var'] not in group_by:
-                        group_by.append(coupled_param['var'])
-        
-        for dim in sweep_params['isolated'].keys():
-            if dim not in group_by:
-                combined_dims.append(dim)
-        for vals in sweep_params['coupled'].values():
-            for coupled_dims in vals :
-                if coupled_dims['var'] not in group_by:
-                    combined_dims.append(coupled_dims['var'])
-        return group_by,combined_dims
 
     @classmethod
     def check_object_availability(cls,__self__,reqs:list,object_name:str,**kwargs):
@@ -1986,7 +1886,7 @@ class DataCollection(object):
             assert len(set([size for size in self.sizes().values()])) <= 1
             length = len(set([size for size in self.sizes().values()]))
         except:
-            raise IrregularDataCollectionSize(f"Irregular DataCollection with sizes {str(self.sizes())}")
+            raise IrregularDataCollectionSize(sizes= self.sizes())
         
         if length <= 0:
             return 0
@@ -2138,19 +2038,6 @@ class OutputSummary(object):
             
         # Collect outputs from folder
         outputs = self.get_folder_outputs(indx,output_folder)
-
-        # Slice according to coordinate and index slice
-        outputs.slice_coordinates()
-
-        # If output dataset is empty raise Error
-        if outputs.data.size() <= 0:
-            raise EmptyData(
-                message = 'Outputs data is empty after slicing by coordinates and/or indices',
-                data_names = 'all'
-            )
-
-        # Stack sweep and iter dimensions
-        outputs.stack_sweep_and_iter_dims(outputs)
 
         # Loop through each member of the data collection
         if self.settings.get('n_workers',1) > 1:
@@ -2320,9 +2207,8 @@ class OutputSummary(object):
             path = os.path.join(output_folder,"config.json"),
             logger = self.logger
         )
-
-        # Gather all sweep-related config data
-        sweep_params,sweep_configurations = config.get_sweep_data(output_folder)
+        # Get sweep-related data
+        config.get_sweep_data()
         
         # If sweep is over input data
         input_sweep_param_names = set(config.sweep_param_names).intersection(
@@ -2345,7 +2231,7 @@ class OutputSummary(object):
                 logger = self.logger,
             ))
 
-        # Reload global outputs
+        # Instantiate global outputs
         outputs = Outputs(
             config = config,
             settings = self.settings,
@@ -2355,12 +2241,8 @@ class OutputSummary(object):
             logger = self.logger
         )
         
-        # Load all sweep-related data to outputs
-        outputs.load(
-            indx = indx,
-            sweep_configurations = sweep_configurations,
-            sweep_params = sweep_params
-        )
+        # Load all output data
+        outputs.load(indx = indx)
 
         return outputs
 

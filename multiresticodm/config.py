@@ -9,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.utils.exceptions import *
-from multiresticodm.fixed.global_variables import deep_walk
+from multiresticodm.fixed.global_variables import deep_walk, CORE_COORDINATES_DTYPES
 from multiresticodm.utils.config_data_structures import instantiate_data_type
 from multiresticodm.utils.misc_utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify, string_to_numeric
 
@@ -341,7 +341,7 @@ class Config:
                 return False
         return True
 
-    def experiment_validate_config(self):
+    def experiment_validate(self):
         # Perform this check only when one experiment is given
         try:
             assert len(self.settings['experiments']) == 1
@@ -394,7 +394,7 @@ class Config:
                         raise Exception(f"Could not find base schema key path {'>'.join(key_path_str.split('>'))}")
         
         # Validate config
-        self.validate_config(
+        self.validate(
             parameters = self.parameters,
             settings = self.settings,
             base_schema = self.schema,
@@ -445,19 +445,20 @@ class Config:
         )
         return value.get('sweepable',False)
 
-    def get_sweep_id(self,sweep_params:dict={}):
+    def get_sweep_id(self,sweep:dict={}):
         sweep_id = ''
-        if len(sweep_params) > 0 and isinstance(sweep_params,dict):
+        
+        if len(sweep) > 0 and isinstance(sweep,dict):
             # Create sweep id by grouping coupled sweep vars together
             # and isolated sweep vars separately
             sweep_id = []
             for v in set(list(self.target_names_by_sweep_var.values())).difference(set(['dataset'])):
                 # Map sigma to noise regime
                 if str(v) == 'sigma':
-                    value = sigma_to_noise_regime(sweep_params[v])
+                    value = sigma_to_noise_regime(sweep[v])
                 # Else use passed sweep value
                 else:
-                    value = sweep_params[v]
+                    value = sweep[v]
                 # Add to key-value pair to unique sweep id
                 sweep_id.append(f"{str(v)}_{stringify(value)}")
             # Join all grouped sweep vars into one sweep id 
@@ -521,8 +522,55 @@ class Config:
             for item in nested_dict.keys()
         ]
         self.sweep_param_names = list(flatten(sweep_param_names))
+
+    def get_group_id(self):
+
+        # Gather sweep dimension names
+        sweep_dims = list(self.sweep_params['isolated'].keys())
+        sweep_dims += list(self.sweep_params['coupled'].keys())
+
+        group_by = []
+        combined_dims = []
+        # Get all non-core sweep dims
+        non_core_sweep_dims = [k for k in sweep_dims if k not in CORE_COORDINATES_DTYPES]
+        for gb in list(self.settings.get('group_by',[]))+non_core_sweep_dims:
+            # If this is an isolated sweep parameter
+            # add it to the group by
+            if gb in self.sweep_params['isolated']:
+                group_by.append(gb)
+            # If it is a coupled sweep parameter
+            # add the coupled parameters too
+            if gb in self.sweep_params['coupled']:
+                group_by.append(gb)
+                # If this parameter is the target name
+                # add its coupled parameters to the group by
+                for coupled_param in self.sweep_params['coupled'].get(gb,[]):
+                    # Make sure there are no duplicate group by params
+                    if coupled_param['var'] not in group_by:
+                        group_by.append(coupled_param['var'])
+            # If this parameter is the coupled parameter
+            # of a target name add the target name and 
+            # the rest of the coupled parameters to the group by
+            target_name = self.target_names_by_sweep_var.get(gb,'none')
+            if target_name != 'none':
+                for coupled_param in self.sweep_params['coupled'].get(target_name,[]):
+                    # Add target name
+                    if target_name not in group_by:
+                        group_by.append(target_name)
+                    # Add rest of coupled params
+                    if coupled_param['var'] not in group_by:
+                        group_by.append(coupled_param['var'])
         
-    def validate_config(self,parameters=None,settings=None,base_schema=None,key_path=[],**kwargs):
+        for dim in self.sweep_params['isolated'].keys():
+            if dim not in group_by:
+                combined_dims.append(dim)
+        for vals in self.sweep_params['coupled'].values():
+            for coupled_dims in vals :
+                if coupled_dims['var'] not in group_by:
+                    combined_dims.append(coupled_dims['var'])
+        return group_by,combined_dims
+        
+    def validate(self,parameters=None,settings=None,base_schema=None,key_path=[],**kwargs):
         # Pass defaults if no meaningful arguments are provided
         if parameters is None:
             parameters = self.parameters
@@ -545,7 +593,7 @@ class Config:
                     # Append key to path
                     key_path.append(idx)
 
-                    self.validate_config(
+                    self.validate(
                         subvalue,
                         settings,
                         base_schema,
@@ -559,7 +607,7 @@ class Config:
             # against each key path
             elif k != 'sweep' and isinstance(v,dict):
                 # Apply function recursively
-                self.validate_config(
+                self.validate(
                     v,
                     settings,
                     base_schema,
@@ -825,7 +873,7 @@ class Config:
                             sys.exit()
                     elif self.has_sweep(key_path) and isinstance(v,dict):
                         # Apply function recursively
-                        self.validate_config(
+                        self.validate(
                             v,
                             settings,
                             base_schema,
@@ -984,7 +1032,7 @@ class Config:
         return sweep_params
     
 
-    def prepare_experiment_config(self,sweep_params,sweep_configuration,cast_to_str:bool=False):
+    def prepare_experiment_config(self,sweep_configuration,cast_to_str:bool=False):
         # Create new config
         new_config = deepcopy(self)
         # Deactivate sweep             
@@ -995,7 +1043,7 @@ class Config:
         sweep = {}
         # Update config
         i = 0
-        for value in sweep_params['isolated'].values():
+        for value in self.sweep_params['isolated'].values():
             new_config.path_set(
                 new_config,
                 sweep_configuration[i],
@@ -1006,7 +1054,7 @@ class Config:
                 if not cast_to_str \
                 else str(sweep_configuration[i])
             i += 1
-        for sweep_group in sweep_params['coupled'].values():
+        for sweep_group in self.sweep_params['coupled'].values():
             for value in sweep_group:
                 new_config.path_set(
                     new_config,
@@ -1028,14 +1076,14 @@ class Config:
         self.find_sweep_key_paths()
 
         # Parse sweep configurations
-        sweep_params = self.parse_sweep_params()
+        self.sweep_params = self.parse_sweep_params()
 
         # Get all sweep configurations
-        sweep_configurations, \
-        param_sizes_str, \
-        total_size_str = self.prepare_sweep_configurations(sweep_params)
-
+        self.sweep_configurations, \
+        self.param_sizes_str, \
+        self.total_size_str = self.prepare_sweep_configurations(self.sweep_params)
         # Get output folder
+
         self.base_dir = self.out_directory.split(
             'samples/'
         )[0]
@@ -1045,8 +1093,39 @@ class Config:
         )[-1]
         self.logger.info("----------------------------------------------------------------------------------")
         self.logger.info(f'{output_folder_succinct}')
-        self.logger.info(f"Parameter space size: {param_sizes_str}")
-        self.logger.info(f"Total = {total_size_str}.")
+        self.logger.info(f"Parameter space size: {self.param_sizes_str}")
+        self.logger.info(f"Total = {self.total_size_str}.")
         self.logger.info("----------------------------------------------------------------------------------")
 
-        return sweep_params,sweep_configurations
+
+    def trim_sweep_configurations(self):
+        # Loop through each sweep configuration
+        for sweep_conf in self.sweep_configurations:
+            # Extract sweep params for this configuration
+            _,sweep = self.prepare_experiment_config(
+                self.sweep_params,
+                sweep_conf
+            )
+            # Get sweep id
+            sweep_id = self.get_sweep_id(sweep = sweep)
+            # Check if 'metadata.json' or 'config.json' and 'data.h5' and 'outputs.log'
+            # exist in output directory
+            file_exists = {}
+            for file in ['metadata.json','data.h5','outputs.log']:
+                # Create filepath
+                filepath = os.path.join(
+                    self.outputs_path,
+                    'samples',
+                    sweep_id,
+                    f"outputs.log"
+                )
+                # Check if path exists and filepath corresponds to a file
+                file_exists[file] = os.path.exists(filepath) and os.path.isfile(filepath)
+            # Check if necessary data exists 
+            data_exists = file_exists['metadata.json'] and \
+                file_exists['data.h5'] and \
+                file_exists['outputs.log']
+            # If necessary data does not exist
+            # Add sweep configurations that need to be run
+            if not data_exists:
+                yield sweep_conf

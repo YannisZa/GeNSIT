@@ -1067,12 +1067,16 @@ class Plot(object):
                                 settings = plot_sett['outputs'],
                                 logger = self.logger
                             )
+                            # Get sweep-related data
+                            config.get_sweep_data()
                         elif isinstance(plot_sett['outputs'],str):
                             # Instantiate config
                             config = Config(
                                 settings = plot_sett['outputs'],
                                 logger = self.logger
                             )
+                            # Get sweep-related data
+                            config.get_sweep_data()
                         else:
                             self.logger.warning(f"Outputs are of type {type(plot_sett['outputs'])} and not dict.")
                             continue
