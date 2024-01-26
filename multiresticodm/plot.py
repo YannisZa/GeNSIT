@@ -1088,7 +1088,7 @@ class Plot(object):
                                 settings = self.settings,
                                 data_names = self.settings['sample'],
                                 logger = self.logger,
-                                print_slice = False
+                                slice = False
                             )
                         ))
                     

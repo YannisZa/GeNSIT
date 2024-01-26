@@ -902,7 +902,10 @@ class Config:
 
         # Compute all combinations of sweep parameters
         # Isolated sweep parameters are cross multiplied
-        isolated_sweep_configurations = [val['values'] for val in sweep_params['isolated'].values()]
+        if len(sweep_params['isolated'].values()) > 0:
+            sweep_configurations = [val['values'] for val in sweep_params['isolated'].values()]
+        else:
+            sweep_configurations = []
 
         # Group all coupled sweep parameters by target name
         if len(sweep_params['coupled'].values()) > 0:
@@ -927,10 +930,11 @@ class Config:
                     "vars":[sweep_val['var'] for sweep_val in target_name_vals]
                 }
             # Cross multiple both sweep configurations
-            sweep_configurations = list(product(*(isolated_sweep_configurations+coupled_sweep_configurations)))
-        else:
+            sweep_configurations = list(product(*(sweep_configurations+coupled_sweep_configurations)))
+        elif len(sweep_configurations) > 0:
             # Cross multiple isolated sweep configurations
-            sweep_configurations = list(product(*(isolated_sweep_configurations)))
+            sweep_configurations = list(product(*(sweep_configurations)))
+        
         # Expand tuples within tuples
         sweep_configurations = [expand_tuple(item) for item in sweep_configurations]
 
@@ -1092,12 +1096,38 @@ class Config:
         output_folder_succinct = self.base_dir.split(
             self['inputs']['dataset']
         )[-1]
-        self.logger.info("----------------------------------------------------------------------------------")
-        self.logger.info(f'{output_folder_succinct}')
-        self.logger.info(f"Parameter space size: {self.param_sizes_str}")
-        self.logger.info(f"Total = {self.total_size_str}.")
-        self.logger.info("----------------------------------------------------------------------------------")
+        if len(self.sweep_configurations) > 0:
+            self.logger.info("----------------------------------------------------------------------------------")
+            self.logger.info(f'{output_folder_succinct}')
+            self.logger.info(f"Parameter space size: {self.param_sizes_str}")
+            self.logger.info(f"Total = {self.total_size_str}.")
+            self.logger.info("----------------------------------------------------------------------------------")
 
+    def slice_sweep_configurations(self,sweep:dict):
+        # Loop through each configuration
+        sliced_sweep_configurations = []
+        for sweep_configuration in self.sweep_configurations:
+            # All the criteria in this loop must be met in order to slice
+            added = True
+            for dim, val in sweep.items():
+                try:
+                    # Find index of dimension in sweep configuration
+                    dim_index = self.sweep_param_names.index(dim)
+                    # If there is a match change the flag
+                    print(sweep_configuration[dim_index],val,sweep_configuration[dim_index] == val)
+                    if sweep_configuration[dim_index] == val:
+                        added = added and True
+                    else:
+                        added = False
+                except:
+                    continue
+            if added:
+                sliced_sweep_configurations.append(sweep_configuration)
+        
+        if len(sliced_sweep_configurations) > 0:
+            return sliced_sweep_configurations
+        else:
+            return self.sweep_configurations
 
     def trim_sweep_configurations(self):
         # Loop through each sweep configuration

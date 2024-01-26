@@ -710,10 +710,10 @@ class RSquared_Analysis(Experiment):
         # Create outputs
         self.outputs = Outputs(
             self.config,
-            module=__name__+kwargs.get('instance',''),
-            sweep=kwargs.get('sweep',{}),
-            base_dir=self.outputs_base_dir,
-            experiment_id=self.sweep_experiment_id,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
 
@@ -940,10 +940,10 @@ class LogTarget_Analysis(Experiment):
         # Create outputs
         self.outputs = Outputs(
             self.config,
-            module=__name__+kwargs.get('instance',''),
-            sweep=kwargs.get('sweep',{}),
-            base_dir=self.outputs_base_dir,
-            experiment_id=self.sweep_experiment_id,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
 
@@ -1131,10 +1131,10 @@ class SIM_MCMC(Experiment):
         # Create outputs
         self.outputs = Outputs(
             self.config,
-            module=__name__+kwargs.get('instance',''),
-            sweep=kwargs.get('sweep',{}),
-            base_dir=self.outputs_base_dir,
-            experiment_id=self.sweep_experiment_id,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
 
@@ -1359,10 +1359,10 @@ class JointTableSIM_MCMC(Experiment):
         # Create outputs
         self.outputs = Outputs(
             self.config,
-            module=__name__+kwargs.get('instance',''),
-            sweep=kwargs.get('sweep',{}),
-            base_dir=self.outputs_base_dir,
-            experiment_id=self.sweep_experiment_id,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
 
@@ -1635,10 +1635,10 @@ class Table_MCMC(Experiment):
         # Create outputs
         self.outputs = Outputs(
             self.config,
-            module=__name__+kwargs.get('instance',''),
-            sweep=kwargs.get('sweep',{}),
-            base_dir=self.outputs_base_dir,
-            experiment_id=self.sweep_experiment_id,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
 
@@ -1787,10 +1787,10 @@ class SIM_NN(Experiment):
         # Create outputs
         self.outputs = Outputs(
             self.config,
-            module=__name__+kwargs.get('instance',''),
-            sweep=kwargs.get('sweep',{}),
-            base_dir=self.outputs_base_dir,
-            experiment_id=self.sweep_experiment_id,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
 
@@ -2011,10 +2011,10 @@ class NonJointTableSIM_NN(Experiment):
         # Create outputs
         self.outputs = Outputs(
             self.config,
-            module=__name__+kwargs.get('instance',''),
-            sweep=kwargs.get('sweep',{}),
-            base_dir=self.outputs_base_dir,
-            experiment_id=self.sweep_experiment_id,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
 

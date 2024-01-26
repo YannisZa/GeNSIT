@@ -88,7 +88,8 @@ class Outputs(object):
         # Enable garbage collector
         gc.enable()
 
-        # Store config
+        self.sweep_id = ''
+
         if isinstance(config,Config):
             # Store config
             self.config = config
@@ -107,25 +108,54 @@ class Outputs(object):
                     self.experiment_id
             ) if kwargs.get('base_dir',None) is None else kwargs['base_dir']
             
-
         elif isinstance(config,str):
-            # Store experiment id
-            self.experiment_id = os.path.basename(os.path.normpath(config.split('samples/')[0]))
+            
+            # Store experiment id and update sweep id if possible
+            if 'samples' in config:
+                self.experiment_id = os.path.basename(os.path.normpath(config.split('samples/')[0]))
+                # Attempt to find sweep id inside path
+                path_suffix = config.split('samples/')[-1]
+                # Remove potentially added filenames
+                path_suffix = path_suffix.replace('metadata.json','')
+                path_suffix = path_suffix.replace('config.json','')
+                # If match is found, extract the string before the suffix
+                if path_suffix:
+                    self.sweep_id = path_suffix
+
+            else:
+                self.experiment_id = os.path.basename(os.path.normpath(config.split('/',-1)[0]))
+            
             
             # Load metadata
-            assert os.path.exists(config)
+            config_filepath = ''
+            if config.endswith('.json') and os.path.exists(config):
+                config_filepath = config
+            if os.path.exists(os.path.join(config,"config.json")):
+                config_filepath = os.path.join(config,"config.json")
+            elif os.path.exists(os.path.join(config,"metadata.json")):
+                config_filepath = os.path.join(config,"metadata.json")
+
+            try:
+                assert config_filepath != ''
+            except:
+                raise MissingFiles(
+                    message = f'Missing config.json or metadata.json in {config}'
+                )
+
+            # Load config
             self.config = Config(
-                path = os.path.join(config,"config.json"),
+                path = config_filepath,
                 logger = self.logger
             )
+
             # Get sweep-related data
-            config.get_sweep_data()
+            self.config.get_sweep_data()
 
             # Get intensity model class
             self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
             
             # Define config experiment path to directory
-            self.outputs_path = config if kwargs.get('base_dir') is None else kwargs['base_dir']
+            self.outputs_path = config.split('samples/')[0] if kwargs.get('base_dir') is None else kwargs['base_dir']
         
         else:
             raise InvalidConfigType(f'Config {config} of type {type(config)} not recognised.')
@@ -177,9 +207,10 @@ class Outputs(object):
         
         # Name output sample directory according 
         # to sweep params (if they are provided)
-        self.sweep_id = self.config.get_sweep_id(sweep = sweep)
+        if self.sweep_id == '':
+            self.sweep_id = self.config.get_sweep_id(sweep = sweep)
 
-        if kwargs.get('print_slice',True):
+        if kwargs.get('slice',True):
         
             # Create coordinate slice conditions
             self.create_slicing_conditions()
@@ -452,17 +483,21 @@ class Outputs(object):
 
     def load_h5_data(self,sample_names:list):
         self.logger.note('Loading h5 data into xarrays...')
+        
         # Get h5 file
         h5file = os.path.join(self.outputs_path,'samples',f"{self.sweep_id}","data.h5")
+
         try:
             assert os.path.exists(h5file) and os.path.isfile(h5file)
         except:
             raise MissingFiles(f"H5 file {h5file} not found.")
+        
         # Read h5 data
         local_coords,global_coords,data_vars = self.read_h5_file(
             filename = h5file,
             sample_names = sample_names
         )
+
         # Convert set to list
         local_coords = {k:np.array(
                             list(v),
@@ -477,30 +512,6 @@ class Outputs(object):
         xr_dict = {}
         for sample_name,sample_data in data_vars.items():
             
-            coordinates = {}
-            # Ignore first two dimensions
-            # First dimension is the sweep dimension
-            # Second dimension is the number of iterations per sweep
-            if len(np.shape(sample_data)) > 2:
-                # Get data dims
-                if DATA_SCHEMA[sample_name]["is_iterable"]:                    
-                    dims = np.shape(sample_data)[2:]
-                else:
-                    dims = np.shape(sample_data)[1:]
-                
-                # For each dim create coordinate
-                for i,d in enumerate(dims):
-                    obj,func = DATA_SCHEMA[sample_name]['funcs'][i]
-                    # Create coordinate ranges based on schema
-                    coordinates[DATA_SCHEMA[sample_name]["dims"][i]] = deep_call(
-                        globals()[obj],
-                        func,
-                        None,
-                        start=1,
-                        stop=d+1,
-                        step=1
-                    ).astype(DATA_SCHEMA[sample_name]['args_dtype'][i])
-
             # Keep only necessary global coordinates
             sample_global_dims = ['iter'] if DATA_SCHEMA[sample_name]['is_iterable'] else []
             sample_global_dims += DATA_SCHEMA[sample_name].get("dims",[])
@@ -510,11 +521,8 @@ class Outputs(object):
             # 2) isolated sweeps 
             # or 3) the targets of coupled sweeps
             coordinates = {
-                **{k:v for k,v in local_coords.items() \
-                   if k != sample_name},
-                **{k:v for k,v in global_coords.items() \
-                   if k in sample_global_dims},
-                **coordinates
+                **{k:v for k,v in local_coords.items() if k != sample_name},
+                **{k:global_coords[k] for k in sample_global_dims},
             }
             # Populate dictionary 
             xr_dict[sample_name] = {
@@ -590,7 +598,7 @@ class Outputs(object):
                     # Append
                     self.logger.debug(f'Appending {sample_name}')
                     data_vars[sample_name] = np.array(
-                        [sample_data[:]],
+                        sample_data[:],
                         dtype=DATA_SCHEMA[sample_name].get('dtype','float32')
                     )
 
@@ -602,92 +610,158 @@ class Outputs(object):
             raise CorruptedFileRead(f'Cannot read file {filename}')
         return local_coords,global_coords,data_vars
 
-    def load(self,indx:int):
-
+    def load(self,indx:int=0):
+        
         # Additionally group data collection by these attributes
         group_by,combined_dims = self.config.get_group_id()
-
-        # Attempt to load all samples
-        # Keep track of samples not loaded
-        samples_not_loaded = self.read_data_collection(
-            group_by = group_by
-        )
-
-        # Load all necessary samples that were not loaded
-        if len(samples_not_loaded) > 0:
-            self.logger.info(f"Collecting samples {', '.join(sorted(samples_not_loaded))}.")
-
-            # Do it concurrently
-            if self.settings.get('n_workers',1) > 1:
-                output_datasets = self.get_sweep_outputs_concurrently(
-                    sample_names = samples_not_loaded,
-                    group_by = group_by
-                )
-
-            # Do it sequentially
-            else:
-                output_datasets = self.get_sweep_outputs_sequentially(
-                    sample_names = samples_not_loaded,
-                    group_by = group_by
-                )
-
-            # Create xarray dataset
-            try:
-                self.logger.info(f"Creating xarray(s) for {', '.join(sorted(samples_not_loaded))}.")
-                
-                for sample_name in sorted(samples_not_loaded):
-                    
-                    # Homogeneous data arrays are the ones that have common coordinates
-                    # along all core dimensions and group_by dimensions
-                    self.data.group_samples_sequentially(
-                        output_datasets = [x for x in [ds.pop(sample_name,None) for ds in output_datasets] if x is not None],
-                        sample_name = sample_name,
-                        group_by = group_by
-                    )
-                    
-                    # Combine coords for each list element of the Data Collection
-                    parallel = False #self.settings.get('n_workers',1) > 1
-                    if parallel:
-                        combined_coords = self.data.combine_by_coords_concurrently(
-                            indx = indx,
-                            sample_name = sample_name,
-                            combined_dims = combined_dims,
-                            n_workers = self.settings.get('n_workers',1)
-                        )
-                        # Add results to self
-                        for cc in combined_coords:
-                            getattr(
-                                self.data,
-                                sample_name
-                            )[cc[0]] = cc[1]
-                    else:
-                        self.data.combine_by_coords_sequentially(
-                            sample_name = sample_name,
-                            combined_dims = combined_dims
-                        )
-                
-                    # Write sample data collection to file
-                    filepath = self.write_data_collection(
-                        sample_names = [sample_name]
-                    )
-                
-                self.logger.info(f'Wrote output collection to {filepath}')
-            except Exception as exc:
-                self.logger.error(traceback.format_exc())
-                raise exc
-            
-        # Slice according to coordinate and index slice
-        self.slice_coordinates()
-
-        # If output dataset is empty raise Error
-        if self.data.size() <= 0:
-            raise EmptyData(
-                message = 'Outputs data is empty after slicing by coordinates and/or indices',
-                data_names = 'all'
+        
+        if len(self.config.sweep_configurations) > 0:
+            # Attempt to load all samples
+            # Keep track of samples not loaded
+            samples_not_loaded = self.read_data_collection(
+                group_by = group_by
             )
 
+            # Load all necessary samples that were not loaded
+            if len(samples_not_loaded) > 0:
+                self.logger.info(f"Collecting samples {', '.join(sorted(samples_not_loaded))}.")
+
+                # Do it concurrently
+                if self.settings.get('n_workers',1) > 1:
+                    output_datasets = self.get_sweep_outputs_concurrently(
+                        sample_names = samples_not_loaded,
+                        group_by = group_by
+                    )
+
+                # Do it sequentially
+                else:
+                    output_datasets = self.get_sweep_outputs_sequentially(
+                        sample_names = samples_not_loaded,
+                        group_by = group_by
+                    )
+
+                # Create xarray dataset
+                try:
+                    self.logger.info(f"Creating xarray(s) for {', '.join(sorted(samples_not_loaded))}.")
+                    
+                    for sample_name in sorted(samples_not_loaded):
+                        
+                        # Homogeneous data arrays are the ones that have common coordinates
+                        # along all core dimensions and group_by dimensions
+                        self.data.group_samples_sequentially(
+                            output_datasets = [x for x in [ds.pop(sample_name,None) for ds in output_datasets] if x is not None],
+                            sample_name = sample_name,
+                            group_by = group_by
+                        )
+                        
+                        # Combine coords for each list element of the Data Collection
+                        parallel = False #self.settings.get('n_workers',1) > 1
+                        if parallel:
+                            combined_coords = self.data.combine_by_coords_concurrently(
+                                indx = indx,
+                                sample_name = sample_name,
+                                combined_dims = combined_dims,
+                                n_workers = self.settings.get('n_workers',1)
+                            )
+                            # Add results to self
+                            for cc in combined_coords:
+                                getattr(
+                                    self.data,
+                                    sample_name
+                                )[cc[0]] = cc[1]
+                        else:
+                            self.data.combine_by_coords_sequentially(
+                                sample_name = sample_name,
+                                combined_dims = combined_dims
+                            )
+                        
+                        # Write sample data collection to file
+                        filepath = self.write_data_collection(
+                            sample_names = [sample_name]
+                        )
+                    
+                    self.logger.info(f'Wrote output collection to {filepath}')
+                except Exception as exc:
+                    self.logger.error(traceback.format_exc())
+                    raise exc
+                
+            # Slice according to coordinate and index slice
+            self.slice_coordinates()
+
+            # If output dataset is empty raise Error
+            if self.data.size() <= 0:
+                raise EmptyData(
+                    message = 'Outputs data is empty after slicing by coordinates and/or indices',
+                    data_names = 'all'
+                )
+
+        else:
+            # Load data array for this given sweep
+            data_array = self.load_single(
+                sample_names = self.output_names,
+                group_by = group_by,
+                sweep = None,
+            )
+            for sample_name,sample_data in data_array.items():
+                setattr(
+                    self.data,
+                    sample_name,
+                    [sample_data]
+                )
+            
         # Stack sweep and iter dimensions
         self.stack_sweep_and_iter_dims(self)
+
+
+
+    def load_single(self,sample_names:list=None, group_by:list=None, sweep:dict=None):
+        # Load inputs
+        if self.inputs is None:
+            # Import all input data
+            self.inputs = Inputs(
+                config = self.config,
+                synthetic_data = False,
+                logger = self.logger
+            )
+        
+        # Cast to xr DataArray
+        self.inputs.cast_to_xarray()
+
+        # Get dictionary output data to be passed into xarray
+        xr_dict_data = self.load_h5_data(sample_names)
+
+        data_arr,slice_dict = {},{}
+        for sample_name,xr_data in xr_dict_data.items():
+            # Get sample xr_data
+            data = xr_data.pop('data')
+            # Coordinates of output dataset
+            coords = xr_data.pop('coordinates')
+            # Create slice dictionary
+            slice_dict = {
+                k: [stringify_coordinate(parse(elem)) for elem in coords[k]]
+                for k in coords.keys()
+            }
+            # Decide on extra set of attributes
+            if not sweep:
+                attrs = {}
+            else:
+                attrs = {
+                    k:stringify_coordinate(parse(sweep[k])) for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
+                    if k in sweep and k != 'seed' and k not in slice_dict
+                }
+            data_arr[sample_name] = xr.DataArray(
+                data = data,
+                coords = slice_dict,
+                attrs = dict(
+                    arr_name = sample_name,
+                    experiment_id = self.experiment_id,
+                    sweep_id = self.sweep_id,
+                    **attrs
+                )
+            )
+
+        return data_arr
+
         
     def update_experiment_directory_id(self,sweep_experiment_id:str=None):
 
@@ -998,12 +1072,11 @@ class Outputs(object):
     def get_sweep_outputs_sequentially(
         self,
         sample_names:list = [],
-        group_by: list = [],
-        **kwargs
-    ):
+        group_by:list = []
+    ):  
         output_datasets = []
         for sweep_configuration in tqdm(
-            self.config.sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)],
+            self.config.sweep_configurations,
             desc='Collecting h5 data sequentially',
             leave=False,
             position=0
@@ -1022,16 +1095,15 @@ class Outputs(object):
     def get_sweep_outputs_concurrently(
             self,
             sample_names:list = [],
-            group_by: list = [],
-            **kwargs
+            group_by:list = []
         ):
         # Gather h5 data from multiple files
         # and store them in xarray-type dictionaries
         output_datasets = []
-    
+
         # Initialise progress bar
         progress = tqdm(
-            total=len(self.config.sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]),
+            total=len(self.config.sweep_configurations),
             desc='Collecting h5 data in parallel',
             leave=False,
             miniters=1,
@@ -1050,7 +1122,7 @@ class Outputs(object):
 
         with BoundedQueueProcessPoolExecutor(max_waiting_tasks = 2*self.settings.get('n_workers',1)) as executor:
             # Start the processes and ignore the results
-            for sweep_configuration in self.config.sweep_configurations[::kwargs.get('step',1)][:kwargs.get('stop',None)]:
+            for sweep_configuration in self.config.sweep_configurations:
                 try:
                     future = executor.submit(
                         self.get_sweep_outputs,
@@ -1095,7 +1167,7 @@ class Outputs(object):
             base_dir = self.outputs_path,
             sweep = sweep,
             console_handling_level = self.settings['logging_mode'],
-            print_slice = False,
+            slice = False,
             logger = self.logger
         )
         # Load inputs
@@ -1106,40 +1178,12 @@ class Outputs(object):
                 synthetic_data = False,
                 logger = self.logger
             )
-        else:
-            outputs.inputs = self.inputs
-        # Cast to xr DataArray
-        outputs.inputs.cast_to_xarray()
-
-        # Get dictionary output data to be passed into xarray
-        xr_dict_data = outputs.load_h5_data(sample_names)
-
-        data_arr,slice_dict = {},{}
-        for sample_name,xr_data in xr_dict_data.items():
-            # Get sample xr_data
-            data = xr_data.pop('data')
-            # Coordinates of output dataset
-            coords = xr_data.pop('coordinates')
-            # Create slice dictionary
-            slice_dict = {
-                k: [stringify_coordinate(parse(elem)) for elem in coords[k]]
-                for k in coords.keys()
-            }
-            data_arr[sample_name] = xr.DataArray(
-                data = data,
-                coords = slice_dict,
-                # dims = (sweep_dims+sample_dims),
-                attrs = dict(
-                    arr_name = sample_name,
-                    experiment_id = outputs.experiment_id,
-                    sweep_id = outputs.sweep_id,
-                    **{
-                        k:stringify_coordinate(parse(sweep[k])) for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
-                        if k in sweep and k != 'seed' and k not in slice_dict
-                    }
-                )
-            )
-        return data_arr
+        data_array = outputs.load_single(
+            sample_names = sample_names, 
+            group_by = group_by,
+            sweep = sweep
+        )
+        return data_array
         
     def create_filename(self,sample=None):
         # Decide on filename
@@ -2738,3 +2782,4 @@ class OutputSummary(object):
                     })
 
         return list(evaluation_data.values())
+        
