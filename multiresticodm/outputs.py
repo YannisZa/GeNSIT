@@ -25,7 +25,7 @@ from multiresticodm.config import Config
 from multiresticodm.inputs import Inputs
 from multiresticodm.utils.misc_utils import *
 from multiresticodm.utils.exceptions import *
-from multiresticodm.fixed.global_variables import *
+from multiresticodm.static.global_variables import *
 from multiresticodm.spatial_interaction_model import *
 from multiresticodm.utils import math_utils as MathUtils
 from multiresticodm.contingency_table import instantiate_ct
@@ -64,6 +64,9 @@ class Outputs(object):
         # Store settings
         self.settings = settings
 
+        # Store device
+        self.device = self.settings.get('device','cpu')
+
         # Store inputs
         self.inputs = inputs
 
@@ -84,7 +87,7 @@ class Outputs(object):
         )
         # Enable garbage collector
         gc.enable()
-    
+
         # Store config
         if isinstance(config,Config):
             # Store config
@@ -199,7 +202,7 @@ class Outputs(object):
         # Find sweep dimensions that are not core coordinates
         sweep = dict(zip(
             first_dataset.get_index('sweep').names,
-            first_dataset.coords['sweep'].values.tolist()[0]
+            [unstringify(d) for d in first_dataset.coords['sweep'].values.tolist()[0]]
         ))
         # Update config
         self_copy.config.update(sweep)
@@ -1080,7 +1083,7 @@ class Outputs(object):
         group_by:list=[]
     ):
         # Get specific sweep config 
-        new_config,sweep = base_config.prepare_experiment_config(
+        new_config,sweep = deepcopy(base_config).prepare_experiment_config(
             sweep_configuration = sweep_configuration
         )
         # Get outputs and unpack its statistics
@@ -1308,10 +1311,15 @@ class Outputs(object):
                         NUMPY_TO_TORCH_DTYPE[INPUT_SCHEMA[sample_name]['dtype']]
                     )
                 )
+            elif isinstance(getattr(self.inputs.data,sample_name),(xr.DataArray,xr.Dataset)):
+                samples = getattr(self.inputs.data,sample_name)
             else:
-                samples = getattr(self.inputs.data,sample_name).astype(
-                    dtype=INPUT_SCHEMA[sample_name]['dtype']
+                samples = torch.tensor(
+                    getattr(self.inputs.data,sample_name),
+                    dtype = NUMPY_TO_TORCH_DTYPE[INPUT_SCHEMA[sample_name]['dtype']],
+                    device = self.device
                 )
+
 
         else:
             if not hasattr(self.data,sample_name):
@@ -1341,7 +1349,7 @@ class Outputs(object):
     def compute_statistic(self,data,sample_name,statistic,**kwargs):
         self.logger.debug(f"""compute_statistic {sample_name},{type(data)},{statistic}""")
         if statistic is None or statistic.lower() == '' or 'sample' in statistic.lower() or len(kwargs.get('dim',[])) == 0:
-            return data
+            return data#.astype('float32')
         
         elif statistic.lower() == 'signedmean' and \
             sample_name in list(OUTPUT_SCHEMA.keys()):
@@ -1354,7 +1362,7 @@ class Outputs(object):
                 numerator = data.dot(signs,dims=kwargs['dim'])
                 denominator = signs.sum(kwargs['dim'])
                 numerator,denominator = xr.align(numerator,denominator, join='exact')
-                return numerator/denominator
+                return (numerator/denominator)#.astype('float32')
             else:
                 return self.compute_statistic(data,sample_name,'mean',dim=kwargs['dim'])
 
@@ -1371,14 +1379,14 @@ class Outputs(object):
                 numerator = (data**2).dot(signs,dims=['iter'])
                 denominator = signs.sum('iter')
                 numerator,denominator = xr.align(numerator,denominator, join='exact')
-                return (numerator/denominator - samples_mean**2)
+                return (numerator/denominator - samples_mean**2)#.astype('float32')
             else:
                 return deep_call(
                     data,
                     f".var(dim)",
                     data,
                     dim=kwargs['dim']
-                )
+                )#.astype('float32')
                 # return self.compute_statistic(data,sample_name,'var',**kwargs)
         
         elif statistic.lower() == 'error' and \
@@ -1389,14 +1397,14 @@ class Outputs(object):
                 tab0=self.ground_truth_table,
                 name=self.settings['norm'],
                 **self.settings
-            )
+            )#.astype('float32')
 
         elif any([op in statistic.lower() for op in OPERATORS]):
             return operate(
                 data,
                 statistic,
                 **kwargs
-            )
+            )#.astype('float32')
 
         elif hasattr(data,statistic):
             return deep_call(
@@ -1404,7 +1412,7 @@ class Outputs(object):
                 f".{statistic}(dim)",
                 data,
                 dim=kwargs['dim']
-            )
+            )#.astype('float32')
         
         else:
             return deep_call(
@@ -1412,7 +1420,7 @@ class Outputs(object):
                 f".{statistic}(data)",
                 data,
                 data=data,
-            )
+            )#.astype('float32')
     
     def apply_sample_statistics(self,samples,sample_name,statistic_dims:Union[List,Tuple]=[],**kwargs):
         
@@ -1913,9 +1921,6 @@ class OutputSummary(object):
 
         # Store settings
         self.settings = settings
-
-        # Store device
-        self.device = self.settings.get('device','cpu')
         
         # Enable garbage collector
         gc.enable()
