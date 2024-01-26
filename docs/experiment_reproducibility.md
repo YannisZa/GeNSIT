@@ -24,14 +24,6 @@ clear; multiresticodm run ./data/inputs/configs/experiment2_joint.toml -sm -et J
 clear; multiresticodm run ./data/inputs/configs/experiment3_joint.toml -sm -et JointTableSIM_NN -nt 6 -nw 5
 ```
 
-## Experiment 4
-
-## Experiment 5 (Expected loss)
-
-```
-clear; multiresticodm run ./data/inputs/configs/experiment_expected_loss.toml -et JointTableSIM_NN -nw 15 -nt 2 -sm
-```
-
 # Summaries and Metrics
 
 ## Table 1
@@ -135,6 +127,8 @@ clear; multiresticodm plot 2d line --y_shade \
 -fs 6 10 -lls 9 -sals 12 -salr 90 -salp 2 -tls 7 -nw 20 -xlim 3.5 4.0 -la 0 0
 ```
 
+## Figure 2
+
 ## Figure 3
 
 `pkill -9 -f 'multiresticodm plot'; `
@@ -159,29 +153,4 @@ clear; multiresticodm plot -y srmse -x 'iter&seed' -x sigma \
 
 <!-- -fs 5 5 -ms 20 -ff pdf -tfs 14 -afs 14 -lls 18 -als 18 -->
 
-## Experiment 5 (Expected loss)
-
-<!-- -et JointTableSIM_NN -dn cambridge_work_commuter_lsoas_to_msoas/exp5_expected_loss \ -->
-
-<!-- -pdd /home/iz230/MultiResTICODM/data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp5_expected_loss/JointTableSIM_NN_LearnedNoise\_\_22_11_2023_20_42_35/paper_figures \ -->
-
-```
-
-clear; multiresticodm plot -y table_likelihood_loss -x table_steps \
--et JointTableSIM_NN -dn cambridge_work_commuter_lsoas_to_msoas/exp5_expected_loss \
--p sca -ma table_likelihood_loss -ft 'table_likelihood_loss_vs_table_steps' \
--stat '' 'mean&' 'iter&' \
--c title -v 0.5 -sz 20 -l title \
--k iter -btt 'iter' 0 100 100 -xlim 0 30 \
---x_discrete -xlab '(\# Table steps)' -ylab 'Table likelihood loss' -xfq 4 8 \
--fs 4 4 -lls 8 -afs 8 -tfs 5 -nw 6
-
-```
-
-```
-
-```
-
-```
-
-```
+## Figure 4
