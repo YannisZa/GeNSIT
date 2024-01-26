@@ -1,7 +1,7 @@
 import click
 from copy import deepcopy
 
-from multiresticodm.fixed.global_variables import *
+from multiresticodm.static.global_variables import *
 
 def btt_callback(ctx, param, value):
     if value is None:

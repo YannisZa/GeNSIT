@@ -17,7 +17,7 @@ from shapely.geometry import Point,LineString, Polygon, MultiPoint
 
 from multiresticodm.utils.misc_utils import *
 from multiresticodm.utils.math_utils import *
-from multiresticodm.fixed.global_variables import SIM_TYPE_CONSTRAINTS
+from multiresticodm.static.global_variables import SIM_TYPE_CONSTRAINTS
 
 def mean_euclidean_distance_from_centroid(multipoly1,multipoly2):
     distances = []

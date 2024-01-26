@@ -26,7 +26,7 @@ from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
 from multiresticodm.utils.exceptions import *
 from multiresticodm.utils.logger_class import *
-from multiresticodm.fixed.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS
+from multiresticodm.static.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -555,7 +555,7 @@ def deep_delete(dictionary, keys):
     return modified_dict
 
 def deep_apply(ob, func, **kwargs):
-    for k, v in ob.items():
+    for k, v in (ob.items() if isinstance(ob,dict) else enumerate(ob)):
         if isinstance(v, Mapping):
             deep_apply(v, func, **kwargs)
         else:
@@ -636,7 +636,7 @@ def stringify_coordinate(d):
 
 def stringify(data):
     if isinstance(data,Iterable) and not isinstance(data,str) and len(data) > 0:
-        return f"({','.join([stringify(v) for v in data])})"
+        return f"[{','.join([stringify(v) for v in data])}]"
     elif data == '' or data is None:
         return "none"
     elif hasattr(data,'__len__') and len(data) == 0:
