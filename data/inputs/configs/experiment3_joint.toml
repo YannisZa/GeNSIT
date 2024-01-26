@@ -10,7 +10,7 @@ dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 [inputs.seed.sweep]
   default = 0
-  range = ["0:29:1"]
+  range = ["0:99:1"]
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta']
   range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
@@ -167,4 +167,4 @@ load_experiment = ''
     out_group = 'exp3'
     [outputs.title.sweep]
       default = '_unconstrained'
-      range = ['_unconstrained','_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      range = ['_unconstrained','_total_constrained','_total_intensity_row_table_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
