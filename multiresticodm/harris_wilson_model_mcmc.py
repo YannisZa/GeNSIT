@@ -11,7 +11,7 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path as PathLib
 from joblib import Parallel, delayed
-from multiresticodm.fixed.global_variables import TABLE_INFERENCE_EXPERIMENTS
+from multiresticodm.static.global_variables import TABLE_INFERENCE_EXPERIMENTS
 
 import multiresticodm.utils.probability_utils as ProbabilityUtils
 

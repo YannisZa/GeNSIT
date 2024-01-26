@@ -2,11 +2,11 @@ import os
 import sys
 import torch
 
-from numpy import array
+from numpy import array,ndarray
 
 from multiresticodm.config import Config
 from multiresticodm.utils.misc_utils import setup_logger, to_json_format
-from multiresticodm.fixed.global_variables import PARAMETER_DEFAULTS, Dataset, INTENSITY_INPUTS, INTENSITY_OUTPUTS
+from multiresticodm.static.global_variables import PARAMETER_DEFAULTS, Dataset, INTENSITY_INPUTS, INTENSITY_OUTPUTS
 from multiresticodm.utils.probability_utils import log_odds_ratio_wrt_intensity
 from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
 
@@ -64,7 +64,6 @@ class SpatialInteraction2D(SpatialInteraction):
         super().__init__(**kwargs)
         # SIM name
         self.dims_names = ['origin','destination']
-        print('self.dim_names',self.dims_names)
         
         # Configuration settings
         if config is not None:
@@ -108,9 +107,11 @@ class SpatialInteraction2D(SpatialInteraction):
             hasattr(self.data,'cost_matrix') and \
             self.data.cost_matrix is not None:
             if torch.is_tensor(self.data.cost_matrix):
-                dims = list(self.data.cost_matrix.size())
+                dims = array(list(self.data.cost_matrix.size()))
+            elif isinstance(self.data.cost_matrix,ndarray):
+                dims = list(self.data.cost_matrix.shape)
             else:
-                dims = [self.data.cost_matrix.sizes[d] for d in self.dim_names]
+                dims = [self.data.cost_matrix.sizes[d] for d in self.dims_names]
             self.dims = dict(zip(self.dims_names,dims))
         # Update config
         self.config.settings['inputs']['dims'] = self.dims
@@ -307,7 +308,7 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
                 assert hasattr(self.data,attr)
             except:
                 raise Exception(f"{self.name} requires {attr} but it is missing!")
-        # Inherit numba functions
+        # Inherit sim-specific functions
         self.inherit_functions(ProductionConstrained)
 
         # self.logger.info(('Building ' + self.__str__()))
@@ -344,7 +345,7 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
             except:
                 raise Exception(f"{self.name} requires {attr} but it is missing!")
         
-        # Inherit numba functions
+        # Inherit sim-specific functions
         self.inherit_functions(TotallyConstrained)
 
         # self.logger.info(('Building ' + self.__str__()))

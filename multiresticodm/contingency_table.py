@@ -14,9 +14,9 @@ from num2words import num2words
 from typing import List, Union, Callable
 
 from multiresticodm.config import Config
-from multiresticodm.fixed.global_variables import *
+from multiresticodm.static.global_variables import *
 from multiresticodm.utils.math_utils import powerset
-from multiresticodm.utils.misc_utils import ndims, setup_logger, unpack_dims, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast, print_json
+from multiresticodm.utils.misc_utils import ndims, setup_logger, unpack_dims, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast, print_json, deep_call
 
 # -> Union[ContingencyTable,None]:
 def instantiate_ct(config: Config, **kwargs):
@@ -347,7 +347,10 @@ class ContingencyTable(object):
     def import_tabular_data(self) -> None:
         # Inherit data from margins
         partial_ground_truth = True
-        if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:
+        if hasattr(self.data,'ground_truth_table') and \
+            self.data.ground_truth_table is not None and \
+            torch.is_tensor(self.data.ground_truth_table):
+
             # Check to see if partial data are provided
             if torch.any(self.data.ground_truth_table < 0):
                 partial_ground_truth = True
@@ -448,7 +451,7 @@ class ContingencyTable(object):
                 if 'cells' in list(self.config.settings['contingency_table']['constraints'].keys()):
                     if isinstance(self.config.settings['contingency_table']['constraints']['cells'],str):
                         cell_constraints = os.path.join(
-                            self.config.settings['inputs']['in_directory'],
+                            os.path.relpath(self.config.in_directory,os.path.dirname(os.path.realpath(__file__))),
                             self.config.settings['inputs']['dataset'],
                             self.config.settings['contingency_table']['constraints']['cells']
                         )
@@ -560,7 +563,6 @@ class ContingencyTable(object):
         margins = deepcopy(margins)
         table = self.data.ground_truth_table if table is None else table
         axes = self.constraints['all_axes'] if axes is None else axes
-
         for cell in constrained_cells:
             cell_arr = np.asarray(cell)
             for ax in axes:
@@ -683,7 +685,7 @@ class ContingencyTable(object):
                 dim=tuplize(axes), 
                 keepdims=True, 
                 dtype=int32
-            ).flatten().to(device=self.device)
+            ).flatten().to(dtype=int32,device=self.device)
             # Update margins iff they are non-negative
             if torch.all(margin_data >= 0):
                 self.data.margins[tuplize(axes)] = margin_data

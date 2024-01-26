@@ -9,7 +9,7 @@ from itertools import product
 
 from multiresticodm import ROOT
 from multiresticodm.utils.exceptions import *
-from multiresticodm.fixed.global_variables import deep_walk, CORE_COORDINATES_DTYPES
+from multiresticodm.static.global_variables import deep_walk, CORE_COORDINATES_DTYPES
 from multiresticodm.utils.config_data_structures import instantiate_data_type
 from multiresticodm.utils.misc_utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify, string_to_numeric
 
@@ -1066,6 +1066,7 @@ class Config:
                 if not cast_to_str \
                 else str(sweep_configuration[i])
                 i += 1
+        
         # Return config and sweep params
         return new_config,sweep
 

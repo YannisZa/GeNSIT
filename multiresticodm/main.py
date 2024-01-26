@@ -9,9 +9,9 @@ import psutil
 from multiresticodm.config import Config
 from multiresticodm.utils.logger_class import *
 from multiresticodm.utils.click_parsers import *
-from multiresticodm.fixed.global_variables import *
+from multiresticodm.static.global_variables import *
 from multiresticodm.utils.misc_utils import setup_logger
-from multiresticodm.fixed.plot_variables import PLOT_VIEWS, PLOT_COORDINATES, PLOT_TYPES
+from multiresticodm.static.plot_variables import PLOT_VIEWS, PLOT_COORDINATES, PLOT_TYPES
 
 
 def set_threads(n_threads):

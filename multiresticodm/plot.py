@@ -22,8 +22,8 @@ from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
 
 from multiresticodm.config import Config
 from multiresticodm.utils.misc_utils import *
-from multiresticodm.fixed.plot_variables import *
-from multiresticodm.fixed.global_variables import *
+from multiresticodm.static.plot_variables import *
+from multiresticodm.static.global_variables import *
 from multiresticodm.outputs import Outputs,OutputSummary
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.spatial_interaction_model import instantiate_sim

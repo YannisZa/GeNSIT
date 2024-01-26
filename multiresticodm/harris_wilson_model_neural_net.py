@@ -16,7 +16,7 @@ from multiresticodm.config import Config
 from multiresticodm.utils.exceptions import *
 from multiresticodm.harris_wilson_model import HarrisWilson
 from multiresticodm.utils.misc_utils import setup_logger, fn_name
-from multiresticodm.fixed.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
+from multiresticodm.static.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
 
 
 def get_architecture(

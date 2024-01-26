@@ -13,7 +13,7 @@ from multiresticodm.config import Config
 from multiresticodm.inputs import Inputs
 from multiresticodm.outputs import Outputs
 from multiresticodm.utils.misc_utils import *
-from multiresticodm.fixed.global_variables import *
+from multiresticodm.static.global_variables import *
 from multiresticodm.utils.math_utils import torch_optimize
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.harris_wilson_model import HarrisWilson
