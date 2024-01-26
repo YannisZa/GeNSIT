@@ -783,7 +783,7 @@ class Outputs(object):
     def print_metadata(self) -> None:
         print_json(self.config,indent=2)
 
-    def open_output_file(self,sweep_params:dict={}):
+    def open_output_file(self,sweep:dict={}):
         # Create output directories if necessary
         self.create_output_subdirectories(sweep_id=self.sweep_id)
         if hasattr(self,'config') and hasattr(self.config,'settings'):
@@ -816,8 +816,8 @@ class Outputs(object):
                 self.h5group = self.h5file.create_group(self.experiment_id)
 
                 # Store sweep configurations as attributes
-                self.h5group.attrs.create("sweep_params",list(sweep_params.keys()))
-                self.h5group.attrs.create("sweep_values",['none' if val is None else str(val) for val in sweep_params.values()])
+                self.h5group.attrs.create("sweep_params",list(sweep.keys()))
+                self.h5group.attrs.create("sweep_values",['none' if val is None else str(val) for val in sweep.values()])
                 
                 # Update log filename
                 if isinstance(self.logger,DualLogger):

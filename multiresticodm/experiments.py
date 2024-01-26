@@ -90,9 +90,9 @@ class ExperimentHandler(object):
                 raise Exception(f'No dataset found for experiment type {experiment_type}')
             # Instatiate new experiment
             experiment = instantiate_experiment(
-                experiment_type=experiment_type,
-                config=experiment_config,
-                logger=self.logger
+                experiment_type = experiment_type,
+                config = experiment_config,
+                logger = self.logger
             )
             # Append it to list of experiments
             self.experiments[experiment_type] = experiment
@@ -711,14 +711,14 @@ class RSquared_Analysis(Experiment):
         self.outputs = Outputs(
             self.config,
             module=__name__+kwargs.get('instance',''),
-            sweep_params=kwargs.get('sweep_params',{}),
+            sweep=kwargs.get('sweep',{}),
             base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -941,14 +941,14 @@ class LogTarget_Analysis(Experiment):
         self.outputs = Outputs(
             self.config,
             module=__name__+kwargs.get('instance',''),
-            sweep_params=kwargs.get('sweep_params',{}),
+            sweep=kwargs.get('sweep',{}),
             base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -1132,21 +1132,21 @@ class SIM_MCMC(Experiment):
         self.outputs = Outputs(
             self.config,
             module=__name__+kwargs.get('instance',''),
-            sweep_params=kwargs.get('sweep_params',{}),
+            sweep=kwargs.get('sweep',{}),
             base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
         
         self.logger.note(f"{self.learning_model}")
         self.logger.info(f"Experiment: {self.outputs.experiment_id}")
-        # self.logger.critical(f"{json.dumps(kwargs.get('sweep_params',{}),indent=2)}")
+        # self.logger.critical(f"{json.dumps(kwargs.get('sweep',{}),indent=2)}")
 
         
     def run(self,**kwargs) -> None:
@@ -1360,14 +1360,14 @@ class JointTableSIM_MCMC(Experiment):
         self.outputs = Outputs(
             self.config,
             module=__name__+kwargs.get('instance',''),
-            sweep_params=kwargs.get('sweep_params',{}),
+            sweep=kwargs.get('sweep',{}),
             base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -1636,14 +1636,14 @@ class Table_MCMC(Experiment):
         self.outputs = Outputs(
             self.config,
             module=__name__+kwargs.get('instance',''),
-            sweep_params=kwargs.get('sweep_params',{}),
+            sweep=kwargs.get('sweep',{}),
             base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -1788,14 +1788,14 @@ class SIM_NN(Experiment):
         self.outputs = Outputs(
             self.config,
             module=__name__+kwargs.get('instance',''),
-            sweep_params=kwargs.get('sweep_params',{}),
+            sweep=kwargs.get('sweep',{}),
             base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -2012,14 +2012,14 @@ class NonJointTableSIM_NN(Experiment):
         self.outputs = Outputs(
             self.config,
             module=__name__+kwargs.get('instance',''),
-            sweep_params=kwargs.get('sweep_params',{}),
+            sweep=kwargs.get('sweep',{}),
             base_dir=self.outputs_base_dir,
             experiment_id=self.sweep_experiment_id,
             logger = self.logger
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params=kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -2255,14 +2255,14 @@ class JointTableSIM_NN(Experiment):
         self.outputs = Outputs(
             self.config,
             module = __name__+kwargs.get('instance',''),
-            sweep_params = kwargs.get('sweep_params',{}),
+            sweep = kwargs.get('sweep',{}),
             base_dir = self.outputs_base_dir,
             experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params = kwargs.get('sweep_params',{}))
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -2467,7 +2467,7 @@ class ExperimentSweep():
         
         self.outputs = Outputs(
             config = self.config,
-            sweep_params = kwargs.get('sweep_params',{}),
+            sweep = kwargs.get('sweep',{}),
             logger = self.logger
         )
         # Make output home directory
@@ -2483,7 +2483,7 @@ class ExperimentSweep():
             )
         
         # Prepare writing to file
-        self.outputs.open_output_file(sweep_params={})
+        self.outputs.open_output_file(sweep={})
 
         # Enable it again
         deep_updates(self.config.settings,{'export_samples':export_samples})
@@ -2557,7 +2557,6 @@ class ExperimentSweep():
     
     def prepare_instantiate_and_run(self,instance_num:int,sweep_configuration:dict,active_positions=None):
         try:
-
             # Prepare experiment
             config,sweep = self.prepare_experiment(sweep_configuration)
 
@@ -2579,7 +2578,7 @@ class ExperimentSweep():
             new_experiment = instantiate_experiment(
                 experiment_type = config.settings['experiment_type'],
                 config = config,
-                sweep_params = sweep,
+                sweep = sweep,
                 instance = str(instance_num),
                 base_dir = self.outputs_base_dir,
                 experiment_id = self.outputs_experiment_id,
