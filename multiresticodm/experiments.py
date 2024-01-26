@@ -2507,7 +2507,7 @@ class ExperimentSweep():
 
     def __str__(self) -> str:
         return f"""
-            Sweep key paths: {self.sweep_key_paths}
+            Sweep key paths: {self.config.sweep_key_paths}
         """
 
     def load_config(self):
@@ -2531,9 +2531,9 @@ class ExperimentSweep():
     def run(self,**kwargs):
 
         self.logger.info(f"{self.outputs.experiment_id}")
-        self.logger.info(f"Parameter space size: {self.param_sizes_str}")
-        self.logger.info(f"Total = {self.total_size_str}")
-        self.logger.info(f"Of which unfinished = {len(self.sweep_configurations)}.")
+        self.logger.info(f"Parameter space size: {self.config.param_sizes_str}")
+        self.logger.info(f"Total = {self.config.total_size_str}")
+        self.logger.info(f"Total to be run = {len(self.config.sweep_configurations)}.")
         self.logger.info(f"Preparing configs...")
         # For each configuration update experiment config 
         # and instantiate new experiment
@@ -2541,9 +2541,9 @@ class ExperimentSweep():
             warnings.simplefilter("ignore")
             # Decide whether to run sweeps in parallel or not
             if self.n_workers > 1:
-                self.run_concurrent(self.sweep_configurations)
+                self.run_concurrent(self.config.sweep_configurations)
             else:
-                self.run_sequential(self.sweep_configurations)
+                self.run_sequential(self.config.sweep_configurations)
         
     def prepare_experiment(self,sweep_configuration):
         # Deactivate logging
@@ -2552,10 +2552,7 @@ class ExperimentSweep():
             file_level='DEBUG'
         )
         
-        return self.config.prepare_experiment_config(
-            self.sweep_params,
-            sweep_configuration
-        )
+        return self.config.prepare_experiment_config(sweep_configuration)
         
     
     def prepare_instantiate_and_run(self,instance_num:int,sweep_configuration:dict,active_positions=None):
