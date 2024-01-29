@@ -10,7 +10,7 @@ from torch import int32, float32
 from scipy.special import gammaln
 from itertools import chain, combinations
 
-from multiresticodm.utils.misc_utils import flatten,is_sorted
+from multiresticodm.utils.misc_utils import flatten,is_sorted,xr_expand_multiindex_dims
 
 
 def log_factorial_sum(arr):
@@ -306,31 +306,40 @@ def sparsity(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
 
 def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
 
-    # High posterior density mass
-    alpha = 1-kwargs['region_mass']
-    
-    # Stack iteration-related dimensions and space-related dimensions
-    stacked_id_dims = set(['iter','seed']).intersection(prediction.dims)
-    prediction = prediction.stack(id=list(stacked_id_dims),space=['origin','destination'])
-    
-    # Copy stacked dimensions and coordinates
-    stacked_dims = deepcopy(prediction.dims)
+    cell_coverages = None
+    for region_mass in kwargs.get('region_mass',[0.95]):
+        # High posterior density mass
+        alpha = 1-region_mass
+        
+        # Stack iteration-related dimensions and space-related dimensions
+        prediction = prediction.stack(space=['origin','destination'])
+        
+        # Copy stacked dimensions and coordinates
+        stacked_dims = deepcopy(prediction.dims)
 
-    # Sort all samples by iteration-seed
-    prediction[:] = np.sort(prediction.values, axis = stacked_dims.index('id'))
+        # Sort all samples by iteration-seed
+        prediction[:] = np.sort(prediction.values, axis = stacked_dims.index('id'))
+        
+        # Get lower and upper bound high posterior density regions
+        lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(
+            prediction,
+            alpha
+        )
+        # Compute flag for whether ground truth table is covered
+        cell_coverage = (ground_truth >= lower_bound_hpdr) & (ground_truth <= upper_bound_hpdr)
+        # Update coordinates to include region mass
+        cell_coverage = xr_expand_multiindex_dims(
+            data = cell_coverage,
+            expanded_coords = {"region_mass":[region_mass]},
+            multiindex_dim = 'sweep'
+        )
 
-    # Get lower and upper bound high posterior density regions
-    lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(
-        prediction,
-        alpha
-    )
-    # Compute flag for whether ground truth table is covered
-    cell_coverage = (ground_truth >= lower_bound_hpdr) & (ground_truth <= upper_bound_hpdr)
-    # Update attributes to include region mass
-    cell_coverage.assign_attrs(
-        region_mass = kwargs.get('region_mass',0.95)
-    )
-    return cell_coverage
+        if cell_coverages is None:
+            cell_coverages = cell_coverage
+        else:
+            cell_coverages = xr.combine_by_coords([cell_coverages,cell_coverage])
+
+    return cell_coverages
 
 
 def calculate_min_interval(x, alpha):
@@ -387,3 +396,5 @@ def logfactorialsum(arr, dim=None):
     else:
         return gammaln(arr+1).sum(dim = dim)
     
+def roundint(data):
+    return np.rint(data)
