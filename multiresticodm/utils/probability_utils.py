@@ -32,7 +32,7 @@ def product_multinomial_sample(log_intensity:torch.tensor,rsums:torch.tensor):
     p = torch.exp(log_intensity-torch.log(rsums).reshape((rsums.shape[0],1)))
     p = p / p.sum(dim=1).reshape((log_intensity.shape[1],1))
     # Initialise table
-    tab = torch.empty(p.shape,dtype=int32)
+    tab = torch.empty(p.shape,dtype=float32)
     # Loop through each row and sample it
     for i in range(rsums.shape[0]):
         tab[i,:] = distr.multinomial.Multinomial(total_count=rsums[i],probs=p[i,:])
@@ -351,7 +351,7 @@ def sample_multinomial_row(i,msum,margin_probabilities,free_cells,axis_uncostrai
         probs = margin_probabilities[free_indices].ravel()
     ).sample()
     # Update free cells
-    return updated_cells.to(device=device,dtype=int32)
+    return updated_cells.to(device=device,dtype=float32)
 
 def kernel_density(y,**kwargs):
     # Kernel density estimation

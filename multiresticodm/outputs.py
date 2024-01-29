@@ -13,11 +13,8 @@ import netCDF4 as nc
 import geopandas as gpd
 
 from tqdm import tqdm
-from torch import int32
-from pathlib import Path
 from copy import deepcopy
 from datetime import datetime
-from dask.distributed import Client
 from typing import Union,List,Tuple
 from itertools import product,chain
 
@@ -1318,7 +1315,7 @@ class Outputs(object):
                 else torch.tensor(
                     self.inputs.data.grand_total,
                     device=self.config['inputs']['device'],
-                    dtype=int32
+                    dtype=torch.int32
                 )
             # Compute log intensity
             samples = IntensityModel.log_intensity(

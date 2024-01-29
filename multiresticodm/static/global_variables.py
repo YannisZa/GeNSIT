@@ -313,7 +313,7 @@ INPUT_SCHEMA = {
 TABLE_SCHEMA = {
     "table":{
         "axes":[0,1],
-        "dtype":"int32", 
+        "dtype":"float32", 
         "ndmin":2,
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
@@ -324,7 +324,7 @@ TABLE_SCHEMA = {
 INTENSITY_SCHEMA = {
     "intensity":{
         "axes":[0,1],
-        "dtype":"int32",
+        "dtype":"float32",
         "funcs":[],
         "args_dtype":[],
         "is_iterable": True,
@@ -565,7 +565,7 @@ METRICS = {
         "shape":"(1,dims)",
         "loop_over":["region_mass"],
         "apply_axis":(1,2),
-        "dtype":"int32",
+        "dtype":"float32",
         "ground_truth":".inputs.data.ground_truth_table"
     },
     "edit_degree_higher_error":{
