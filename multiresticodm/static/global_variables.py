@@ -496,6 +496,7 @@ AUXILIARY_COORDINATES_DTYPES = {
     "table_steps": torch.int32,
     "bmax":torch.float32,
     "cost_matrix":str,
+    "proposal":str
 }
 
 CORE_COORDINATES_DTYPES = {
