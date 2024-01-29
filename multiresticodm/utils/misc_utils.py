@@ -1204,3 +1204,23 @@ def lexicographic_sort(arr):
     sorted_array = arr.reshape(-1, arr.shape[-1])[sorting_order].reshape(arr.shape)
     
     return sorted_array
+
+
+def xr_expand_multiindex_dims(data,expanded_coords:dict,multiindex_dim:str):
+                            
+    # Expand dimensions
+    data = data.expand_dims(expanded_coords)
+
+    # Expand coordinates
+    data = data.assign_coords(expanded_coords)
+
+    # Get all names in multi-index
+    multiindex_dim_names = list(data.get_index(multiindex_dim).names)
+
+    # Unstack multi-index
+    data = data.unstack(multiindex_dim)
+    
+    # Re stack updated multi-index
+    data = data.stack({multiindex_dim: multiindex_dim_names+list(expanded_coords.keys())})
+    
+    return data
