@@ -908,7 +908,7 @@ def summarise(
         logger=logger
     )
     # Collect
-    experiment_metadata = outsum.collect_experiments_metadata()
+    experiment_metadata = outsum.collect_metadata()
     # Write experiment metadata to file
     outsum.write_metadata_summaries(experiment_metadata)
 
