@@ -547,6 +547,7 @@ class Outputs(object):
                 group_id = next(iter(h5data))
                 if 'sweep_params' in list(h5data[group_id].attrs.keys()) and \
                     'sweep_values' in list(h5data[group_id].attrs.keys()):
+                    
                     # Loop through each sweep parameters and add it as a coordinate
                     for (k,v) in zip(h5data[group_id].attrs['sweep_params'],
                                 h5data[group_id].attrs['sweep_values']):
@@ -613,8 +614,10 @@ class Outputs(object):
     def load(self,indx:int=0):
         
         # Additionally group data collection by these attributes
-        group_by,combined_dims = self.config.get_group_id()
-        
+        group_by,combined_dims = self.config.get_group_id(
+            group_by = self.settings.get('group_by',[])
+        )
+
         if len(self.config.sweep_configurations) > 0:
             # Attempt to load all samples
             # Keep track of samples not loaded
@@ -639,7 +642,7 @@ class Outputs(object):
                         sample_names = samples_not_loaded,
                         group_by = group_by
                     )
-
+                
                 # Create xarray dataset
                 try:
                     self.logger.info(f"Creating xarray(s) for {', '.join(sorted(samples_not_loaded))}.")
@@ -653,7 +656,7 @@ class Outputs(object):
                             sample_name = sample_name,
                             group_by = group_by
                         )
-                        
+
                         # Combine coords for each list element of the Data Collection
                         parallel = False #self.settings.get('n_workers',1) > 1
                         if parallel:
@@ -759,7 +762,6 @@ class Outputs(object):
                     **attrs
                 )
             )
-
         return data_arr
 
         
@@ -1393,7 +1395,7 @@ class Outputs(object):
     def compute_statistic(self,data,sample_name,statistic,**kwargs):
         self.logger.debug(f"""compute_statistic {sample_name},{type(data)},{statistic}""")
         if statistic is None or statistic.lower() == '' or 'sample' in statistic.lower() or len(kwargs.get('dim',[])) == 0:
-            return data#.astype('float32')
+            return data
         
         elif statistic.lower() == 'signedmean' and \
             sample_name in list(OUTPUT_SCHEMA.keys()):
@@ -1406,7 +1408,7 @@ class Outputs(object):
                 numerator = data.dot(signs,dims=kwargs['dim'])
                 denominator = signs.sum(kwargs['dim'])
                 numerator,denominator = xr.align(numerator,denominator, join='exact')
-                return (numerator/denominator)#.astype('float32')
+                return (numerator/denominator)
             else:
                 return self.compute_statistic(data,sample_name,'mean',dim=kwargs['dim'])
 
@@ -1423,14 +1425,14 @@ class Outputs(object):
                 numerator = (data**2).dot(signs,dims=['iter'])
                 denominator = signs.sum('iter')
                 numerator,denominator = xr.align(numerator,denominator, join='exact')
-                return (numerator/denominator - samples_mean**2)#.astype('float32')
+                return (numerator/denominator - samples_mean**2)
             else:
                 return deep_call(
                     data,
                     f".var(dim)",
                     data,
                     dim=kwargs['dim']
-                )#.astype('float32')
+                )
                 # return self.compute_statistic(data,sample_name,'var',**kwargs)
         
         elif statistic.lower() == 'error' and \
@@ -1441,14 +1443,14 @@ class Outputs(object):
                 tab0=self.ground_truth_table,
                 name=self.settings['norm'],
                 **self.settings
-            )#.astype('float32')
+            )
 
         elif any([op in statistic.lower() for op in OPERATORS]):
             return operate(
                 data,
                 statistic,
                 **kwargs
-            )#.astype('float32')
+            )
 
         elif hasattr(data,statistic):
             return deep_call(
@@ -1456,7 +1458,7 @@ class Outputs(object):
                 f".{statistic}(dim)",
                 data,
                 dim=kwargs['dim']
-            )#.astype('float32')
+            )
         
         else:
             return deep_call(
@@ -1464,7 +1466,7 @@ class Outputs(object):
                 f".{statistic}(data)",
                 data,
                 data=data,
-            )#.astype('float32')
+            )
     
     def apply_sample_statistics(self,samples,sample_name,statistic_dims:Union[List,Tuple]=[],**kwargs):
         
@@ -1823,7 +1825,11 @@ class DataCollection(object):
         # Sort datasets by seed
         datasets = sorted(
             datasets, 
-            key = lambda x: tuple([x.coords[var].item() for var in combined_dims if var not in ['N','iter']])
+            key = lambda x: tuple([
+                x.coords[var].item() \
+                    for var in combined_dims \
+                    if var not in ['N','iter']
+            ])
         )
         result = None
         for j,datum in enumerate(datasets):
@@ -2058,7 +2064,7 @@ class OutputSummary(object):
             __self__.logger.info(f"{len(output_dirs)} output folders found.")
         return output_dirs
     
-    def collect_experiments_metadata(self):
+    def collect_metadata(self):
         
         experiment_metadata = {}
         for indx,output_folder in enumerate(self.output_folders):
@@ -2080,6 +2086,7 @@ class OutputSummary(object):
     
     def collect_folder_metadata(self, indx:int, output_folder:str):
         self.logger.info(f"\n\n\n Scanning folder {indx+1}/{len(self.output_folders)}")
+        self.logger.info(output_folder)
             
         # Collect outputs from folder
         outputs = self.get_folder_outputs(indx,output_folder)
@@ -2604,27 +2611,7 @@ class OutputSummary(object):
             self.logger.progress(f'Getting sample {key}...')
             try:
                 samples = sweep_outputs.get_sample(key)
-                sweep_vals = samples['sweep'].values.tolist()
-                if key == 'table' and '_unconstrained' not in sweep_vals[0]:
-                    inputs_copy = deepcopy(sweep_outputs.inputs)
-                    inputs_copy.cast_from_xarray()
-                    ct = instantiate_ct(
-                        config = sweep_outputs.config,
-                        **inputs_copy.data_vars()
-                    )
-                    print(sweep_vals)
-                    # print(ct.constraints)
-                    for _,tab in samples.groupby('id'):
-                        print('Tables margins',ct.table_constrained_margins_summary_statistic(torch.tensor(tab.values.squeeze())))
-                    print('Fixed margins',torch.cat(
-                        [ct.data.margins[tuplize(ax)] for ax in sorted(ct.constraints['constrained_axes'])],
-                        dim=0
-                    ))
-                    print('Tables margins admissible',any([ct.table_margins_admissible(torch.tensor(tab.values.squeeze())) for _,tab in samples.groupby('id')]))
-                    print('Tables cells admissible',all([ct.table_cells_admissible(torch.tensor(tab.values.squeeze())) for _,tab in samples.groupby('id')]))
-                    print('Tables admissible',all([ct.table_admissible(torch.tensor(tab.values.squeeze())) for _,tab in samples.groupby('id')]))
-                # Unstack id multi-dimensional index
-                keyword_args[key] = samples.unstack('id') if 'id' in samples.dims else samples
+                keyword_args[key] = samples
             except CoordinateSliceMismatch as exc:
                 self.logger.debug(exc)
                 continue
@@ -2726,14 +2713,14 @@ class OutputSummary(object):
                     # Update list of evaluated expressions
                     evaluation_kwargs[operation_name] = evaluation
                 except Exception as exc:
-                    # traceback.print_exc()
+                    traceback.print_exc()
                     self.logger.warning(f"{operation_name} with operation expression {expression} failed: {exc}")
                     self.logger.debug(traceback.format_exc())
                     continue
             
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
                 if 'sweep' in evaluation.dims:
-                    print('sweep',evaluation['sweep'].values.tolist())
+                    self.logger.note(f"sweep: {evaluation['sweep'].values.tolist()}")
 
             self.logger.success(f"Evaluation {operation_name} using {expression} succeded {np.shape(evaluation)}")
             print('\n')
