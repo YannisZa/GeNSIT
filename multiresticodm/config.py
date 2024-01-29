@@ -523,7 +523,7 @@ class Config:
         ]
         self.sweep_param_names = list(flatten(sweep_param_names))
 
-    def get_group_id(self):
+    def get_group_id(self,group_by:list=[]):
 
         # Gather sweep dimension names
         sweep_dims = list(self.sweep_params['isolated'].keys())
@@ -533,7 +533,7 @@ class Config:
         combined_dims = []
         # Get all non-core sweep dims
         non_core_sweep_dims = [k for k in sweep_dims if k not in CORE_COORDINATES_DTYPES]
-        for gb in list(self.settings.get('group_by',[]))+non_core_sweep_dims:
+        for gb in list(group_by)+non_core_sweep_dims:
             # If this is an isolated sweep parameter
             # add it to the group by
             if gb in self.sweep_params['isolated']:
@@ -1089,16 +1089,9 @@ class Config:
         self.total_size_str = self.prepare_sweep_configurations(self.sweep_params)
         # Get output folder
 
-        self.base_dir = self.out_directory.split(
-            'samples/'
-        )[0]
-
-        output_folder_succinct = self.base_dir.split(
-            self['inputs']['dataset']
-        )[-1]
+        self.base_dir = self.out_directory.split('samples/')[0]
         if len(self.sweep_configurations) > 0:
             self.logger.info("----------------------------------------------------------------------------------")
-            self.logger.info(f'{output_folder_succinct}')
             self.logger.info(f"Parameter space size: {self.param_sizes_str}")
             self.logger.info(f"Total = {self.total_size_str}.")
             self.logger.info("----------------------------------------------------------------------------------")
