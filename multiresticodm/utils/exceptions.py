@@ -1,10 +1,10 @@
 class DataException(Exception):
-    def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+    def __init__(self,message:str):
+        super().__init__(message)
 
 class CastingException(DataException):
     def __init__(self,data_name:str='',from_type:str='notype',to_type:str='notype',**kwargs):
-        super().__init__('',**kwargs)
+        super().__init__('')
         self.data_name = data_name
         self.from_type = from_type
         self.to_type = to_type
@@ -17,7 +17,7 @@ class CastingException(DataException):
 
 class MissingData(DataException):
     def __init__(self,missing_data_name:str='',data_names:str='none',location:str='nowhere',**kwargs):
-        super().__init__('',**kwargs)
+        super().__init__('')
         self.missing_data_name = missing_data_name
         self.data_names = data_names
         self.location = location
@@ -29,7 +29,7 @@ class MissingData(DataException):
 
 class InvalidDataLength(DataException):
     def __init__(self,data_name_lens:dict={},**kwargs):
-        super().__init__('',**kwargs)
+        super().__init__('')
         self.data_name_lens = data_name_lens
 
     def __str__(self):
@@ -39,7 +39,7 @@ class InvalidDataLength(DataException):
 
 class DuplicateData(DataException):
     def __init__(self,message:str,len_data:int=0,len_unique_data:int=0,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
         self.message = message
         self.len_data = len_data
         self.len_unique_data = len_unique_data
@@ -54,7 +54,7 @@ class DuplicateData(DataException):
 
 class EmptyData(DataException):
     def __init__(self,message:str,data_names:str='no_data',**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
         self.message = message
         self.data_names = data_names
 
@@ -65,7 +65,7 @@ class EmptyData(DataException):
     
 class InvalidDataRange(DataException):
     def __init__(self,data,rang:list,**kwargs):
-        super().__init__('',**kwargs)
+        super().__init__('')
         self.rang = rang
         self.data = data
 
@@ -76,15 +76,15 @@ class InvalidDataRange(DataException):
 
 class H5DataWritingFailed(DataException):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 class DataCollectionException(DataException):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 class IrregularDataCollectionSize(DataCollectionException):
     def __init__(self,message:str,sizes:dict={},**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
         self.sizes = sizes
 
     def __str__(self):
@@ -96,7 +96,7 @@ class IrregularDataCollectionSize(DataCollectionException):
 
 class MultiprocessorFailed(Exception):
     def __init__(self,message:str,**kwargs):
-        super().__init__(**kwargs)
+        super().__init__(message)
         self.message = message
         self.processor_name = kwargs.get('name','')
 
@@ -109,57 +109,57 @@ class MultiprocessorFailed(Exception):
 
 class InvalidDataNames(DataException):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 class MissingFiles(DataException):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 class CorruptedFileRead(DataException):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 class InvalidMetadataType(DataException):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 class MissingMetadata(DataException):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 class CoordinateSliceMismatch(DataException):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 
 # ---
 
 class ConfigException(Exception):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 class InvalidConfigType(ConfigException):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 
 # ---
 
 class LoggerType(Exception):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 
 class InvalidLoggerType(LoggerType):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 
 # ---
 
 class InstantiationException(Exception):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message,**kwargs)
+        super().__init__(message)
 
 
 
@@ -171,7 +171,7 @@ class InstantiationException(Exception):
 
 class EntryException(Exception):
     def __init__(self,message:str,**kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
         self.message = message
         self.key_path = kwargs.get('key_path',[])
         self.data = kwargs.get('data','[data-not-found]')
@@ -259,7 +259,7 @@ class InvalidValueException(InvalidElementException):
 
 class SchemaException(Exception):
     def __init__(self,**kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
         self.key_path = kwargs.get('key_path',[])
         self.data = kwargs.get('data','[data-not-found]')
 
