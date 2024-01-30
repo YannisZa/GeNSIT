@@ -35,7 +35,7 @@ load_experiment = ''
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
-    default = [[[+0],[+1]]]
+    default = [[+0],[+1]]
     range = [[[+0], [+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'
