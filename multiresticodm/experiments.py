@@ -290,10 +290,11 @@ class Experiment(object):
 
             if param == 'table':
                 # Get initial margins
-                # try:
-                initialisations['table'] = deep_call(self,'.ct_mcmc.initialise_table()',None)
-                # except:
-                    # self.logger.warning("Table could not be initialised.")
+                try:
+                    initialisations['table'] = deep_call(self,'.ct_mcmc.initialise_table()',None)
+                    assert initialisations['table'] is not None
+                except:
+                    self.logger.error("Table could not be initialised.")
             
             elif param == 'theta':
                 try:
@@ -1974,6 +1975,7 @@ class NonJointTableSIM_NN(Experiment):
             logger = self.logger,
             **vars(self.inputs.data)
         )
+        
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
@@ -2386,6 +2388,9 @@ class JointTableSIM_NN(Experiment):
                     data_size = len(training_data),
                     **self.config['training']
                 )
+                
+                if self.samples_validated:
+                    self.validate_samples()
             
             # print statements
             self.show_progress()
@@ -2531,8 +2536,6 @@ class ExperimentSweep():
     def run(self,**kwargs):
 
         self.logger.info(f"{self.outputs.experiment_id}")
-        self.logger.info(f"Parameter space size: {self.config.param_sizes_str}")
-        self.logger.info(f"Total = {self.config.total_size_str}")
         self.logger.info(f"Total to be run = {len(self.config.sweep_configurations)}.")
         self.logger.info(f"Preparing configs...")
         # For each configuration update experiment config 
@@ -2559,7 +2562,6 @@ class ExperimentSweep():
         try:
             # Prepare experiment
             config,sweep = self.prepare_experiment(sweep_configuration)
-
             self.logger.info(f'Instance = {str(instance_num)} START')
             
             # Find tqdm position

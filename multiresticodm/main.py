@@ -205,8 +205,6 @@ def exec(logger,settings,config_path,**kwargs):
     logger.info(f"Validating config provided...")
     # Validate config
     config.validate()
-    # Get sweep-related data
-    config.get_sweep_data()
 
     # Intialise experiment handler
     eh = ExperimentHandler(

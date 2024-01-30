@@ -223,7 +223,7 @@ class ContingencyTable(object):
 
     # Check if cell constraints are satisfied
     def table_cells_admissible(self, tab) -> bool:
-        return all([self.data.ground_truth_table[cell] == tab[cell] for cell in sorted(self.constraints['cells'])])
+        return all([self.data.ground_truth_table[cell] == tab[cell].to(int32) for cell in sorted(self.constraints['cells'])])
 
     # Check if function (or table equivalently) is admissible
     def table_admissible(self, tab) -> bool:
@@ -451,7 +451,7 @@ class ContingencyTable(object):
                 if 'cells' in list(self.config.settings['contingency_table']['constraints'].keys()):
                     if isinstance(self.config.settings['contingency_table']['constraints']['cells'],str):
                         cell_constraints = os.path.join(
-                            os.path.relpath(self.config.in_directory,os.path.dirname(os.path.realpath(__file__))),
+                            os.path.relpath(self.config.in_directory,os.path.realpath(os.getcwd())),
                             self.config.settings['inputs']['dataset'],
                             self.config.settings['contingency_table']['constraints']['cells']
                         )
@@ -571,11 +571,11 @@ class ContingencyTable(object):
                     axc = axc[0]
                     # Subtract non-total margins
                     # print('ax update',ax,cell_arr[axc],table[tuplize(cell)], residual_margins[ax][cell_arr[axc]],residual_margins[ax][cell_arr[axc]]-table[tuplize(cell)])
-                    margins[ax][cell_arr[axc]] -= table[tuplize(cell)]
+                    margins[ax][cell_arr[axc]] -= table[tuplize(cell)].to(int32)
                 else:
                     # Subtract cell values from grand total (only once)
                     # print('grand total update',ax,table[tuplize(cell)], residual_margins[ax],residual_margins[ax]-table[tuplize(cell)])
-                    margins[ax] -= table[tuplize(cell)] 
+                    margins[ax] -= table[tuplize(cell)].to(int32)
         return margins
 
 
@@ -819,41 +819,41 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             constraint_table = self.constraint_table()
             table0_copy = deepcopy(table0)
             table0_copy[constraint_table>=0] = -1
-            print(f'Generated table (free cells)')
-            print(table0_copy)
-            print('True table')
-            print(self.data.ground_truth_table)
+            self.logger.debug(f'Generated table (free cells)')
+            self.logger.debug(table0_copy)
+            self.logger.debug('True table')
+            self.logger.debug(self.data.ground_truth_table)
             if not self.table_cells_admissible(table0):
                 table0_copy = deepcopy(table0)
                 table0_copy[constraint_table<0] = -1
-                print("Cell constraints equal")
-                print(np.array_equal(table0_copy,constraint_table))
-                print('Cell constraint difference')
-                print(table0_copy-constraint_table)
-                print("table0_fixed_cells")
-                print(table0_copy)
+                self.logger.debug("Cell constraints equal")
+                self.logger.debug(np.array_equal(table0_copy,constraint_table))
+                self.logger.debug('Cell constraint difference')
+                self.logger.debug(table0_copy-constraint_table)
+                self.logger.debug("table0_fixed_cells")
+                self.logger.debug(table0_copy)
                 # print("constraints")
                 # print(constraint_table)
                 raise Exception(f'{sampler_name} sampler yielded a cell-inadmissible contingency table')
             elif not self.table_margins_admissible(table0):
                 table0_copy = deepcopy(table0)
                 table0_copy[constraint_table<0] = 0
-                print("total value of constrained cells")
-                print(constraint_table[constraint_table>0].sum())
-                print("total value of residual margins")
-                print([v.sum() for v in self.residual_margins.values()])
-                print('table total')
-                print(torch.ravel(self.data.ground_truth_table.sum()))
+                self.logger.debug("total value of constrained cells")
+                self.logger.debug(constraint_table[constraint_table>0].sum())
+                self.logger.debug("total value of residual margins")
+                self.logger.debug([v.sum() for v in self.residual_margins.values()])
+                self.logger.debug('table total')
+                self.logger.debug(torch.ravel(self.data.ground_truth_table.sum()))
                 for ax in sorted(self.constraints['constrained_axes']):
                     if len(ax) < ndims(self):
-                        print(f"True summary statistics")
-                        print(self.data.margins[tuplize(ax)])
-                        print(f"Residual summary statistics")
-                        print(self.residual_margins[tuplize(ax)])
-                        print(f"Fixed cell summary statistics")
-                        print(table0_copy.sum(dim=tuplize(ax),keepdims=True).flatten())
-                        print(f'Current summary statistics')
-                        print(table0.sum(dim=tuplize(ax),keepdims=True).flatten())
+                        self.logger.debug(f"True summary statistics")
+                        self.logger.debug(self.data.margins[tuplize(ax)])
+                        self.logger.debug(f"Residual summary statistics")
+                        self.logger.debug(self.residual_margins[tuplize(ax)])
+                        self.logger.debug(f"Fixed cell summary statistics")
+                        self.logger.debug(table0_copy.sum(dim=tuplize(ax),keepdims=True).flatten())
+                        self.logger.debug(f'Current summary statistics')
+                        self.logger.debug(table0.sum(dim=tuplize(ax),keepdims=True).flatten())
                 raise Exception(f'{sampler_name} sampler yielded a margin-inadmissible contingency table')
             else:
                 raise Exception('Unrecognized error encountered.')
@@ -1026,7 +1026,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
 
                 if query_index in self.constraints['cells']:
                     # Initialise cell at constraint
-                    table0[query_index] = self.data.ground_truth_table[query_index]
+                    table0[query_index] = self.data.ground_truth_table[query_index].to(float32)
                 else:
                     # Count number of entries between c_1+...+c_{j-1}+1 and c_1+...+c_j
                     if j == 0:
@@ -1128,7 +1128,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             # Extract indices,
             fixed_indices = np.ravel_multi_index(fixed_cells.T, self.dims)
             # Fix table cells
-            table0.view(-1)[fixed_indices] = self.data.ground_truth_table.view(-1)[fixed_indices]
+            table0.view(-1)[fixed_indices] = self.data.ground_truth_table.view(-1)[fixed_indices].to(float32)
             # Set minimum residual to zero
             np.put(min_residual, fixed_indices, 0)
 
@@ -1140,7 +1140,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         # Update minimum residual
         min_residual = torch.tensor(
             self.minres_given_constraints(min_residual,residual_margins),
-            dtype=int32
+            dtype=float32
         )
         
         # Count number of steps run max entropy updates

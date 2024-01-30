@@ -2,6 +2,7 @@ import os
 import re
 import gc
 import sys
+import time
 import torch
 import logging
 import traceback
@@ -107,26 +108,23 @@ class Outputs(object):
             
         elif isinstance(config,str):
             
+            # Remove potentially added filenames
+            config = config.replace('metadata.json','')
+            config = config.replace('config.json','')
             # Store experiment id and update sweep id if possible
             if 'samples' in config:
                 self.experiment_id = os.path.basename(os.path.normpath(config.split('samples/')[0]))
                 # Attempt to find sweep id inside path
                 path_suffix = config.split('samples/')[-1]
-                # Remove potentially added filenames
-                path_suffix = path_suffix.replace('metadata.json','')
-                path_suffix = path_suffix.replace('config.json','')
                 # If match is found, extract the string before the suffix
                 if path_suffix:
                     self.sweep_id = path_suffix
-
             else:
                 self.experiment_id = os.path.basename(os.path.normpath(config.split('/',-1)[0]))
             
             
             # Load metadata
             config_filepath = ''
-            if config.endswith('.json') and os.path.exists(config):
-                config_filepath = config
             if os.path.exists(os.path.join(config,"config.json")):
                 config_filepath = os.path.join(config,"config.json")
             elif os.path.exists(os.path.join(config,"metadata.json")):
@@ -232,11 +230,14 @@ class Outputs(object):
             first_dataset.get_index('sweep').names,
             [unstringify(d) for d in first_dataset.coords['sweep'].values.tolist()[0]]
         ))
+        # Convert sweep to sweep configuration
+        sweep_configuration = self_copy.config.convert_sweep(sweep)
         # Update config
-        self_copy.config.update(sweep)
+        self_copy.config,_ = self_copy.config.prepare_experiment_config(sweep_configuration)
+        # self_copy.config.update(sweep)
         return self_copy
 
-    def strip_data(self,keep_inputs:list=[],keep_outputs:list=[]):
+    def strip_data(self,keep_inputs:list=[],keep_outputs:list=[],keep_collection_ids:list=[]):
         # Remove all but keep_inputs from input data
         if len(keep_inputs) <= 0:
             safe_delete(self.inputs)
@@ -245,19 +246,37 @@ class Outputs(object):
                 removed_inputs = set(list(self.inputs.data_vars().keys())).difference(set(keep_inputs))
                 for removed_inpt in removed_inputs:
                     delattr(self.inputs.data,removed_inpt)
+        
         # Remove all but keep_outputs from output data
-        if len(keep_outputs) <= 0:
+        if len(keep_outputs) <= 0 and len(keep_collection_ids) <= 0:
             safe_delete(self.data)
             self.data = DataCollection(
                 data = [],
                 logger = self.logger
             )
-        else:
+        
+        elif len(keep_outputs) <= 0 and len(keep_collection_ids) > 0:
+            for sample_name in self.data_vars().keys():
+                removed_collection_ids = set(range(len(self.data_vars()[sample_name]))).difference(set(keep_collection_ids))
+                for i in sorted(removed_collection_ids,reverse=True):
+                    del getattr(self.data,sample_name)[i]
+        
+        elif len(keep_outputs) > 0 and len(keep_collection_ids) <= 0:
             removed_outputs = set(list(self.data_vars().keys())).difference(set(keep_outputs))
             for removed_outpt in removed_outputs:
                 delattr(self.data,removed_outpt)
-
-
+        
+        elif len(keep_outputs) > 0 and len(keep_collection_ids) > 0:
+            removed_outputs = set(list(self.data_vars().keys())).difference(set(keep_outputs))
+            for removed_outpt in removed_outputs:
+                removed_collection_ids = set(range(len(self.data_vars()[removed_outpt]))).difference(set(keep_collection_ids))
+                for i in sorted(removed_collection_ids,reverse=True):
+                    del getattr(self.data,removed_outpt)[i]
+        
+        time.sleep(3)
+        gc.collect()
+        time.sleep(3)
+    
     def group_by(self,dim:str):
         # Get all data vars by each group
         data_by_group = {}
@@ -291,76 +310,68 @@ class Outputs(object):
                 desc = 'Slicing coordinates sequentially'
             )
             successful_slices = set()
-            for sample_name,samples in self.data_vars().items():
-                removed_collection_ids = set()
-                kept_collection_ids = set()
-                for i in range(len(samples)):
-                    # Get latest sample collection element
-                    # NOTE: you have to name this dataset 'da'
-                    # so that slice expressions can be evaluated in the next step
-                    da = samples[i]
-                    self.logger.progress(f"Before coordinate slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
-                    # print(sample_name,i,'/',len(samples))
-                    for coord_slice in self.coordinate_slice:
-                        try:
-                            # Slice based on these conditions
-                            da = da.where( 
-                                eval(
-                                    coord_slice,
-                                    {"da":da}
-                                ),
-                                drop = True
-                            )
-                        except Exception as exc:
-                            self.logger.debug(f"Slicing using {sample_name}[{i}] {coord_slice} failed with {exc}")
-                            continue
-                        # Reassign da to sliced data
-                        if str(coord_slice) not in successful_slices:
-                            self.logger.success(f"Slicing using {coord_slice} succeded")
-                            successful_slices.add(str(coord_slice))
-                    
-                    if da.size <= 0:
-                        removed_collection_ids.add(i)
-                        self.logger.warning(f"""
-                            Slicing using {sample_name}[{i}] {coord_slice} yielded zero size dataset. Removing collection id {i}.
-                        """)
-                        continue
-                    
-                    self.logger.progress(f"After coordinate slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
-                    # Keep track of previous number of iterations
-                    prev_iter = deepcopy({
-                        k:da.sizes[k] \
-                        for index_slice in self.settings['burnin_thinning_trimming'] \
-                        for ktuple in index_slice.keys()
-                        for k in ktuple.split('+')
-                        if k in da.dims
-                    })
-                    
-                    # Apply burning, thinning and trimming
-                    da = self.slice_coordinates_by_index(da,successful_slices)
-                    
-                    self.logger.progress(f"After index slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
+            # Based on first sample name slice the rest of sample names
+            sample_name = list(self.data_vars().keys())[0]
+            samples = self.data_vars()[sample_name]
+            removed_collection_ids = set()
 
-                    # If no data remains after slicing raise exception
-                    if any([da.sizes[k] <= 0 for k in da.dims]):
-                        raise EmptyData(
-                            data_names = sample_name,
-                            message = f"slicing {list(prev_iter.keys())} with shape {prev_iter} using {self.settings['burnin_thinning_trimming']}"
-                        )
-                    else:
-                        # Update data with sliced data
-                        getattr(self.data,sample_name)[i] = da
-                        kept_collection_ids.add(i)
-                    
-                    # Update progress
-                    progress.update(1)
+            for i in range(len(samples)):
+
+                # Apply coordinate value slice
+                try:
+                    samples[i] = self.slice_coordinates_by_value(
+                        da = samples[i],
+                        sample_name = sample_name,
+                        i = i,
+                        successful_slices = successful_slices
+                    )
+                except Exception as exc:
+                    removed_collection_ids.add(i)
+                    self.logger.debug(exc)
+                    continue
+
+                
+                # Apply burning, thinning and trimming
+                try:
+                    samples[i] = self.slice_coordinates_by_index(
+                        samples = samples[i],
+                        sample_name = sample_name,
+                        successful_slices = successful_slices
+                    )
+                    self.logger.progress(f"After index slicing {sample_name}[{i}]: {({k:v for k,v in dict(samples[i].sizes).items() if v > 1})}")   
+                    # Make sure you keep the samples for this collection id
+                    getattr(self.data,sample_name)[i] = samples[i]
+                    # Slice the rest of the sample data
+                    for sam_name, current_samples in self.data_vars().items():
+                        if sam_name != sample_name:
+                            # Slice sam_name's data
+                            current_samples[i] = self.slice_coordinates_by_value(
+                                da = current_samples[i],
+                                sample_name = sam_name,
+                                i = i,
+                                successful_slices = successful_slices
+                            )
+                            current_samples[i] = self.slice_coordinates_by_index(
+                                samples = current_samples[i],
+                                sample_name = sam_name,
+                                successful_slices = successful_slices
+                            )
+                            # Update data with sliced data
+                            getattr(self.data,sam_name)[i] = current_samples[i]
+                except Exception as exc:
+                    traceback.print_exc()
+                    raise exc
+                
+                # Update progress
+                progress.update(1)
                 
                 # Remove collection ids that are not matching coordinate slice
                 # print('removed',sorted(list(removed_collection_ids), reverse=True))
                 # print('kept',sorted(list(kept_collection_ids), reverse=True))
                 for cid in sorted(list(removed_collection_ids), reverse=True):
-                    del getattr(self.data,sample_name)[cid]
-                gc.collect()
+                    for sam_name in self.data_vars().keys():
+                        del getattr(self.data,sam_name)[cid]
+                    gc.collect()
 
             progress.close()
 
@@ -395,7 +406,50 @@ class Outputs(object):
                                   which does not exist in {','.join(list(self.data_vars().keys()))}")
         return available
 
-    def slice_coordinates_by_index(self,samples,successful_slices:set):
+    def slice_coordinates_by_value(self,da,sample_name:str,i:int,successful_slices:set):
+        # Get latest sample collection element
+        # NOTE: you have to name this dataset 'da'
+        # so that slice expressions can be evaluated in the next step
+        self.logger.progress(f"Before coordinate slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
+        # print(sample_name,i,'/',len(samples))
+        for coord_slice in self.coordinate_slice:
+            try:
+                # Slice based on these conditions
+                da = da.where( 
+                    eval(
+                        coord_slice,
+                        {"da":da}
+                    ),
+                    drop = True
+                )
+            except Exception as exc:
+                self.logger.debug(f"Slicing using {sample_name}[{i}] {coord_slice} failed with {exc}")
+                continue
+            # Reassign da to sliced data
+            if str(coord_slice) not in successful_slices:
+                self.logger.success(f"Slicing using {coord_slice} succeded")
+                successful_slices.add(str(coord_slice))
+
+        if da.size <= 0:
+            raise EmptyData(
+                message=f"Slicing using {sample_name}[{i}] {coord_slice} yielded zero size dataset. Removing collection id {i}.",
+                data_names=sample_name
+            )
+        self.logger.progress(f"After coordinate slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
+        
+        return da
+    
+    def slice_coordinates_by_index(self,samples,sample_name:str,successful_slices:set):
+
+        # Keep track of previous number of iterations
+        prev_iter = deepcopy({
+            k:samples.sizes[k] \
+            for index_slice in self.settings['burnin_thinning_trimming'] \
+            for ktuple in index_slice.keys()
+            for k in ktuple.split('+')
+            if k in samples.dims
+        })
+        
         # Keep track of sliced dimensions/variables
         sliced_dims = set()
         for index_slice in self.settings['burnin_thinning_trimming']:
@@ -467,6 +521,12 @@ class Outputs(object):
                     self.logger.success(f"Slicing {dim_names} {slice_setts} succeded {({k:v for k,v in dict(samples.sizes).items() if v > 1})}")
                     successful_slices.add(','.join(list(map(str,dim_names))))
 
+        # If no data remains after slicing raise exception
+        if any([samples.sizes[k] <= 0 for k in samples.dims]):
+            raise EmptyData(
+                data_names = sample_name,
+                message = f"slicing {list(prev_iter.keys())} with shape {prev_iter} using {self.settings['burnin_thinning_trimming']}"
+            )
         return samples
     
     
@@ -758,7 +818,7 @@ class Outputs(object):
                     sweep_id = self.sweep_id,
                     **attrs
                 )
-            )
+            ).astype(DATA_SCHEMA[sample_name]["dtype"])
         return data_arr
 
         
@@ -1061,7 +1121,10 @@ class Outputs(object):
                 ) as ds:
                     data = ds.load()
             
-            return {sam_name:data}
+            if sam_name == 'table':
+                return {sam_name:data.astype('float32')}
+            else:
+                return {sam_name:data}
 
         except Exception as exc:
             traceback.print_exc()

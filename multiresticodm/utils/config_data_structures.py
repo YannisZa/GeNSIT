@@ -6,6 +6,7 @@ from typing import Any
 from collections.abc import Iterable
 from numpy import arange, isfinite, isnan, shape, array, repeat
 
+from multiresticodm import ROOT
 from multiresticodm.utils.exceptions import *
 from multiresticodm.utils.misc_utils import in_range,string_to_numeric,is_null,flatten
 
@@ -255,7 +256,7 @@ class Path(Str):
             self.schema.get("directory-exists",False) or \
             self.schema.get("exists",False):
             try:
-                assert os.path.exists(self.data)
+                assert os.path.exists(os.path.join(ROOT,self.data))
             except:
                 raise PathNotExistException(
                     f"Path to file {self.data} does not exist",

@@ -1,11 +1,13 @@
 import json
 import sys
 import toml
+import math
 import os.path
 import traceback
 
 from copy import deepcopy
 from itertools import product
+from collections.abc import Iterable
 
 from multiresticodm import ROOT
 from multiresticodm.utils.exceptions import *
@@ -172,17 +174,23 @@ class Config:
         Add root path to all configured paths (inputs, output directories).
         """
         # Store absolute paths
+        in_dir = kwargs.get('input_dir','')
         out_dir = kwargs.get('output_dir','')
-        self.in_directory = os.path.join(
-            ROOT,
-            self.settings['inputs']['in_directory'].replace('./','')
-        )
+        
+        if len(in_dir) > 0:
+            self.in_directory = in_dir
+        else:
+            self.in_directory = os.path.join(
+                ROOT,
+                self.settings['inputs']['in_directory']
+            )
+
         if len(out_dir) > 0:
             self.out_directory = out_dir
         else:
             self.out_directory = os.path.join(
                 ROOT,
-                self.settings['outputs']['out_directory'].replace('./','')
+                self.settings['outputs']['out_directory']
             )
 
 
@@ -472,13 +480,14 @@ class Config:
     
     def find_sweep_key_paths(self):
         for key_val_path in deep_walk(self.settings):
-            
-            if 'sweep' in key_val_path and key_val_path[-2] == 'range':
+
+            if "sweep" in key_val_path and "range" in key_val_path:
                 # Index location of sweep in key value path
-                indx = key_val_path.index('sweep')
+                sweep_indx = key_val_path.index("sweep")
+                range_indx = key_val_path.index("range")
                 # Get sweep settings
                 sweep_settings,_ = self.path_get(
-                    key_path = key_val_path[:(indx+1)],
+                    key_path = key_val_path[:(sweep_indx+1)],
                     settings = self.settings
                 )
                 # If the sweep setting is coupled add to coupled sweep paths
@@ -486,9 +495,8 @@ class Config:
                     # Get target name
                     target_name = sweep_settings.get('target_name','')
                     # Get coupled name and value
-                    coupled_name = key_val_path[indx-1] if key_val_path[indx-1] != 'file' else key_val_path[indx-2]
-                    coupled_value = key_val_path[:indx]
-
+                    coupled_name = key_val_path[sweep_indx-1] if key_val_path[sweep_indx-1] != 'file' else key_val_path[sweep_indx-2]
+                    coupled_value = key_val_path[:sweep_indx]
                     if target_name in list(self.coupled_sweep_paths.keys()):
                         # Add path to coupled sweeps
                         self.coupled_sweep_paths[target_name][coupled_name] = deepcopy(coupled_value)
@@ -507,7 +515,7 @@ class Config:
                             }
                 # Else add to isolated sweep paths
                 else:
-                    self.isolated_sweep_paths[key_val_path[indx-1]] = deepcopy(key_val_path[:indx])
+                    self.isolated_sweep_paths[key_val_path[sweep_indx-1]] = deepcopy(key_val_path[:sweep_indx])
         
         # Find common keys between isolated and coupled paths
         common_keys = set(list(self.isolated_sweep_paths.keys())).intersection(set(list(self.coupled_sweep_paths.keys())))
@@ -638,7 +646,7 @@ class Config:
                     key_path = key_path, 
                     settings = base_schema
                 )
-
+                
                 # key must exist in schema
                 try: 
                     assert schema_found
@@ -1096,31 +1104,36 @@ class Config:
             self.logger.info(f"Total = {self.total_size_str}.")
             self.logger.info("----------------------------------------------------------------------------------")
 
-    def slice_sweep_configurations(self,sweep:dict):
+    def slice_sweep_configurations(self,sweep:dict,group_by:list=[]):
         # Loop through each configuration
         sliced_sweep_configurations = []
+        grouped_sweep_indices = [i for i,d in enumerate(self.sweep_param_names) if d not in group_by]
+        grouped_sweep_param_names = [self.sweep_param_names[i] for i in grouped_sweep_indices]
         for sweep_configuration in self.sweep_configurations:
+            grouped_sweep_configuration = [sweep_configuration[i] for i in grouped_sweep_indices]
             # All the criteria in this loop must be met in order to slice
-            added = True
-            for dim, val in sweep.items():
-                try:
-                    # Find index of dimension in sweep configuration
-                    dim_index = self.sweep_param_names.index(dim)
-                    # If there is a match change the flag
-                    print(sweep_configuration[dim_index],val,sweep_configuration[dim_index] == val)
-                    if sweep_configuration[dim_index] == val:
-                        added = added and True
-                    else:
-                        added = False
-                except:
-                    continue
-            if added:
+            match = True
+            # print(dict(zip(grouped_sweep_param_names,grouped_sweep_configuration)))
+            for dim in grouped_sweep_param_names:
+                val = sweep[dim]
+                # Find index of dimension in sweep configuration
+                dim_index = grouped_sweep_param_names.index(dim)
+                
+                # Check if there is a coordinate match
+                if val is None or grouped_sweep_configuration[dim_index] is None:
+                    match = match and grouped_sweep_configuration[dim_index] == val
+                elif isinstance(val,Iterable):
+                    match = match and grouped_sweep_configuration[dim_index] == val
+                else: 
+                    match = match and math.isclose(grouped_sweep_configuration[dim_index], val, rel_tol=1e-1) 
+
+                if not match:
+                    break
+
+            if match:
                 sliced_sweep_configurations.append(sweep_configuration)
         
-        if len(sliced_sweep_configurations) > 0:
-            return sliced_sweep_configurations
-        else:
-            return self.sweep_configurations
+        return sliced_sweep_configurations
 
     def trim_sweep_configurations(self):
         # Loop through each sweep configuration
@@ -1153,3 +1166,12 @@ class Config:
             # Add sweep configurations that need to be run
             if not data_exists:
                 yield sweep_conf
+
+    def convert_sweep(self,sweep):
+        if isinstance(sweep,dict):
+            return list(sweep.values())
+        else:
+            return dict(zip(
+                self.sweep_param_names,
+                sweep
+            ))
