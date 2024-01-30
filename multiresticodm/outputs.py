@@ -230,11 +230,8 @@ class Outputs(object):
             first_dataset.get_index('sweep').names,
             [unstringify(d) for d in first_dataset.coords['sweep'].values.tolist()[0]]
         ))
-        # Convert sweep to sweep configuration
-        sweep_configuration = self_copy.config.convert_sweep(sweep)
         # Update config
-        self_copy.config,_ = self_copy.config.prepare_experiment_config(sweep_configuration)
-        # self_copy.config.update(sweep)
+        self_copy.config.update(sweep)
         return self_copy
 
     def strip_data(self,keep_inputs:list=[],keep_outputs:list=[],keep_collection_ids:list=[]):
@@ -2679,7 +2676,7 @@ class OutputSummary(object):
                 self.logger.debug(exc)
                 continue
             except Exception as exc:
-                self.logger.error(f"{operation_name} with expression {expression} failed")
+                self.logger.error(f"Getting sample {key} failed")
                 self.logger.debug(traceback.format_exc())
                 self.logger.error(exc)
                 sys.exit()
