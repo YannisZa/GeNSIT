@@ -4,7 +4,7 @@ class DataException(Exception):
 
 class CastingException(DataException):
     def __init__(self,data_name:str='',from_type:str='notype',to_type:str='notype',**kwargs):
-        super().__init__(**kwargs)
+        super().__init__('',**kwargs)
         self.data_name = data_name
         self.from_type = from_type
         self.to_type = to_type
@@ -17,7 +17,7 @@ class CastingException(DataException):
 
 class MissingData(DataException):
     def __init__(self,missing_data_name:str='',data_names:str='none',location:str='nowhere',**kwargs):
-        super().__init__(**kwargs)
+        super().__init__('',**kwargs)
         self.missing_data_name = missing_data_name
         self.data_names = data_names
         self.location = location
@@ -29,7 +29,7 @@ class MissingData(DataException):
 
 class InvalidDataLength(DataException):
     def __init__(self,data_name_lens:dict={},**kwargs):
-        super().__init__(**kwargs)
+        super().__init__('',**kwargs)
         self.data_name_lens = data_name_lens
 
     def __str__(self):
@@ -65,7 +65,7 @@ class EmptyData(DataException):
     
 class InvalidDataRange(DataException):
     def __init__(self,data,rang:list,**kwargs):
-        super().__init__(**kwargs)
+        super().__init__('',**kwargs)
         self.rang = rang
         self.data = data
 
@@ -171,7 +171,7 @@ class InstantiationException(Exception):
 
 class EntryException(Exception):
     def __init__(self,message:str,**kwargs):
-        super().__init__(message)
+        super().__init__(**kwargs)
         self.message = message
         self.key_path = kwargs.get('key_path',[])
         self.data = kwargs.get('data','[data-not-found]')
