@@ -162,6 +162,7 @@ load_experiment = ''
   export_samples = true
   export_metadata = true
   overwrite = true
+  validate_sampels = false
 
 [[experiments]]
   type = 'JointTableSIM_MCMC'
@@ -170,6 +171,7 @@ load_experiment = ''
   export_samples = true
   export_metadata = true
   overwrite = true
+  validate_sampels = false
 
 [outputs]
     chunk_size = +20_000
