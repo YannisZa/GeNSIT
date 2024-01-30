@@ -29,52 +29,24 @@ clear; multiresticodm run ./data/inputs/configs/experiment3_joint.toml -sm -et J
 ## Table 1
 
 Get SRMSEs for all samples and all experiments
+-et SIM_NN -et SIM_MCMC -et JointTableSIM_NN -et JointTableSIM_MCMC -et NonJointTableSIM_NN
 
 ```
 clear; multiresticodm summarise \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
--et SIM_NN -et SIM_MCMC -et NonJointTableSIM_NN -et JointTableSIM_NN -et JointTableSIM_MCMC \
--ma table -ma intensity \
--stat 'srmse' 'signedmean&' 'iter+seed&' \
--btt 'iter' 10000 100 100 \
--btt 'iter' 0 75 13 \
--cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
--k sigma -k type -k name -k title \
--fe SRMSEs -nw 20
-```
-
-```
-clear; multiresticodm summarise \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 -et JointTableSIM_MCMC \
--el np -el ProbabilityUtils -el MathUtils -el xr \
+-et NonJointTableSIM_NN  \
+-el np -el MathUtils -el xr \
 -e table_srmse "srmse_func(prediction=mean_table,ground_truth=ground_truth)" \
 -e intensity_srmse "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \
 -ea table -ea intensity -ea sign \
 -ea "srmse_func=MathUtils.srmse" \
 -ea "signed_mean_func=outputs.compute_statistic" \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
--ea "mean_table=table.mean(['iter'])" \
--ea "mean_intensity=signed_mean_func(intensity,'intensity','signedmean',dim=['iter'])" \
+-ea "mean_table=table.mean(['id'])" \
+-ea "mean_intensity=signed_mean_func(intensity,'intensity','signedmean',dim=['id'])" \
+-cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
 -btt 'iter' 10000 90 1000 \
--k sigma -k type -k name -k title -fe SRMSEs -nw 20
-```
-
-```
-clear; multiresticodm summarise \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 -et SIM_NN -et SIM_MCMC -et NonJointTableSIM_NN -et JointTableSIM_NN -et JointTableSIM_MCMC \
--el np -el ProbabilityUtils -el MathUtils -el xr \
--e table_srmse "srmse_func(prediction=mean_table,ground_truth=ground_truth)" \
--e intensity_srmse "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \
--ea table -ea intensity -ea sign \
--ea "srmse_func=MathUtils.srmse" \
--ea "signed_mean_func=outputs.compute_statistic" \
--ea "ground_truth=outputs.inputs.data.ground_truth_table" \
--ea "mean_table=table.mean(['iter','seed'])" \
--ea "mean_table=table.mean(['iter'])" \
--ea "mean_intensity=intensity.mean(['iter','seed'])" \
--ea "mean_intensity=signed_mean_func(intensity,'intensity','signedmean',dim=['iter'])" \
--btt 'iter' 10000 90 1000 -btt 'iter' 0 10 100 \
--cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
+-btt 'iter' 100 90 10 \
 -k sigma -k type -k name -k title -fe SRMSEs -nw 20
 ```
 
@@ -83,11 +55,19 @@ Get coverage probabilities for all samples and all experiments:
 ```
 clear; multiresticodm summarise \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
--et SIM_NN -et SIM_MCMC -et NonJointTableSIM_NN -et JointTableSIM_NN -et JointTableSIM_MCMC \
--ma table -ma intensity \
--stat 'coverage_probability' '&mean|\*100|rint' '&origin+destination||' \
+-et SIM_NN -et SIM_MCMC \
+-el np -el MathUtils -el xr \
+-e intensity_coverage "xr.apply_ufunc(roundint, 100*intensity_covered.mean(['origin','destination']))" \
+-e table_coverage "xr.apply_ufunc(roundint, 100*table_covered.mean(['origin','destination']))" \
+-ea table -ea intensity \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "coverage_func=MathUtils.coverage_probability" \
+-ea "region_masses=[0.99]" \
+-ea "roundint=MathUtils.roundint" \
+-ea "intensity_covered=coverage_func(prediction=intensity,ground_truth=ground_truth,region_mass=region_masses)" \
+-ea "table_covered=coverage_func(prediction=table,ground_truth=ground_truth,region_mass=region_masses)" \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
--k sigma -k type -k name -k title --region_mass 0.99 \
+-k sigma -k type -k name -k title \
 -fe CoverageProbabilities -nw 20
 ```
 
