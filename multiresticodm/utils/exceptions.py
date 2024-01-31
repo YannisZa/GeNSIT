@@ -78,6 +78,10 @@ class H5DataWritingFailed(DataException):
     def __init__(self,message:str,**kwargs):
         super().__init__(message)
 
+class H5DataReadingFailed(DataException):
+    def __init__(self,message:str,**kwargs):
+        super().__init__(message)
+
 class DataCollectionException(DataException):
     def __init__(self,message:str,**kwargs):
         super().__init__(message)
