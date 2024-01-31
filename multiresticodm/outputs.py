@@ -4,6 +4,7 @@ import gc
 import sys
 import time
 import torch
+import shutil
 import logging
 import traceback
 import h5py as h5
@@ -16,6 +17,7 @@ import geopandas as gpd
 from tqdm import tqdm
 from copy import deepcopy
 from datetime import datetime
+from itertools import product
 from typing import Union,List,Tuple
 from itertools import product,chain
 
@@ -717,8 +719,7 @@ class Outputs(object):
                             combined_coords = self.data.combine_by_coords_concurrently(
                                 indx = indx,
                                 sample_name = sample_name,
-                                combined_dims = combined_dims,
-                                n_workers = self.settings.get('n_workers',1)
+                                combined_dims = combined_dims
                             )
                             # Add results to self
                             for cc in combined_coords:
@@ -979,44 +980,102 @@ class Outputs(object):
         # Make output directory
         output_directory = os.path.join(self.outputs_path,'sample_collections')
         makedir(output_directory)
-        # Write output to file
-        filepath = os.path.join(
-            output_directory,
-            f"data_collection.nc"
-        )
+        
         # Get specific sample names
         sample_names = sample_names if sample_names is not None else list(self.data_vars().keys())
         sample_names = set(sample_names).intersection(set(list(self.data_vars().keys())))
 
+        # Create sample_name - collection_id pairs to export in parallel
+        group_ids = []
         for sam_name in sample_names:
-            for i,datum in tqdm(
-                enumerate(getattr(self.data,sam_name)), 
-                total = len(getattr(self.data,sam_name)),
-                leave = False,
-                miniters = 1,
-                position = 0,
-                desc = f"Writing {sam_name}"
-            ):
-                write_xr_data(
-                    datum,
-                    filepath,
-                    group = f"/{sam_name}/{i}"
-                )
-        return filepath
+            for collection_id in range(len(getattr(self.data,sam_name))):
+                group_ids.append([sam_name,collection_id])
+
+        # Write data arrays each one of which 
+        # corresponds to a different group
+        if self.settings.get('n_workers',1) > 1:
+            self.write_xr_data_concurrently(
+                group_ids = group_ids,
+                sample_names = sample_names,
+                dirpath = output_directory
+            )
+        else:
+            self.write_xr_data_sequentially(
+                group_ids = group_ids,
+                sample_names = sample_names,
+                dirpath = output_directory
+            )
     
+    def write_xr_data_sequentially(self,group_ids,dirpath:str,sample_names:list):
+        for grid in tqdm(
+            group_ids, 
+            leave = False,
+            miniters = 1,
+            position = 0,
+            desc = f"Writing {','.join(sample_names)} group data sequentially"
+        ):
+            sam_name, collection_id = grid[0], grid[1]
+            write_xr_data(
+                getattr(self.data,sam_name)[collection_id],
+                dirpath,
+                group = grid
+            )
+    
+    def write_xr_data_concurrently(self,group_ids,dirpath:str,sample_names:list):
+        # Initialise progress bar
+        progress = tqdm(
+            total=len(group_ids),
+            desc=f"Writing {','.join(sample_names)} group data",
+            leave=False,
+            miniters=1,
+            position=0
+        )
+        def my_callback(fut):
+            progress.update()
+            try:
+                fut.result()
+            except Exception as exc:
+                raise ValueError("write_xr_data_concurrently failed") from exc
+
+        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = 2*self.settings.get('n_workers',1)) as executor:
+            # Start the processes and ignore the results
+            for grid in group_ids:
+                try:
+                    sam_name, collection_id = grid[0], grid[1]
+                    future = executor.submit(
+                        write_xr_data,
+                        getattr(self.data,sam_name)[collection_id],
+                        dirpath,
+                        group = grid
+                    )
+                    future.add_done_callback(my_callback)
+                except:
+                    traceback.print_exc()
+                    raise MultiprocessorFailed(
+                        f"Writing {','.join(sample_names)} group data failed",
+                        name = 'write_xr_data_concurrently'
+                    )
+
+            # Delete executor and progress bar
+            progress.close()
+            safe_delete(progress)
+            executor.shutdown(wait=True)
+            safe_delete(executor)
+
+
     def read_data_collection(self, group_by:list):
     
         # Outputs filepath
-        output_filepath = os.path.join(self.outputs_path,'sample_collections',"data_collection.nc")        
+        dirpath = os.path.join(self.outputs_path,'sample_collections')
 
-        if not os.path.isfile(output_filepath) or \
-            not os.path.exists(output_filepath) or \
+        if not os.path.isdir(dirpath) or \
+            not os.path.exists(dirpath) or \
             self.settings.get('force_reload',False):
-            self.logger.warning(f'Removing {output_filepath}')
+            self.logger.warning(f'Removing {dirpath}')
 
             # Remove existing file
-            if os.path.exists(output_filepath):
-                os.remove(output_filepath)
+            if os.path.exists(dirpath):
+                shutil.rmtree(dirpath)
 
             return self.output_names
         else:
@@ -1024,9 +1083,14 @@ class Outputs(object):
             samples_not_loaded = deepcopy(sorted(self.output_names))
             # Get all sample names and collection ids (all of that constitutes the group ids)
             samples_to_load_group_ids = {}
-            with nc.Dataset(output_filepath, mode='r') as nc_file:
-                samples_to_load_group_ids = read_xr_group_ids(nc_file,list_format=False)
-
+            print([x[-1] for x in os.walk(dirpath)])
+            for group_id in list(set([x[-1] for x in os.walk(dirpath)])):
+                samples_to_load_group_ids.setdefault(
+                    group_id.split('>')[1],
+                    [group_id.split('>')[2:]]
+                ).append(group_id.split('>')[2:])
+            
+            print(samples_to_load_group_ids)
             # Raise error if no data collection elements found
             if len(samples_to_load_group_ids) <= 0:
                 return self.output_names
@@ -1061,25 +1125,83 @@ class Outputs(object):
                 for gid in samples_to_load_group_ids[sam_name]
             ]
 
-            data_arrs = []
             self.logger.info(f"Reading samples {', '.join(sorted(samples_to_load))}.")
-
+            
+            data_arrs = []
             # Gather all group and group elements that need to be combined
-            for group in tqdm(
-                all_groups,
-                leave = False,
-                miniters = 1,
-                position = 0,
-                desc = f"Reading data collection"
-            ):
-                try:
-                    sample_dict = self.read_xr_data(
-                        output_filepath = output_filepath,
-                        sample_gid = group
-                    )
+            if self.settings.get('n_workers',1) > 1:
+                data_arrs = self.read_xr_data_concurrently(
+                    all_groups = all_groups,
+                    samples_not_loaded = samples_not_loaded,
+                    dirpath = dirpath
+                )
+            else:
+                data_arrs = self.read_xr_data_sequentially(
+                    all_groups = all_groups,
+                    samples_not_loaded = samples_not_loaded,
+                    dirpath = dirpath
+                )
+
+            # Pass all samples into a data collection object
+            self.data = DataCollection(
+                data = data_arrs,
+                group_by = group_by,
+                logger = self.logger
+            )
+            return samples_not_loaded
+        
+    def read_xr_data_sequentially(self,all_groups,samples_not_loaded:list,dirpath:str):
+        data_arrs = []
+        for group in tqdm(
+            all_groups,
+            leave = False,
+            miniters = 1,
+            position = 0,
+            desc = f"Reading {','.join(samples_not_loaded)} group"
+        ):
+            try:
+                sample_dict = read_xr_data(
+                    dirpath = dirpath,
+                    sample_gid = group
+                )
+                # Extract sample name and data
+                sample_name = list(sample_dict.keys())[0]
+                sample_data = list(sample_dict.values())[0]
+                # append array to data arrays
+                if sample_data is not None:
+                    data_arrs.append(sample_data)
+                # remove loaded sample from consideration
+                # since it has been succesfully loaded
+                if sample_name in samples_not_loaded and sample_data is not None:
+                    samples_not_loaded.remove(sample_name)
+            except:
+                traceback.print_exc()
+                raise MultiprocessorFailed(
+                    f"Reading {','.join(samples_not_loaded)} group",
+                    name = 'read_xarray_group'
+                )
+    
+    def read_xr_data_concurrently(self,all_groups,samples_not_loaded:list,dirpath:str):
+        # Gather h5 data from multiple files
+        # and store them in xarrays
+        data_arrs = []
+
+        # Initialise progress bar
+        progress = tqdm(
+            total=len(all_groups),
+            desc=f"Reading {','.join(samples_not_loaded)} group concurrently",
+            leave=False,
+            miniters=1,
+            position=0
+        )
+        def my_callback(fut):
+            progress.update()
+            try:
+                res = fut.result()
+                if len(res) > 0:
                     # Extract sample name and data
-                    sample_name = list(sample_dict.keys())[0]
-                    sample_data = list(sample_dict.values())[0]
+                    sample_name = list(res.keys())[0]
+                    sample_data = list(res.values())[0]
                     # append array to data arrays
                     if sample_data is not None:
                         data_arrs.append(sample_data)
@@ -1087,46 +1209,36 @@ class Outputs(object):
                     # since it has been succesfully loaded
                     if sample_name in samples_not_loaded and sample_data is not None:
                         samples_not_loaded.remove(sample_name)
+                        data_arrs.append(res)
+            except (MissingFiles,CorruptedFileRead):
+                pass
+            except Exception as exc:
+                raise ValueError(f"Reading {','.join(samples_not_loaded)} group concurrently failed") from exc
+
+        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = 2*self.settings.get('n_workers',1)) as executor:
+            # Start the processes and ignore the results
+            for group in all_groups:
+                try:
+                    future = executor.submit(
+                        read_xr_data,
+                        dirpath = dirpath,
+                        sample_gid = group
+                    )
+                    future.add_done_callback(my_callback)
                 except:
                     traceback.print_exc()
                     raise MultiprocessorFailed(
-                        'Reading xarray group failed.',
-                        name = 'read_xarray_group'
+                        'Reading data collection.',
+                        name = 'read_xr_data_concurrently'
                     )
-            
-            self.data = DataCollection(
-                data = data_arrs,
-                group_by = group_by,
-                logger = self.logger
-            )
-            return samples_not_loaded
 
-    def read_xr_data(self,output_filepath,sample_gid):
-        sam_name, collection_id = sample_gid
-        group = f'/{sam_name}/{collection_id}'
-        try:
-            if len(group) > 0:
-                with xr.open_dataarray(
-                    output_filepath,
-                    group = group
-                ) as ds:
-                    data = ds.load()
-            else:
-                with xr.open_dataset(
-                    output_filepath,
-                    engine = 'h5netcdf'
-                ) as ds:
-                    data = ds.load()
-            
-            if sam_name == 'table':
-                return {sam_name:data.astype('float32')}
-            else:
-                return {sam_name:data}
+            # Delete executor and progress bar
+            progress.close()
+            safe_delete(progress)
+            executor.shutdown(wait=True)
+            safe_delete(executor)
 
-        except Exception as exc:
-            traceback.print_exc()
-            self.logger.error(exc)
-            return {"None":None}
+        return data_arrs
         
     def get_sweep_outputs_sequentially(
         self,
@@ -1826,7 +1938,7 @@ class DataCollection(object):
                 datasets = datasets
             )[1]
 
-    def combine_by_coords_concurrently(self,indx:int,sample_name:str,combined_dims:list,n_workers:int=1):
+    def combine_by_coords_concurrently(self,indx:int,sample_name:str,combined_dims:list):
         dataset_list = getattr(
             self,
             sample_name
@@ -1852,7 +1964,7 @@ class DataCollection(object):
             return _callback_
         my_callback = make_callback(indx)
 
-        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = n_workers) as executor:
+        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = self.settings.get('n_workers',1)) as executor:
             # Gather all group and group elements that need to be combined
             for i,datasets in enumerate(dataset_list):
                 try:
