@@ -61,8 +61,31 @@ def write_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
     np.save(file=filepath, arr=data)
 
 
-def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
+def read_xr_data(dirpath:str,sample_gid:Iterable) -> dict:
+    sam_name, collection_id = sample_gid
+    group_id = f'{sam_name}>{collection_id}.nc'
+    
+    # Create group-specific filepath
+    filepath = os.path.join(dirpath,group_id)
+    try:
+        with xr.open_dataarray(filepath) as ds:
+            data = ds.load()
+
+        return {sam_name:data}
+
+    except Exception as exc:
+        raise H5DataReadingFailed(message=str(exc))
+
+def write_xr_data(data:xr.DataArray,dirpath:str,**kwargs:Dict) -> None:
     try: 
+        # Group id of interest
+        group_id = kwargs.pop('group','')
+        if isinstance(group_id,Iterable) and not isinstance(group_id,str):
+            group_id = '>'.join([str(grid) for grid in group_id])
+        
+        # Create group-specific filepath
+        filepath = os.path.join(dirpath,group_id+'.nc')
+
         # Writing the DataArray to a NetCDF file inside a with context
         if not os.path.exists(filepath) or not os.path.isfile(filepath):
             data.to_netcdf(
@@ -72,13 +95,9 @@ def write_xr_data(data:xr.DataArray,filepath:str,**kwargs:Dict) -> None:
             )
             # close file
             data.close()
-        else:
-            # Group id of interest
-            group_id = kwargs.pop('group','')
-                
+        else:                
             data.to_netcdf(
                 path = filepath,
-                group = group_id,
                 mode = 'a',
                 **kwargs
             )
