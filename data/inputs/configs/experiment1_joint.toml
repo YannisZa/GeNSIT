@@ -33,7 +33,7 @@ seed = 1234
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
-    default = [[+0],[+1]]
+    default = []
     range = [[], [[+0,+1]], [[+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'

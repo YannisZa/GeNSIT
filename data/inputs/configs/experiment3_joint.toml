@@ -33,21 +33,21 @@ seed = 1234
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
-    default = [[+0],[+1]]
-    range = [[[+0], [+1]], [[+0],[+1]], [[+0],[+1]]]
+    default = []
+    range = [[], [[+0,+1]], [[+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'
   [contingency_table.constraints.cells.sweep]
     default = ''
-    range = [ '','constraints/cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt','constraints/cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
-    ]
+    range = ['','','','','','constraints/cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt','constraints/cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt']
     coupled = true
     target_name = 'title'
 
 [spatial_interaction_model]
   [spatial_interaction_model.name.sweep]
     default = 'TotallyConstrained'
-    range =   ['TotallyConstrained','TotallyConstrained','TotallyConstrained']
+    range = ['TotallyConstrained','TotallyConstrained','TotallyConstrained','ProductionConstrained',
+    'TotallyConstrained','TotallyConstrained','TotallyConstrained']
     coupled = true
     target_name = 'title'
   grand_total = +33704
@@ -78,8 +78,8 @@ seed = 1234
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
       [mcmc.contingency_table.proposal.sweep]
-        default = 'degree_higher'
-        range = ['degree_higher','degree_higher','degree_higher']
+        default = 'direct_sampling'
+        range = ['direct_sampling','direct_sampling','direct_sampling','direct_sampling', 'degree_higher','degree_higher','degree_higher']
         coupled = true
         target_name = 'title'
 
@@ -87,26 +87,36 @@ seed = 1234
   disable_tqdm = true
 
   [neural_network.loss.loss_name.sweep]
-    default = ['total_distance_loss']
+    default = ['total_intensity_distance_loss']
     range = [
-      ['total_distance_loss'],
-      ['total_distance_likelihood_loss'],
+      ['total_table_distance_loss'],
+      ['total_table_distance_likelihood_loss'],
+      ['total_intensity_distance_loss'],
+      ['total_intensity_distance_likelihood_loss'],
       ['table_likelihood_loss'],
       ['dest_attraction_ts_likelihood_loss','table_likelihood_loss'],
-      ['dest_attraction_ts_likelihood_loss','total_distance_likelihood_loss'],
-      ['total_distance_likelihood_loss','table_likelihood_loss'],
-      ['dest_attraction_ts_likelihood_loss','total_distance_likelihood_loss','table_likelihood_loss'],
+      ['dest_attraction_ts_likelihood_loss','total_table_distance_likelihood_loss'],
+      ['dest_attraction_ts_likelihood_loss','total_intensity_distance_likelihood_loss'],
+      ['total_table_distance_likelihood_loss','table_likelihood_loss'],
+      ['total_intensity_distance_likelihood_loss','table_likelihood_loss'],
+      ['dest_attraction_ts_likelihood_loss','total_table_distance_likelihood_loss','table_likelihood_loss'],              
+      ['dest_attraction_ts_likelihood_loss','total_intensity_distance_likelihood_loss','table_likelihood_loss'],
     ]
 
   [neural_network.loss.loss_function.sweep]
-    default = ['gaussiannllloss','custom']
+    default = ['mseloss']
     range = [
+      ['mseloss'],
+      ['gaussiannllloss'],
       ['mseloss'],
       ['gaussiannllloss'],
       ['custom'],
       ['custom','custom'],
       ['custom','gaussiannllloss'],
+      ['custom','gaussiannllloss'],
       ['gaussiannllloss','custom'],
+      ['gaussiannllloss','custom'],
+      ['custom','gaussiannllloss','custom'],
       ['custom','gaussiannllloss','custom']
     ]
     coupled = true
@@ -118,6 +128,8 @@ seed = 1234
     [neural_network.loss.loss_kwargs.sweep.default]
       nokey = nan
     [[neural_network.loss.loss_kwargs.sweep.range]]
+      var = 0.005
+    [[neural_network.loss.loss_kwargs.sweep.range]]
       nokey = nan
     [[neural_network.loss.loss_kwargs.sweep.range]]
       var = 0.005
@@ -129,6 +141,14 @@ seed = 1234
       noise_percentage = nan
       var = 0.005
     [[neural_network.loss.loss_kwargs.sweep.range]]
+      noise_percentage = nan
+      var = 0.005
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      var = 0.005
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      var = 0.005
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      noise_percentage = nan
       var = 0.005
     [[neural_network.loss.loss_kwargs.sweep.range]]
       noise_percentage = nan
@@ -166,5 +186,5 @@ seed = 1234
     out_directory = './data/outputs/'
     out_group = 'exp3'
     [outputs.title.sweep]
-      default = '_doubly_constrained'
-      range = ['_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      default = '_unconstrained'
+      range = ['_unconstrained','_total_constrained','_total_intensity_row_table_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
