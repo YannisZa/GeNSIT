@@ -8,9 +8,7 @@ device = 'cpu'
 in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
-[inputs.seed.sweep]
-  default = 1
-  range = ["0:99:1"]
+seed = 1234
 [inputs.to_learn.sweep]
   default = ['alpha', 'beta'] 
   range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
@@ -36,13 +34,12 @@ load_experiment = ''
   sparse_margins = false
   [contingency_table.constraints.axes.sweep]
     default = [[+0],[+1]]
-    range = [[[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
+    range = [[], [[+0,+1]], [[+1]], [[+1]], [[+0],[+1]], [[+0],[+1]], [[+0],[+1]]]
     coupled = true
     target_name = 'title'
   [contingency_table.constraints.cells.sweep]
     default = ''
-    range = ['','constraints/cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt','constraints/cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
-    ]
+    range = ['','','','','','constraints/cell_constraints_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt','constraints/cell_constraints_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt']
     coupled = true
     target_name = 'title'
 
@@ -50,7 +47,8 @@ load_experiment = ''
 [spatial_interaction_model]
   [spatial_interaction_model.name.sweep]
     default = 'TotallyConstrained'
-    range =   ['TotallyConstrained','TotallyConstrained','TotallyConstrained']
+    range = ['TotallyConstrained','TotallyConstrained','TotallyConstrained','ProductionConstrained',
+    'TotallyConstrained','TotallyConstrained','TotallyConstrained']
     coupled = true
     target_name = 'title'
     
@@ -72,7 +70,7 @@ load_experiment = ''
 [training]
   num_steps = +1
   batch_size = +1
-  N = 10000
+  N = 1000000
 
 [mcmc]
     disable_tqdm = true
@@ -83,8 +81,8 @@ load_experiment = ''
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
       [mcmc.contingency_table.proposal.sweep]
-        default = 'degree_higher'
-        range = ['degree_higher','degree_higher','degree_higher']
+        default = 'direct_sampling'
+        range = ['direct_sampling','direct_sampling','direct_sampling','direct_sampling', 'degree_higher','degree_higher','degree_higher']
         coupled = true
         target_name = 'title'
 
@@ -178,5 +176,5 @@ load_experiment = ''
     out_directory = './data/outputs/'
     out_group = 'exp1'
     [outputs.title.sweep]
-      default = '_doubly_constrained'
-      range = ['_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
+      default = '_unconstrained'
+      range = ['_unconstrained','_total_constrained','_total_intensity_row_table_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained']
