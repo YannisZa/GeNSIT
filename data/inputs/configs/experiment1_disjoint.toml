@@ -65,7 +65,7 @@ seed = 1234
 [training]
   num_steps = +1
   batch_size = +1
-  N = 1000000
+  N = 100000
 
 [mcmc]
     disable_tqdm = true
