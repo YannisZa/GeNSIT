@@ -297,7 +297,7 @@ class ContingencyTable(object):
             return 'Empty Table'
 
     def __repr__(self):
-        return f"{'x'.join([str(dim) for dim in self.dims])} ContingencyTable{ndims(self)}(Config)"
+        return f"{'x'.join([str(dim) for dim in self.dims])} ContingencyTable{ndims(self)}D(Config)"
 
     def __len__(self):
         return np.prod([dim for dim in self.dims if dim > 0])
