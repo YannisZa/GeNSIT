@@ -2561,13 +2561,16 @@ class ExperimentSweep():
             
             # Find tqdm position
             if active_positions is not None:
-                position_id = position_index(active_positions)
-                # Activate it
-                active_positions[position_id] = True
-                # Sleep for a second so that active_positions
-                # can sync with other instances
-                self.logger.debug(f"{instance_num},{active_positions},{position_id}")
-                time.sleep(2)
+                try:
+                    position_id = position_index(active_positions)
+                    # Activate it
+                    active_positions[position_id] = True
+                    # Sleep for a second so that active_positions
+                    # can sync with other instances
+                    self.logger.debug(f"{instance_num},{active_positions},{position_id}")
+                    time.sleep(2)
+                except:
+                    position_id = 0
             else:
                 position_id = 0
             
