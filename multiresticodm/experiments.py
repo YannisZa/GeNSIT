@@ -476,13 +476,14 @@ class Experiment(object):
             **kwargs
         ):
         self.logger.note('Update and export')
+        kwargs_copy = deepcopy(kwargs)
         # Update the model parameters after every batch and clear the loss
         if t % batch_size == 0 or t == data_size - 1:
             # Update time
             self._time += 1
 
             # Update gradients
-            loss = kwargs.pop('loss',None)
+            loss = kwargs_copy.pop('loss',None)
             if loss is not None:
                 # Extract values from each sub-loss
                 loss_values = sum([val for val in loss.values()])
@@ -492,7 +493,7 @@ class Experiment(object):
                 self.learning_model._neural_net.optimizer.zero_grad()
 
                 # Compute average losses here
-                n_processed_steps = kwargs.pop('n_processed_steps',None)
+                n_processed_steps = kwargs_copy.pop('n_processed_steps',None)
 
                 if n_processed_steps is not None:
                     for name in loss.keys():
@@ -502,7 +503,7 @@ class Experiment(object):
 
             # Write to file
             self.write_data(
-                **kwargs,
+                **kwargs_copy,
                 **loss
             )
             # Delete loss
