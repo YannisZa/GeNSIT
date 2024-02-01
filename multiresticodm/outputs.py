@@ -2268,7 +2268,7 @@ class OutputSummary(object):
         outputs = self.get_folder_outputs(indx,output_folder)
 
         # Loop through each member of the data collection
-        if False:#self.settings.get('n_workers',1) > 1:
+        if self.settings.get('n_workers',1) > 1:
             metadata_collection = self.get_experiment_metadata_concurrently(outputs)
         else:
             metadata_collection = self.get_experiment_metadata_sequentially(outputs)
