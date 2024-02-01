@@ -499,7 +499,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             ]
             table_new[free_indices] = torch.hstack(updated_cells).to(device=self.ct.device,dtype=float32)
             # Afix non-free cells
-            table_new[fixed_cells] = self.ct.data.ground_truth_table[fixed_cells]
+            table_new[fixed_cells] = self.ct.data.ground_truth_table[fixed_cells].to(device=self.ct.device,dtype=float32)
             # Reshape table to match original dims
             table_new = torch.reshape(table_new, tuplize(list(unpack_dims(self.ct.data.dims)))).to(device=self.ct.device,dtype=float32)
 
