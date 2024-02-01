@@ -63,6 +63,7 @@ clear; multiresticodm summarise \
 -ea "mean_table=table.mean(['id'])" \
 -ea "mean_intensity=intensity.mean(['id'])" \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
+-btt 'iter' 100 1 10000 \
 -k sigma -k type -k name -k title -fe SRMSEs -nw 20
 ```
 
