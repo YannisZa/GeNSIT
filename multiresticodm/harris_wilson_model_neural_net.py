@@ -377,15 +377,19 @@ class HarrisWilson_NN:
             # print(list(self.loss_kwargs[name].keys()),loss_fn_name_keys)
 
             for n in range(N_samples):
-                if name in ['total_distance_loss','total_distance_likelihood_loss']:
+                if name in ['total_table_distance_loss','total_table_distance_likelihood_loss',
+                            'total_intensity_distance_loss','total_intensity_distance_likelihood_loss']:
+                    # Find prediction data
+                    pred_dataset = LOSS_DATA_REQUIREMENTS[name]['prediction_data'][0]
+
                     # Calculate total cost incurred by travelling from every origin
                     total_cost_predicted = torch.mul(
-                        prediction_data['table'][n].to(dtype = float32),
+                        prediction_data[pred_dataset][n].to(dtype = float32),
                         validation_data['cost_matrix']
                     ).sum(dim = 1)
                     # Normalise to 1
                     normalised_total_cost_predicted = total_cost_predicted / total_cost_predicted.sum(dim = 0)
-                    
+                     
                     # Reshape loss kwargs if needed
                     for key, value in deepcopy( self.loss_kwargs.get(name,{})).items():
                         if len(LOSS_KWARG_OPERATIONS.get(key,'')):

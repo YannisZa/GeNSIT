@@ -1605,8 +1605,10 @@
               "dest_attraction_ts_likelihood_loss",
               "table_loss",
               "table_likelihood_loss",
-              "total_distance_loss",
-              "total_distance_likelihood_loss"
+              "total_table_distance_loss",
+              "total_table_distance_likelihood_loss",
+              "total_intensity_distance_loss",
+              "total_intensity_distance_likelihood_loss"
             ]
           },
           "range": {
@@ -1620,8 +1622,10 @@
               "dest_attraction_ts_likelihood_loss",
               "table_loss",
               "table_likelihood_loss",
-              "total_distance_loss",
-              "total_distance_likelihood_loss"
+              "total_table_distance_loss",
+              "total_table_distance_likelihood_loss",
+              "total_intensity_distance_loss",
+              "total_intensity_distance_likelihood_loss"
             ]
           }
         }

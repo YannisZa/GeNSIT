@@ -2362,6 +2362,7 @@ class JointTableSIM_NN(Experiment):
                     ),
                     prediction_data = dict(
                         destination_attraction_ts = [destination_attraction_sample],
+                        intensity = torch.exp(log_intensity_sample),
                         table = table_samples
                     ),
                     aux_inputs = vars(self.inputs.data)

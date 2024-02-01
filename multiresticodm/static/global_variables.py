@@ -112,8 +112,12 @@ RAW_LOSS_DATA_REQUIREMENTS = {
         "prediction_data": ["table"],
         "validation_data": ["log_intensity"],
     },
-    "total_distance_loss": {
+    "total_table_distance_loss": {
         "prediction_data": ["table"],
+        "validation_data": ["cost_matrix","total_cost_by_origin"]
+    },
+    "total_intensity_distance_loss": {
+        "prediction_data": ["intensity"],
         "validation_data": ["cost_matrix","total_cost_by_origin"]
     },
     "total_loss": {},
