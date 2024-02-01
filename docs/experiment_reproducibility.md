@@ -45,16 +45,15 @@ clear; multiresticodm summarise \
 -ea "mean_table=table.mean(['id'])" \
 -ea "mean_intensity=signed_mean_func(intensity,'intensity','signedmean',dim=['id'])" \
 -ea "mean_intensity=intensity.mean(['id'])" \
--cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
+-cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
 -btt 'iter' 10000 90 1000 \
--btt 'iter' 100 90 10 \
 -k sigma -k type -k name -k title -fe SRMSEs -nw 20
 ```
 
 ```
 clear; multiresticodm summarise \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
--d NonJointTableSIM_NN_SweepedNoise_30_01_2024_23_25_12  \
+-d NonJointTableSIM_NN_SweepedNoise_30_01_2024_23_25_12 -d JointTableSIM_NN_SweepedNoise_30_01_2024_21_29_31  \
 -el np -el MathUtils -el xr \
 -e table_srmse "srmse_func(prediction=mean_table,ground_truth=ground_truth)" \
 -e intensity_srmse "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \
@@ -63,8 +62,7 @@ clear; multiresticodm summarise \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
 -ea "mean_table=table.mean(['id'])" \
 -ea "mean_intensity=intensity.mean(['id'])" \
--cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
--btt 'iter' 100 90 10 \
+-cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
 -k sigma -k type -k name -k title -fe SRMSEs -nw 20
 ```
 
