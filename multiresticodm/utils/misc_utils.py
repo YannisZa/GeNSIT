@@ -69,12 +69,11 @@ def read_xr_data(dirpath:str,sample_gid:Iterable) -> dict:
     filepath = os.path.join(dirpath,group_id)
     try:
         with xr.open_dataarray(filepath) as ds:
-            data = ds.load()
-
-        return {sam_name:data}
-
+            data = ds.load()    
     except Exception as exc:
         raise H5DataReadingFailed(message=str(exc))
+    
+    return {sam_name:data}
 
 def write_xr_data(data:xr.DataArray,dirpath:str,**kwargs:Dict) -> None:
     try: 
