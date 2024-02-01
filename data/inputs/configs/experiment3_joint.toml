@@ -127,6 +127,9 @@ seed = 1234
     target_name = 'loss_name'
     [neural_network.loss.loss_kwargs.sweep.default]
       nokey = nan
+    
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      nokey = nan
     [[neural_network.loss.loss_kwargs.sweep.range]]
       var = 0.005
     [[neural_network.loss.loss_kwargs.sweep.range]]
