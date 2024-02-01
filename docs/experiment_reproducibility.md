@@ -7,8 +7,8 @@ Set `ulimit -n 50000`
 ## Experiment 1
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 4 -nw 6
-clear; multiresticodm run ./data/inputs/configs/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 4 -nw 6
+clear; multiresticodm run ./data/inputs/configs/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 4 -nw 7
+clear; multiresticodm run ./data/inputs/configs/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 4 -nw 7
 ```
 
 ## Experiment 2
@@ -53,17 +53,18 @@ clear; multiresticodm summarise \
 ```
 clear; multiresticodm summarise \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
--d NonJointTableSIM_NN_SweepedNoise_30_01_2024_23_25_12  \
+-d NonJointTableSIM_NN_SweepedNoise_01_02_2024_00_45_29  \
 -el np -el MathUtils -el xr \
 -e table_srmse "srmse_func(prediction=mean_table,ground_truth=ground_truth)" \
 -e intensity_srmse "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \
+-e table_size "dict(table.sizes)" \
+-e intensity_size "dict(intensity.sizes)" \
 -ea table -ea intensity \
 -ea "srmse_func=MathUtils.srmse" \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
 -ea "mean_table=table.mean(['id'])" \
 -ea "mean_intensity=intensity.mean(['id'])" \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
--btt 'iter' 100 1 10000 \
 -k sigma -k type -k name -k title -fe SRMSEs -nw 20
 ```
 
