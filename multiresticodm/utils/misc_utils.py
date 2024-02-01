@@ -58,7 +58,7 @@ def write_csv(data:pd.DataFrame,filepath:str,**kwargs:Dict) -> None:
 
 def write_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
     # Write array to npy format
-    np.save(file=filepath, arr=data)
+    np.save(file = filepath, arr = data)
 
 
 def read_xr_data(dirpath:str,sample_gid:Iterable) -> dict:
@@ -71,7 +71,7 @@ def read_xr_data(dirpath:str,sample_gid:Iterable) -> dict:
         with xr.open_dataarray(filepath) as ds:
             data = ds.load()    
     except Exception as exc:
-        raise H5DataReadingFailed(message=str(exc))
+        raise H5DataReadingFailed(message = str(exc))
     
     return {sam_name:data}
 
@@ -103,14 +103,14 @@ def write_xr_data(data:xr.DataArray,dirpath:str,**kwargs:Dict) -> None:
             # close file
             data.close()
     except Exception as exc:
-        raise H5DataWritingFailed(message=str(exc))
+        raise H5DataWritingFailed(message = str(exc))
 
 
 
 
 def write_compressed_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
     # Write array to npy format
-    with gzip.GzipFile(filepath, "wb", compresslevel=6) as f:
+    with gzip.GzipFile(filepath, "wb", compresslevel = 6) as f:
         np.save(f, data)
 
 
@@ -122,12 +122,12 @@ def write_figure(figure,filepath,**settings):
         filepath += '_'+str(settings.get('filename_ending',''))+'.'+settings['figure_format']
         
     if settings['figure_format'] == 'tex':
-        # tikzplotlib.clean_figure(fig=figure)
-        tikzplotlib.save(filepath,figure=figure)
+        # tikzplotlib.clean_figure(fig = figure)
+        tikzplotlib.save(filepath,figure = figure)
     else:
         figure.savefig(
             filepath,
-            format=settings['figure_format'],
+            format = settings['figure_format'],
             bbox_inches='tight'
         )
     
@@ -143,10 +143,10 @@ def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_ty
         if settings.get('data_format','dat') == 'dat':
             # Write dat file
             write_tex_data(
-                key_type=key_type,
-                data=list(zip(*[np.asarray(plot_sett[k],dtype=key_type[k]) for k in key_type.keys()])),
-                filepath=filepath+'_data.dat',
-                precision=settings.get('data_precision',19)
+                key_type = key_type,
+                data = list(zip(*[np.asarray(plot_sett[k],dtype = key_type[k]) for k in key_type.keys()])),
+                filepath = filepath+'_data.dat',
+                precision = settings.get('data_precision',19)
             )
         elif settings.get('data_format','dat') == 'json':
             write_json(
@@ -178,11 +178,11 @@ def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_ty
 
 def read_file(filepath:str,**kwargs) -> np.ndarray:
     if filepath.endswith('.npy'):
-        return read_npy(filepath=filepath,**kwargs)
+        return read_npy(filepath = filepath,**kwargs)
     elif filepath.endswith('.txt'):
-        return np.loadtxt(fname=filepath,**kwargs)
+        return np.loadtxt(fname = filepath,**kwargs)
     elif filepath.endswith('.json'):
-        return read_json(filepath=filepath)
+        return read_json(filepath = filepath)
     elif filepath.endswith('.csv'):
         return pd.read_csv(filepath,**kwargs)
     else:
@@ -200,7 +200,7 @@ def read_netcdf_group_ids(nc_data:str,key_path=[]):
     for key,value in nc_data.groups.items():
         yield from read_netcdf_group_ids(value,key_path+[key])
 
-def read_xr_group_ids(nc_data,list_format:bool=True):
+def read_xr_group_ids(nc_data,list_format:bool = True):
     # Get all key paths
     key_paths = list(read_netcdf_group_ids(
         nc_data = nc_data,
@@ -269,15 +269,15 @@ def print_json(data:Dict,**kwargs:Dict):
         for k in data.keys():
             print(f"{k}: {data[k]}",sep='')
     else:
-        print(json.dumps(data,cls=NumpyEncoder,**kwargs))
+        print(json.dumps(data,cls = NumpyEncoder,**kwargs))
 
 def write_compressed_string(data:str,filepath:str) -> None:
-    with gzip.GzipFile(filename=filepath, mode="w") as f:
+    with gzip.GzipFile(filename = filepath, mode="w") as f:
         f.write(zlib.compress(data.encode()))
 
 
 def read_compressed_string(filepath:str) -> None:
-    with gzip.GzipFile(filename=filepath, mode="r") as f:
+    with gzip.GzipFile(filename = filepath, mode="r") as f:
         data = f.read()
         f.close()
     data = ast.literal_eval(zlib.decompress(data).decode())
@@ -311,7 +311,7 @@ def get_dims(data):
         res = list(data.dims)
     return res
 
-def parse(value,default:str='none',ndigits:int=5):
+def parse(value,default:str='none',ndigits:int = 5):
     if value is None:
         return default
     elif isinstance(value,str):
@@ -341,8 +341,8 @@ def str_to_tuple(s:str) -> Tuple[int,int]:
     return (int(s.split('(')[1].split(',')[0]),int(s.split(',')[1].split(')')[0]))
 
 
-def ndims(__self__,time_dims:bool=True):
-    return np.sum([1 for dim in unpack_dims(__self__.data.dims,time_dims=time_dims) if dim > 1],dtype='uint8')
+def ndims(__self__,time_dims:bool = True):
+    return np.sum([1 for dim in unpack_dims(__self__.data.dims,time_dims = time_dims) if dim > 1],dtype='uint8')
 
 def deep_merge(dict1,dict2):
     result = dict1.copy()
@@ -406,10 +406,10 @@ def deep_call(input:object,expressions:str,defaults:object,**kwargs):
         for i,expr in enumerate(expressions):
             value.append(
                 deep_call(
-                    input=input,
-                    expressions=expr,
-                    defaults=defaults[i],
-                    kwargs=kwargs
+                    input = input,
+                    expressions = expr,
+                    defaults = defaults[i],
+                    kwargs = kwargs
                 )
             )
     else:
@@ -456,17 +456,17 @@ def find_common_substring(names):
             string1 = names[i]
             string2 = names[j]
             match = SequenceMatcher(None, string1, string2).find_longest_match(0, len(string1), 0, len(string2))
-            matching_substring=string1[match.a:match.a+match.size]
+            matching_substring = string1[match.a:match.a+match.size]
             if(matching_substring not in substring_counts):
-                substring_counts[matching_substring]=1
+                substring_counts[matching_substring] = 1
             else:
                 substring_counts[matching_substring]+=1
 
     return substring_counts
 
-def get_all_subdirectories(out_path,stop_at:str='config.json',level:int=2):
+def get_all_subdirectories(out_path,stop_at:str='config.json',level:int = 2):
     directories = []
-    for root, dirs, files in walklevel(out_path,level=level):
+    for root, dirs, files in walklevel(out_path,level = level):
         # If this is a dir that matches the stopping condition
         # or has a file that matches the stopping condition
         if any([stop_at in file for file in files]):
@@ -476,7 +476,7 @@ def get_all_subdirectories(out_path,stop_at:str='config.json',level:int=2):
 
     return directories
 
-def walklevel(some_dir, level=1):
+def walklevel(some_dir, level = 1):
     some_dir = some_dir.rstrip(os.path.sep)
     assert os.path.isdir(some_dir)
     num_sep = some_dir.count(os.path.sep)
@@ -503,11 +503,11 @@ def find_longest_common_substring(names):
     # Find common substrings
     substring_counts = find_common_substring(names)
     # Pick maximum occuring one
-    return max(substring_counts.items(), key=operator.itemgetter(1))[0]
+    return max(substring_counts.items(), key = operator.itemgetter(1))[0]
 
 
 # https://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth
-def update_recursively(d:Dict, u:Dict, overwrite:bool=False) -> Dict:
+def update_recursively(d:Dict, u:Dict, overwrite:bool = False) -> Dict:
     for k, v in u.items():
         if isinstance(v, Mapping):
             d[k] = update_recursively(d.get(k, {}), v, overwrite)
@@ -528,7 +528,7 @@ def deep_flatten(d, parent_key='', sep='_'):
         # new_key = parent_key + sep + k if parent_key else k
         new_key = k
         if isinstance(v, MutableMapping):
-            items.extend(deep_flatten(v, new_key, sep=sep).items())
+            items.extend(deep_flatten(v, new_key, sep = sep).items())
         else:
             items.append((new_key, v))
     return dict(items)
@@ -588,7 +588,7 @@ def pop_variable(_self,var):
     else:
         return None
 
-def extract_config_parameters(conf,fields=dict):
+def extract_config_parameters(conf,fields = dict):
     trimmed_conf = {}
     if not isinstance(conf,dict):
         return conf
@@ -605,7 +605,7 @@ def extract_config_parameters(conf,fields=dict):
                 trimmed_conf[f] = extract_config_parameters(conf[f],v)
     return trimmed_conf
 
-def safe_delete(variable,instance=None):
+def safe_delete(variable,instance = None):
     try:
         del variable
     except:
@@ -757,7 +757,7 @@ def convert_string_to_torch_function(s:str=''):
     elif 'median' == s.lower():
         return torch.median
     elif 'sumnorm' == s.lower():
-        def sum_normalise(x,axis=None):
+        def sum_normalise(x,axis = None):
             if axis != (None,):
                 return x/torch.sum(x,axis)
             else:
@@ -769,7 +769,7 @@ def convert_string_to_torch_function(s:str=''):
         # Prepare evaluation of mathematical expression
         s = s.replace("^","**").replace("\\","").strip()
         # Define the corresponding function
-        def evaluate_expression(data,axis=None):
+        def evaluate_expression(data,axis = None):
             if axis is not None:
                 return numexpr.evaluate(s.replace("X", "data").replace("axis",axis))
             else:
@@ -830,7 +830,7 @@ def f_to_df(f:Dict,type:str='int32')-> pd.DataFrame:
     return my_table
 
 
-def f_to_array(f:Dict,shape:tuple=None)-> Union[np.ndarray,np.generic]:
+def f_to_array(f:Dict,shape:tuple = None)-> Union[np.ndarray,np.generic]:
 
     # Get tuple indices
     rows,cols = zip(*f.keys())
@@ -854,10 +854,10 @@ def f_to_array(f:Dict,shape:tuple=None)-> Union[np.ndarray,np.generic]:
             arr = np.zeros(shape)
         arr[list(rows),list(cols)] = list(f.values())
     return arr.astype('int32')
-    # return np.array([v for k,v in sorted(f.items(),key=lambda x:str_to_tuple(x[0]))])
+    # return np.array([v for k,v in sorted(f.items(),key = lambda x:str_to_tuple(x[0]))])
 
 
-def array_to_f(a:Union[np.ndarray,np.generic],axis:int=0) -> Dict:
+def array_to_f(a:Union[np.ndarray,np.generic],axis:int = 0) -> Dict:
     if len(np.shape(a)) == 1 and axis == 0:
         return dict(((0,index),int(value)) for index, value in enumerate(a))
     elif len(np.shape(a)) == 1 and axis == 1:
@@ -867,7 +867,7 @@ def array_to_f(a:Union[np.ndarray,np.generic],axis:int=0) -> Dict:
 
 
 def f_to_str(f:dict) -> str:
-    return ','.join([str(v) for k,v in sorted(f.items(),key=lambda x:str_to_tuple(x[0]))])
+    return ','.join([str(v) for k,v in sorted(f.items(),key = lambda x:str_to_tuple(x[0]))])
 
 
 def table_to_str(tab:np.ndarray) -> str:
@@ -896,14 +896,14 @@ def str_to_array(s:str,dims:Tuple):
         return np.array(s.split(',')).astype('int32')
     # If array should be higher dimensional
     else:
-        return np.reshape(np.asarray(s.split(','),dtype = int),newshape=dims)
+        return np.reshape(np.asarray(s.split(','),dtype = int),newshape = dims)
     
 
 def create_dynamic_data_label(__self__,data,**kwargs):
     # Read label(s) from settings
     label_by_key,label_by_value = [],[]
     for k in list(__self__.settings['label_by']):
-        v = list(deep_get(key=k,value=data))[0]
+        v = list(deep_get(key = k,value = data))[0]
         if k == "dims":
             v = 'x'.join(list(map(str,list(unpack_dims(v,kwargs.get('time_dims',False))))))
         # If label not included in metadata ignore it
@@ -923,7 +923,7 @@ def create_dynamic_data_label(__self__,data,**kwargs):
     # Add label to error data
     return x_label,label_by_key,label_by_value
 
-def in_range(v,limits:list,allow_nan:bool=False,inclusive:bool=False):
+def in_range(v,limits:list,allow_nan:bool = False,inclusive:bool = False):
     within_range = True
     if v is None or not np.isfinite(v):
         return allow_nan
@@ -1005,8 +1005,8 @@ def string_to_numeric(s):
 
 def setup_logger(
         name,
-        console_level:str=None,
-        file_level:str=None,
+        console_level:str = None,
+        file_level:str = None,
     ):
     # print('setting up new logger',name)
     # traceback.print_stack()
@@ -1028,7 +1028,7 @@ def setup_logger(
 
     return logger
 
-def sigma_to_noise_regime(sigma=None):
+def sigma_to_noise_regime(sigma = None):
     if sigma:
         if sigma == 'none':
             return 'learned'
@@ -1082,10 +1082,10 @@ def broadcast(arr,shape):
     # Figure out repetitions
     axes = [i for i in range(len(shape)) if shape[i] not in list(arr.shape)]
     # Expand dims
-    arr_reshaped = np.expand_dims(arr,axis=axes)
+    arr_reshaped = np.expand_dims(arr,axis = axes)
     for ax in axes:
         # Repeat along axis
-        arr_reshaped = np.repeat(arr_reshaped,shape[ax],axis=ax)
+        arr_reshaped = np.repeat(arr_reshaped,shape[ax],axis = ax)
 
     return arr_reshaped
 
@@ -1098,7 +1098,7 @@ def expand_tuple(t):
             result.append(item)
     return tuple(result)
 
-def unpack_dims(self,time_dims:bool=True):
+def unpack_dims(self,time_dims:bool = True):
     try:
         dims = tuple([v for k,v in self.dims.items() if (k != 'time' or time_dims)])
     except:
@@ -1126,7 +1126,7 @@ def to_json_format(x):
 def tuple_dim(x,dims=()):
     if isinstance(x,tuple):
         dims = (*dims,len(x))
-        return tuple_dim(x[0],dims=dims)
+        return tuple_dim(x[0],dims = dims)
     else:
         return dims
     

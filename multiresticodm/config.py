@@ -13,11 +13,11 @@ from multiresticodm import ROOT
 from multiresticodm.utils.exceptions import *
 from multiresticodm.static.global_variables import deep_walk, CORE_COORDINATES_DTYPES
 from multiresticodm.utils.config_data_structures import instantiate_data_type
-from multiresticodm.utils.misc_utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify, string_to_numeric
+from multiresticodm.utils.misc_utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify, string_to_numeric, print_json
 
 class Config:
 
-    def __init__(self, path:str=None, settings:dict=None, **kwargs):
+    def __init__(self, path:str = None, settings:dict = None, **kwargs):
         """
         Config object constructor.
         :param path: Path to configuration TOML file
@@ -38,7 +38,7 @@ class Config:
             self.logger.debug(f' Loading config from {path}')
 
             if path.endswith('.toml'):
-                self.settings = toml.load(path, _dict=dict)
+                self.settings = toml.load(path, _dict = dict)
             elif path.endswith('.json'):
                 self.settings = read_json(path)
 
@@ -96,28 +96,28 @@ class Config:
         # Keep track of the target name for each sweeped variable
         self.target_names_by_sweep_var = {}
 
-    def __str__(self,settings=None):
+    def __str__(self,settings = None):
         if settings is not None:
             try:
-                res_str = json.dumps(settings,indent=2)
+                res_str = json.dumps(settings,indent = 2)
                 return res_str
             except Exception as exc:
                 self.logger.error(
                     json.dumps(
                         deep_apply(deepcopy(settings),type),
-                        indent=2
+                        indent = 2
                     )
                 )
                 raise exc
         else:
             try:
-                res_str = json.dumps(self.settings,indent=2)
+                res_str = json.dumps(self.settings,indent = 2)
                 return res_str
             except Exception as exc:
                 self.logger.error(
                     json.dumps(
                         deep_apply(deepcopy(self.settings),type),
-                        indent=2
+                        indent = 2
                     )
                 )
                 raise exc
@@ -216,7 +216,7 @@ class Config:
         # return parsed data
         return data.value()
 
-    def has_sweep(self,key_path,settings=None):
+    def has_sweep(self,key_path,settings = None):
         if settings is None:
             settings = self.settings
         # Return True if sweep is a key in the path
@@ -230,7 +230,7 @@ class Config:
             # Return whether sweep is later down the path
             return isinstance(value,dict) and value.get('sweep',None) is not None
     
-    def path_exists(self, key, value, found:bool=False):
+    def path_exists(self, key, value, found:bool = False):
         for k, v in (value.items() if isinstance(value, dict) else
             enumerate(value) if isinstance(value, list) else []):
             if k == key:
@@ -240,7 +240,7 @@ class Config:
         
         return found
 
-    def path_find(self, key, settings:dict=None, current_key_path:list=[], all_key_paths:list=[]):
+    def path_find(self, key, settings:dict = None, current_key_path:list=[], all_key_paths:list=[]):
         if settings is None:
             settings = self.settings
         settings_copy = deepcopy(settings)
@@ -263,7 +263,7 @@ class Config:
         return all_key_paths
 
 
-    def path_get(self,key_path=[],settings=None):
+    def path_get(self,key_path=[],settings = None):
         if len(key_path) <= 0:
             return None,False
         if settings is None:
@@ -287,7 +287,7 @@ class Config:
                     
         return settings_copy,(settings_copy!='not-found')
 
-    def path_delete(self,settings,key_path:list,deleted:bool=False):
+    def path_delete(self,settings,key_path:list,deleted:bool = False):
         if len(key_path) <= 0:
             return deleted,settings
         deleted = False
@@ -306,7 +306,7 @@ class Config:
             deleted,settings = self.path_delete(settings[current_key],key_path[1:],deleted)
         return deleted,settings
 
-    def path_set(self,settings,value,key_path=[],overwrite:bool=False):
+    def path_set(self,settings,value,key_path=[],overwrite:bool = False):
         if len(key_path) <= 0:
             return False
         value_set = False
@@ -472,7 +472,7 @@ class Config:
             # Join all grouped sweep vars into one sweep id 
             # which will be used to create an output folder
             if len(sweep_id) > 0:
-                sweep_id = os.path.join(*sorted(sweep_id,key=lambda x: x.split('_')[0]))
+                sweep_id = os.path.join(*sorted(sweep_id,key = lambda x: x.split('_')[0]))
             else:
                 sweep_id = ''
         
@@ -578,7 +578,7 @@ class Config:
                     combined_dims.append(coupled_dims['var'])
         return group_by,combined_dims
         
-    def validate(self,parameters=None,settings=None,base_schema=None,key_path=[],**kwargs):
+    def validate(self,parameters = None,settings = None,base_schema = None,key_path=[],**kwargs):
         # Pass defaults if no meaningful arguments are provided
         if parameters is None:
             parameters = self.parameters
@@ -868,9 +868,9 @@ class Config:
                         )
                         # Parse settings value into approapriate data structure
                         entry = instantiate_data_type(
-                            data=settings_val,
-                            schema=schema_val,
-                            key_path=key_path
+                            data = settings_val,
+                            schema = schema_val,
+                            key_path = key_path
                         )
                         # Check that entry is valid
                         try:
@@ -891,9 +891,9 @@ class Config:
                     else:
                         # Parse settings value into appropriate data structure
                         entry = instantiate_data_type(
-                            data=settings_val,
-                            schema=schema_val,
-                            key_path=key_path
+                            data = settings_val,
+                            schema = schema_val,
+                            key_path = key_path
                         )
                         # Check that entry is valid
                         try:
@@ -1044,7 +1044,7 @@ class Config:
         return sweep_params
     
 
-    def prepare_experiment_config(self,sweep_configuration,cast_to_str:bool=False):
+    def prepare_experiment_config(self,sweep_configuration,cast_to_str:bool = False):
         # Create new config
         new_config = deepcopy(self)
         # Deactivate sweep             
@@ -1056,6 +1056,7 @@ class Config:
         # Update config
         i = 0
         for value in self.sweep_params['isolated'].values():
+            self.logger.debug(f"{value['path']}: {sweep_configuration[i]}")
             new_config.path_set(
                 new_config,
                 sweep_configuration[i],
@@ -1068,6 +1069,7 @@ class Config:
             i += 1
         for sweep_group in self.sweep_params['coupled'].values():
             for value in sweep_group:
+                self.logger.debug(f"{value['path']}: {sweep_configuration[i]}")
                 new_config.path_set(
                     new_config,
                     sweep_configuration[i],
@@ -1125,7 +1127,7 @@ class Config:
                 elif isinstance(val,Iterable):
                     match = match and grouped_sweep_configuration[dim_index] == val
                 else: 
-                    match = match and math.isclose(grouped_sweep_configuration[dim_index], val, rel_tol=1e-1) 
+                    match = match and math.isclose(grouped_sweep_configuration[dim_index], val, rel_tol = 1e-1) 
 
                 if not match:
                     break

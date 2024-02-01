@@ -18,7 +18,7 @@ from copy import deepcopy
 # Add your Google Maps API key here:
 with open('.api_key', 'r') as file:
     API_key = file.read().replace('\n', '')
-gmaps = googlemaps.Client(key=API_key)
+gmaps = googlemaps.Client(key = API_key)
 
 # ==== Functions =======================================================================================================
 def split_given_size(a, size):
@@ -67,10 +67,10 @@ def get_times_distances(origin_coords: list,
         
         if mode == 'transit':
             res['values'].append(
-            gmaps.distance_matrix(origs, dests, mode=mode, departure_time=dep_time,transit_routing_preference='fewer_transfers'))
+            gmaps.distance_matrix(origs, dests, mode = mode, departure_time = dep_time,transit_routing_preference='fewer_transfers'))
         else:
             res['values'].append(
-            gmaps.distance_matrix(origs, dests, mode=mode, departure_time=dep_time))
+            gmaps.distance_matrix(origs, dests, mode = mode, departure_time = dep_time))
 
         num_requests += 1
         # Print status and write every n requests
@@ -127,9 +127,9 @@ def eval_distance_matrix(route_data: dict,
                     traffic_duraction_data.append(0)
 
     # Create DataFrame
-    times = pd.DataFrame(np.reshape(time_data, (I,J)), index=origin_zones.index, columns=dest_zones.index)
-    distances = pd.DataFrame(np.reshape(distance_data, (I,J)), index=origin_zones.index, columns=dest_zones.index)
-    traffic_duration = pd.DataFrame(np.reshape(distance_data, (I,J)), index=origin_zones.index, columns=dest_zones.index)
+    times = pd.DataFrame(np.reshape(time_data, (I,J)), index = origin_zones.index, columns = dest_zones.index)
+    distances = pd.DataFrame(np.reshape(distance_data, (I,J)), index = origin_zones.index, columns = dest_zones.index)
+    traffic_duration = pd.DataFrame(np.reshape(distance_data, (I,J)), index = origin_zones.index, columns = dest_zones.index)
 
     # Write to csv
     times.to_csv(f"./data/raw/cambridge_commuter/{resolution}_origs_{n_origins}_dests_{n_dests}_{mode}_metrics_{date_string}_times.csv", index_label='row: origin/col: dest/entries: seconds')
@@ -139,8 +139,8 @@ def eval_distance_matrix(route_data: dict,
 # ==== Get data ========================================================================================================
 
 # Collect the origin zone and destination zone coordinates
-# origin_zones = pd.read_csv('./data/raw/london_commuter/GLA_data/origin_sizes.csv', header=0, index_col=0)
-# dest_zones = pd.read_csv('./data/raw/london_commuter/GLA_data/dest_sizes.csv', header=0, index_col=0)
+# origin_zones = pd.read_csv('./data/raw/london_commuter/GLA_data/origin_sizes.csv', header = 0, index_col = 0)
+# dest_zones = pd.read_csv('./data/raw/london_commuter/GLA_data/dest_sizes.csv', header = 0, index_col = 0)
 # origins = list(zip(origin_zones['Latitude'], origin_zones['Longitude']))
 # destinations = list(zip(dest_zones['Latitude'], dest_zones['Longitude']))
 # origin_coords = [{'lat': val[0], 'lng': val[1]} for val in origins]
@@ -168,7 +168,7 @@ date_string = '18_01_2023' #datetime.today().strftime('%d_%m_%Y')
 # Read origins
 origin_zones = gpd.read_file(f'./data/inputs/cambridge_work_commuter_lsoas/sample_{n_origins}_home_clustered_facilities_seed_1234.geojson')
 # Reproject to global coordinates and sort by id
-origin_zones = origin_zones.set_crs('EPSG:27700',allow_override=True)
+origin_zones = origin_zones.set_crs('EPSG:27700',allow_override = True)
 origin_zones = origin_zones.to_crs('EPSG:4326')
 origin_zones = origin_zones.sort_values(id_name)
 origin_zones = origin_zones.set_index("facility_id")
@@ -176,7 +176,7 @@ origin_zones = origin_zones.set_index("facility_id")
 # Read destinations
 destination_zones = gpd.read_file(f'./data/inputs/cambridge_work_commuter_lsoas/sample_{n_dests}_work_clustered_facilities_seed_1234.geojson')
 # Reproject to global coordinates and sort by id
-destination_zones = destination_zones.set_crs('EPSG:27700',allow_override=True)
+destination_zones = destination_zones.set_crs('EPSG:27700',allow_override = True)
 destination_zones = destination_zones.to_crs('EPSG:4326')
 destination_zones = destination_zones.sort_values(id_name)
 destination_zones = destination_zones.set_index("facility_id")
@@ -191,9 +191,9 @@ for mode_of_transport in ['driving','transit','bicycling']:
 
     output_filename = f"./data/raw/cambridge_commuter/{resolution}_origs_{n_origins}_dests_{n_dests}_{mode_of_transport}_metrics_{date_string}.pkl"
 
-    # get_times_distances(origins, destinations, mode=mode_of_transport, dep_time=dep_time, write_every=30)
+    # get_times_distances(origins, destinations, mode = mode_of_transport, dep_time = dep_time, write_every = 30)
 
     with open(output_filename, 'rb') as f:
         metrics = pickle.load(f)
 
-    eval_distance_matrix(metrics, origin_zones, destination_zones, mode=mode_of_transport,resolution=resolution)
+    eval_distance_matrix(metrics, origin_zones, destination_zones, mode = mode_of_transport,resolution = resolution)

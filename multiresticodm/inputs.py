@@ -106,7 +106,7 @@ class Inputs:
                 )
                 if os.path.isfile(filepath):
                     # Import data
-                    data = np.loadtxt(filepath,dtype=schema['dtype'], ndmin=schema['ndmin'])
+                    data = np.loadtxt(filepath,dtype = schema['dtype'], ndmin = schema['ndmin'])
                     setattr(self.data,attr,data)
                     # Check to see see that they are all positive
                     if schema.get('positive',True) and (getattr(self.data,attr) < 0).any():
@@ -258,12 +258,12 @@ class Inputs:
                     obj,func = schema['funcs'][i]
                     # Create coordinate ranges based on schema
                     coordinates[schema["dims"][i]] = deep_call(
-                        input=globals()[obj],
-                        expressions=func,
-                        defaults=None,
-                        start=1,
-                        stop=d+1,
-                        step=1
+                        input = globals()[obj],
+                        expressions = func,
+                        defaults = None,
+                        start = 1,
+                        stop = d+1,
+                        step = 1
                     ).astype(schema['args_dtype'][i])
 
                 setattr(
@@ -296,7 +296,7 @@ class Inputs:
                             self.data,
                             input, 
                             torch.reshape(
-                                torch.from_numpy(getattr(self.data,input)).to(dtype=NUMPY_TO_TORCH_DTYPE[schema['dtype']]),
+                                torch.from_numpy(getattr(self.data,input)).to(dtype = NUMPY_TO_TORCH_DTYPE[schema['dtype']]),
                                 tuple([self.data.dims[name] for name in schema["dims"]])
                             ).to(device)
                         )
@@ -305,7 +305,7 @@ class Inputs:
             if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
                 self.data.grand_total = torch.tensor(self.data.grand_total).float().to(device)
             if hasattr(self.data,'margins') and getattr(self.data,'margins') is not None:
-                self.data.margins = {axis: torch.tensor(margin,dtype=int32,device=device) for axis,margin in self.data.margins.items()}
+                self.data.margins = {axis: torch.tensor(margin,dtype = int32,device = device) for axis,margin in self.data.margins.items()}
             if hasattr(self,'true_parameters') and len(getattr(self,'true_parameters')) > 0:
                 for param in self.true_parameters.keys():
                     self.true_parameters[param] = torch.tensor(self.true_parameters[param]).float().to(device)
@@ -363,10 +363,10 @@ class Inputs:
                     # Convert string key to tuple
                     cell = tuple(eval(cell_str))
                     try:
-                        assert len(cell) == ndims(self) and cell < np.asarray(list(unpack_dims(self.data.dims,time_dims=False)))
+                        assert len(cell) == ndims(self) and cell < np.asarray(list(unpack_dims(self.data.dims,time_dims = False)))
                     except:
                         self.logger.error(f"Cell has length {len(cell)}. The number of table dims are {ndims(self)}")
-                        self.logger.error(f"Cell is equal to {cell}. The cell bounds are {np.asarray(list(unpack_dims(self.data.dims,time_dims=False)))}")
+                        self.logger.error(f"Cell is equal to {cell}. The cell bounds are {np.asarray(list(unpack_dims(self.data.dims,time_dims = False)))}")
                     for ax in cell:
                         if tuplize(ax) in self.margins.keys():
                             try:
@@ -398,7 +398,7 @@ class Inputs:
             if hasattr(self.data,'origin_attraction_ts') and getattr(self.data,'origin_attraction_ts') is not None:
                 self.data.origin_attraction_ts = self.data.origin_attraction_ts.cpu().detach().numpy()
             if hasattr(self.data,'cost_matrix') and getattr(self.data,'cost_matrix') is not None:
-                self.data.cost_matrix = self.data.cost_matrix.cpu().detach().numpy().reshape(unpack_dims(self.data,time_dims=False))
+                self.data.cost_matrix = self.data.cost_matrix.cpu().detach().numpy().reshape(unpack_dims(self.data,time_dims = False))
             if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
                 self.data.grand_total = self.data.grand_total.cpu().detach().numpy()
             if hasattr(self.data,'margins') and getattr(self.data,'margins') is not None:
@@ -406,7 +406,7 @@ class Inputs:
             if hasattr(self.data,'total_cost_by_origin') and getattr(self.data,'total_cost_by_origin') is not None:
                 self.data.total_cost_by_origin = self.data.total_cost_by_origin.cpu().detach().numpy()
             if hasattr(self.data,'ground_truth_table') and getattr(self.data,'ground_truth_table') is not None:
-                self.data.ground_truth_table = self.data.ground_truth_table.cpu().detach().numpy().reshape(unpack_dims(self.data,time_dims=False))
+                self.data.ground_truth_table = self.data.ground_truth_table.cpu().detach().numpy().reshape(unpack_dims(self.data,time_dims = False))
             if hasattr(self,'true_parameters') and len(getattr(self,'true_parameters')) > 0:
                 for param in self.true_parameters.keys():
                     self.true_parameters[param] = self.true_parameters[param].cpu().detach().item()
@@ -427,7 +427,7 @@ class Inputs:
         # This does not affect the training data
         data_size = self.config.settings.get("data_size", destination_attraction_ts.shape[0])
         if time_series.shape[0] == 1:
-            time_series = torch.concat((destination_attraction_ts, destination_attraction_ts), axis=0)
+            time_series = torch.concat((destination_attraction_ts, destination_attraction_ts), axis = 0)
 
         # Extract the training data from the time series data
         training_data = destination_attraction_ts[-data_size:]
@@ -436,9 +436,9 @@ class Inputs:
         dset_time_series = h5group.create_dataset(
             "time_series",
             time_series.shape[:-1],
-            maxshape=time_series.shape[:-1],
-            chunks=True,
-            compression=3,
+            maxshape = time_series.shape[:-1],
+            chunks = True,
+            compression = 3,
         )
 
         write_start = self.config.settings['outputs']['neural_network']['write_start']
@@ -458,9 +458,9 @@ class Inputs:
         dset_training_data = h5group.create_dataset(
             "training_data",
             training_data.shape[:-1],
-            maxshape=training_data.shape[:-1],
-            chunks=True,
-            compression=3,
+            maxshape = training_data.shape[:-1],
+            chunks = True,
+            compression = 3,
         )
         dset_training_data.attrs["dim_names"] = ["time", "zone_id"]
         dset_training_data.attrs["coords_mode__time"] = "trivial"
@@ -475,9 +475,9 @@ class Inputs:
         dset_origin_sizes = h5group.create_dataset(
             "origin_sizes",
             origin_demand.shape,
-            maxshape=origin_demand.shape,
-            chunks=True,
-            compression=3,
+            maxshape = origin_demand.shape,
+            chunks = True,
+            compression = 3,
         )
         dset_origin_sizes.attrs["dim_names"] = ["zone_id", "dim_name__0"]
         dset_origin_sizes.attrs["coords_mode__zone_id"] = "trivial"
@@ -494,9 +494,9 @@ class Inputs:
             "_vertices",
             (sum(dims),),
             maxshape=(sum(dims),),
-            chunks=True,
-            compression=3,
-            dtype=int,
+            chunks = True,
+            compression = 3,
+            dtype = int,
         )
         vertices.attrs["dim_names"] = ["vertex_idx"]
         vertices.attrs["coords_mode__vertex_idx"] = "trivial"
@@ -508,8 +508,8 @@ class Inputs:
             "_edges",
             (np.prod(dims), 2),
             maxshape=(np.prod(dims), 2),
-            chunks=True,
-            compression=3,
+            chunks = True,
+            compression = 3,
         )
         edges.attrs["dim_names"] = ["edge_idx", "vertex_idx"]
         edges.attrs["coords_mode__edge_idx"] = "trivial"
@@ -527,8 +527,8 @@ class Inputs:
             "_edge_weights",
             (np.prod(dims),),
             maxshape=(np.prod(dims),),
-            chunks=True,
-            compression=3,
+            chunks = True,
+            compression = 3,
         )
         edge_weights.attrs["dim_names"] = ["edge_idx"]
         edge_weights.attrs["coords_mode__edge_idx"] = "trivial"
@@ -560,7 +560,7 @@ class Inputs:
                 # Randomly generate data
                 data = np.abs(
                     random_vector(
-                        **value, size=tuple([self.data.dims[name] for name in INPUT_SCHEMA[key]["dims"]])
+                        **value, size = tuple([self.data.dims[name] for name in INPUT_SCHEMA[key]["dims"]])
                     )
                 ).astype('float32')
                 # Normalise to sum to one
@@ -575,7 +575,7 @@ class Inputs:
                 size=(self.data.dims['origin'], self.data.dims['destination']),
             )
         ).astype('float32')
-        self.data.total_cost_by_origin = self.data.cost_matrix.sum(dim=0)
+        self.data.total_cost_by_origin = self.data.cost_matrix.sum(dim = 0)
 
         # Normalise to sum to one
         cost_matrix_max = deepcopy(self.data.cost_matrix.max())
@@ -607,7 +607,7 @@ class Inputs:
             true_parameters = self.true_parameters,
             instance = kwargs.get('instance',''),
             **vars(self.data),
-            logger=self.logger
+            logger = self.logger
         )
 
         # Initialise the Harris Wilson model
@@ -675,23 +675,23 @@ class Inputs:
         num_steps = self.config.settings['training']['num_steps']
         for instance in tqdm(
             range(num_samples),
-            desc=f"Generating time series in sequence: Instance {self.instance}",
-            leave=False,
-            position=self.instance+1
+            desc = f"Generating time series in sequence: Instance {self.instance}",
+            leave = False,
+            position = self.instance+1
         ):
             samples.append(
                 HWM.run(
-                    init_destination_attraction=self.data.destination_attraction_ts,
-                    n_iterations=num_steps,
-                    free_parameters=None,
-                    generate_time_series=True,
-                    requires_grad=False,
-                    seed=instance
+                    init_destination_attraction = self.data.destination_attraction_ts,
+                    n_iterations = num_steps,
+                    free_parameters = None,
+                    generate_time_series = True,
+                    requires_grad = False,
+                    seed = instance
                 )
             )
 
         # Take mean over seed
-        return torch.stack(samples).mean(dim=0)
+        return torch.stack(samples).mean(dim = 0)
     
     def sde_solver_in_parallel(self,HWM):
         # Run experiments in parallel
@@ -702,9 +702,9 @@ class Inputs:
         manager = mp.Manager()
         samples = manager.dict()
         pbar = tqdm(
-            total=self.config['inputs']['data']['synthesis_n_samples'], 
+            total = self.config['inputs']['data']['synthesis_n_samples'], 
             desc="Generating time series in parallel",
-            leave=False,
+            leave = False,
             position=(self.instance%n_workers)%n_threads+1
         )
         # Run the ABM for n iterations, generating the entire time series
@@ -712,17 +712,17 @@ class Inputs:
         num_steps = self.config.settings['training']['num_steps']
         for instance in range(num_samples):
             p = mp.Process(
-                target=HWM.run,
+                target = HWM.run,
                 kwargs = dict(
-                    init_destination_attraction=self.data.destination_attraction_ts,
-                    n_iterations=num_steps,
-                    free_parameters=None,
-                    generate_time_series=True,
-                    requires_grad=False,
-                    seed=instance,
-                    semaphore=semaphore,
-                    samples=samples,
-                    pbar=pbar
+                    init_destination_attraction = self.data.destination_attraction_ts,
+                    n_iterations = num_steps,
+                    free_parameters = None,
+                    generate_time_series = True,
+                    requires_grad = False,
+                    seed = instance,
+                    semaphore = semaphore,
+                    samples = samples,
+                    pbar = pbar
                 )
             )
             processes.append(p)
@@ -736,7 +736,7 @@ class Inputs:
         pbar.close()
 
         # Take mean over seed
-        destination_attraction_ts = torch.stack(list(samples.values())).mean(dim=0)
+        destination_attraction_ts = torch.stack(list(samples.values())).mean(dim = 0)
         return destination_attraction_ts
     
     def sde_potential_in_sequence(self,HWM):
@@ -763,8 +763,8 @@ class Inputs:
             HWM.sde_potential(
                 torch.tensor(xs[i]
             ).to(
-                dtype=float32,
-                device=HWM.intensity_model.device
+                dtype = float32,
+                device = HWM.intensity_model.device
             ),
             **self.true_parameters
             ).detach().cpu().numpy() for i in range(Ndests)
@@ -773,7 +773,7 @@ class Inputs:
         arg_min = np.argmin(fs)
         minimum = xs[arg_min]
         # Update log destination attraction
-        destination_attraction_ts = torch.exp(torch.tensor(minimum,dtype=float32,device=self.config['inputs']['device']))
+        destination_attraction_ts = torch.exp(torch.tensor(minimum,dtype = float32,device = self.config['inputs']['device']))
         
         return destination_attraction_ts
 

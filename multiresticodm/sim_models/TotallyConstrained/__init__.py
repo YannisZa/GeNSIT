@@ -17,15 +17,15 @@ def sde_pot_and_jacobian(**kwargs):
 def sde_pot_expanded(log_destination_attraction,cost_matrix,grand_total,alpha,beta,delta,gamma,kappa,epsilon):
     return sde_pot(
             **dict(
-                log_destination_attraction=log_destination_attraction,
-                cost_matrix=cost_matrix,
-                grand_total=grand_total,
-                alpha=alpha,
-                beta=beta,
-                delta=delta,
-                gamma=gamma,
-                kappa=kappa,
-                epsilon=epsilon
+                log_destination_attraction = log_destination_attraction,
+                cost_matrix = cost_matrix,
+                grand_total = grand_total,
+                alpha = alpha,
+                beta = beta,
+                delta = delta,
+                gamma = gamma,
+                kappa = kappa,
+                epsilon = epsilon
             )
     )
 
@@ -44,7 +44,7 @@ def sde_pot(**kwargs):
     # Compute log unnormalised expected flow
     log_utility = alpha*log_destination_attraction - beta*cost_matrix
     # Compute log normalisation factor
-    log_normalisation = torch.logsumexp(log_utility.ravel(),dim=0)
+    log_normalisation = torch.logsumexp(log_utility.ravel(),dim = 0)
     
     # Compute potential
     if alpha == 0:
@@ -60,8 +60,8 @@ def sde_pot_jacobian(**kwargs):
     # Calculate gradient of potential
     return torch.autograd.functional.jacobian(
         sde_pot_expanded, 
-        inputs=tuple([kwargs[k] for k in SDE_POT_ARGS]), 
-        create_graph=True
+        inputs = tuple([kwargs[k] for k in SDE_POT_ARGS]), 
+        create_graph = True
     )
 
 def sde_pot_hessian(**kwargs):
@@ -69,8 +69,8 @@ def sde_pot_hessian(**kwargs):
     # Calculate hessian of potential
     return torch.autograd.functional.hessian(
         sde_pot_expanded, 
-        inputs=tuple([kwargs[k] for k in SDE_POT_ARGS]), 
-        create_graph=True
+        inputs = tuple([kwargs[k] for k in SDE_POT_ARGS]), 
+        create_graph = True
     )
 
 
@@ -87,13 +87,13 @@ def log_flow_matrix(**kwargs):
     beta = kwargs['beta']
     
     # Extract dimensions
-    origin,destination = cost_matrix.size(dim=0), cost_matrix.size(dim=1)
+    origin,destination = cost_matrix.size(dim = 0), cost_matrix.size(dim = 1)
     
     # If input is torch use the following code
     if tensor:
         if log_destination_attraction.ndim > 2:
-            N = log_destination_attraction.size(dim=0)
-            sweep = log_destination_attraction.size(dim=2)
+            N = log_destination_attraction.size(dim = 0)
+            sweep = log_destination_attraction.size(dim = 2)
         elif log_destination_attraction.ndim > 1:
             N = 1
             sweep = 1
@@ -115,26 +115,26 @@ def log_flow_matrix(**kwargs):
         log_destination_attraction = log_destination_attraction.isel(time = -1).sel(
             **{dim: slice(None) for dim in ['id','destination','sweep']}
         ).transpose('id','sweep','destination')
-        alpha = alpha.sel(id=slice(None),sweep=slice(None))
-        beta = beta.sel(id=slice(None),sweep=slice(None))
+        alpha = alpha.sel(id = slice(None),sweep = slice(None))
+        beta = beta.sel(id = slice(None),sweep = slice(None))
         
         # Convert the selected_data to torch tensor
         log_destination_attraction = torch.tensor(
             log_destination_attraction.values
-        ).to(dtype=float32,device=device)
+        ).to(dtype = float32,device = device)
         alpha = torch.tensor(
             alpha.values
-        ).to(dtype=float32,device=device)
+        ).to(dtype = float32,device = device)
         beta = torch.tensor(
             beta.values
-        ).to(dtype=float32,device=device)
+        ).to(dtype = float32,device = device)
     
     # Reshape tensors to ensure operations are possible
     log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,destination,sweep))
     cost_matrix = torch.reshape(cost_matrix.unsqueeze(1).repeat(1, 1, 1, sweep),(1,origin,destination,sweep))
     alpha = torch.reshape(alpha,(N,1,1,sweep))
     beta = torch.reshape(beta,(N,1,1,sweep))
-    log_grand_total = torch.log(grand_total).to(device=device)
+    log_grand_total = torch.log(grand_total).to(device = device)
 
     # Compute log unnormalised expected flow
     # Compute log utility
@@ -152,19 +152,19 @@ def log_flow_matrix(**kwargs):
     else:
         # Create outputs xr data array
         return xr.DataArray(
-            data=log_flow.detach().cpu().numpy(), 
-            dims=dims,
+            data = log_flow.detach().cpu().numpy(), 
+            dims = dims,
             coords={k:coords[k] for k in dims}
         ) 
 
 def flow_matrix_expanded(log_destination_attraction,cost_matrix,grand_total,alpha,beta):
     return torch.exp(log_flow_matrix(
             **dict(
-                log_destination_attraction=log_destination_attraction,
-                cost_matrix=cost_matrix,
-                grand_total=grand_total,
-                alpha=alpha,
-                beta=beta
+                log_destination_attraction = log_destination_attraction,
+                cost_matrix = cost_matrix,
+                grand_total = grand_total,
+                alpha = alpha,
+                beta = beta
             )
     ))
 
@@ -172,6 +172,6 @@ def flow_matrix_jacobian(**kwargs):
     # Calculate gradient of intensity
     return torch.autograd.functional.jacobian(
         flow_matrix_expanded, 
-        inputs=tuple([kwargs[k] for k in FLOW_MATRIX_ARGS]), 
-        create_graph=True
+        inputs = tuple([kwargs[k] for k in FLOW_MATRIX_ARGS]), 
+        create_graph = True
     )

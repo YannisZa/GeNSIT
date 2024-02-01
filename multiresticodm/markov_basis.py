@@ -109,9 +109,9 @@ class MarkovBasis(object):
         # This is checking condition 1.5a in Diaconis 1992 paper for a single choice of Markov basis
         # checks that the markov basis has at least one non-zero entry
         # and finally checks that that the markov basis does not change any of the fixed cells
-        tab = torch.tensor(f_to_array(f),dtype=int32)
+        tab = torch.tensor(f_to_array(f),dtype = int32)
         # basis fully expanded to match table dims
-        full_tab = torch.tensor(f_to_array(f,shape=unpack_dims(self.ct.data.dims,time_dims=False)),dtype=int32)
+        full_tab = torch.tensor(f_to_array(f,shape = unpack_dims(self.ct.data.dims,time_dims = False)),dtype = int32)
 
         return (not torch.any(self.ct.table_constrained_margins_summary_statistic(tab))) and \
                 (torch.any(tab)) and \
@@ -120,8 +120,8 @@ class MarkovBasis(object):
     def check_markov_basis_validity(self) -> bool:
         for i in tqdm(
             range(len(self.basis_dictionaries)),
-            disable=self.tqdm_disabled,
-            leave=False
+            disable = self.tqdm_disabled,
+            leave = False
         ):
             if not self.basis_function_admissible(self.basis_dictionaries[i]):
                 return False
@@ -158,9 +158,9 @@ class MarkovBasis(object):
         # Loop through each pair combination and keep only ones that don't share a row OR column
         for index,tup1 in tqdm(
             enumerate(sorted_cells),
-            total=len(sorted_cells),
-            disable=self.tqdm_disabled,
-            leave=False
+            total = len(sorted_cells),
+            disable = self.tqdm_disabled,
+            leave = False
         ):
             # Get all active candidate cells
             inactive_candidate_cells = []
@@ -177,8 +177,8 @@ class MarkovBasis(object):
         self.basis_active_cells = []
         for index in tqdm(
             range(len(basis_cells)),
-            disable=self.tqdm_disabled,
-            leave=False
+            disable = self.tqdm_disabled,
+            leave = False
         ):
             # Make sure that no cell in the basis is a constrained cell
             if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
@@ -210,9 +210,9 @@ class MarkovBasis(object):
         # Loop through each pair combination and keep only ones that don't share a row OR column
         for index,tup1 in tqdm(
             enumerate(sorted_cells),
-            total=len(sorted_cells),
-            disable=self.tqdm_disabled,
-            leave=False
+            total = len(sorted_cells),
+            disable = self.tqdm_disabled,
+            leave = False
         ):
             # Get all active candidate cells
             inactive_candidate_cells = []
@@ -229,8 +229,8 @@ class MarkovBasis(object):
         self.basis_active_cells = []
         for index in tqdm(
             range(len(basis_cells)),
-            disable=self.tqdm_disabled,
-            leave=False
+            disable = self.tqdm_disabled,
+            leave = False
         ):
             # Make sure that no cell in the basis is a constrained cell
             if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
@@ -255,7 +255,7 @@ class MarkovBasis(object):
 
     def import_basis_function(self,filepath:str) -> Dict:
         # Import basis function from csv
-        table = pd.read_csv(filepath,index_col=0,header=0)
+        table = pd.read_csv(filepath,index_col = 0,header = 0)
         table.index = table.index.astype('str')
         # Remove zeros
         table_dict = df_to_f(table)
@@ -282,7 +282,7 @@ class MarkovBasis(object):
         )
         
         # Create filepath
-        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims=False)
+        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims = False)
         table_dims = 'x'.join(list(map(str,unpacked_dims)))
         axes = '_'.join(sorted([str(ax).replace(' ','') for ax in self.ct.constraints['constrained_axes']]))
         filepath = os.path.join(
@@ -308,7 +308,7 @@ class MarkovBasis(object):
 
     def export_markov_basis(self) -> None:
         # Export markov bases to file
-        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims=False)
+        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims = False)
         table_dims = 'x'.join(list(map(str,unpacked_dims)))
 
         if not 'outputs' in list(self.ct.config.settings.keys()) or \
@@ -343,8 +343,8 @@ class MarkovBasis(object):
         updated_basis_dictionaries = [] 
         for i in tqdm(
             range(len(self.basis_dictionaries)),
-            disable=self.tqdm_disabled,
-            leave=False
+            disable = self.tqdm_disabled,
+            leave = False
         ):
             if self.basis_function_admissible(self.basis_dictionaries[i]):
                 updated_basis_dictionaries.append(self.basis_dictionaries[i])
@@ -361,7 +361,7 @@ class MarkovBasis1DTable(MarkovBasis):
         self.build()
 
     def true_markov_basis_length(self):
-        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims=False)
+        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims = False)
         if unpacked_dims[0] == 1:
             return int(unpacked_dims[1]*(unpacked_dims[1]-1)/2)
         elif unpacked_dims[1] == 1:
@@ -373,7 +373,7 @@ class MarkovBasis1DTable(MarkovBasis):
         if len(self.ct.constraints['constrained_axes']) == 1:
             self.generate_one_margin_preserving_markov_basis()
         else:
-            raise Exception(f'Unexpected table size {unpack_dims(self.ct.data.dims,time_dims=False)} for MarkovBasis1DTable.')
+            raise Exception(f'Unexpected table size {unpack_dims(self.ct.data.dims,time_dims = False)} for MarkovBasis1DTable.')
 
 
 
@@ -387,7 +387,7 @@ class MarkovBasis2DTable(MarkovBasis):
         self.build()
 
     def true_markov_basis_length(self):
-        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims=False)
+        unpacked_dims = unpack_dims(self.ct.data.dims,time_dims = False)
         if np.array_equal(self.ct.constraints['constrained_axes'],np.asarray([[1],[0,1]],dtype='int32')):
             return int(unpacked_dims[1]*(unpacked_dims[1]-1)*unpacked_dims[0]/2)
         elif np.array_equal(self.ct.constraints['constrained_axes'],np.asarray([[0],[0,1]],dtype='int32')):

@@ -59,7 +59,7 @@ class Plot(object):
         # Run plotting
         self.data_plot(plot_func = self.compile_plot(plot_view))
 
-    def print_data(self,plot_setting:dict,local_vars:dict,plot_vars:list=None,index:int=None,summarise:bool=False):
+    def print_data(self,plot_setting:dict,local_vars:dict,plot_vars:list = None,index:int = None,summarise:bool = False):
         for v in ['x','y','size','colour','visibility','zorder','style','label','marker','hatch']:
             if plot_vars is None or v in plot_vars:
                 if index is None:
@@ -132,25 +132,25 @@ class Plot(object):
         origin_geometry_ids = geometry[geometry.geometry_type == self.settings['origin_geometry_type']].geometry_id.tolist()
         destination_geometry_ids = geometry[geometry.geometry_type == self.settings['destination_geometry_type']].geometry_id.tolist()
         # Create dataframe
-        table_df = pd.DataFrame(table,index=origin_geometry_ids,columns=destination_geometry_ids)
+        table_df = pd.DataFrame(table,index = origin_geometry_ids,columns = destination_geometry_ids)
         # Create pairs of flow records instead of 2D flows
         table_df = table_df.stack().reset_index()
         # Rename columns
-        table_df.rename(columns={"level_0":"origin","level_1":"destination",0:"flow"},inplace=True)
+        table_df.rename(columns={"level_0":"origin","level_1":"destination",0:"flow"},inplace = True)
         # Attach origin geometry
         table_df = table_df.merge(
                         geometry[['geometry_id','LONG','LAT','geometry','origin_demand']].set_index('geometry_id'),
                         left_on='origin',
-                        right_index=True,
+                        right_index = True,
                         how='left'
         )
         # Rename geometry
-        table_df.rename(columns={"LONG":"origin_long","LAT":"origin_lat","geometry":"origin_geometry"},inplace=True)
+        table_df.rename(columns={"LONG":"origin_long","LAT":"origin_lat","geometry":"origin_geometry"},inplace = True)
         # Attach destination geometry
         table_df = table_df.merge(
                         geometry[['geometry_id','LONG','LAT','geometry','destination_demand']].set_index('geometry_id'),
                         left_on='destination',
-                        right_index=True,
+                        right_index = True,
                         how='left'
         )
         # Rename geometry
@@ -159,12 +159,12 @@ class Plot(object):
                     "LONG":"destination_long",
                     "LAT":"destination_lat",
                     "geometry":"destination_geometry"
-                },inplace=True)
+                },inplace = True)
 
         # Convert to geopandas
         return gpd.GeoDataFrame(table_df,geometry='origin_geometry')
 
-    def get_axes_limits(self,plot_settings,vars:list,axes_id:str,axes_lims=None):
+    def get_axes_limits(self,plot_settings,vars:list,axes_id:str,axes_lims = None):
         # Axes limits from settings (read only x,y limits)
         if axes_lims is None:
             axes_lims = {}
@@ -227,7 +227,7 @@ class Plot(object):
     def get_discrete_ticks(self,plot_settings,var:str,id_var:str,tickfreq_var:str):
         # Sort all var values and keep their ordering
         all_var = np.array(list(flatten(plot_settings[id_var])))
-        sorted_index = all_var.argsort(axis=0)
+        sorted_index = all_var.argsort(axis = 0)
         all_var = all_var[sorted_index]
         # Get unique var values
         unique_var = np.unique(all_var)
@@ -383,11 +383,11 @@ class Plot(object):
         # Write figure data
         write_figure_data(
             [plot_settings],
-            filepath=filepath,
+            filepath = filepath,
             key_type={'x':'float','y':'float'},
-            aux_keys=PLOT_VARIABLES_AND_DERIVATIVES+['outputs'],
+            aux_keys = PLOT_VARIABLES_AND_DERIVATIVES+['outputs'],
             **self.settings,
-            print_data=False
+            print_data = False
         )
         self.logger.success(f"Figure data exported to {dirpath}")
         
@@ -404,17 +404,17 @@ class Plot(object):
         if self.settings.get('x_label',''):
             plt.xlabel(
                 self.settings['x_label'].replace("_"," "),
-                fontsize=self.settings['axis_label_size'],
-                labelpad=self.settings['axis_label_pad'],
-                rotation=self.settings['axis_label_rotation']
+                fontsize = self.settings['axis_label_size'],
+                labelpad = self.settings['axis_label_pad'],
+                rotation = self.settings['axis_label_rotation']
             )
         # Global y label
         if self.settings.get('y_label',''):
             plt.ylabel(
                 self.settings['y_label'].replace("_"," "),
-                fontsize=self.settings['axis_label_size'],
-                labelpad=self.settings['axis_label_pad'],
-                rotation=self.settings['axis_label_rotation'],
+                fontsize = self.settings['axis_label_size'],
+                labelpad = self.settings['axis_label_pad'],
+                rotation = self.settings['axis_label_rotation'],
             )
         
         # Set axes limits
@@ -426,8 +426,8 @@ class Plot(object):
                 axes_id = 'global'
             )
             
-            plt.xlim(left=axes_lims['x'][0], right=axes_lims['x'][1])
-            plt.ylim(bottom=axes_lims['y'][0], top=axes_lims['y'][1])
+            plt.xlim(left = axes_lims['x'][0], right = axes_lims['x'][1])
+            plt.ylim(bottom = axes_lims['y'][0], top = axes_lims['y'][1])
 
         # Get axes ids and arange them in order
         self.axids = {}
@@ -478,7 +478,7 @@ class Plot(object):
                                 rotation = self.settings[f"{var}_tick_rotation"][i]
                             )
                         # Set gridlines
-                        ax[r,c].grid(axis=var,which='both')
+                        ax[r,c].grid(axis = var,which='both')
                         getattr(
                             ax[r,c],
                             f"{var}axis",
@@ -661,7 +661,7 @@ class Plot(object):
                     by_label.keys(),
                     frameon = False,
                     prop = {'size': self.settings.get('legend_label_size',None)},
-                    bbox_to_anchor=self.settings.get('legend_location',(1.0, 1.0))
+                    bbox_to_anchor = self.settings.get('legend_location',(1.0, 1.0))
                 )
                 leg._ncol = 1
             else:
@@ -690,7 +690,7 @@ class Plot(object):
                 by_label.keys(),
                 frameon = False,
                 prop = {'size': self.settings.get('legend_label_size',None)},
-                bbox_to_anchor=self.settings.get('legend_location',(1.0, 1.0))
+                bbox_to_anchor = self.settings.get('legend_location',(1.0, 1.0))
             )
             leg._ncol = 1
 
@@ -795,7 +795,7 @@ class Plot(object):
                         )
                     else:
                         label_strs.append(
-                            r'$'+MATH_EXPRESSIONS[label_key]+'='+str(parse(meta[label_key],'learned',ndigits=3))+r'$'
+                            r'$'+MATH_EXPRESSIONS[label_key]+'='+str(parse(meta[label_key],'learned',ndigits = 3))+r'$'
                         )
                 else:
                     label_strs.append(
@@ -840,17 +840,17 @@ class Plot(object):
                 # Determine plot features based on global plot settings
                 if var == 'marker':
                     value = PLOT_MARKERS[var_key].get(
-                        str(parse(value,'.',ndigits=3)),
+                        str(parse(value,'.',ndigits = 3)),
                         PLOT_MARKERS[var_key]['else']
                     )
                 elif var == 'hatch':
                     value = PLOT_HATCHES[var_key].get(
-                        str(parse(value,'+++',ndigits=3)),
+                        str(parse(value,'+++',ndigits = 3)),
                         PLOT_HATCHES[var_key]['else']
                     )
                 elif var == 'style':
                     value = PLOT_LINESTYLES[var_key].get(
-                        str(parse(value,'-',ndigits=3)),
+                        str(parse(value,'-',ndigits = 3)),
                         PLOT_LINESTYLES[var_key]['else']
                     )
                 elif var == 'colour':
@@ -926,7 +926,7 @@ class Plot(object):
         # Iterate through the list of dictionaries
         if len(plot_settings) > 1:
             for d in plot_settings:
-                # print_json(d,newline=True)
+                # print_json(d,newline = True)
                 # Concatenate values to the merged_dict
                 for key, value in d.items():
                     if value is None:
@@ -1042,7 +1042,7 @@ class Plot(object):
 
                     # Find data in json format
                     # no other format is acceptable
-                    files = list(glob(os.path.join(plot_data_dir,"*data.json"),recursive=False))
+                    files = list(glob(os.path.join(plot_data_dir,"*data.json"),recursive = False))
 
                     # If nothing was found return false
                     if len(files) <= 0:

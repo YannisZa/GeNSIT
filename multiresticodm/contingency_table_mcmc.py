@@ -26,7 +26,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
     def __init__(
         self, 
         ct: ContingencyTable, 
-        table_mb:MarkovBasis=None, 
+        table_mb:MarkovBasis = None, 
         **kwargs
     ):
         # Setup logger
@@ -158,7 +158,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         
         # Build solver for table and margin
         self.table_solver = self.ct.map_table_solver_name_to_function(
-            solver_name=self.table_initialisation_solver_name
+            solver_name = self.table_initialisation_solver_name
         )
         
     def update_margin_initialisation_solver(self, solver_name: str = None) -> None:
@@ -169,16 +169,16 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             self.margin_initialisation_solver_name = solver_name
         # Get margin solver
         self.margin_solver = self.ct.map_margin_solver_name_to_function(
-            solver_name=self.margin_initialisation_solver_name
+            solver_name = self.margin_initialisation_solver_name
         )
 
-    def initialise_table(self,intensity:list=None,margins:dict={}) -> None:
+    def initialise_table(self,intensity:list = None,margins:dict={}) -> None:
         self.logger.debug('Initialise table')
         
         # If no intensity provided 
         # Use uniform intensity for every cell
         if intensity is None:
-            intensity = torch.ones(tuplize(list(unpack_dims(self.ct.data.dims))),dtype=float32)
+            intensity = torch.ones(tuplize(list(unpack_dims(self.ct.data.dims))),dtype = float32)
 
         # Sample uncostrained margins
         self.sample_unconstrained_margins(intensity)
@@ -198,11 +198,11 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         self.logger.debug(f'initialise_margins_2way_tables {constrained}')
         
         # Sort axes
-        sorted_axes = sorted(axes,key=len,reverse=True)
+        sorted_axes = sorted(axes,key = len,reverse = True)
 
         # Set probabilities to uniform
         if intensity is None:
-            intensity = torch.ones(tuple(list(unpack_dims(self.ct.data.dims))),dtype=float32)
+            intensity = torch.ones(tuple(list(unpack_dims(self.ct.data.dims))),dtype = float32)
 
         _ = set_seed(self.ct.config['inputs'].get('seed',None))
 
@@ -216,26 +216,26 @@ class ContingencyTableMarkovChainMonteCarlo(object):
                     # Sample grand total from Poisson
                     margins[ax] = distr.poisson.Poisson(
                         rate = total_intensity.item(),
-                    ).sample().to(device=self.ct.device,dtype=int32)
+                    ).sample().to(device = self.ct.device,dtype = int32)
                 else:
                     # Get margin grand total data
-                    margins[ax] = total_intensity.to(device=self.ct.device,dtype=int32)
+                    margins[ax] = total_intensity.to(device = self.ct.device,dtype = int32)
                     
             elif len(ax) == 1:
                 # Get total
-                grand_total = (self.ct.data.margins[tuplize(range(ndims(self.ct)))]).to(dtype=int32,device=self.ct.device)
+                grand_total = (self.ct.data.margins[tuplize(range(ndims(self.ct)))]).to(dtype = int32,device = self.ct.device)
                 # Compute multinomial probabilities
                 table_probabilities = torch.div(intensity,grand_total)
                 margin_probabilities = torch.sum(
                     table_probabilities,
-                    dim=tuplize(ax),
-                    keepdim=False
+                    dim = tuplize(ax),
+                    keepdim = False
                 ).flatten()
                 # Sample row or column margin from Multinomial conditioned on grand total
                 margins[ax] = distr.multinomial.Multinomial(
                     total_count = grand_total.item(),
                     probs = margin_probabilities
-                ).sample().to(device=self.ct.device,dtype=int32)
+                ).sample().to(device = self.ct.device,dtype = int32)
             else:
                 raise Exception(f"margins for axes {ax} could not be initialised")
 
@@ -244,32 +244,32 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         return margins
 
     def sample_constrained_margins(self, intensity: list = None) -> None:
-        return self.sample_margins(intensity,self.ct.constraints['constrained_axes'],constrained=True)
+        return self.sample_margins(intensity,self.ct.constraints['constrained_axes'],constrained = True)
     
     def sample_unconstrained_margins(self, intensity: list = None) -> None:
-        return self.sample_margins(intensity,self.ct.constraints['unconstrained_axes'],constrained=False)
+        return self.sample_margins(intensity,self.ct.constraints['unconstrained_axes'],constrained = False)
 
     def initialise_margin(self, axis, intensity: list = None) -> None:
         return self.margin_solver(
-                axis=axis,
-                intensity=intensity
+                axis = axis,
+                intensity = intensity
         )
     
     def initialise_unconstrained_margins(self, intensity: list = None) -> None:
-        unconstrained_axes = sorted(self.ct.constraints['unconstrained_axes'],key=len,reverse=True)
+        unconstrained_axes = sorted(self.ct.constraints['unconstrained_axes'],key = len,reverse = True)
         margins = {}
         for ax in unconstrained_axes:
             # Initialise margin
-            margins[ax] = self.initialise_margin(axis=ax, intensity=intensity)
+            margins[ax] = self.initialise_margin(axis = ax, intensity = intensity)
             # Update margin
             self.ct.update_margins({ax:margins[ax]})
         return margins
 
     def initialise_constrained_margins(self, intensity: list = None) -> None:
-        constrained_axes = sorted(self.ct.constraints['constrained_axes'],key=len,reverse=True)
+        constrained_axes = sorted(self.ct.constraints['constrained_axes'],key = len,reverse = True)
         margins = {}
         for ax in constrained_axes:
-            margins[ax] = self.initialise_margin(axis=ax, intensity=intensity)
+            margins[ax] = self.initialise_margin(axis = ax, intensity = intensity)
             # Update margin
             self.ct.update_margins({ax:margins[ax]})
         return margins
@@ -358,7 +358,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             if column_indices is not None:
                 log_intensity = log_intensity[...,-1:][column_indices]
             # Compute unnormalised log probabilities
-            log_intensities_colsums = torch.logsumexp(log_intensity,dim=0)
+            log_intensities_colsums = torch.logsumexp(log_intensity,dim = 0)
         else:
             raise Exception(
                 f'Cannot handle log_intensity with dimensions {len(log_intensity.shape)}')
@@ -398,7 +398,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
     
     def poisson_sample_2way_table(self,margin_probabilities):
         # Initialise table to zero
-        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype=float32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype = float32,device = self.ct.device)
         # Get fixed cells
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
@@ -415,7 +415,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # Sample from Poisson
         continue_loop = True
         while continue_loop:
-            table_new[ free_indices ] = distr.poisson.Poisson(rate = margin_probabilities[ free_indices ]).sample().to(device=self.ct.device,dtype=float32)
+            table_new[ free_indices ] = distr.poisson.Poisson(rate = margin_probabilities[ free_indices ]).sample().to(device = self.ct.device,dtype = float32)
             # Continue loop only if table is not sparse admissible
             continue_loop = False#not self.ct.table_sparse_admissible(table_new)
         return table_new
@@ -424,7 +424,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # This is the case with the grand total fixed
         # Initialise table to zero
         # Get fixed cells
-        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype=float32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype = float32,device = self.ct.device)
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
         if len(fixed_cells) > 0:
@@ -437,29 +437,29 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         free_cells = np.array(self.ct.cells)
         free_indices = [ free_cells[:,i] for i in range(ndims(self.ct)) ]
         # Get constrained axes
-        axis_constrained = min(self.ct.constraints['constrained_axes'], key=len)
+        axis_constrained = min(self.ct.constraints['constrained_axes'], key = len)
         
         # Sample from one multinomial
         continue_loop = True
         while continue_loop:
             # Sample free cells from multinomial
             updated_cells = distr.multinomial.Multinomial(
-                total_count=self.ct.residual_margins[tuplize(axis_constrained)].item(),
-                probs=margin_probabilities[free_indices].ravel()
+                total_count = self.ct.residual_margins[tuplize(axis_constrained)].item(),
+                probs = margin_probabilities[free_indices].ravel()
             ).sample()
             # Update free cells
-            table_new[free_indices] = updated_cells.to(dtype=float32,device=self.ct.device)
+            table_new[free_indices] = updated_cells.to(dtype = float32,device = self.ct.device)
             # Reshape table to match original dims
             table_new = torch.reshape(table_new, tuplize(list(unpack_dims(self.ct.data.dims))))
             # Continue loop only if table is not sparse admissible
             continue_loop = False#not self.ct.table_sparse_admissible(table_new)
 
-        return table_new.to(dtype=float32,device=self.ct.device)
+        return table_new.to(dtype = float32,device = self.ct.device)
 
     def product_multinomial_sample_2way_table(self,margin_probabilities):
         # This is the case with either margins fixed (but not both)
         # Initialise table to zero
-        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype=float32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype = float32,device = self.ct.device)
         # Get fixed cells
         fixed_cells = np.array(self.ct.constraints['cells'])
         # Apply cell constaints if at least one cell is fixed
@@ -474,7 +474,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         free_indices = [ free_cells[:,i] for i in range(ndims(self.ct)) ]
 
         # Get constrained axes
-        axis_constrained = min(self.ct.constraints['constrained_axes'], key=len)
+        axis_constrained = min(self.ct.constraints['constrained_axes'], key = len)
         # Get all unconstrained axes
         axis_uncostrained = deepcopy(self.ct.constraints['unconstrained_axes'])
         # Get plain uncostrained axis (must have length 1)
@@ -491,17 +491,17 @@ class ContingencyTableMarkovChainMonteCarlo(object):
                     margin_probabilities,
                     free_cells,
                     axis_uncostrained_flat,
-                    device=self.ct.device,
-                    ndims=ndims(self.ct)
+                    device = self.ct.device,
+                    ndims = ndims(self.ct)
                 ) for i, msum in enumerate(
                     self.ct.residual_margins[tuplize(axis_constrained)]
                 )
             ]
-            table_new[free_indices] = torch.hstack(updated_cells).to(device=self.ct.device,dtype=float32)
+            table_new[free_indices] = torch.hstack(updated_cells).to(device = self.ct.device,dtype = float32)
             # Afix non-free cells
-            table_new[fixed_cells] = self.ct.data.ground_truth_table[fixed_cells].to(device=self.ct.device,dtype=float32)
+            table_new[fixed_cells] = self.ct.data.ground_truth_table[fixed_cells].to(device = self.ct.device,dtype = float32)
             # Reshape table to match original dims
-            table_new = torch.reshape(table_new, tuplize(list(unpack_dims(self.ct.data.dims)))).to(device=self.ct.device,dtype=float32)
+            table_new = torch.reshape(table_new, tuplize(list(unpack_dims(self.ct.data.dims)))).to(device = self.ct.device,dtype = float32)
 
             # Continue loop only if table is not sparse admissible
             continue_loop = not self.ct.table_admissible(table_new)
@@ -521,39 +521,39 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
         # Get smallest in length constrained axis
         if len(self.ct.constraints['constrained_axes']) > 0:
-            axis_constrained = min(self.ct.constraints['constrained_axes'], key=len)
+            axis_constrained = min(self.ct.constraints['constrained_axes'], key = len)
         else:
             axis_constrained = torch.tensor([])
         # Get all unconstrained axes
         axis_uncostrained = deepcopy(self.ct.constraints['unconstrained_axes'])
         # Initialise shape of probability normalisation matrix
-        new_shape = torch.ones(ndims(self.ct), dtype=torch.uint8)
+        new_shape = torch.ones(ndims(self.ct), dtype = torch.uint8)
 
         if len(axis_constrained) == ndims(self.ct):
             # Calculate normalisation of multinomial probabilities (total intensity)
-            probabilities_normalisation = torch.logsumexp(log_intensity.ravel(),dim=0)
+            probabilities_normalisation = torch.logsumexp(log_intensity.ravel(),dim = 0)
             axis_uncostrained_flat = None
         elif len(axis_constrained) > 0 and len(axis_uncostrained) > 0:
             # Get plain uncostrained axis (must have length 1)
             axis_uncostrained_flat = list(flatten(axis_uncostrained))[0]
             # Calculate normalisation of multinomial probabilities for each row or column
-            probabilities_normalisation = log_intensity.logsumexp(dim=axis_constrained,keepdim=True)
+            probabilities_normalisation = log_intensity.logsumexp(dim = axis_constrained,keepdim = True)
             # Update shape of probability normalisation matrix
             new_shape[axis_uncostrained_flat] = self.ct.data.dims[self.ct.dim_names[axis_uncostrained_flat]]
         else:
-            probabilities_normalisation = torch.tensor([0],dtype=float32)
+            probabilities_normalisation = torch.tensor([0],dtype = float32)
             new_shape = np.array([1]*ndims(self.ct))
             axis_uncostrained_flat = None
 
         # Reshape and send to device
-        probabilities_normalisation = probabilities_normalisation.reshape(tuple(new_shape)).to(dtype=float32,device=self.ct.device)
+        probabilities_normalisation = probabilities_normalisation.reshape(tuple(new_shape)).to(dtype = float32,device = self.ct.device)
         # Calculate probabilities
         margin_probabilities = torch.exp(
             log_intensity-probabilities_normalisation
         )
 
         # Initialise table
-        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype=float32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype = float32,device = self.ct.device)
         firstIteration = True
         # Resample if margins are not allowed to be sparse but contain zeros
         while (not self.ct.table_admissible(table_new)) or firstIteration:
@@ -597,10 +597,10 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         func_index = np.random.randint(len(self.markov_basis))
 
         # Sample epsilon uniformly at random
-        epsilon = torch.tensor(uniform_binary_choice(),dtype=float32)
+        epsilon = torch.tensor(uniform_binary_choice(),dtype = float32)
 
         # initialise new table
-        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype=float32,device=self.ct.device)
+        table_new = torch.zeros(tuple(list(unpack_dims(self.ct.data.dims)))).to(dtype = float32,device = self.ct.device)
 
         # Store old table
         table_new[:] = table_prev
@@ -608,8 +608,8 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # Construct new table
         for k in self.markov_basis.basis_dictionaries[func_index].keys():
             table_new[k] = table_prev[k] + epsilon * \
-                torch.tensor(self.markov_basis.basis_dictionaries[func_index][k],dtype=float32)
-        return table_new.to(device=self.ct.device,dtype=float32), \
+                torch.tensor(self.markov_basis.basis_dictionaries[func_index][k],dtype = float32)
+        return table_new.to(device = self.ct.device,dtype = float32), \
             int(epsilon), \
             self.markov_basis.basis_dictionaries[func_index], \
             func_index, \
@@ -629,7 +629,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         positive_cells = [cell for cell in non_zero_cells if self.markov_basis.basis_dictionaries[func_index][cell] > 0]
 
         # Copy previous table
-        tab_new = torch.zeros(tab_prev.shape,dtype=float32,device=self.ct.device)
+        tab_new = torch.zeros(tab_prev.shape,dtype = float32,device = self.ct.device)
         tab_new[:] = tab_prev
 
         # Compute log odds ratio for 2x2 table
@@ -650,20 +650,20 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         total = np.sum([np.int32(tab_prev[non_zero_cells[i]]) for i in range(len(non_zero_cells))])
 
         # Sample upper leftmost entry of 2x2 subtable from non-central hypergeometric distribution
-        new_val = nchypergeom_fisher.rvs(M=total, n=rsum, N=csum, odds=omega)
+        new_val = nchypergeom_fisher.rvs(M = total, n = rsum, N = csum, odds = omega)
 
         # Update upper leftmost entry and propagate to rest of cells
-        tab_new[non_zero_cells[0]] = torch.tensor(new_val).to(device=self.ct.device,dtype=float32)
-        tab_new[non_zero_cells[1]] = torch.tensor(rsum - new_val,dtype=float32)
-        tab_new[non_zero_cells[2]] = torch.tensor(csum - new_val,dtype=float32)
-        tab_new[non_zero_cells[3]] = torch.tensor(total - rsum - csum + new_val,dtype=float32)
+        tab_new[non_zero_cells[0]] = torch.tensor(new_val).to(device = self.ct.device,dtype = float32)
+        tab_new[non_zero_cells[1]] = torch.tensor(rsum - new_val,dtype = float32)
+        tab_new[non_zero_cells[2]] = torch.tensor(csum - new_val,dtype = float32)
+        tab_new[non_zero_cells[3]] = torch.tensor(total - rsum - csum + new_val,dtype = float32)
         
         # non_zero_cells = np.array(non_zero_cells)
         # non_zero_indices = [non_zero_cells[:,i] for i in range(ndims(self.ct))]
         # print(tab_new[non_zero_indices]-tab_prev[non_zero_indices])
         # print('\n')
 
-        return tab_new.to(device=self.ct.device,dtype=float32), \
+        return tab_new.to(device = self.ct.device,dtype = float32), \
             None, \
             self.markov_basis.basis_dictionaries[func_index], \
             func_index, \

@@ -16,7 +16,7 @@ from multiresticodm.utils.misc_utils import flatten,is_sorted,xr_expand_multiind
 def log_factorial_sum(arr):
     return torch.lgamma(arr+1).sum()
 
-def positive_sigmoid(x,scale:float=1.0):
+def positive_sigmoid(x,scale:float = 1.0):
     return 2/(1+torch.exp(-x/scale)) - 1
 
 def powerset(iterable):
@@ -33,7 +33,7 @@ def normalised_manhattan_distance(prediction:xr.DataArray,ground_truth:xr.DataAr
     difference = prediction - ground_truth
 
     # Take absolute value of difference and divide by L1 norms
-    return torch.mean(torch.divide(torch.absolute(difference), (torch.absolute(prediction)+torch.absolute(ground_truth)), out=torch.zeros_like(prediction,dtype=float32), where=prediction!=0.0))
+    return torch.mean(torch.divide(torch.absolute(difference), (torch.absolute(prediction)+torch.absolute(ground_truth)), out = torch.zeros_like(prediction,dtype = float32), where = prediction!=0.0))
 
 
 def map_distance_name_to_function(distance_name):
@@ -48,43 +48,43 @@ def apply_norm(prediction:xr.DataArray,ground_truth:xr.DataArray,name:str,**kwar
     except:
         raise Exception(f'Norm function name {name} not recognized')
     norm = norm_function(
-        prediction=prediction,
-        ground_truth=ground_truth,
-        normalisation_constant=kwargs.get('normalisation_constant',None),
-        progress_proxy=None
+        prediction = prediction,
+        ground_truth = ground_truth,
+        normalisation_constant = kwargs.get('normalisation_constant',None),
+        progress_proxy = None
     )
     return norm
 
-def l_0(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
+def l_0(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
-        ground_truth = torch.unsqueeze(ground_truth,dim=0)
-    res = (prediction - ground_truth).to(dtype=float32)
+        ground_truth = torch.unsqueeze(ground_truth,dim = 0)
+    res = (prediction - ground_truth).to(dtype = float32)
     return res
 
 
-def relative_l_0(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
+def relative_l_0(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
-        ground_truth = torch.unsqueeze(ground_truth,dim=0)
-    res = (prediction - ground_truth).to(device=float32)
+        ground_truth = torch.unsqueeze(ground_truth,dim = 0)
+    res = (prediction - ground_truth).to(device = float32)
     if normalisation_constant is None:
-        res = ((prediction - ground_truth)/torch.sum(ground_truth)).to(dtype=float32)
+        res = ((prediction - ground_truth)/torch.sum(ground_truth)).to(dtype = float32)
     else:
-        res = ((prediction - ground_truth)/normalisation_constant).to(dtype=float32)
+        res = ((prediction - ground_truth)/normalisation_constant).to(dtype = float32)
     return res
 
-def l_1(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
+def l_1(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
-        ground_truth = torch.unsqueeze(ground_truth,dim=0)
-    res = torch.absolute(prediction - ground_truth).to(device=float32)
+        ground_truth = torch.unsqueeze(ground_truth,dim = 0)
+    res = torch.absolute(prediction - ground_truth).to(device = float32)
     return res
 
-def relative_l_1(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
+def relative_l_1(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
-        ground_truth = torch.unsqueeze(ground_truth,dim=0)
+        ground_truth = torch.unsqueeze(ground_truth,dim = 0)
     if normalisation_constant is None:
         res = (torch.absolute(prediction - ground_truth)/torch.sum(torch.absolute(ground_truth))).astype('float32')
     else:
@@ -94,8 +94,8 @@ def relative_l_1(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation
 def l_2(prediction:xr.DataArray,ground_truth:xr.DataArray,progress_proxy):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
-        ground_truth = torch.unsqueeze(ground_truth,dim=0)
-    res = torch.pow((prediction - ground_truth),2).to(dtype=float32)
+        ground_truth = torch.unsqueeze(ground_truth,dim = 0)
+    res = torch.pow((prediction - ground_truth),2).to(dtype = float32)
     return res
 
 
@@ -114,7 +114,7 @@ def torch_optimize(init,**kwargs):
     function = kwargs['function']
 
     def fit(xx):
-        xx = torch.tensor(xx,dtype=float32,device=kwargs.get('device','cpu'),requires_grad=True)
+        xx = torch.tensor(xx,dtype = float32,device = kwargs.get('device','cpu'),requires_grad = True)
         # Convert torch to numpy
         y,y_grad = function(xx,**kwargs)
         return y.detach().cpu().numpy(), y_grad.detach().cpu().numpy()
@@ -123,7 +123,7 @@ def torch_optimize(init,**kwargs):
         res = optimize.minimize(
             fit,
             init,
-            jac=True,
+            jac = True,
             options={'disp': False}
         )
         return res.x
@@ -131,14 +131,14 @@ def torch_optimize(init,**kwargs):
         return None
 
 
-def relative_l_2(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float=None,progress_proxy=None):
+def relative_l_2(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
-        ground_truth = torch.unsqueeze(ground_truth,dim=0)
+        ground_truth = torch.unsqueeze(ground_truth,dim = 0)
     if normalisation_constant is None:
-        res = torch.pow(prediction - ground_truth,2)/torch.sum(torch.pow(ground_truth,2)).to(dtype=float32)
+        res = torch.pow(prediction - ground_truth,2)/torch.sum(torch.pow(ground_truth,2)).to(dtype = float32)
     else:
-        res = (torch.pow(prediction - ground_truth,2)/normalisation_constant).to(dtype=float32)
+        res = (torch.pow(prediction - ground_truth,2)/normalisation_constant).to(dtype = float32)
     return res
 
 def euclidean_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
@@ -147,7 +147,7 @@ def euclidean_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
 def l_p_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     return torch.linalg.norm( 
         ((tab1 - tab2).ravel()/torch.sum(tab2.ravel())), 
-        ord=int(kwargs['ord']) if kwargs['ord'].isnumeric() else kwargs['ord']
+        ord = int(kwargs['ord']) if kwargs['ord'].isnumeric() else kwargs['ord']
     )
 
 def edit_distance_degree_one(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs):
@@ -158,27 +158,27 @@ def edit_distance_degree_one(prediction:xr.DataArray,ground_truth:xr.DataArray,*
     return torch.sum(torch.absolute(prediction - ground_truth))/2
 
 def edit_degree_one_error(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs):
-    return torch.sum(torch.absolute(prediction - ground_truth,dim=0))/2
+    return torch.sum(torch.absolute(prediction - ground_truth,dim = 0))/2
 
 def edit_distance_degree_higher(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs):
-    return torch.sum((prediction - ground_truth) > 0,axis=slice(1,None))
+    return torch.sum((prediction - ground_truth) > 0,axis = slice(1,None))
 
 def chi_squared_row_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     dims = kwargs.get("dims",None)
     tab1 = tab1.reshape(dims)
     tab2 = tab2.reshape(dims)
-    rowsums1 = np.where(tab1.sum(axis=1)<=0,1,tab1.sum(axis=1)).reshape((dims[0],1))
-    rowsums2 = np.where(tab2.sum(axis=1)<=0,1,tab2.sum(axis=1)).reshape((dims[0],1))
-    colsums = np.where(tab1.sum(axis=0)<=0,1,tab1.sum(axis=0)).reshape((1,dims[1]))
+    rowsums1 = np.where(tab1.sum(axis = 1)<=0,1,tab1.sum(axis = 1)).reshape((dims[0],1))
+    rowsums2 = np.where(tab2.sum(axis = 1)<=0,1,tab2.sum(axis = 1)).reshape((dims[0],1))
+    colsums = np.where(tab1.sum(axis = 0)<=0,1,tab1.sum(axis = 0)).reshape((1,dims[1]))
     return np.sum((tab1/rowsums1 - tab2/rowsums2)**2 / colsums)
 
 def chi_squared_column_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     dims = kwargs.get("dims",None)
     tab1 = tab1.reshape(dims)
     tab2 = tab2.reshape(dims)
-    colsums1 = np.where(tab1.sum(axis=0)<=0,1,tab1.sum(axis=0)).reshape((1,dims[1]))
-    colsums2 = np.where(tab2.sum(axis=0)<=0,1,tab2.sum(axis=0)).reshape((1,dims[1]))
-    rowsums = np.where(tab1.sum(axis=1)<=0,1,tab1.sum(axis=1)).reshape((dims[0],1))
+    colsums1 = np.where(tab1.sum(axis = 0)<=0,1,tab1.sum(axis = 0)).reshape((1,dims[1]))
+    colsums2 = np.where(tab2.sum(axis = 0)<=0,1,tab2.sum(axis = 0)).reshape((1,dims[1]))
+    rowsums = np.where(tab1.sum(axis = 1)<=0,1,tab1.sum(axis = 1)).reshape((dims[0],1))
     return np.sum((tab1/colsums1 - tab2/colsums2)**2 / rowsums)
 
 def chi_squared_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
@@ -251,7 +251,7 @@ def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
 
 def shannon_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
     """Computes entropy for a table X
-    E = sum_{i}^I sum_{j=1}^{J} X_{ij}log(X_{ij})
+    E = sum_{i}^I sum_{j = 1}^{J} X_{ij}log(X_{ij})
     
     ground_truth : log intensity
     """
@@ -279,9 +279,9 @@ def von_neumann_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwar
     # Find eigenvalues
     eigenval = torch.real(torch.linalg.eigvals(matrix))
     # Get all non-zero eigenvalues
-    eigenval = eigenval[~torch.isclose(eigenval,0,atol=1e-08)]
+    eigenval = eigenval[~torch.isclose(eigenval,0,atol = 1e-08)]
     # Compute entropy
-    res = torch.sum(-eigenval*torch.log(eigenval)).to(dtype=float32)
+    res = torch.sum(-eigenval*torch.log(eigenval)).to(dtype = float32)
 
     return res
 
@@ -386,11 +386,11 @@ def calculate_min_interval(x, alpha):
     return hdi_min, hdi_max
 
 
-def logsumexp(input, dim=None):
+def logsumexp(input, dim = None):
     max_val = input.max(dim = dim)
     return max_val + np.log((np.exp((input - max_val)).sum(dim = dim)))
 
-def logfactorialsum(arr, dim=None):
+def logfactorialsum(arr, dim = None):
     if dim is None or len(dim) <= 0:
         return gammaln(arr+1).sum()
     else:

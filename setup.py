@@ -12,10 +12,10 @@ if os.path.isfile(requirementPath):
 
 setup(
     name='multiresticodm',
-    version=__version__,
+    version = __version__,
     description="A command line tool for origin destination matrix inference.",
-    packages=find_packages(),
-    install_requires=install_requires,
+    packages = find_packages(),
+    install_requires = install_requires,
     entry_points={
         'console_scripts': [
             'multiresticodm = multiresticodm.main:cli'

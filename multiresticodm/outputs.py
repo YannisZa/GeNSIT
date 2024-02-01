@@ -42,7 +42,7 @@ class Outputs(object):
     def __init__(self,
                  config:Config, 
                  settings:dict={},
-                 data_names:list=None,
+                 data_names:list = None,
                  sweep:dict={},
                  inputs:Inputs = None,
                  **kwargs):
@@ -231,10 +231,13 @@ class Outputs(object):
             first_dataset.get_index('sweep').names,
             [unstringify(d) for d in first_dataset.coords['sweep'].values.tolist()[0]]
         ))
+        # NOTE: We are not using config's native 'prepare_experiment_config' function
+        # because some of the sweep dimensions might have be grouped when loading the outputs
+        # e.g. seed is often grouped and does not appear in the sweep coordinates of the output data array
         # Update config
         self_copy.config.update(sweep)
-        # sweep_configuration = self_copy.config.convert_sweep(sweep)
-        # self_copy.config = self_copy.config.prepare_experiment_config(sweep_configuration)[0]
+        # Update sweep mode flag
+        self_copy.config.settings['sweep_mode'] = self_copy.config.sweep_mode()
         return self_copy
 
     def strip_data(self,keep_inputs:list=[],keep_outputs:list=[],keep_collection_ids:list=[]):
@@ -258,7 +261,7 @@ class Outputs(object):
         elif len(keep_outputs) <= 0 and len(keep_collection_ids) > 0:
             for sample_name in self.data_vars().keys():
                 removed_collection_ids = set(range(len(self.data_vars()[sample_name]))).difference(set(keep_collection_ids))
-                for i in sorted(removed_collection_ids,reverse=True):
+                for i in sorted(removed_collection_ids,reverse = True):
                     del getattr(self.data,sample_name)[i]
         
         elif len(keep_outputs) > 0 and len(keep_collection_ids) <= 0:
@@ -270,7 +273,7 @@ class Outputs(object):
             removed_outputs = set(list(self.data_vars().keys())).difference(set(keep_outputs))
             for removed_outpt in removed_outputs:
                 removed_collection_ids = set(range(len(self.data_vars()[removed_outpt]))).difference(set(keep_collection_ids))
-                for i in sorted(removed_collection_ids,reverse=True):
+                for i in sorted(removed_collection_ids,reverse = True):
                     del getattr(self.data,removed_outpt)[i]
         
         time.sleep(3)
@@ -327,6 +330,8 @@ class Outputs(object):
                 except Exception as exc:
                     removed_collection_ids.add(i)
                     self.logger.debug(exc)
+                    # Update progress
+                    progress.update(1)
                     continue
 
                 
@@ -364,13 +369,15 @@ class Outputs(object):
                 # Update progress
                 progress.update(1)
                 
-                # Remove collection ids that are not matching coordinate slice
-                # print('removed',sorted(list(removed_collection_ids), reverse=True))
-                # print('kept',sorted(list(kept_collection_ids), reverse=True))
-                for cid in sorted(list(removed_collection_ids), reverse=True):
-                    for sam_name in self.data_vars().keys():
-                        del getattr(self.data,sam_name)[cid]
+            # Remove collection ids that are not matching coordinate slice
+            # print('removed',sorted(list(removed_collection_ids), reverse = True))
+            # print('kept',sorted(list(kept_collection_ids), reverse = True))
+            for cid in sorted(list(removed_collection_ids), reverse = True):
+                for sam_name in self.data_vars().keys():
+                    del getattr(self.data,sam_name)[cid]
                     gc.collect()
+            # Sleep for 3 secs so that gc cleans memory
+            time.sleep(3)
 
             progress.close()
 
@@ -431,8 +438,8 @@ class Outputs(object):
 
         if da.size <= 0:
             raise EmptyData(
-                message=f"Slicing using {sample_name}[{i}] {coord_slice} yielded zero size dataset. Removing collection id {i}.",
-                data_names=sample_name
+                message = f"Slicing using {sample_name}[{i}] {coord_slice} yielded zero size dataset. Removing collection id {i}.",
+                data_names = sample_name
             )
         self.logger.progress(f"After coordinate slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
         
@@ -468,7 +475,7 @@ class Outputs(object):
                 continue
 
             # Stack all dims together
-            samples = samples.stack(temp_dim=dim_names)
+            samples = samples.stack(temp_dim = dim_names)
 
             # Get total number of iterations
             total_samples = samples.sizes['temp_dim']
@@ -480,7 +487,7 @@ class Outputs(object):
             thinning = slice_setts.get('thinning',1)
 
             # Get iterations
-            iters = np.arange(start=burnin,stop=total_samples,step=thinning,dtype='int32')
+            iters = np.arange(start = burnin,stop = total_samples,step = thinning,dtype='int32')
             
             # Get number of samples to keep
             trimming = slice_setts.get('trimming',None)
@@ -532,7 +539,7 @@ class Outputs(object):
     def load_geometry(self,geometry_filename,default_crs:str='epsg:27700'):
         # Load geometry from file
         geometry = gpd.read_file(geometry_filename)
-        geometry = geometry.set_crs(default_crs,allow_override=True)
+        geometry = geometry.set_crs(default_crs,allow_override = True)
         
         return geometry
 
@@ -557,11 +564,11 @@ class Outputs(object):
         # Convert set to list
         local_coords = {k:np.array(
                             list(v),
-                            dtype=TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
+                            dtype = TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
                         ) for k,v in local_coords.items()}
         global_coords = {k:np.array(
                             list(v),
-                            dtype=TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
+                            dtype = TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
                         ) for k,v in global_coords.items()}
         self.logger.progress('Populating data dictionary')
         # Create an xarray dataset for each sample
@@ -639,24 +646,24 @@ class Outputs(object):
                         if dim in global_coords:
                             global_coords.update({
                                 dim : np.arange(
-                                    start=1,
-                                    stop=sample_data.shape[i+start_idx]+1,
-                                    step=1,
+                                    start = 1,
+                                    stop = sample_data.shape[i+start_idx]+1,
+                                    step = 1,
                                     dtype='int32'
                                 )
                             })
                         else:
                             global_coords[dim] = np.arange(
-                                start=1,
-                                stop=sample_data.shape[i+start_idx]+1,
-                                step=1,
+                                start = 1,
+                                stop = sample_data.shape[i+start_idx]+1,
+                                step = 1,
                                 dtype='int32'
                             )
                     # Append
                     self.logger.debug(f'Appending {sample_name}')
                     data_vars[sample_name] = np.array(
                         sample_data[:],
-                        dtype=DATA_SCHEMA[sample_name].get('dtype','float32')
+                        dtype = DATA_SCHEMA[sample_name].get('dtype','float32')
                     )
 
         except BlockingIOError:
@@ -667,7 +674,7 @@ class Outputs(object):
             raise CorruptedFileRead(f'Cannot read file {filename}')
         return local_coords,global_coords,data_vars
 
-    def load(self,indx:int=0):
+    def load(self,indx:int = 0):
         
         # Additionally group data collection by these attributes
         group_by,combined_dims = self.config.get_group_id(
@@ -772,7 +779,7 @@ class Outputs(object):
 
 
 
-    def load_single(self,sample_names:list=None, group_by:list=None, sweep:dict=None):
+    def load_single(self,sample_names:list = None, group_by:list = None, sweep:dict = None):
         # Load inputs
         if self.inputs is None:
             # Import all input data
@@ -820,19 +827,19 @@ class Outputs(object):
         return data_arr
 
         
-    def update_experiment_directory_id(self,sweep_experiment_id:str=None):
+    def update_experiment_directory_id(self,sweep_experiment_id:str = None):
 
-        noise_level = list(deep_get(key='noise_regime',value=self.config.settings))
+        noise_level = list(deep_get(key='noise_regime',value = self.config.settings))
         if len(noise_level) <= 0:
             if 'sigma' in self.config.settings['inputs']['to_learn']:
                 noise_level = 'learned'
             else:
-                sigma = list(deep_get(key='sigma',value=self.config.settings))
+                sigma = list(deep_get(key='sigma',value = self.config.settings))
                 if len(sigma) == 1:
                     if isinstance(sigma[0],dict) and 'sweep' in list(sigma[0].keys()):
                         noise_level = 'sweeped'
                     else:
-                        noise_level = sigma_to_noise_regime(sigma=sigma[0])
+                        noise_level = sigma_to_noise_regime(sigma = sigma[0])
         else:
             noise_level = noise_level[0]
         noise_level = noise_level.capitalize()
@@ -869,8 +876,8 @@ class Outputs(object):
             return sweep_experiment_id
 
     def create_output_subdirectories(self,sweep_id:str='') -> None:
-        export_samples = list(deep_get(key='export_samples',value=self.config.settings))
-        export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
+        export_samples = list(deep_get(key='export_samples',value = self.config.settings))
+        export_metadata = list(deep_get(key='export_metadata',value = self.config.settings))
         export_samples = export_samples[0] if len(export_samples) > 0 else True
         export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
         if export_samples or export_metadata:
@@ -905,21 +912,21 @@ class Outputs(object):
         filepath = os.path.join(self.outputs_path,dir_path,f"{filename.split('.')[0]}.json")
         if (os.path.exists(filepath) and self.config['experiments'][0]['overwrite']) or (not os.path.exists(filepath)):
             if isinstance(self.config,Config):
-                write_json(self.config.settings,filepath,indent=2)
+                write_json(self.config.settings,filepath,indent = 2)
             elif isinstance(self.config,dict):
-                write_json(self.config,filepath,indent=2)
+                write_json(self.config,filepath,indent = 2)
             else:
                 raise InvalidMetadataType(f'Cannot write metadata of invalid type {type(self.config)}')
 
     def print_metadata(self) -> None:
-        print_json(self.config,indent=2)
+        print_json(self.config,indent = 2)
 
     def open_output_file(self,sweep:dict={}):
         # Create output directories if necessary
-        self.create_output_subdirectories(sweep_id=self.sweep_id)
+        self.create_output_subdirectories(sweep_id = self.sweep_id)
         if hasattr(self,'config') and hasattr(self.config,'settings'):
-            export_samples = list(deep_get(key='export_samples',value=self.config.settings))
-            export_metadata = list(deep_get(key='export_metadata',value=self.config.settings))
+            export_samples = list(deep_get(key='export_samples',value = self.config.settings))
+            export_metadata = list(deep_get(key='export_metadata',value = self.config.settings))
             # Keep first entry of these values
             export_samples = export_samples[0] if len(export_samples) > 0 else True
             export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
@@ -1024,11 +1031,11 @@ class Outputs(object):
     def write_xr_data_concurrently(self,group_ids,dirpath:str,sample_names:list):
         # Initialise progress bar
         progress = tqdm(
-            total=len(group_ids),
-            desc=f"Writing {','.join(sample_names)} group data",
-            leave=False,
-            miniters=1,
-            position=0
+            total = len(group_ids),
+            desc = f"Writing {','.join(sample_names)} group data",
+            leave = False,
+            miniters = 1,
+            position = 0
         )
         def my_callback(fut):
             progress.update()
@@ -1059,7 +1066,7 @@ class Outputs(object):
             # Delete executor and progress bar
             progress.close()
             safe_delete(progress)
-            executor.shutdown(wait=True)
+            executor.shutdown(wait = True)
             safe_delete(executor)
 
 
@@ -1089,7 +1096,7 @@ class Outputs(object):
                     [x.replace('.nc','') for x in group_id.split('>')[1:]]
                 ).extend([x.replace('.nc','') for x in group_id.split('>')[1:]])
             # Find unique group ids by sample name and sort them
-            samples_to_load_group_ids = {k:sorted(list(set(v)),key=lambda x: eval(x)) for k,v in samples_to_load_group_ids.items()}
+            samples_to_load_group_ids = {k:sorted(list(set(v)),key = lambda x: eval(x)) for k,v in samples_to_load_group_ids.items()}
             
             # Raise error if no data collection elements found
             if len(samples_to_load_group_ids) <= 0:
@@ -1189,11 +1196,11 @@ class Outputs(object):
 
         # Initialise progress bar
         progress = tqdm(
-            total=len(all_groups),
-            desc=f"Reading {','.join(samples_not_loaded)} group concurrently",
-            leave=False,
-            miniters=1,
-            position=0
+            total = len(all_groups),
+            desc = f"Reading {','.join(samples_not_loaded)} group concurrently",
+            leave = False,
+            miniters = 1,
+            position = 0
         )
         def my_callback(fut):
             progress.update()
@@ -1235,7 +1242,7 @@ class Outputs(object):
             # Delete executor and progress bar
             progress.close()
             safe_delete(progress)
-            executor.shutdown(wait=True)
+            executor.shutdown(wait = True)
             safe_delete(executor)
 
         return data_arrs,samples_not_loaded
@@ -1249,8 +1256,8 @@ class Outputs(object):
         for sweep_configuration in tqdm(
             self.config.sweep_configurations,
             desc='Collecting h5 data sequentially',
-            leave=False,
-            position=0
+            leave = False,
+            position = 0
         ):
             # Get metric data for sweep dataset
             res = self.get_sweep_outputs(
@@ -1274,11 +1281,11 @@ class Outputs(object):
 
         # Initialise progress bar
         progress = tqdm(
-            total=len(self.config.sweep_configurations),
+            total = len(self.config.sweep_configurations),
             desc='Collecting h5 data in parallel',
-            leave=False,
-            miniters=1,
-            position=0
+            leave = False,
+            miniters = 1,
+            position = 0
         )
         def my_callback(fut):
             progress.update()
@@ -1313,7 +1320,7 @@ class Outputs(object):
             # Delete executor and progress bar
             progress.close()
             safe_delete(progress)
-            executor.shutdown(wait=True)
+            executor.shutdown(wait = True)
             safe_delete(executor)
 
         return output_datasets
@@ -1356,7 +1363,7 @@ class Outputs(object):
         )
         return data_array
         
-    def create_filename(self,sample=None):
+    def create_filename(self,sample = None):
         # Decide on filename
         if (sample is None) or (not isinstance(sample,str)):
             filename = f"{','.join(self.settings['sample'])}"
@@ -1486,8 +1493,8 @@ class Outputs(object):
                 if torch.is_tensor(self.inputs.data.grand_total) \
                 else torch.tensor(
                     self.inputs.data.grand_total,
-                    device=self.config['inputs']['device'],
-                    dtype=torch.int32
+                    device = self.config['inputs']['device'],
+                    dtype = torch.int32
                 )
             # Compute log intensity
             samples = IntensityModel.log_intensity(
@@ -1548,7 +1555,7 @@ class Outputs(object):
                     message = f"""
                         Cannot process {sample_name} Data Collection of size > 1.
                     """,
-                    sizes = {sample_name: self.data.sizes(dim=sample_name)}
+                    sizes = {sample_name: self.data.sizes(dim = sample_name)}
                 )
             else:
                 # Get xarray
@@ -1574,12 +1581,12 @@ class Outputs(object):
                 signs = self.get_sample('sign')
                 # Compute moments
                 data,signs = xr.align(data,signs, join='exact')
-                numerator = data.dot(signs,dims=kwargs['dim'])
+                numerator = data.dot(signs,dims = kwargs['dim'])
                 denominator = signs.sum(kwargs['dim'])
                 numerator,denominator = xr.align(numerator,denominator, join='exact')
                 return (numerator/denominator)
             else:
-                return self.compute_statistic(data,sample_name,'mean',dim=kwargs['dim'])
+                return self.compute_statistic(data,sample_name,'mean',dim = kwargs['dim'])
 
         elif (statistic.lower() == 'signedvariance' or statistic.lower() == 'signedvar') and \
             sample_name in list(OUTPUT_SCHEMA.keys()):
@@ -1600,7 +1607,7 @@ class Outputs(object):
                     data,
                     f".var(dim)",
                     data,
-                    dim=kwargs['dim']
+                    dim = kwargs['dim']
                 )
                 # return self.compute_statistic(data,sample_name,'var',**kwargs)
         
@@ -1608,9 +1615,9 @@ class Outputs(object):
             sample_name in [param for param in list(OUTPUT_SCHEMA.keys()) if 'error' not in param]:
             # Apply error norm
             return MathUtils.apply_norm(
-                tab=data,
-                tab0=self.ground_truth_table,
-                name=self.settings['norm'],
+                tab = data,
+                tab0 = self.ground_truth_table,
+                name = self.settings['norm'],
                 **self.settings
             )
 
@@ -1626,7 +1633,7 @@ class Outputs(object):
                 data,
                 f".{statistic}(dim)",
                 data,
-                dim=kwargs['dim']
+                dim = kwargs['dim']
             )
         
         else:
@@ -1634,7 +1641,7 @@ class Outputs(object):
                 np,
                 f".{statistic}(data)",
                 data,
-                data=data,
+                data = data,
             )
     
     def apply_sample_statistics(self,samples,sample_name,statistic_dims:Union[List,Tuple]=[],**kwargs):
@@ -1653,10 +1660,10 @@ class Outputs(object):
                 dims = [None] 
 
             sample_statistic = self.compute_statistic(
-                                    data=sample_statistic,
-                                    sample_name=sample_name,
-                                    statistic=stat,
-                                    dim=dims,
+                                    data = sample_statistic,
+                                    sample_name = sample_name,
+                                    statistic = stat,
+                                    dim = dims,
                                     **kwargs
                                 )
 
@@ -1985,7 +1992,7 @@ class DataCollection(object):
         # Delete executor and progress bar
         progress.close()
         safe_delete(progress)
-        executor.shutdown(wait=True)
+        executor.shutdown(wait = True)
         safe_delete(executor)
         return combined_coords
             
@@ -2082,7 +2089,7 @@ class DataCollection(object):
             ])
     
     
-    def sizes(self,dim:str=None):
+    def sizes(self,dim:str = None):
         if dim is None:
             return {
                 sample_name : (
@@ -2261,7 +2268,7 @@ class OutputSummary(object):
         outputs = self.get_folder_outputs(indx,output_folder)
 
         # Loop through each member of the data collection
-        if self.settings.get('n_workers',1) > 1:
+        if False:#self.settings.get('n_workers',1) > 1:
             metadata_collection = self.get_experiment_metadata_concurrently(outputs)
         else:
             metadata_collection = self.get_experiment_metadata_sequentially(outputs)
@@ -2288,11 +2295,11 @@ class OutputSummary(object):
         # Loop through each member of the data collection
         for j in tqdm(
             range(len(outputs.data)),
-            total=len(outputs.data),
+            total = len(outputs.data),
             desc='Collecting experiment metadata sequentially',
-            leave=False,
-            miniters=1,
-            position=0
+            leave = False,
+            miniters = 1,
+            position = 0
         ):
             # Collect metric metadata
             yield self.get_experiment_metadata(outputs.get(j))
@@ -2302,11 +2309,11 @@ class OutputSummary(object):
         # sweep id and sample name
         # Initialise progress bar
         progress = tqdm(
-            total=len(outputs.data),
+            total = len(outputs.data),
             desc='Collecting experiment metadata concurrently',
-            leave=False,
-            miniters=1,
-            position=0
+            leave = False,
+            miniters = 1,
+            position = 0
         )
         results = []
         def my_callback(fut):
@@ -2336,7 +2343,7 @@ class OutputSummary(object):
         # Delete executor and progress bar
         progress.close()
         safe_delete(progress)
-        executor.shutdown(wait=True)
+        executor.shutdown(wait = True)
         safe_delete(executor)
         return results
 
@@ -2477,8 +2484,8 @@ class OutputSummary(object):
             if len(self.settings['sort_by']) > 0 and \
                 all([sb in experiment_metadata_df.columns.values for sb in self.settings['sort_by']]):
                 experiment_metadata_df = experiment_metadata_df.sort_values(
-                    by=list(self.settings['sort_by']),
-                    ascending=self.settings['ascending']
+                    by = list(self.settings['sort_by']),
+                    ascending = self.settings['ascending']
                 )
 
             # Find dataset directory name
@@ -2522,7 +2529,7 @@ class OutputSummary(object):
                 )
             # Write experiment summaries to file
             self.logger.info(f"Writing summaries to {filepath}")
-            write_csv(experiment_metadata_df,filepath,index=True)
+            write_csv(experiment_metadata_df,filepath,index = True)
             print('\n')
     
     
@@ -2684,7 +2691,7 @@ class OutputSummary(object):
                     self.logger.progress(f"Summarised metric is squeezed to {dict(metric_summarised.sizes)}")
                     # Get metric data in pandas dataframe
                     try:
-                        metric_summarised = metric_summarised.to_dataframe().reset_index(drop=True)
+                        metric_summarised = metric_summarised.to_dataframe().reset_index(drop = True)
                     except:
                         # Create row out of coordinates
                         row = {k:[np.asarray(v.data)] for k,v in metric_summarised.coords.items()}
@@ -2753,7 +2760,7 @@ class OutputSummary(object):
         if len(self.settings['evaluate']) == 0:
             return []
 
-        self.logger.progress(f"Evaluating expressions for {outputs.experiment_id}")
+        self.logger.info(f"Evaluating expressions for {outputs.experiment_id}")
 
         # Create a copy of global outputs
         sweep_outputs = deepcopy(outputs)
@@ -2849,7 +2856,7 @@ class OutputSummary(object):
                 
                 self.logger.progress(f"Keyword {key} expression {expression} succeded.")
 
-            # print_json(keyword_args,newline=True)
+            # print_json(keyword_args,newline = True)
         
         # Delete temporary objects
         for attr in ['ct','intensity_model','ct_mcmc','physics_model','learning_model']:

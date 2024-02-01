@@ -37,14 +37,14 @@ def test_2d_table_markov_basis_length(default_config):
 
         # Get new row and column sums
         new_total = int(np.random.randint(5,10))
-        new_rowsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(I),int(I))).tolist()
-        new_colsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(J),int(J))).tolist()
+        new_rowsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(I),int(I))).tolist()
+        new_colsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(J),int(J))).tolist()
 
         # Set update
         config_update = {"inputs":{"contingency_table":{"generate":{"I":int(I),"J":int(J),"rowsums":new_rowsums,"colsums":new_colsums}}}}
 
         # Change generated table size
-        updated_config.settings = deep_updates(d=updated_config.settings,u=config_update,overwrite=True)
+        updated_config.settings = deep_updates(d = updated_config.settings,u = config_update,overwrite = True)
 
         # Generate new table
         new_ct = ContingencyTable2D(updated_config)
@@ -96,14 +96,14 @@ def test_2d_table_markov_basis_validity(default_config):
 
         # Get new row and column sums
         new_total = int(np.random.randint(5,10))
-        new_rowsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(I),int(I))).tolist()
-        new_colsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(J),int(J))).tolist()
+        new_rowsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(I),int(I))).tolist()
+        new_colsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(J),int(J))).tolist()
 
         # Set update
         config_update = {"inputs":{"contingency_table":{"generate":{"I":int(I),"J":int(J),"rowsums":new_rowsums,"colsums":new_colsums}}}}
 
         # Change generated table size
-        updated_config.settings = deep_updates(updated_config.settings,config_update,overwrite=True)
+        updated_config.settings = deep_updates(updated_config.settings,config_update,overwrite = True)
 
         # Generate new table
         new_ct = ContingencyTable2D(updated_config)
@@ -140,8 +140,8 @@ def test_2d_table_all_markov_basis_validity(default_config):
 
         # Get new row and column sums
         new_total = int(np.random.randint(5,10))
-        new_rowsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(I),int(I))).tolist()
-        new_colsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(J),int(J))).tolist()
+        new_rowsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(I),int(I))).tolist()
+        new_colsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(J),int(J))).tolist()
 
         # Set update
         config_update = {"inputs":{"contingency_table":{"generate":{"I":int(I),"J":int(J),"rowsums":new_rowsums,"colsums":new_colsums}}}}
@@ -182,14 +182,14 @@ def test_2d_table_row_margin_preserving_markov_basis_length(default_config):
 
         # Get new row and column sums
         new_total = int(np.random.randint(5,10))
-        new_rowsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(I),int(I))).tolist()
-        new_colsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(J),int(J))).tolist()
+        new_rowsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(I),int(I))).tolist()
+        new_colsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(J),int(J))).tolist()
 
         # Set update
         config_update = {"inputs":{"contingency_table":{"generate":{"I":int(I),"J":int(J),"rowsums":new_rowsums,"colsums":new_colsums}}}}
 
         # Change generated table size
-        updated_config.settings = deep_updates(d=updated_config.settings,u=config_update,overwrite=True)
+        updated_config.settings = deep_updates(d = updated_config.settings,u = config_update,overwrite = True)
         if 'outputs' in list(updated_config.settings.keys()
             del updated_config.settings['outputs']
 
@@ -224,14 +224,14 @@ def test_2d_table_column_margin_preserving_markov_basis_length(default_config):
 
         # Get new row and column sums
         new_total = int(np.random.randint(5,10))
-        new_rowsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(I),int(I))).tolist()
-        new_colsums = np.random.multinomial(n=new_total,pvals=np.repeat(1./int(J),int(J))).tolist()
+        new_rowsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(I),int(I))).tolist()
+        new_colsums = np.random.multinomial(n = new_total,pvals = np.repeat(1./int(J),int(J))).tolist()
 
         # Set update
         config_update = {"inputs":{"contingency_table":{"generate":{"I":int(I),"J":int(J),"rowsums":new_rowsums,"colsums":new_colsums}}}}
 
         # Change generated table size
-        updated_config.settings = deep_updates(d=updated_config.settings,u=config_update,overwrite=True)
+        updated_config.settings = deep_updates(d = updated_config.settings,u = config_update,overwrite = True)
         if 'outputs' in list(updated_config.settings.keys()
             del updated_config.settings['outputs']
 
@@ -267,7 +267,7 @@ def test_2d_table_column_margin_preserving_markov_basis_length(default_config):
 #
 #         # Copy current table
 #         new_ct = deepcopy(ct)
-#         new_ct.resize(addRows=addRows,addCols=addCols)
+#         new_ct.resize(addRows = addRows,addCols = addCols)
 #
 #         # Build only new markov bases
 #         mb.update_and_augment(new_ct)

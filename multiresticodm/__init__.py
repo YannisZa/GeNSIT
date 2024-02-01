@@ -4,4 +4,4 @@ import os
 import warnings
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category = UserWarning)

@@ -21,7 +21,7 @@ for table_filename in table_filenames:
         sampling_method = 'permuted'
 
         # Instantiate table
-        ct = ContingencyTable2D(table=table,**settings)
+        ct = ContingencyTable2D(table = table,**settings)
 
         # Get total number of cells
         Ncells = np.prod(ct.table.shape)
@@ -29,7 +29,7 @@ for table_filename in table_filenames:
 
         if sampling_method == 'permuted':
             # Permute cells
-            permuted_cells = np.random.RandomState(seed=settings['seed']).permutation(ct.cells)
+            permuted_cells = np.random.RandomState(seed = settings['seed']).permutation(ct.cells)
             # Get first X percentage of cells
             constrained_cells = permuted_cells[:int(np.round((percentage_of_cells*Ncells)/100))]
             # Convert to tuples
@@ -41,18 +41,18 @@ for table_filename in table_filenames:
         settings['constraints']['cells'] = constrained_cells
 
         # Instantiate table with new constraints
-        ct = ContingencyTable2D(table=table,**settings)
+        ct = ContingencyTable2D(table = table,**settings)
 
         # Print constraint table
-        print(ct.constraint_table(with_margins=True))
+        print(ct.constraint_table(with_margins = True))
 
 
         print(f"{len(constrained_cells)} cells selected")
         print(f"{len(ct.cells)} cells need to be learned")
 
         print("Minimum number of cells to be learned")
-        learned_cells_ax0 = (ct.constraint_table(with_margins=False) < 0).sum(axis=0)
-        learned_cells_ax1 = (ct.constraint_table(with_margins=False) < 0).sum(axis=1)
+        learned_cells_ax0 = (ct.constraint_table(with_margins = False) < 0).sum(axis = 0)
+        learned_cells_ax1 = (ct.constraint_table(with_margins = False) < 0).sum(axis = 1)
         print(f"ax = 0 | min = {np.min(learned_cells_ax0)}, argmin = {np.argmin(learned_cells_ax0)+1}")
         print(f"ax = 1 | min = {np.min(learned_cells_ax1)}, argmin = {np.argmin(learned_cells_ax1)+1}")
 

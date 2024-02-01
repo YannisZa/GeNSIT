@@ -78,7 +78,7 @@ class Test5Helpers:
     
     def pytorch_log_product_multinomial_unnormalised_pmf(intensity_tor,table_tor):
         # Compute log pmf
-        log_colsums = torch.unsqueeze(torch.log((torch.sum(intensity_tor,dim=1)+1e-8)), dim=1)
+        log_colsums = torch.unsqueeze(torch.log((torch.sum(intensity_tor,dim = 1)+1e-8)), dim = 1)
         log_probabilities = torch.log(intensity_tor) - log_colsums
         return torch.sum(torch.mul(table_tor,log_probabilities)) - torch.sum(torch.lgamma(table_tor+1))
 
@@ -88,8 +88,8 @@ class Test5Helpers:
 
     def pytorch_odds_ratio(intensity_tor):
         # Compute margins
-        intensity_rowsums = torch.unsqueeze(torch.sum(intensity_tor,dim=1),dim=1)
-        intensity_colsums = torch.unsqueeze(torch.sum(intensity_tor,dim=0),dim=0)
+        intensity_rowsums = torch.unsqueeze(torch.sum(intensity_tor,dim = 1),dim = 1)
+        intensity_colsums = torch.unsqueeze(torch.sum(intensity_tor,dim = 0),dim = 0)
         intensity_total = torch.sum(intensity_rowsums)
         # Compute odds ratio and margins
         odds_ratio = torch.div(
@@ -102,7 +102,7 @@ class Test5Helpers:
         # Compute log odds ratio
         odds_ratio_tor = Test5Helpers.pytorch_odds_ratio(intensity_tor)
         # Compute log odds ratio margins
-        odds_ratio_colsums_tor = torch.unsqueeze(torch.sum(odds_ratio_tor,dim=0),dim=0)
+        odds_ratio_colsums_tor = torch.unsqueeze(torch.sum(odds_ratio_tor,dim = 0),dim = 0)
         log_odds_ratio_probabilities = torch.log(odds_ratio_tor) - torch.log(odds_ratio_colsums_tor)
         return torch.sum(torch.mul(table_tor,log_odds_ratio_probabilities)) - torch.sum(torch.lgamma(table_tor+1))
 
@@ -145,7 +145,7 @@ def sim_default_config(cost_matrix_2x3,log_destination_attraction_2x3,origin_dem
 def ct_default(table_2x3_n100):
     # Import config
     kwargs = {"constraints":{"axes":[[0,1]]}}
-    ct_default = ContingencyTable2D(table=table_2x3_n100,**kwargs)
+    ct_default = ContingencyTable2D(table = table_2x3_n100,**kwargs)
     return ct_default
 
 @pytest.fixture
@@ -178,7 +178,7 @@ def test_odds_ratio(totally_constrained_log_intensity,test5_helpers):
     nrows,ncols = np.shape(totally_constrained_log_intensity)
 
     # Convert object to torch tensors
-    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad=True)
+    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad = True)
 
     # My gradient
     my_log_or = log_odds_ratio_wrt_intensity(totally_constrained_log_intensity)
@@ -202,8 +202,8 @@ def test_odds_ratio(totally_constrained_log_intensity,test5_helpers):
 
 def test_poisson_pmf(ct_default,totally_constrained_log_intensity,test5_helpers):
     # Convert object to torch tensors
-    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad=True)
-    table_tor = torch.tensor(ct_default.table,requires_grad=False)
+    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad = True)
+    table_tor = torch.tensor(ct_default.table,requires_grad = False)
 
     # Normalised pmf
     # Compute log pmf using my method
@@ -218,8 +218,8 @@ def test_poisson_pmf_jacobian(ct_default,totally_constrained_log_intensity,test5
     # Dimensions
     nrows,ncols = np.shape(ct_default.table)
     # Convert object to torch tensors
-    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad=True).float()
-    table_tor = torch.tensor(ct_default.table,requires_grad=False).float()
+    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad = True).float()
+    table_tor = torch.tensor(ct_default.table,requires_grad = False).float()
     # Compute likelihood derivative wrt to log intensity using my method
     my_log_pmf_jacobian = log_poisson_pmf_jacobian_wrt_intensity(totally_constrained_log_intensity,ct_default.table)
 
@@ -241,10 +241,10 @@ def test_poisson_pmf_jacobian_wrt_xx(test5_helpers,totally_constrained_sim,ct_de
     nrows,ncols = np.shape(ct_default.table)
     theta = np.array([0.8,0.5])
     xx = totally_constrained_sim.log_destination_attraction
-    xx_tor = torch.tensor(xx, requires_grad=True).float()
-    theta_tor = torch.tensor(theta, requires_grad=False).float()
-    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad=False).float()
-    table_tor = torch.tensor(ct_default.table,requires_grad=False).float()
+    xx_tor = torch.tensor(xx, requires_grad = True).float()
+    theta_tor = torch.tensor(theta, requires_grad = False).float()
+    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad = False).float()
+    table_tor = torch.tensor(ct_default.table,requires_grad = False).float()
 
     # Compute the Jacobian of z with respect to x
     true_jacobian_tor,_,_,_ = torch.autograd.functional.jacobian(
@@ -278,8 +278,8 @@ def test_multinomial_pmf(ct_default,totally_constrained_log_intensity,test5_help
     # Dimensions
     nrows,ncols = np.shape(ct_default.table)
 
-    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad=True)
-    table_tor = torch.tensor(ct_default.table,requires_grad=False)
+    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad = True)
+    table_tor = torch.tensor(ct_default.table,requires_grad = False)
 
     # Normalised pmf
     # Compute log pmf using my method
@@ -294,8 +294,8 @@ def test_multinomial_pmf_jacobian(ct_default,totally_constrained_log_intensity,t
     # Dimensions
     nrows,ncols = np.shape(ct_default.table)
 
-    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad=True).float()
-    table_tor = torch.tensor(ct_default.table,requires_grad=False).float()
+    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad = True).float()
+    table_tor = torch.tensor(ct_default.table,requires_grad = False).float()
     
     # Compute likelihood derivative wrt to log intensity using my method
     my_log_pmf_jacobian = log_multinomial_pmf_jacobian_wrt_intensity(totally_constrained_log_intensity,ct_default.table)
@@ -318,10 +318,10 @@ def test_multinomial_pmf_jacobian_wrt_xx(test5_helpers,totally_constrained_sim,c
     _,ncols = np.shape(ct_default.table)
     theta = np.array([0.8,0.5])
     xx = totally_constrained_sim.log_destination_attraction
-    xx_tor = torch.tensor(xx, requires_grad=True).float()
-    theta_tor = torch.tensor(theta, requires_grad=False).float()
-    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad=False).float()
-    table_tor = torch.tensor(ct_default.table,requires_grad=False).float()
+    xx_tor = torch.tensor(xx, requires_grad = True).float()
+    theta_tor = torch.tensor(theta, requires_grad = False).float()
+    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad = False).float()
+    table_tor = torch.tensor(ct_default.table,requires_grad = False).float()
 
     # Compute the Jacobian of z with respect to x
     true_jacobian_tor,_,_,_ = torch.autograd.functional.jacobian(
@@ -362,8 +362,8 @@ def test_multinomial_pmf_jacobian_wrt_xx(test5_helpers,totally_constrained_sim,c
 
 def test_product_multinomial_pmf(ct_default,totally_constrained_log_intensity,test5_helpers):
     # Convert object to torch tensors
-    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad=True)
-    table_tor = torch.tensor(ct_default.table,requires_grad=False)
+    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad = True)
+    table_tor = torch.tensor(ct_default.table,requires_grad = False)
 
     # Normalised pmf
     # Compute log pmf using my method
@@ -378,8 +378,8 @@ def test_product_multinomial_pmf_jacobian(ct_default,totally_constrained_log_int
     # Dimensions
     nrows,ncols = np.shape(ct_default.table)
     # Convert object to torch tensors
-    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad=True).float()
-    table_tor = torch.tensor(ct_default.table,requires_grad=False).float()
+    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad = True).float()
+    table_tor = torch.tensor(ct_default.table,requires_grad = False).float()
     
     # Compute likelihood derivative wrt to log intensity using my method
     my_log_pmf_jacobian = log_product_multinomial_pmf_jacobian_wrt_intensity(totally_constrained_log_intensity,ct_default.table)
@@ -402,10 +402,10 @@ def test_product_multinomial_pmf_jacobian_wrt_xx(test5_helpers,totally_constrain
     nrows,ncols = np.shape(ct_default.table)
     theta = np.array([0.8,0.5])
     xx = totally_constrained_sim.log_destination_attraction
-    xx_tor = torch.tensor(xx, requires_grad=True).float()
-    theta_tor = torch.tensor(theta, requires_grad=False).float()
-    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad=False).float()
-    table_tor = torch.tensor(ct_default.table,requires_grad=False).float()
+    xx_tor = torch.tensor(xx, requires_grad = True).float()
+    theta_tor = torch.tensor(theta, requires_grad = False).float()
+    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad = False).float()
+    table_tor = torch.tensor(ct_default.table,requires_grad = False).float()
 
     # Compute the Jacobian of z with respect to x
     true_jacobian_tor,_,_,_ = torch.autograd.functional.jacobian(
@@ -437,8 +437,8 @@ def test_product_multinomial_pmf_jacobian_wrt_xx(test5_helpers,totally_constrain
 
 def test_fishers_hypergeometric_pmf(ct_default,totally_constrained_log_intensity,test5_helpers):
     # Convert object to torch tensors
-    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad=True)
-    table_tor = torch.tensor(ct_default.table,requires_grad=False)
+    intensity_tor = torch.tensor(np.exp(totally_constrained_log_intensity),requires_grad = True)
+    table_tor = torch.tensor(ct_default.table,requires_grad = False)
 
     # Normalised pmf
     # Compute log pmf using my method
@@ -455,8 +455,8 @@ def test_fishers_hypergeometric_pmf_jacobian_wrt_intensity(ct_default,totally_co
     # Intensity function
     intensity = np.exp(totally_constrained_log_intensity)
     # Convert object to torch tensors
-    intensity_tor = torch.tensor(intensity,requires_grad=True).float()
-    table_tor = torch.tensor(ct_default.table,requires_grad=False).float()
+    intensity_tor = torch.tensor(intensity,requires_grad = True).float()
+    table_tor = torch.tensor(ct_default.table,requires_grad = False).float()
 
     # Compute likelihood derivative wrt to log intensity using my method
     my_log_pmf_jacobian = log_fishers_hypergeometric_pmf_jacobian_wrt_intensity(totally_constrained_log_intensity,ct_default.table)
@@ -480,10 +480,10 @@ def test_fishers_hypergeometric_pmf_jacobian_wrt_xx(test5_helpers,totally_constr
     nrows,ncols = np.shape(ct_default.table)
     theta = np.array([0.8,0.5])
     xx = totally_constrained_sim.log_destination_attraction
-    xx_tor = torch.tensor(xx, requires_grad=True).float()
-    theta_tor = torch.tensor(theta, requires_grad=False).float()
-    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad=False).float()
-    table_tor = torch.tensor(ct_default.table,requires_grad=False).float()
+    xx_tor = torch.tensor(xx, requires_grad = True).float()
+    theta_tor = torch.tensor(theta, requires_grad = False).float()
+    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad = False).float()
+    table_tor = torch.tensor(ct_default.table,requires_grad = False).float()
 
     # Compute the Jacobian of z with respect to x
     true_jacobian_tor,_,_,_ = torch.autograd.functional.jacobian(

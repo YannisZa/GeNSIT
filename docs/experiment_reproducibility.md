@@ -7,8 +7,8 @@ Set `ulimit -n 50000`
 ## Experiment 1
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 6 -nw 4
-clear; multiresticodm run ./data/inputs/configs/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 6 -nw 4
+clear; multiresticodm run ./data/inputs/configs/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 4 -nw 6
+clear; multiresticodm run ./data/inputs/configs/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 4 -nw 6
 ```
 
 ## Experiment 2
@@ -53,7 +53,7 @@ clear; multiresticodm summarise \
 ```
 clear; multiresticodm summarise \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
--d NonJointTableSIM_NN_SweepedNoise_30_01_2024_23_25_12 -d JointTableSIM_NN_SweepedNoise_30_01_2024_21_29_31  \
+-d NonJointTableSIM_NN_SweepedNoise_30_01_2024_23_25_12  \
 -el np -el MathUtils -el xr \
 -e table_srmse "srmse_func(prediction=mean_table,ground_truth=ground_truth)" \
 -e intensity_srmse "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \

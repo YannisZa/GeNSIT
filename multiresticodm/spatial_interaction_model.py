@@ -243,7 +243,7 @@ class SpatialInteraction2D(SpatialInteraction):
         # Squeeze output
         log_flow = torch.squeeze(log_flow)
         # Compute destination demand
-        log_destination_demand = torch.logsumexp(log_flow,dim=0)
+        log_destination_demand = torch.logsumexp(log_flow,dim = 0)
         
         return torch.exp(log_destination_demand)
     

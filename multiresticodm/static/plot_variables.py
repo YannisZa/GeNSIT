@@ -172,11 +172,11 @@ bluegreen = LinearSegmentedColormap.from_list(
                 ]
             )
         ),
-        N=256
+        N = 256
 )
 bluegreen.set_bad((0,0,0,1))
 if not cmap_exists("bluegreen"):
-    cm.register_cmap(cmap=bluegreen, name="bluegreen")
+    cm.register_cmap(cmap = bluegreen, name="bluegreen")
 
 yellowpurple = LinearSegmentedColormap.from_list(
         "yellowpurple",
@@ -195,11 +195,11 @@ yellowpurple = LinearSegmentedColormap.from_list(
                 ]
             )
         ),
-        N=256
+        N = 256
 )
 yellowpurple.set_bad((0,0,0,1))
 if not cmap_exists("yellowpurple"):
-    cm.register_cmap(cmap=yellowpurple, name="yellowpurple")
+    cm.register_cmap(cmap = yellowpurple, name="yellowpurple")
 
 
 
@@ -217,10 +217,10 @@ yellowblue = LinearSegmentedColormap.from_list(
                  (0./255.,0./255.,139./255.,1)]
             )
         ),
-        N=256
+        N = 256
 )
 if not cmap_exists("yellowblue"):
-    cm.register_cmap(cmap=yellowblue, name="yellowblue")
+    cm.register_cmap(cmap = yellowblue, name="yellowblue")
 
 
 redgreen = LinearSegmentedColormap.from_list(
@@ -238,10 +238,10 @@ redgreen = LinearSegmentedColormap.from_list(
                  (0./255.,100./255.,0./255.,1)]
             )
         ),
-        N=256
+        N = 256
 )
 if not cmap_exists("redgreen"):
-    cm.register_cmap(cmap=redgreen, name="redgreen")
+    cm.register_cmap(cmap = redgreen, name="redgreen")
 
 cblue = LinearSegmentedColormap.from_list(
         "cblue", 
@@ -251,7 +251,7 @@ cblue = LinearSegmentedColormap.from_list(
         ]
 )
 if not cmap_exists("cblue"):
-    cm.register_cmap(cmap=cblue, name="cblue")
+    cm.register_cmap(cmap = cblue, name="cblue")
 
 cgreen = LinearSegmentedColormap.from_list(
         "cgreen", 
@@ -261,7 +261,7 @@ cgreen = LinearSegmentedColormap.from_list(
         ]
 )
 if not cmap_exists("cgreen"):
-    cm.register_cmap(cmap=cgreen, name="cgreen")
+    cm.register_cmap(cmap = cgreen, name="cgreen")
 
 cred = LinearSegmentedColormap.from_list(
     "cred", 
@@ -271,4 +271,4 @@ cred = LinearSegmentedColormap.from_list(
     ]
 )
 if not cmap_exists("cred"):
-    cm.register_cmap(cmap=cred, name="cred")
+    cm.register_cmap(cmap = cred, name="cred")

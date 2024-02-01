@@ -38,7 +38,7 @@ class InvalidDataLength(DataException):
         """
 
 class DuplicateData(DataException):
-    def __init__(self,message:str,len_data:int=0,len_unique_data:int=0,**kwargs):
+    def __init__(self,message:str,len_data:int = 0,len_unique_data:int = 0,**kwargs):
         super().__init__(message)
         self.message = message
         self.len_data = len_data

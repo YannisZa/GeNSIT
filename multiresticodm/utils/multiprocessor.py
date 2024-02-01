@@ -16,7 +16,7 @@ class BoundedQueuePoolExecutor:
         return future
 
 class BoundedQueueProcessPoolExecutor(BoundedQueuePoolExecutor, concurrent.futures.ProcessPoolExecutor):
-    def __init__(self, *args, max_waiting_tasks=None, **kwargs):
+    def __init__(self, *args, max_waiting_tasks = None, **kwargs):
         concurrent.futures.ProcessPoolExecutor.__init__(self, *args, **kwargs)
         if max_waiting_tasks is None:
             max_waiting_tasks = self._max_workers

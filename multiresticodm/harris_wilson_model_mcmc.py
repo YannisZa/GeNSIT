@@ -24,7 +24,7 @@ AIS_SAMPLE_ARGS = ['alpha','beta','gamma','n_temperatures','ais_samples','leapfr
 
 def instantiate_harris_wilson_mcmc(config:Config,physics_model:HarrisWilson,**kwargs):
     if hasattr(sys.modules[__name__], ('HarrisWilsonMarkovChainMonteCarlo')):
-        return getattr(sys.modules[__name__],f"HarrisWilson{len(unpack_dims(config['inputs']['dims'],time_dims=False))}DMarkovChainMonteCarlo")(
+        return getattr(sys.modules[__name__],f"HarrisWilson{len(unpack_dims(config['inputs']['dims'],time_dims = False))}DMarkovChainMonteCarlo")(
             config = config,
             physics_model = physics_model,
             **kwargs
@@ -86,12 +86,12 @@ class HarrisWilsonMarkovChainMonteCarlo():
             N *= int(self.config.settings['mcmc']['parameters'].get('theta_steps',1))
         self.logger.note(f'Attempting to import {N} stopping times')
         # Try to import stopping times from file
-        read_stopping_times = self.import_stopping_times(N=N)
+        read_stopping_times = self.import_stopping_times(N = N)
         # If file is not provided
         if not read_stopping_times:
             # Generate stopping times
             self.logger.note('Generating stopping times')
-            self.stopping_times = ProbabilityUtils.generate_stopping_times(N=N,k_power=self.k_power,seed=self.config['inputs'].get('seed'))
+            self.stopping_times = ProbabilityUtils.generate_stopping_times(N = N,k_power = self.k_power,seed = self.config['inputs'].get('seed'))
             # Reset random seed
             set_seed(None)
             # Export stopping times
@@ -111,7 +111,7 @@ class HarrisWilsonMarkovChainMonteCarlo():
         if path.isfile(self.stopping_times_filepath):
             # Get number of samples of stopping times in file
             self.stopping_times = np.loadtxt(self.stopping_times_filepath,dtype='int32')
-            self.stopping_times = torch.tensor(self.stopping_times,dtype=float32,device=self.device)
+            self.stopping_times = torch.tensor(self.stopping_times,dtype = float32,device = self.device)
             # If there are more than the number of samples needs load stopping times
             # Otherwise generate new stopping times
             if len(self.stopping_times) == N:
@@ -189,7 +189,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             # Store number of bridging distributions in temperature schedule of AIS
             self.destination_attraction_n_bridging_distributions = self.config.settings['mcmc']['destination_attraction']['n_bridging_distributions']
             # Store power of k for truncating infinite series of AIS samples
-            self.k_power = torch.tensor(1.1,dtype=float32,device=self.device)#self.config.settings['mcmc']['destination_attraction']['k_power']
+            self.k_power = torch.tensor(1.1,dtype = float32,device = self.device)#self.config.settings['mcmc']['destination_attraction']['k_power']
 
             # Get stopping times for Z inverse estimator
             self.load_stopping_times()
@@ -206,7 +206,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             self.log_destination_attraction_step = self.log_destination_attraction_gibbs_step
 
         # Store proposal covariance
-        self.theta_proposal_covariance = torch.tensor(self.config.settings['mcmc']['parameters']['covariance'],dtype=float32,device=self.device)
+        self.theta_proposal_covariance = torch.tensor(self.config.settings['mcmc']['parameters']['covariance'],dtype = float32,device = self.device)
         # Store theta step size
         self.theta_step_size = self.config.settings['mcmc']['parameters']['step_size']
 
@@ -256,8 +256,8 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         self.logger.debug('negative_table_log_likelihood')
         
         log_likelihood = self.table_unnormalised_log_likelihood(
-            log_intensity=log_intensity,
-            table=table
+            log_intensity = log_intensity,
+            table = table
         )
         return -log_likelihood
     
@@ -293,8 +293,8 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             beta = beta
         )
         log_likelihood = self.table_unnormalised_log_likelihood(
-            log_intensity=log_intensity,
-            table=table
+            log_intensity = log_intensity,
+            table = table
         )
         return -log_likelihood
 
@@ -311,8 +311,8 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # Get log table likelihood derivative with respect to inputs
         return -torch.autograd.functional.jacobian(
             self.negative_table_log_likelihood_expanded, 
-            inputs=tuple([kwargs[k].to(dtype=float32) for k in ['log_destination_attraction','table','alpha','beta']]), 
-            create_graph=True
+            inputs = tuple([kwargs[k].to(dtype = float32) for k in ['log_destination_attraction','table','alpha','beta']]), 
+            create_graph = True
         )[0]
     
     def negative_table_log_likelihood_and_gradient(
@@ -401,13 +401,13 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         log_weights = -torch.log(
             torch.tensor(
                 ais_samples,
-                dtype=float32,
-                device=self.device
+                dtype = float32,
+                device = self.device
             )
         ) * torch.ones(
             ais_samples,
-            dtype=float32,
-            device=self.device
+            dtype = float32,
+            device = self.device
         )
         # For each particle
         for ip in range(ais_samples):
@@ -417,10 +417,10 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             gamma_distr = torch.distributions.gamma.Gamma(gamma*(delta+1./Ndestinations), 1./(gamma*kappa))
             xx = torch.log(gamma_distr.sample(torch.tensor((Ndestinations,))))
             # Compute potential of prior distribution (temperature = 0)
-            V0, gradV0 = self.physics_model.sde_ais_potential_and_jacobian(log_destination_attraction=xx,**kwargs)
+            V0, gradV0 = self.physics_model.sde_ais_potential_and_jacobian(log_destination_attraction = xx,**kwargs)
 
             # Compute potential of target distribution (temperature = 1)
-            V1, gradV1 = self.physics_model.sde_potential_and_gradient(log_destination_attraction=xx,**kwargs)
+            V1, gradV1 = self.physics_model.sde_potential_and_gradient(log_destination_attraction = xx,**kwargs)
             
             # Anneal
             for it in range(1, n_temperatures):
@@ -447,9 +447,9 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
                     # Make a full step in latent space
                     x_p = x_p + epsilon_step*p_p
                     # Compute potential of prior distribution
-                    V0_p, gradV0_p = self.physics_model.sde_ais_potential_and_jacobian(log_destination_attraction=x_p,**kwargs)
+                    V0_p, gradV0_p = self.physics_model.sde_ais_potential_and_jacobian(log_destination_attraction = x_p,**kwargs)
                     # Compute potential of target distribution
-                    V1_p, gradV1_p = self.physics_model.sde_potential_and_gradient(log_destination_attraction=x_p,**kwargs)
+                    V1_p, gradV1_p = self.physics_model.sde_potential_and_gradient(log_destination_attraction = x_p,**kwargs)
                     # Compute log tempered distribution log p_j(x_{j))
                     V_p, gradV_p = negative_temperatures[it]*V0_p + temperatures[it]*V1_p, negative_temperatures[it]*gradV0_p + temperatures[it]*gradV1_p
                     # Make another half step in momentum space
@@ -472,7 +472,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
         # Take the mean of the particles corresponding to a given target distribution weight
         # You can see this is the case by looking at the initialisation of log_weights
-        return torch.logsumexp(log_weights.ravel(),dim=0)
+        return torch.logsumexp(log_weights.ravel(),dim = 0)
     
     def annealed_importance_sampling_log_z_parallel(
         self,
@@ -481,7 +481,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
     ):
         # Run experiments in parallel
         ctx = mp.get_context('spawn')
-        # pbar = tqdm(total=N, desc='Running AIS in parallel',leave=False)
+        # pbar = tqdm(total = N, desc='Running AIS in parallel',leave = False)
 
         kwargs['semaphore'] = None
         # kwargs['pbar'] = pbar
@@ -533,8 +533,8 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         fs = np.asarray([
             self.physics_model.sde_potential(
                 torch.tensor(xs[i]).to(
-                    dtype=float32,
-                    device=self.device
+                    dtype = float32,
+                    device = self.device
                 ),
                 **theta,
                 **vars(self.physics_model.params),
@@ -560,8 +560,8 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         L = torch.linalg.cholesky(A)
         # Compute the log determinant of the hessian
         # det(Hessian) = det(L)*det(L^T) = det(L)^2
-        # det(L) = \prod_{j=1}^M L_{jj} and
-        # \log(det(L)) = \sum_{j=1}^M \log(L_{jj})
+        # det(L) = \prod_{j = 1}^M L_{jj} and
+        # \log(det(L)) = \sum_{j = 1}^M \log(L_{jj})
         # So \log(det(Hessian)^(1/2)) = \log(det(L))
         half_log_det_A = torch.sum(torch.log(torch.diag(L)))
 
@@ -573,7 +573,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # log_likelihood_values[i, j] = -lap - si.sde_potential_and_gradient(xd,theta)[0]
 
         # Return array
-        ret = torch.empty(2,dtype=float32,device=self.device)
+        ret = torch.empty(2,dtype = float32,device = self.device)
         # Log z(\theta) without the constant (2\pi\gamma^{-1})^{M/2}
         ret[0] = minimum_potential + half_log_det_A
         # self.physics_model.sde_potential_and_gradient(minimum,theta)[0] +  half_log_det_A
@@ -599,7 +599,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             # self.logger.debug(f"Multiprocessing with workers = {min(self.n_workers,N+1)}")
             # with joblib_progress(f"Multiprocessing {min(self.n_workers,N+1)}", total=(N+1)):
             # log_weights = torch.asarray(
-            #     Parallel(n_jobs=min(self.n_workers,N+1))(
+            #     Parallel(n_jobs = min(self.n_workers,N+1))(
             #         delayed(self.annealed_importance_sampling_log_z_partial)(i,theta) for i in range(N+1)
             #     )
             # )
@@ -608,26 +608,26 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
             self.logger.debug(f"annealed_importance_sampling_log_z_parallel")
             log_weights = self.annealed_importance_sampling_log_z_parallel(
                 (N+1),
-                ais_samples=int(self.destination_attraction_ais_samples),
-                n_temperatures=int(self.destination_attraction_n_bridging_distributions),
-                leapfrog_steps=int(self.destination_attraction_leapfrog_steps_ais),
-                epsilon_step=float(self.destination_attraction_leapfrog_step_size_ais),
+                ais_samples = int(self.destination_attraction_ais_samples),
+                n_temperatures = int(self.destination_attraction_n_bridging_distributions),
+                leapfrog_steps = int(self.destination_attraction_leapfrog_steps_ais),
+                epsilon_step = float(self.destination_attraction_leapfrog_step_size_ais),
                 **{p:theta[p] if theta.get(p,None) is not None else getattr(self.physics_model.params,p) for p in ['alpha','beta','gamma']}
             )
-            log_weights = log_weights.to(dtype=float32,device=self.device)
+            log_weights = log_weights.to(dtype = float32,device = self.device)
         else:
             log_weights = []
             self.logger.debug(f"annealed_importance_sampling_log_z_partial")
             for i in range(N+1):
                 log_weights.append(self.annealed_importance_sampling_log_z(
                     i,
-                    ais_samples=int(self.destination_attraction_ais_samples),
-                    n_temperatures=int(self.destination_attraction_n_bridging_distributions),
-                    leapfrog_steps=int(self.destination_attraction_leapfrog_steps_ais),
-                    epsilon_step=float(self.destination_attraction_leapfrog_step_size_ais),
+                    ais_samples = int(self.destination_attraction_ais_samples),
+                    n_temperatures = int(self.destination_attraction_n_bridging_distributions),
+                    leapfrog_steps = int(self.destination_attraction_leapfrog_steps_ais),
+                    epsilon_step = float(self.destination_attraction_leapfrog_step_size_ais),
                     **{p:theta[p] if theta.get(p,None) is not None else getattr(self.physics_model.params,p) for p in ['alpha','beta','gamma']}
                 ))
-            log_weights = torch.tensor(log_weights,dtype=float32,device=self.device)
+            log_weights = torch.tensor(log_weights,dtype = float32,device = self.device)
         
         if not torch.all(torch.isfinite(log_weights)):
             raise Exception('Nulls/NaNs found in annealed importance sampling')
@@ -668,7 +668,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # print('log_z_inverse',log_z_inverse)
 
         # Theta-proposal (random walk with reflecting boundaries
-        rndm_walk = self.theta_step_size*torch.matmul(self.theta_proposal_covariance, torch.randn(2,dtype=float32,device=self.device))
+        rndm_walk = self.theta_step_size*torch.matmul(self.theta_proposal_covariance, torch.randn(2,dtype = float32,device = self.device))
         theta_new = deepcopy(theta_prev)
         for i,prev in enumerate(theta_prev):
             # Perform one step
@@ -695,8 +695,8 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
         # Compute inverse of z(theta)
         log_z_inverse_new, sign_new = self.z_inverse(
-            index=index,
-            theta=theta_new_dict
+            index = index,
+            theta = theta_new_dict
         )
 
         # Evaluate log potential function for theta proposal
@@ -757,7 +757,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # print('log_z_inverse',log_z_inverse)
 
         # Theta-proposal (random walk with reflecting boundaries
-        theta_new = theta_prev.unsqueeze(dim=1) + self.theta_step_size*torch.matmul(self.theta_proposal_covariance, torch.randn((2,1)))
+        theta_new = theta_prev.unsqueeze(dim = 1) + self.theta_step_size*torch.matmul(self.theta_proposal_covariance, torch.randn((2,1)))
         theta_new = theta_new.squeeze()
         # Relfect the boundaries if theta proposal falls outside of [0,2]^2
         for j in range(2):
@@ -782,8 +782,8 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
         # Compute inverse of z(theta)
         log_z_inverse_new, sign_new = self.z_inverse(
-            index=index,
-            theta=theta_new_dict
+            index = index,
+            theta = theta_new_dict
         )
 
         # Evaluate log potential function for theta proposal
@@ -818,14 +818,14 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # log_intensities_prev = self.physics_model.intensity_model.log_intensity(
         #                     log_destination_attraction,
         #                     theta_scaled_and_expanded_prev,
-        #                     total_flow=torch.sum(table.ravel())
+        #                     total_flow = torch.sum(table.ravel())
         #                 )
         # theta_scaled_and_expanded_new = torch.concatenate([theta_new,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
         # theta_scaled_and_expanded_new[1] *= self.physics_model.params.bmax
         # log_intensities_new = self.physics_model.intensity_model.log_intensity(
         #                     log_destination_attraction,
         #                     theta_scaled_and_expanded_new,
-        #                     total_flow=torch.sum(table.ravel())
+        #                     total_flow = torch.sum(table.ravel())
         #                 )
         # print(("Proposing " + str(theta_new)))
         # print(("Current sample " + str(theta_prev)))
@@ -888,7 +888,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         ''' Log destination demand update '''
 
         # Initialize leapfrog integrator for HMC proposal
-        momentum = torch.randn(size=(self.physics_model.intensity_model.dims['destination'],),dtype=float32,device=self.device)
+        momentum = torch.randn(size=(self.physics_model.intensity_model.dims['destination'],),dtype = float32,device = self.device)
         # Compute -log(\pi(y|x))
         negative_log_data_likelihood, \
         negative_gradient_log_data_likelihood = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
@@ -1030,7 +1030,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # print('negative_log_table_likelihood copy',negative_log_table_likelihood_copy)
         
         # Initialize leapfrog integrator for HMC proposal
-        momentum = torch.randn(size=(self.physics_model.intensity_model.dims['destination'],),dtype=float32,device=self.device)
+        momentum = torch.randn(size=(self.physics_model.intensity_model.dims['destination'],),dtype = float32,device = self.device)
         # Compute -log(\pi(y|x))
         negative_log_data_likelihood, \
         negative_gradient_log_data_likelihood = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
@@ -1188,10 +1188,10 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
         # Compute variances
         # print('Data variance',torch.repeat(self.physics_model.noise_var,self.physics_model.intensity_model.dims['destination']))
-        # table_rowsums = table.sum(axis=1).reshape((self.physics_model.intensity_model.dims[0],1))
+        # table_rowsums = table.sum(axis = 1).reshape((self.physics_model.intensity_model.dims[0],1))
         # intensity_rowsums = torch.array([logsumexp(log_intensity[i,:]) for i in range(self.physics_model.intensity_model.dims[0])]).reshape((self.physics_model.intensity_model.dims[0],1))
         # intensity_probs = torch.exp( log_intensity - intensity_rowsums )
-        # table_variance = torch.sum(table_rowsums*intensity_probs*(1-intensity_probs),axis=0)
+        # table_variance = torch.sum(table_rowsums*intensity_probs*(1-intensity_probs),axis = 0)
         # print('Table variance',table_variance)
 
         # UNCOMMENT

@@ -7,7 +7,7 @@ from copy import deepcopy
 from torch import int32, float32, uint8, int8, float64, int64, int16
 from torch import bool as tbool
 
-def deep_walk(indict, pre=None):
+def deep_walk(indict, pre = None):
     pre = pre[:] if pre else []
     if isinstance(indict, dict):
         for key, value in indict.items():
@@ -98,7 +98,7 @@ NUMPY_TO_TORCH_DTYPE = {
 TORCH_TO_NUMPY_DTYPE = {v:k for k,v in NUMPY_TO_TORCH_DTYPE.items()}
 
 
-def sigmoid(beta=torch.tensor(1.0)):
+def sigmoid(beta = torch.tensor(1.0)):
     """Extends the torch.nn.sigmoid activation function by allowing for a slope parameter."""
     return lambda x: torch.sigmoid(beta * x)
 

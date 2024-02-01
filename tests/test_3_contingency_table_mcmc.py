@@ -323,7 +323,7 @@ def test_similarity_measure(ct,sim):
 #     fnew,step_size,basis_func,index,_ = mcmc.proposal(fold,np.array([]))
 
 #     print(fold)
-#     print(f_to_array(basis_func,shape=ct_copy.shape()))
+#     print(f_to_array(basis_func,shape = ct_copy.shape()))
 #     print(fnew)
 
 #     # Compute acceptance ratio
@@ -376,7 +376,7 @@ def test_similarity_measure(ct,sim):
 #     print(fold)
 #     # print(f_to_df(add))
 #     print(fnew)
-#     print(f_to_array(basis_func,shape=ct.shape()))
+#     print(f_to_array(basis_func,shape = ct.shape()))
 
 #     # Compute acceptance ratio
 #     log_acc = mcmc.log_acceptance_ratio(fnew,fold,np.zeros((ct.I,ct.J)))
@@ -430,7 +430,7 @@ def test_similarity_measure(ct,sim):
 #     log_acc = mcmc.log_acceptance_ratio(fnew,fold,np.zeros((ct_2x2_copy.I,ct_2x2_copy.J)))
 
 #     print(fold)
-#     print(f_to_array(dummy_degree_higher_proposal_addition_2x2_table,shape=ct_2x2_copy.shape()))
+#     print(f_to_array(dummy_degree_higher_proposal_addition_2x2_table,shape = ct_2x2_copy.shape()))
 #     print(fnew)
 #     print(dummy_degree_higher_proposal_2x2_table)
 
@@ -498,7 +498,7 @@ def test_similarity_measure(ct,sim):
 #     print(fold)
 #     print(fnew)
 #     print(dummy_degree_one_proposal_noncentral_2x3_table)
-#     print(f_to_array(basis_func,shape=ct_copy.shape()))
+#     print(f_to_array(basis_func,shape = ct_copy.shape()))
 #     print(log_acc)
 
 #     # Proposal should be both admissible and non-negative
@@ -551,8 +551,8 @@ def test_similarity_measure(ct,sim):
 #     print(fold)
 #     print(fnew)
 #     print('\n')
-#     print(f_to_array(basis_func,shape=ct_copy.shape()))
-#     print(f_to_array(dummy_degree_higher_proposal_noncentral_addition_2x3_table,shape=ct_copy.shape()))
+#     print(f_to_array(basis_func,shape = ct_copy.shape()))
+#     print(f_to_array(dummy_degree_higher_proposal_noncentral_addition_2x3_table,shape = ct_copy.shape()))
 #     print(dummy_degree_higher_proposal_noncentral_2x3_table)
 #     # print(non_negative_epsilon_probs)
 
@@ -625,8 +625,8 @@ def test_similarity_measure(ct,sim):
 #     true_mode = deepcopy(prev_column_sum)
 #     max_prob = 0
 #     for v in support:
-#         if scipy.stats.multinomial.pmf(v,n=sim.total_flow,p=np.exp(log_probabilities)) > max_prob:
-#             max_prob = scipy.stats.multinomial.pmf(v,n=sim.total_flow,p=np.exp(log_probabilities))
+#         if scipy.stats.multinomial.pmf(v,n = sim.total_flow,p = np.exp(log_probabilities)) > max_prob:
+#             max_prob = scipy.stats.multinomial.pmf(v,n = sim.total_flow,p = np.exp(log_probabilities))
 #             true_mode = np.array(v)
 
 #     # print(true_mode)
@@ -664,8 +664,8 @@ def test_similarity_measure(ct,sim):
 #     true_mode = deepcopy(prev_column_sum)
 #     max_prob = 0
 #     for v in support:
-#         if scipy.stats.multinomial.pmf(v,n=total,p=np.exp(log_probabilities)) > max_prob:
-#             max_prob = scipy.stats.multinomial.pmf(v,n=total,p=np.exp(log_probabilities))
+#         if scipy.stats.multinomial.pmf(v,n = total,p = np.exp(log_probabilities)) > max_prob:
+#             max_prob = scipy.stats.multinomial.pmf(v,n = total,p = np.exp(log_probabilities))
 #             true_mode[:,column_indices] = v
 
 #     print('previous',prev_column_sum)
@@ -697,7 +697,7 @@ def test_similarity_measure(ct,sim):
 #     omega = np.exp(ct_mcmc.log_odds_cross_ratio(log_l,*[(3,13),(8,24)]))
 
 #     # Get rowsums and total
-#     rsums,csums,ttotal = f_to_df(randf).sum(axis=1).values, f_to_df(randf).sum(axis=0).values, f_to_df(randf).sum().sum()
+#     rsums,csums,ttotal = f_to_df(randf).sum(axis = 1).values, f_to_df(randf).sum(axis = 0).values, f_to_df(randf).sum().sum()
 
 #     # Compute mode of multinomial distribution
 #     mode = ct_mcmc.mode_estimate_2way_table_non_central_hypergeometric(randtab,omega)
@@ -706,8 +706,8 @@ def test_similarity_measure(ct,sim):
 #     true_mode = -1
 #     max_prob = 0
 #     for s in range(0,min([rsums[0],csums[0]])+1):
-#         if scipy.stats.nchypergeom_fisher.pmf(k=s, M=ttotal, n=csums[0], N=rsums[0], odds=omega) > max_prob:
-#             max_prob = scipy.stats.nchypergeom_fisher.pmf(k=s, M=ttotal, n=csums[0], N=rsums[0], odds=omega)
+#         if scipy.stats.nchypergeom_fisher.pmf(k = s, M = ttotal, n = csums[0], N = rsums[0], odds = omega) > max_prob:
+#             max_prob = scipy.stats.nchypergeom_fisher.pmf(k = s, M = ttotal, n = csums[0], N = rsums[0], odds = omega)
 #             true_mode = s
 
 #     assert abs(mode - a[(3,13)]) <= 1e-100
@@ -734,7 +734,7 @@ def test_similarity_measure(ct,sim):
 #     omega = np.exp(ct_mcmc.log_odds_cross_ratio(log_l,*[(0,0),(1,1)]))
 
 #     # Get rowsums and total
-#     rsums,csums,ttotal = f_to_df(randf).sum(axis=1).values, f_to_df(randf).sum(axis=0).values, f_to_df(randf).sum().sum()
+#     rsums,csums,ttotal = f_to_df(randf).sum(axis = 1).values, f_to_df(randf).sum(axis = 0).values, f_to_df(randf).sum().sum()
 
 #     # Compute mode of multinomial distribution
 #     mode = ct_mcmc.mode_estimate_2way_table_non_central_hypergeometric(randtab,omega)
@@ -743,8 +743,8 @@ def test_similarity_measure(ct,sim):
 #     true_mode = -1
 #     max_prob = 0
 #     for s in range(0,min([rsums[0],csums[0]])+1):
-#         if scipy.stats.nchypergeom_fisher.pmf(k=s, M=ttotal, n=csums[0], N=rsums[0], odds=omega) > max_prob:
-#             max_prob = scipy.stats.nchypergeom_fisher.pmf(k=s, M=ttotal, n=csums[0], N=rsums[0], odds=omega)
+#         if scipy.stats.nchypergeom_fisher.pmf(k = s, M = ttotal, n = csums[0], N = rsums[0], odds = omega) > max_prob:
+#             max_prob = scipy.stats.nchypergeom_fisher.pmf(k = s, M = ttotal, n = csums[0], N = rsums[0], odds = omega)
 #             true_mode = s
 
 #     assert abs(mode - a[(0,0)]) <= 1e-100
@@ -804,7 +804,7 @@ def test_similarity_measure(ct,sim):
 
 #     print(prev_column_sum)
 #     print('move')
-#     print(f_to_array(mb_move,shape=prev_column_sum.shape))
+#     print(f_to_array(mb_move,shape = prev_column_sum.shape))
 #     print(new_column_sum)
 #     print('probabilities',np.exp(log_probabilities))
 
@@ -927,8 +927,8 @@ def test_similarity_measure(ct,sim):
 #     # max_prob = 0
 #     #
 #     # for v in support:
-#     #     if scipy.stats.multinomial.pmf(v,n=total,p=probs) > max_prob:
-#     #         max_prob = scipy.stats.multinomial.pmf(v,n=total,p=probs)
+#     #     if scipy.stats.multinomial.pmf(v,n = total,p = probs) > max_prob:
+#     #         max_prob = scipy.stats.multinomial.pmf(v,n = total,p = probs)
 #     #         true_mode[column_indices] = v
 #     # print('true_mode',true_mode)
 
@@ -973,12 +973,12 @@ def test_similarity_measure(ct,sim):
 #     # max_prob = 0
 #     #
 #     # for v in support:
-#     #     if scipy.stats.multinomial.pmf(v,n=total,p=probs) > max_prob:
-#     #         max_prob = scipy.stats.multinomial.pmf(v,n=total,p=probs)
+#     #     if scipy.stats.multinomial.pmf(v,n = total,p = probs) > max_prob:
+#     #         max_prob = scipy.stats.multinomial.pmf(v,n = total,p = probs)
 #     #         true_mode[column_indices] = v
 
 #     print(prev_column_sum)
-#     print(f_to_array(mb_move,shape=prev_column_sum.shape))
+#     print(f_to_array(mb_move,shape = prev_column_sum.shape))
 #     print(new_column_sum)
 #     print('\n')
 #     # print('true_mode',true_mode)
@@ -1016,7 +1016,7 @@ def test_similarity_measure(ct,sim):
 #     true_non_zero_probabilities =  np.array([1.0])
 
 #     print(prev_column_sum)
-#     print(f_to_array(mb_move,shape=prev_column_sum.shape))
+#     print(f_to_array(mb_move,shape = prev_column_sum.shape))
 #     print(new_column_sum)
 #     print('probabilities',np.exp(log_probabilities))
 
@@ -1084,16 +1084,16 @@ def test_similarity_measure(ct,sim):
 #     # Define omega
 #     omega = np.exp(mcmc.log_odds_cross_ratio(log_intensities,*positive_cells))
 #     # Get row, column and total table sums
-#     rsums,csums,ttotal = table.sum(axis=1), table.sum(axis=0), table.sum().sum()
+#     rsums,csums,ttotal = table.sum(axis = 1), table.sum(axis = 0), table.sum().sum()
 
 #     # Find mode through search
 #     # true_mode = np.zeros(len(log_probabilities))
 #     # max_prob = 0
 #     # true_non_zero_probabilities = []
 #     # for s in step_sizes:
-#     #     true_non_zero_probabilities.append(scipy.stats.nchypergeom_fisher.pmf(k=fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M=ttotal, n=csums[0], N=rsums[0], odds=omega))
-#     #     if scipy.stats.nchypergeom_fisher.pmf(k=fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M=ttotal, n=csums[0], N=rsums[0], odds=omega) > max_prob:
-#     #         max_prob = scipy.stats.nchypergeom_fisher.pmf(k=fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M=ttotal, n=csums[0], N=rsums[0], odds=omega)
+#     #     true_non_zero_probabilities.append(scipy.stats.nchypergeom_fisher.pmf(k = fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M = ttotal, n = csums[0], N = rsums[0], odds = omega))
+#     #     if scipy.stats.nchypergeom_fisher.pmf(k = fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M = ttotal, n = csums[0], N = rsums[0], odds = omega) > max_prob:
+#     #         max_prob = scipy.stats.nchypergeom_fisher.pmf(k = fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M = ttotal, n = csums[0], N = rsums[0], odds = omega)
 #     #         true_mode = fold[positive_cells[0]]+s*basis_func[positive_cells[0]]
 #     # # Renormalise true probabilities
 #     # true_non_zero_probabilities /= np.sum(true_non_zero_probabilities)
@@ -1121,7 +1121,7 @@ def test_similarity_measure(ct,sim):
 #     ct_2x2_copy.table = true_table
 #     ct_2x2_copy.rowsums = [8,9]
 #     ct_2x2_copy.colsums = [10,7]
-#     ct_2x2_copy.update_table_properties_from_margins(updateCells=True)
+#     ct_2x2_copy.update_table_properties_from_margins(updateCells = True)
 #     ct_2x2_copy.config.settings['inputs']['contingency_table']['ct_type'] = 'ContingencyTable2DDependenceModel'
 #     ct_2x2_copy.config.settings['mcmc']['contingency_table']['proposal'] = 'degree_higher'
 
@@ -1153,16 +1153,16 @@ def test_similarity_measure(ct,sim):
 #     # Define omega
 #     omega = np.exp(mcmc.log_odds_cross_ratio(log_intensities,*positive_cells))
 #     # Get row, column and total table sums
-#     rsums,csums,ttotal = table.sum(axis=1), table.sum(axis=0), table.sum().sum()
+#     rsums,csums,ttotal = table.sum(axis = 1), table.sum(axis = 0), table.sum().sum()
 
 #     # Find mode through search
 #     true_mode = np.zeros(len(log_probabilities))
 #     max_prob = 0
 #     true_non_zero_probabilities = []
 #     for s in step_sizes:
-#         true_non_zero_probabilities.append(scipy.stats.nchypergeom_fisher.pmf(k=fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M=ttotal, n=csums[0], N=rsums[0], odds=omega))
-#         if scipy.stats.nchypergeom_fisher.pmf(k=fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M=ttotal, n=csums[0], N=rsums[0], odds=omega) > max_prob:
-#             max_prob = scipy.stats.nchypergeom_fisher.pmf(k=fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M=ttotal, n=csums[0], N=rsums[0], odds=omega)
+#         true_non_zero_probabilities.append(scipy.stats.nchypergeom_fisher.pmf(k = fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M = ttotal, n = csums[0], N = rsums[0], odds = omega))
+#         if scipy.stats.nchypergeom_fisher.pmf(k = fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M = ttotal, n = csums[0], N = rsums[0], odds = omega) > max_prob:
+#             max_prob = scipy.stats.nchypergeom_fisher.pmf(k = fold[positive_cells[0]]+s*basis_func[positive_cells[0]], M = ttotal, n = csums[0], N = rsums[0], odds = omega)
 #             true_mode = fold[positive_cells[0]]+s*basis_func[positive_cells[0]]
 #     # Renormalise true probabilities
 #     true_non_zero_probabilities /= np.sum(true_non_zero_probabilities)
@@ -1176,7 +1176,7 @@ def test_similarity_measure(ct,sim):
 #     print('intensities')
 #     print(np.exp(log_intensities))
 #     print('\n')
-#     print(f_to_array(basis_func,shape=fold.shape))
+#     print(f_to_array(basis_func,shape = fold.shape))
 #     print('true_mode',true_mode)
 
 #     # Proposal should be both admissible and non-negative
@@ -1210,9 +1210,9 @@ def test_similarity_measure(ct,sim):
 #         # Sample table
 #         table,_,_,_,_ = ct_mcmc.direct_sampling_2way_table(true_table,log_lambdas)
 #         # Assert rowsums are conserved
-#         assert all([abs(np.sum(table,axis=1)[i] - ct_mcmc.ct.rowsums[i]) <= 1e-9 for i in range(ct_mcmc.ct.I)])
+#         assert all([abs(np.sum(table,axis = 1)[i] - ct_mcmc.ct.rowsums[i]) <= 1e-9 for i in range(ct_mcmc.ct.I)])
 #         # Assert colsums are strictly positive
-#         assert all([np.sum(table,axis=0)[k] > 0 for k in range(ct_mcmc.ct.J)])
+#         assert all([np.sum(table,axis = 0)[k] > 0 for k in range(ct_mcmc.ct.J)])
 
 #     assert np.array_equal(table,np.array([[2,0,4],[3,2,0]]))
 
@@ -1486,7 +1486,7 @@ def test_similarity_measure(ct,sim):
 #     print(fnew)
 #     print('new_f')
 #     print(new_f)
-#     print(f_to_array(basis_func,shape=fold.shape))
+#     print(f_to_array(basis_func,shape = fold.shape))
 #     print('\n')
 
 #     # Proposal should be both admissible and non-negative

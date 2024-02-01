@@ -34,17 +34,17 @@ logging.addLevelName(EMPTY, "EMPTY")
 
 
 
-def random_string(N:int=10):
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=N))
+def random_string(N:int = 10):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k = N))
 
 
 class CustomFileHandler(logging.FileHandler):
-    def __init__(self, filename, mode='a', delay=True, **kwargs):
+    def __init__(self, filename, mode='a', delay = True, **kwargs):
         dirpath = Path(filename).absolute().parent
         if not os.path.exists(dirpath) or not os.path.isdir(dirpath):
             os.makedirs(dirpath)
         
-        super().__init__(filename=filename,mode=mode)
+        super().__init__(filename = filename,mode = mode)
         self.filename = filename
         self.mode = mode
         self.delay = delay
@@ -73,7 +73,7 @@ class CustomFileHandler(logging.FileHandler):
 class CustomLogger(logging.Logger):
     """The custom dantro logging class with additional log levels"""
 
-    def __init__(self, name, level=logging.NOTSET):
+    def __init__(self, name, level = logging.NOTSET):
         super().__init__(name, level)
 
     def trace(self, msg, *args, **kwargs):
@@ -114,7 +114,7 @@ class CustomLogger(logging.Logger):
 
 class DualLogger():
 
-    def __init__(self, name, level=logging.NOTSET):
+    def __init__(self, name, level = logging.NOTSET):
 
         logging.setLoggerClass(CustomLogger)
 
@@ -126,13 +126,13 @@ class DualLogger():
         coloredlogs.install(
             fmt='%(asctime)s.%(msecs)03d %(modulename)-s %(levelname)-3s %(message)s',
             datefmt='%M:%S',
-            logger=self.console,
-            level=level
+            logger = self.console,
+            level = level
         )
-        self.setLevels(console_level=level)
+        self.setLevels(console_level = level)
 
         # File handler
-        file_handler = CustomFileHandler(f'logs/temp_{name}_{random_string(10)}.log',name=name)
+        file_handler = CustomFileHandler(f'logs/temp_{name}_{random_string(10)}.log',name = name)
         verbose_format = logging.Formatter(
             fmt='%(asctime)s.%(msecs)03d %(modulename)-s %(levelname)-s %(message)s',
             datefmt='%M:%S'
@@ -151,7 +151,7 @@ class DualLogger():
             handler.setLevel(logging.DEBUG)
         
 
-    def getLevels(self,numeric:bool=False):
+    def getLevels(self,numeric:bool = False):
         if numeric:
             console_level = logging._nameToLevel[self.console.level] if isinstance(self.console.level,str) else self.console.level
             file_level = logging._nameToLevel[self.file.level] if isinstance(self.file.level,str) else self.file.level
@@ -163,7 +163,7 @@ class DualLogger():
         return {"console":console_level,
                 "file":file_level}
 
-    def setLevels(self, console_level=None, file_level=None) -> None:
+    def setLevels(self, console_level = None, file_level = None) -> None:
         if console_level is not None:
             console_level = logging._nameToLevel[console_level.upper()] if isinstance(console_level,str) else console_level
             self.console.setLevel(console_level)
@@ -184,110 +184,110 @@ class DualLogger():
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.DEBUG):
-            self.console.debug(msg,extra = dict(modulename=module))
+            self.console.debug(msg,extra = dict(modulename = module))
         if self.file.isEnabledFor(logging.DEBUG):
-            self.file.debug(msg,extra = dict(modulename=module))
+            self.file.debug(msg,extra = dict(modulename = module))
 
     def info(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.INFO):
-            self.console.info(msg,extra = dict(modulename=module))
+            self.console.info(msg,extra = dict(modulename = module))
         if self.file.isEnabledFor(logging.INFO):
-            self.file.info(msg,extra = dict(modulename=module))
+            self.file.info(msg,extra = dict(modulename = module))
 
     def warning(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.INFO):
-            self.console.warning(msg,extra = dict(modulename=module))
+            self.console.warning(msg,extra = dict(modulename = module))
         if self.file.isEnabledFor(logging.WARNING):
-            self.file.warning(msg,extra = dict(modulename=module))
+            self.file.warning(msg,extra = dict(modulename = module))
 
     def error(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.ERROR):
-            self.console.error(msg,extra = dict(modulename=module))
+            self.console.error(msg,extra = dict(modulename = module))
         if self.file.isEnabledFor(logging.ERROR):
-            self.file.error(msg,extra = dict(modulename=module))
+            self.file.error(msg,extra = dict(modulename = module))
 
     def critical(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(logging.CRITICAL):
-            self.console.critical(msg,extra = dict(modulename=module))
+            self.console.critical(msg,extra = dict(modulename = module))
         if self.file.isEnabledFor(logging.CRITICAL):
-            self.file.critical(msg,extra = dict(modulename=module))
+            self.file.critical(msg,extra = dict(modulename = module))
 
     def trace(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(TRACE):
-            self.console.trace(msg, extra = dict(modulename=module))
+            self.console.trace(msg, extra = dict(modulename = module))
         if self.file.isEnabledFor(TRACE):
-            self.file.trace(msg, extra = dict(modulename=module))
+            self.file.trace(msg, extra = dict(modulename = module))
     
     def remark(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(REMARK):
-            self.console.remark(msg, extra = dict(modulename=module))
+            self.console.remark(msg, extra = dict(modulename = module))
         if self.file.isEnabledFor(REMARK):
-            self.file.remark(msg, extra = dict(modulename=module))
+            self.file.remark(msg, extra = dict(modulename = module))
 
     def note(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(NOTE):
-            self.console.note(msg, extra = dict(modulename=module))
+            self.console.note(msg, extra = dict(modulename = module))
         if self.file.isEnabledFor(NOTE):
-            self.file.note(msg, extra = dict(modulename=module))
+            self.file.note(msg, extra = dict(modulename = module))
     
     def iteration(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(ITERATION):
-            self.console.iteration(msg, extra = dict(modulename=module))
+            self.console.iteration(msg, extra = dict(modulename = module))
         if self.file.isEnabledFor(ITERATION):
-            self.file.iteration(msg, extra = dict(modulename=module))
+            self.file.iteration(msg, extra = dict(modulename = module))
     
     def progress(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(PROGRESS):
-            self.console.progress(msg, extra = dict(modulename=module))
+            self.console.progress(msg, extra = dict(modulename = module))
         if self.file.isEnabledFor(PROGRESS):
-            self.file.progress(msg, extra = dict(modulename=module))
+            self.file.progress(msg, extra = dict(modulename = module))
     
     def caution(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(CAUTION):
-            self.console.caution(msg, extra = dict(modulename=module))
+            self.console.caution(msg, extra = dict(modulename = module))
         if self.file.isEnabledFor(CAUTION):
-            self.file.caution(msg, extra = dict(modulename=module))
+            self.file.caution(msg, extra = dict(modulename = module))
     
     def hilight(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(HILIGHT):
-            self.console.hilight(msg, extra = dict(modulename=module))
+            self.console.hilight(msg, extra = dict(modulename = module))
         if self.file.isEnabledFor(HILIGHT):
-            self.file.hilight(msg, extra = dict(modulename=module))
+            self.file.hilight(msg, extra = dict(modulename = module))
     
     def success(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(SUCCESS):
-            self.console.success(msg, extra = dict(modulename=module))
+            self.console.success(msg, extra = dict(modulename = module))
         if self.file.isEnabledFor(SUCCESS):
-            self.file.success(msg, extra = dict(modulename=module))
+            self.file.success(msg, extra = dict(modulename = module))
     
     def empty(self, msg):
         frame = inspect.stack()[1]
         module = frame.filename.split('.py')[0].split('/')[-1]
         if self.console.isEnabledFor(EMPTY):
-            self.console.empty(msg, extra = dict(modulename=module))
+            self.console.empty(msg, extra = dict(modulename = module))
         if self.file.isEnabledFor(EMPTY):
-            self.file.empty(msg, extra = dict(modulename=module))
+            self.file.empty(msg, extra = dict(modulename = module))

@@ -39,8 +39,8 @@ def update_settings(setts):
     return setts
 
 # Get total number of threads
-AVAILABLE_CORES = psutil.cpu_count(logical=True)
-AVAILABLE_THREADS = psutil.cpu_count(logical=True)
+AVAILABLE_CORES = psutil.cpu_count(logical = True)
+AVAILABLE_THREADS = psutil.cpu_count(logical = True)
 
 
 @click.group('multiresticodm')
@@ -51,94 +51,94 @@ def cli():
     pass
 
 _common_options = [
-    click.option('--norm', '-no', default='relative_l_1', show_default=True,
-            type=click.Choice(NORMS), help=f'Sets norm to use in relevant plots.'),
-    click.option('--n_workers','-nw', type=click.IntRange(min=1,max=AVAILABLE_CORES),
+    click.option('--norm', '-no', default='relative_l_1', show_default = True,
+            type = click.Choice(NORMS), help = f'Sets norm to use in relevant plots.'),
+    click.option('--n_workers','-nw', type = click.IntRange(min = 1,max = AVAILABLE_CORES),
             default = '1', help = 'Overwrites number of independent workers used in multiprocessing'),
-    click.option('--n_threads','-nt', type=click.IntRange(min=1,max=AVAILABLE_THREADS), 
+    click.option('--n_threads','-nt', type = click.IntRange(min = 1,max = AVAILABLE_THREADS), 
                  default = '1',help = '''Overwrites number of threads (per worker) used in multithreading.
             If many are provided first is set as the numpy threads and the second as the numba threads'''),
-    click.option('--logging_mode','-log', type=click.Choice(['debug', 'info', 'warning', 'critical']+LOG_LEVELS), default='info', 
-            help=f'Type of logging mode used.'),
-    click.option('--n', '-n', type=click.IntRange(min=1), help = 'Overwrites number of iterations of the selected the algorithm'),
-    click.option('--table','-tab', type=click.STRING,default=None, help = 'Overwrites input table filename in config'),
-    click.option('--device','-dev', type=click.Choice(['cpu', 'cuda', 'mps']), default='cpu',
-            help=f'Type of device used for torch operations.')
+    click.option('--logging_mode','-log', type = click.Choice(['debug', 'info', 'warning', 'critical']+LOG_LEVELS), default='info', 
+            help = f'Type of logging mode used.'),
+    click.option('--n', '-n', type = click.IntRange(min = 1), help = 'Overwrites number of iterations of the selected the algorithm'),
+    click.option('--table','-tab', type = click.STRING,default = None, help = 'Overwrites input table filename in config'),
+    click.option('--device','-dev', type = click.Choice(['cpu', 'cuda', 'mps']), default='cpu',
+            help = f'Type of device used for torch operations.')
 ]
 
 _create_and_run_options = [
-    click.argument('config_path', type=click.Path(exists=True), required=True),
-    click.option('--data_generation_seed','-dgseed', type=click.IntRange(min=0), show_default=True,
-               default=None, help = 'Overwrites random number generation seed for synthetic data generation.'),
-    click.option('--alpha','-alpha', type=click.FloatRange(min=0,max=2), default = None,
+    click.argument('config_path', type = click.Path(exists = True), required = True),
+    click.option('--data_generation_seed','-dgseed', type = click.IntRange(min = 0), show_default = True,
+               default = None, help = 'Overwrites random number generation seed for synthetic data generation.'),
+    click.option('--alpha','-alpha', type = click.FloatRange(min = 0,max = 2), default = None,
             help = 'Overwrites alpha parameter in Spatial Interaction Model.'),
-    click.option('--beta','-beta', type=click.FloatRange(min=0,max=2), default = None,
+    click.option('--beta','-beta', type = click.FloatRange(min = 0,max = 2), default = None,
             help = 'Overwrites beta parameter in Spatial Interaction Model.'),
-    click.option('--bmax','-bmax', type=click.FloatRange(min=1), default = None,
+    click.option('--bmax','-bmax', type = click.FloatRange(min = 1), default = None,
             help = 'Overwrites bmax parameter in Spatial Interaction Model.'),
-    click.option('--delta','-delta', type=click.FloatRange(min=0), default = None,
+    click.option('--delta','-delta', type = click.FloatRange(min = 0), default = None,
             help = 'Overwrites delta parameter in Spatial Interaction Model.'),
-    click.option('--kappa','-kappa', type=click.FloatRange(min=0), default = None,
+    click.option('--kappa','-kappa', type = click.FloatRange(min = 0), default = None,
             help = 'Overwrites kappa parameter in Spatial Interaction Model.'),
-    click.option('--epsilon','-epsilon', type=click.FloatRange(min=1), default = None,
+    click.option('--epsilon','-epsilon', type = click.FloatRange(min = 1), default = None,
             help = 'Overwrites epsilon parameter in Spatial Interaction Model.'),
-    click.option('--sigma','-sigma', type=click.FloatRange(min=0.0), default = None,
+    click.option('--sigma','-sigma', type = click.FloatRange(min = 0.0), default = None,
             help = 'Overwrites sigma parameter in arris Wilson Model.'),
-    click.option('--dt','-dt', type=click.FloatRange(min=0.0), default = None,
+    click.option('--dt','-dt', type = click.FloatRange(min = 0.0), default = None,
             help = 'Overwrites dt parameter in Harris Wilson Model.'),
-    click.option('--noise_percentage','-np', type=click.FloatRange(min=0.0), default = None,
+    click.option('--noise_percentage','-np', type = click.FloatRange(min = 0.0), default = None,
             help = 'Overwrites noise_percentage parameter in Harris Wilson Model.')
 ]
 
 _common_run_options = [
-    click.option('--load_experiment','-le', multiple=False, type=click.Path(exists=True), default=None, 
+    click.option('--load_experiment','-le', multiple = False, type = click.Path(exists = True), default = None, 
                    help='Defines path to existing experiment output in order to load it and resume experimentation.'),
-    click.option('--experiment_type','-et', type=click.Choice(list(EXPERIMENT_OUTPUT_NAMES.keys())), multiple=True, callback=to_list,
+    click.option('--experiment_type','-et', type = click.Choice(list(EXPERIMENT_OUTPUT_NAMES.keys())), multiple = True, callback = to_list,
                default = None, help = 'Decides which experiment types to run'),
-    click.option('--title','-ttl', type=click.STRING,
+    click.option('--title','-ttl', type = click.STRING,
                default = None, help = 'Title appended to output filename of experiment'),
-    click.option('--sweep_mode/--no-sweep_mode', default=None,is_flag=True, show_default=True,
-              help=f'Flag for whether parameter sweep mode is activated or not.'),
-    click.option('--validate_samples/--no-validate_samples', default=None, is_flag=True, show_default=True,
-              help=f'Flag for whether every sample generated should by appropriately validated.'),
-    click.option('--overwrite/--no-overwrite', default=None,is_flag=True, show_default=True,
-              help=f'Flag for whether parameter sweep mode is activated or not.'),
-    click.option('--dataset','-d', type=click.Path(exists=False),
-               default=None, help = 'Overwrites dataset name in config'),
-    click.option('--in_directory','-id', type=click.Path(exists=True),
-                default=None, help = 'Overwrites inputs directory in config'),
-    click.option('--to_learn','-tl', type=click.Choice(['alpha','beta','kappa','sigma']), default = None,
+    click.option('--sweep_mode/--no-sweep_mode', default = None,is_flag = True, show_default = True,
+              help = f'Flag for whether parameter sweep mode is activated or not.'),
+    click.option('--validate_samples/--no-validate_samples', default = None, is_flag = True, show_default = True,
+              help = f'Flag for whether every sample generated should by appropriately validated.'),
+    click.option('--overwrite/--no-overwrite', default = None,is_flag = True, show_default = True,
+              help = f'Flag for whether parameter sweep mode is activated or not.'),
+    click.option('--dataset','-d', type = click.Path(exists = False),
+               default = None, help = 'Overwrites dataset name in config'),
+    click.option('--in_directory','-id', type = click.Path(exists = True),
+                default = None, help = 'Overwrites inputs directory in config'),
+    click.option('--to_learn','-tl', type = click.Choice(['alpha','beta','kappa','sigma']), default = None,
            help = 'Overwrites parameters to learn.'),
-    click.option('--mcmc_workers','-mcmcnw', type=click.IntRange(min=1,max=AVAILABLE_CORES), help = 'Overwrites number of MCMC workers'),
-    click.option('--name','-nm', type=click.Choice(['TotallyConstrained','ProductionConstrained']),
-               default=None, help = 'Overwrites spatial interaction model of choice (intensity function)'),
-    click.option('--origin_demand','-od', type=click.STRING,
-               default=None, help = 'Overwrites input origin demand filename in config'),
-    click.option('--cost_matrix','-cm', type=click.STRING,
-           default=None, help = 'Overwrites input cost matrix filename in config'),
-    click.option('--table0','-tab0', type=click.Choice(TABLE_SOLVERS), default = None,
+    click.option('--mcmc_workers','-mcmcnw', type = click.IntRange(min = 1,max = AVAILABLE_CORES), help = 'Overwrites number of MCMC workers'),
+    click.option('--name','-nm', type = click.Choice(['TotallyConstrained','ProductionConstrained']),
+               default = None, help = 'Overwrites spatial interaction model of choice (intensity function)'),
+    click.option('--origin_demand','-od', type = click.STRING,
+               default = None, help = 'Overwrites input origin demand filename in config'),
+    click.option('--cost_matrix','-cm', type = click.STRING,
+           default = None, help = 'Overwrites input cost matrix filename in config'),
+    click.option('--table0','-tab0', type = click.Choice(TABLE_SOLVERS), default = None,
            help = 'Overwrites table initialisation method name in MCMC.'),
-    click.option('--log_destination_attraction','-lda', type=click.STRING,
-            default=None, help = 'Overwrites input log destination attraction filename in config'),
-    click.option('--destination_attraction_ts','-dats', type=click.STRING,
-            default=None, help = 'Overwrites input destination attraction time series filename in config'),
-    click.option('--margins','-ma', type=click.STRING, cls=OptionEatAll,
-           default=None, help = 'Overwrites input margin filenames in config'),
-    click.option('--margin0','-m0', type=click.Choice(MARGINAL_SOLVERS), default = None,
+    click.option('--log_destination_attraction','-lda', type = click.STRING,
+            default = None, help = 'Overwrites input log destination attraction filename in config'),
+    click.option('--destination_attraction_ts','-dats', type = click.STRING,
+            default = None, help = 'Overwrites input destination attraction time series filename in config'),
+    click.option('--margins','-ma', type = click.STRING, cls = OptionEatAll,
+           default = None, help = 'Overwrites input margin filenames in config'),
+    click.option('--margin0','-m0', type = click.Choice(MARGINAL_SOLVERS), default = None,
             help = 'Overwrites margin initialisation method name in MCMC.'),
-    click.option('--sparse_margins','-sm', is_flag=True, default = False,
+    click.option('--sparse_margins','-sm', is_flag = True, default = False,
            help = 'Flag for allowing sparsity in margins of contingency table'),
-    click.option('--store_progress','-sp', default = 1.0, show_default=True, 
-           type=click.FloatRange(min=0.01,max=1.0),
+    click.option('--store_progress','-sp', default = 1.0, show_default = True, 
+           type = click.FloatRange(min = 0.01,max = 1.0),
            help = 'Sets percentage of total samples that will be exported as a batch'),
-    click.option('--axes','-ax', cls=PythonLiteralOption, multiple=True, default = None,
+    click.option('--axes','-ax', cls = PythonLiteralOption, multiple = True, default = None,
                help = '''Overwrites constrained margin axes (axes over which table is summed) in config.\
                Use the following syntax: -ax '[ENTER AXES SEPARATED BY COMMA HERE]' e.g -ax '[0]' -ax '[0, 1]'
                The unconstrained case is just -ax '[]' '''),
-    click.option('--cells','-c', type=click.STRING, default = None,
+    click.option('--cells','-c', type = click.STRING, default = None,
                help = 'Overwrites constrained cells filename in config. '),
-    click.option('--seed','-seed', type=click.IntRange(min=0), show_default=True,
-               default=None, help = 'Overwrites random number generation seed for model runs.'),
+    click.option('--seed','-seed', type = click.IntRange(min = 0), show_default = True,
+               default = None, help = 'Overwrites random number generation seed for model runs.'),
 
 ]
 
@@ -171,7 +171,7 @@ def exec(logger,settings,config_path,**kwargs):
     )
 
     # Update settings with overwritten values
-    deep_updates(config.settings,settings,overwrite=True)
+    deep_updates(config.settings,settings,overwrite = True)
 
     # Set device to run code on
     config.settings['inputs']['device'] = update_device(
@@ -220,12 +220,12 @@ def exec(logger,settings,config_path,**kwargs):
 @cli.command('create')
 @common_options
 @create_and_run_options
-@click.option('--dims','-dims', type=(str, int), multiple=True,
+@click.option('--dims','-dims', type=(str, int), multiple = True,
                 default=[(None,None)], help = 'Overwrites input dimensions size')
-@click.option('--synthesis_method','-smthd', type=click.Choice(['sde_solver','sde_potential']),
+@click.option('--synthesis_method','-smthd', type = click.Choice(['sde_solver','sde_potential']),
                 default='sde_solver', help = 'Determines method for synthesing data')
-@click.option('--synthesis_n_samples','-sn', type=click.IntRange(min=1),
-                default=None, help = 'Determines number of times sde solver will be run to create synthetic data')
+@click.option('--synthesis_n_samples','-sn', type = click.IntRange(min = 1),
+                default = None, help = 'Determines number of times sde solver will be run to create synthetic data')
 def create(
     norm,
     n_workers,
@@ -284,13 +284,13 @@ def create(
 
     # Read config
     config = Config(
-        path=config_path,
-        settings=None,
+        path = config_path,
+        settings = None,
         console_level = settings.get('logging_mode','info'),
-        logger=logger
+        logger = logger
     )
     # Update settings with overwritten values
-    deep_updates(config.settings,settings,overwrite=True)
+    deep_updates(config.settings,settings,overwrite = True)
 
     # Maintain a dictionary of available experiments and their list index
     experiment_types = {
@@ -320,44 +320,44 @@ def create(
     eh.run_and_write_experiments_sequentially()
 
 @cli.command('run')
-# @click.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.option('--proposal','-p', type=click.Choice(['direct_sampling','degree_higher','degree_one']),
+# @click.command(context_settings = dict(help_option_names=['-h', '--help']))
+@click.option('--proposal','-p', type = click.Choice(['direct_sampling','degree_higher','degree_one']),
             default = None, help = 'Overwrites contingency table MCMC proposal')
-@click.option('--loss_name','-ln', type=click.Choice(list(LOSS_DATA_REQUIREMENTS.keys())), callback=to_list,
+@click.option('--loss_name','-ln', type = click.Choice(list(LOSS_DATA_REQUIREMENTS.keys())), callback = to_list,
             default = None, multiple = True, help = 'Overwrites neural net loss name(s)')
-@click.option('--loss_function','-lf', type=click.Choice(list(LOSS_FUNCTIONS.keys())), callback=to_list,
+@click.option('--loss_function','-lf', type = click.Choice(list(LOSS_FUNCTIONS.keys())), callback = to_list,
             default = None, multiple = True, help = 'Overwrites neural net loss function(s)')
-@click.option('--loss_kwarg_keys','-lkk', type=click.STRING, callback=split_to_list,
+@click.option('--loss_kwarg_keys','-lkk', type = click.STRING, callback = split_to_list,
             default = None, multiple = True, help = 'Overwrites neural net loss function(s) kwarg parameter keys')
-@click.option('--grid_size','-gs', type=click.IntRange(min=1),
+@click.option('--grid_size','-gs', type = click.IntRange(min = 1),
             default = None, help = 'Overwrites size of square grid for R^2 and Log Target analyses.')
-@click.option('--theta_steps','-pn', type=click.IntRange(min=1),
+@click.option('--theta_steps','-pn', type = click.IntRange(min = 1),
             default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.')
-@click.option('--destination_attraction_steps','-dan', type=click.IntRange(min=1),
+@click.option('--destination_attraction_steps','-dan', type = click.IntRange(min = 1),
             default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.')
-@click.option('--table_steps','-tn', type=click.IntRange(min=1),
+@click.option('--table_steps','-tn', type = click.IntRange(min = 1),
             default = None, help = 'Overwrites number of Spatial Interaction Model MCMC steps in joint scheme.')
-@click.option('--alpha0','-alpha0', type=click.FloatRange(min=0), default = None,
+@click.option('--alpha0','-alpha0', type = click.FloatRange(min = 0), default = None,
             help = 'Overwrites initialisation of alpha parameter in MCMC.')
-@click.option('--beta0','-beta0', type=click.FloatRange(min=0), default = None,
+@click.option('--beta0','-beta0', type = click.FloatRange(min = 0), default = None,
             help = 'Overwrites initialisation of beta parameter in MCMC.')
-@click.option('--beta_max','-bm', type=click.FloatRange(min=0), default = None,
+@click.option('--beta_max','-bm', type = click.FloatRange(min = 0), default = None,
             help = 'Overwrites maximum beta in SIM parameters.')
-@click.option('--covariance','-cov', type=click.STRING, default = None,
+@click.option('--covariance','-cov', type = click.STRING, default = None,
             help = 'Overwrites covariance matrix of parameter Gaussian Randow walk proposal')
-@click.option('--step_size','-ss', type=click.FloatRange(min=0), default = None,
+@click.option('--step_size','-ss', type = click.FloatRange(min = 0), default = None,
             help = 'Overwrites step size in parameter Gaussian Randow walk proposal')
-@click.option('--leapfrog_steps','-ls', type=click.IntRange(min=1), default = None,
+@click.option('--leapfrog_steps','-ls', type = click.IntRange(min = 1), default = None,
             help = 'Overwrites number of steps in Leapfrog Integrator in HMC')
-@click.option('--leapfrog_step_size','-lss', type=click.FloatRange(min=0), default = None,
+@click.option('--leapfrog_step_size','-lss', type = click.FloatRange(min = 0), default = None,
             help = 'Overwrites number of step size in Leapfrog Integrator in HMC')
-@click.option('--ais_leapfrog_steps','-als', type=click.IntRange(min=1), default = None,
+@click.option('--ais_leapfrog_steps','-als', type = click.IntRange(min = 1), default = None,
             help = 'Overwrites number of leapfrog steps in AIS HMC proposal (normalising constant sampling)')
-@click.option('--ais_leapfrog_step_size','-alss', type=click.FloatRange(min=0), default = None,
+@click.option('--ais_leapfrog_step_size','-alss', type = click.FloatRange(min = 0), default = None,
             help = 'Overwrites size of leapfrog steps in AIS HMC proposal (normalising constant sampling)')
-@click.option('--ais_samples','-as', type=click.IntRange(min=1), default = None,
+@click.option('--ais_samples','-as', type = click.IntRange(min = 1), default = None,
             help = 'Overwrites number of samples in AIS (normalising constant sampling)')
-@click.option('--n_bridging_distributions','-nb', type=click.IntRange(min=1), default = None,
+@click.option('--n_bridging_distributions','-nb', type = click.IntRange(min = 1), default = None,
             help = 'Overwrites number of temperatures in tempered distribution in AIS (normalising constant sampling)')
 @common_options
 @create_and_run_options
@@ -465,47 +465,47 @@ def run(
 
 _output_options = [
     # Output experiment data search options 
-    click.option('--out_directory', '-o', required=True, type=click.Path(exists=True), default='./data/outputs/'),
-    click.option('--dataset_name', '-dn', required=False, multiple=True, type=click.STRING),
-    click.option('--directories','-d', multiple=True, required=False, type=click.Path(exists=False)),
-    click.option('--experiment_type','-et', multiple=True, type=click.STRING, default = [''], cls=NotRequiredIf, not_required_if='directories'),
-    click.option('--title','-en', multiple=True, type=click.STRING, default = [''], cls=NotRequiredIf, not_required_if='directories'),
-    click.option('--exclude','-exc', type=click.STRING, default = [], multiple = True, cls=NotRequiredIf, not_required_if='directories'),
-    click.option('--dates','-date', type=click.STRING, default=None, multiple=True, required=False),
-    click.option('--filename_ending', '-fe', default = '', type=click.STRING),
+    click.option('--out_directory', '-o', required = True, type = click.Path(exists = True), default='./data/outputs/'),
+    click.option('--dataset_name', '-dn', required = False, multiple = True, type = click.STRING),
+    click.option('--directories','-d', multiple = True, required = False, type = click.Path(exists = False)),
+    click.option('--experiment_type','-et', multiple = True, type = click.STRING, default = [''], cls = NotRequiredIf, not_required_if='directories'),
+    click.option('--title','-en', multiple = True, type = click.STRING, default = [''], cls = NotRequiredIf, not_required_if='directories'),
+    click.option('--exclude','-exc', type = click.STRING, default = [], multiple = True, cls = NotRequiredIf, not_required_if='directories'),
+    click.option('--dates','-date', type = click.STRING, default = None, multiple = True, required = False),
+    click.option('--filename_ending', '-fe', default = '', type = click.STRING),
     # Slicing and grouping outputs options
-    click.option('--burnin_thinning_trimming', '-btt', default=[], show_default=True, multiple = True, callback = btt_callback,
-                 type=(click.STRING,click.IntRange(min=0),click.IntRange(min=1),click.IntRange(min=1)), 
-                 help=f'Sets number of initial samples to discard (burnin), number of samples to skip (thinning) and number of samples to keep (trimming).'),
-    click.option('--coordinate_slice','-cs', multiple=True, default=None, type = click.STRING, required=False, callback = list_of_str,
+    click.option('--burnin_thinning_trimming', '-btt', default=[], show_default = True, multiple = True, callback = btt_callback,
+                 type=(click.STRING,click.IntRange(min = 0),click.IntRange(min = 1),click.IntRange(min = 1)), 
+                 help = f'Sets number of initial samples to discard (burnin), number of samples to skip (thinning) and number of samples to keep (trimming).'),
+    click.option('--coordinate_slice','-cs', multiple = True, default = None, type = click.STRING, required = False, callback = list_of_str,
             help='Every argument corresponds to a list of keys, operators and values by which the output sweeped parameters will be sliced.'),
-    click.option('--input_slice','-is', multiple=True, default=None, type = click.STRING, required=False, callback = list_of_str,
+    click.option('--input_slice','-is', multiple = True, default = None, type = click.STRING, required = False, callback = list_of_str,
             help='Every argument corresponds to a list of keys and values by which the input sweeped parameters will be sliced.'),
-    click.option('--group_by','-gb', multiple=True, default=None, type = click.Choice(SWEEPABLE_PARAMS),required=False,
+    click.option('--group_by','-gb', multiple = True, default = None, type = click.Choice(SWEEPABLE_PARAMS),required = False,
             help='Every argument corresponds to a list of sweeped parameters that the outputs will be grouped by.'),
     # Options for applying metrics and evaluating expressions on outputs
-    click.option('--statistic','-stat', multiple=True, default=None, 
-            type = (click.STRING,click.STRING,click.STRING), required=False, callback = unpack_statistics, 
+    click.option('--statistic','-stat', multiple = True, default = None, 
+            type = (click.STRING,click.STRING,click.STRING), required = False, callback = unpack_statistics, 
             help='Every argument corresponds to a list of metrics, statistics and their corresponding axes e.g. passing  ("SRMSE", \"mean|sum\",  \"iter|sweep\") corresponds to applying mean across the iter dimension and then sum across sweep dimension before applying SRMSE metric'),
-    click.option('--metric','-m', multiple=True, type=click.Choice(METRICS.keys()), required=False, default=None,
-                help=f'Sets list of metrics to compute over samples.'),
+    click.option('--metric','-m', multiple = True, type = click.Choice(METRICS.keys()), required = False, default = None,
+                help = f'Sets list of metrics to compute over samples.'),
     click.option('--metric_args', '-ma', multiple = True, required = False,
-            type=click.STRING, default=None, callback = to_list, help=f'''Metric keyword arguments.'''),
-    click.option('--evaluate','-e', multiple=True, type=(click.STRING, click.STRING), required=False, default=[], 
-                callback = list_of_lists, help=f'''Evaluates expressions for one or more datasets. 
+            type = click.STRING, default = None, callback = to_list, help = f'''Metric keyword arguments.'''),
+    click.option('--evaluate','-e', multiple = True, type=(click.STRING, click.STRING), required = False, default=[], 
+                callback = list_of_lists, help = f'''Evaluates expressions for one or more datasets. 
                 First argument is the name of the evaluation. Second is the evaluation expression'''),
-    click.option('--evaluation_kwargs','-ea', multiple=True, type=click.STRING, required=False, default=None, 
-                callback = evaluate_kwargs_callback, help=f'''Expression evaluation keyword arguments.'''),
-    click.option('--evaluation_library','-el', multiple = True, type=click.STRING, required=False, default = ["np"], callback = list_of_str, help = f'''Expression evaluation libraries that needs to be loaded before applying evaluation'''),
+    click.option('--evaluation_kwargs','-ea', multiple = True, type = click.STRING, required = False, default = None, 
+                callback = evaluate_kwargs_callback, help = f'''Expression evaluation keyword arguments.'''),
+    click.option('--evaluation_library','-el', multiple = True, type = click.STRING, required = False, default = ["np"], callback = list_of_str, help = f'''Expression evaluation libraries that needs to be loaded before applying evaluation'''),
     # Metric-specific options
-    click.option('--region_mass', '-r', default=[0.95], show_default=True, multiple=True,
-              type=click.FloatRange(0,1), help=f'Sets high posterior density region mass.'),
-    click.option('--epsilon_threshold', '-eps', default=0.001, show_default=True,
-        type=click.FLOAT, help=f'Sets error norm threshold below which convergence is achieved. Used only in convergence plots.'),
+    click.option('--region_mass', '-r', default=[0.95], show_default = True, multiple = True,
+              type = click.FloatRange(0,1), help = f'Sets high posterior density region mass.'),
+    click.option('--epsilon_threshold', '-eps', default = 0.001, show_default = True,
+        type = click.FLOAT, help = f'Sets error norm threshold below which convergence is achieved. Used only in convergence plots.'),
     # Data storage and checkpointing options
-    click.option('--metadata_keys','-k', multiple=True, type=click.STRING, required=False),
-    click.option('--force_reload/--no-force_reload', default=False,is_flag=True, show_default=True,
-              help=f'Flag for whether output collections should be re-compiled and re-written to file.'),
+    click.option('--metadata_keys','-k', multiple = True, type = click.STRING, required = False),
+    click.option('--force_reload/--no-force_reload', default = False,is_flag = True, show_default = True,
+              help = f'Flag for whether output collections should be re-compiled and re-written to file.'),
 ]
 
 def output_options(func):
@@ -516,24 +516,24 @@ def output_options(func):
 _plot_coordinate_options = []
 for i,var in enumerate(PLOT_COORDINATES):
     _plot_coordinate_options += [
-        click.option(f'--{var}_group', f'-{var}grp', default=None, show_default=False, callback = split_to_list,
-            type=click.STRING, multiple=True, help=f'Sets {var} group (# groups corresponds to number of stacked axes).'),
-        click.option(f'--{var}_label', f'-{var}lab', default=None, show_default=False,
-            type=click.STRING, help=f'Sets {var} axis label.'),
-        click.option(f'--{var}_shade/--no-{var}_shade', f'-{var}sh', show_default=False, default=False, is_flag=True, 
-                     help=f'Sets flag for whether to shade area between lines and {var}-axis.'),
-        click.option(f'--{var}_discrete/--no-{var}_discrete', default=False, show_default=True, 
-            is_flag=True, help=f'Flag for whether {var} is discrete or not.'),
-        click.option(f'--{var}_limit', f'-{var}lim', default=[(None,None)], show_default=False,
-            type=(click.FLOAT, click.FLOAT), multiple=True, help=f'Sets {var} limits.'),
-        click.option(f'--{var}_tick_frequency', f'-{var}tf', default=[(0, 1),(0, 1)], show_default=True, multiple = True, callback = to_list,
-            type=(click.INT,click.INT), help=f'Sets starting point and frequency of minor and major {var} global ticks.'),
-        click.option(f'--sub{var}_tick_frequency', f'-s{var}tf', default=[(0, 1),(0, 1)], show_default=True, multiple = True, callback = to_list,
-            type=(click.INT,click.INT), help=f'Sets starting point and frequency of minor and major {var} local ticks in subplot.'),
-        click.option(f'--{var}_tick_pad', f'-{var}tp', default=(2,10), show_default=True, multiple = False, callback = to_list,
-            type=(click.INT,click.INT), help=f'Sets tick label padding for minor and major {var} ticks.'),
-        click.option(f'--{var}_tick_rotation', f'-{var}tr', default=(0,45), show_default=True, multiple = False, callback = to_list,
-            type=(click.INT,click.INT), help=f'Sets tick label rotation for minor and major {var} ticks.')
+        click.option(f'--{var}_group', f'-{var}grp', default = None, show_default = False, callback = split_to_list,
+            type = click.STRING, multiple = True, help = f'Sets {var} group (# groups corresponds to number of stacked axes).'),
+        click.option(f'--{var}_label', f'-{var}lab', default = None, show_default = False,
+            type = click.STRING, help = f'Sets {var} axis label.'),
+        click.option(f'--{var}_shade/--no-{var}_shade', f'-{var}sh', show_default = False, default = False, is_flag = True, 
+                     help = f'Sets flag for whether to shade area between lines and {var}-axis.'),
+        click.option(f'--{var}_discrete/--no-{var}_discrete', default = False, show_default = True, 
+            is_flag = True, help = f'Flag for whether {var} is discrete or not.'),
+        click.option(f'--{var}_limit', f'-{var}lim', default=[(None,None)], show_default = False,
+            type=(click.FLOAT, click.FLOAT), multiple = True, help = f'Sets {var} limits.'),
+        click.option(f'--{var}_tick_frequency', f'-{var}tf', default=[(0, 1),(0, 1)], show_default = True, multiple = True, callback = to_list,
+            type=(click.INT,click.INT), help = f'Sets starting point and frequency of minor and major {var} global ticks.'),
+        click.option(f'--sub{var}_tick_frequency', f'-s{var}tf', default=[(0, 1),(0, 1)], show_default = True, multiple = True, callback = to_list,
+            type=(click.INT,click.INT), help = f'Sets starting point and frequency of minor and major {var} local ticks in subplot.'),
+        click.option(f'--{var}_tick_pad', f'-{var}tp', default=(2,10), show_default = True, multiple = False, callback = to_list,
+            type=(click.INT,click.INT), help = f'Sets tick label padding for minor and major {var} ticks.'),
+        click.option(f'--{var}_tick_rotation', f'-{var}tr', default=(0,45), show_default = True, multiple = False, callback = to_list,
+            type=(click.INT,click.INT), help = f'Sets tick label rotation for minor and major {var} ticks.')
     ]
 
 
@@ -542,131 +542,131 @@ def plot_coordinate_options(func):
         func = option(func)
     return func
 
-@cli.command(name='plot',context_settings=dict(
-    ignore_unknown_options=True,
-    allow_extra_args=True,
+@cli.command(name='plot',context_settings = dict(
+    ignore_unknown_options = True,
+    allow_extra_args = True,
 ))
-@click.argument('plot_view', type=click.Choice(PLOT_VIEWS.keys()), default = None)
-@click.argument('plot_type', type=click.Choice(PLOT_TYPES.keys()), default = None)
+@click.argument('plot_view', type = click.Choice(PLOT_VIEWS.keys()), default = None)
+@click.argument('plot_type', type = click.Choice(PLOT_TYPES.keys()), default = None)
 @output_options
 @common_options
-@click.option('-x', type = click.STRING, required = False, callback=split_to_list, multiple=True,
+@click.option('-x', type = click.STRING, required = False, callback = split_to_list, multiple = True,
               default = [None], help='Sets x coordinate(s) in plot')
-@click.option('-y', type = click.STRING, required = False, callback=split_to_list, multiple=True,
+@click.option('-y', type = click.STRING, required = False, callback = split_to_list, multiple = True,
                 default = [None], help='Sets y coordinate(s) in plot')
-@click.option('-z', type = click.STRING, required = False, callback=split_to_list, multiple=True,
+@click.option('-z', type = click.STRING, required = False, callback = split_to_list, multiple = True,
                 default = [None], help='Sets z coordinate(s) in plot')
-@click.option('--plot_data_dir', '-pdd', type=click.Path(exists=True), multiple = True, required=False)
-@click.option('--label', '-l', default=[''], show_default=False, multiple=True, callback=to_list,
-              type=click.STRING, help=f'Sets metadata key(s) to label figure elements by.')
-@click.option('--colour', '-c', default='', show_default=False,
-              type=click.STRING, help=f'Sets metadata key(s) to colour figure elements by.')
-@click.option('--size', '-sz', default='1.0', show_default=False,
-              type=click.STRING, help=f'Sets metadata key(s) to size figure element markers by.')
-@click.option('--style', '-st', default='-', show_default=False,
-              type=click.STRING, help=f'Sets metadata key(s) to style figure element lines by.')
-@click.option('--visibility', '-v', default='1.0', show_default=False,
-              type=click.STRING, help=f'Sets metadata key(s) to determine figure element visibility (transparency) by.')
-@click.option('--marker', '-mrkr', default='.', show_default=False,
-              type=click.STRING, help=f'Sets metadata key(s) to determine figure element marker type by.')
-@click.option('--hatch', '-hch', default='', show_default=False,
-              type=click.STRING, help=f'Sets metadata key(s) to determine figure element marker texture by.')
-@click.option('--zorder', '-or', default=[(None,None)], show_default=False, multiple = True, callback = to_list,
+@click.option('--plot_data_dir', '-pdd', type = click.Path(exists = True), multiple = True, required = False)
+@click.option('--label', '-l', default=[''], show_default = False, multiple = True, callback = to_list,
+              type = click.STRING, help = f'Sets metadata key(s) to label figure elements by.')
+@click.option('--colour', '-c', default='', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to colour figure elements by.')
+@click.option('--size', '-sz', default='1.0', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to size figure element markers by.')
+@click.option('--style', '-st', default='-', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to style figure element lines by.')
+@click.option('--visibility', '-v', default='1.0', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to determine figure element visibility (transparency) by.')
+@click.option('--marker', '-mrkr', default='.', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to determine figure element marker type by.')
+@click.option('--hatch', '-hch', default='', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to determine figure element marker texture by.')
+@click.option('--zorder', '-or', default=[(None,None)], show_default = False, multiple = True, callback = to_list,
               type=(click.Choice(['asc','desc']),click.STRING),
-              help=f'''Sets variable to order plot points/lines by in ascending or descending order. 
+              help = f'''Sets variable to order plot points/lines by in ascending or descending order. 
               If ascending order is set, smaller values are given priority (go on top) and vice versa''')
-@click.option('--geometry','-g', multiple=False, type=click.File(), default=None, 
+@click.option('--geometry','-g', multiple = False, type = click.File(), default = None, 
                 help='Defines path to geometry geojson for visualising flows on a map.')
-@click.option('--origin_geometry_type', '-ogt', default='lsoa', show_default=True,
-              type=click.STRING, help=f'Define origin geometry type to plot origin destination data.')
-@click.option('--destination_geometry_type', '-dgt', default='msoa', show_default=True,
-              type=click.STRING, help=f'Define destination geometry type to plot origin destination data.')
-@click.option('--origin_ids', '-oid', default=None, show_default=True, multiple=True,
-              type=click.STRING, help=f'Subset of origin ids to use in various plots.')
-@click.option('--destination_ids', '-did', default=None, show_default=True, multiple=True,
-              type=click.STRING, help=f'Subset of destination ids to use in various plots.')
-@click.option('--margin_plot', '-mp', default='destination_demand', show_default=True,
-              type=click.Choice(['origin_demand', 'destination_demand']), help=f'Sets margin to plot in table flow plots.')
-@click.option('--embedding_method', '-emb', default='isomap', show_default=False,
-              type=click.Choice(['isomap','tsne']), help=f'Sets method for embedding tabular data Into lower dimensional manifold.')
-@click.option('--n_bins', '-nb', default=100, show_default=True,
-              type=click.INT, help=f'Sets number of bins to use in histograms or number of lags in ACF or number of levels in countour plots.')
-@click.option('--nearest_neighbours', '-nn', default=100, show_default=True,
-              type=click.INT, help=f'Sets number of nearest neigbours in table_distribution_low_dimensional_embedding.')
-@click.option('--distance_metric', '-dis', default='edit_distance_degree_one', show_default=True,
-              type=click.Choice(DISTANCE_FUNCTIONS), 
-              help=f'Sets distance metric for lower dimensional embedding method')
-@click.option('--figure_format', '-ff', default='pdf', show_default=True,
-              type=click.Choice(['eps', 'png', 'pdf', 'tex']), help=f'Sets figure format.')#, case_sensitive=False)
-@click.option('--data_format', '-df', default='json', show_default=True,
-              type=click.Choice(['dat', 'txt', 'json', 'csv']), help=f'Sets figure data format.')#, case_sensitive=False)
-@click.option('--data_precision', '-dp', default=5, show_default=True,
-              type=click.INT, help=f'Sets figure data precision.')#, case_sensitive=False)
-@click.option('--figure_size', '-fs', default=(7,5), show_default=True,
-              type=(float, float), help=f'Sets figure format.')
-@click.option('--legend_location', '-lloc', default=(1.0,1.0), show_default=True,
-              type=(float, float), help=f'Sets legend bbox to anchor coordinates.')
-@click.option('--legend_axis', '-la', default=None, show_default=True,
-              type=(click.IntRange(0,None), click.IntRange(0,None)), help=f'Sets axis inside which to plot legend.')
-@click.option('--main_colourmap', '-mc', default='cblue',required=False, show_default=True,
-              type=click.STRING, help=f'Sets main colourmap (e.g. colourmap corresponding to flows).')
-@click.option('--aux_colourmap', '-ac', multiple=True, required=False, default=['Greens','Blues'],
-              type=click.STRING, help=f'Sets auxiliary colourmap (e.g. colourmap corresponding to margins).')
-@click.option('--colour_segmentation_limits', '-csl', default=(0,1), show_default=False,
+@click.option('--origin_geometry_type', '-ogt', default='lsoa', show_default = True,
+              type = click.STRING, help = f'Define origin geometry type to plot origin destination data.')
+@click.option('--destination_geometry_type', '-dgt', default='msoa', show_default = True,
+              type = click.STRING, help = f'Define destination geometry type to plot origin destination data.')
+@click.option('--origin_ids', '-oid', default = None, show_default = True, multiple = True,
+              type = click.STRING, help = f'Subset of origin ids to use in various plots.')
+@click.option('--destination_ids', '-did', default = None, show_default = True, multiple = True,
+              type = click.STRING, help = f'Subset of destination ids to use in various plots.')
+@click.option('--margin_plot', '-mp', default='destination_demand', show_default = True,
+              type = click.Choice(['origin_demand', 'destination_demand']), help = f'Sets margin to plot in table flow plots.')
+@click.option('--embedding_method', '-emb', default='isomap', show_default = False,
+              type = click.Choice(['isomap','tsne']), help = f'Sets method for embedding tabular data Into lower dimensional manifold.')
+@click.option('--n_bins', '-nb', default = 100, show_default = True,
+              type = click.INT, help = f'Sets number of bins to use in histograms or number of lags in ACF or number of levels in countour plots.')
+@click.option('--nearest_neighbours', '-nn', default = 100, show_default = True,
+              type = click.INT, help = f'Sets number of nearest neigbours in table_distribution_low_dimensional_embedding.')
+@click.option('--distance_metric', '-dis', default='edit_distance_degree_one', show_default = True,
+              type = click.Choice(DISTANCE_FUNCTIONS), 
+              help = f'Sets distance metric for lower dimensional embedding method')
+@click.option('--figure_format', '-ff', default='pdf', show_default = True,
+              type = click.Choice(['eps', 'png', 'pdf', 'tex']), help = f'Sets figure format.')#, case_sensitive = False)
+@click.option('--data_format', '-df', default='json', show_default = True,
+              type = click.Choice(['dat', 'txt', 'json', 'csv']), help = f'Sets figure data format.')#, case_sensitive = False)
+@click.option('--data_precision', '-dp', default = 5, show_default = True,
+              type = click.INT, help = f'Sets figure data precision.')#, case_sensitive = False)
+@click.option('--figure_size', '-fs', default=(7,5), show_default = True,
+              type=(float, float), help = f'Sets figure format.')
+@click.option('--legend_location', '-lloc', default=(1.0,1.0), show_default = True,
+              type=(float, float), help = f'Sets legend bbox to anchor coordinates.')
+@click.option('--legend_axis', '-la', default = None, show_default = True,
+              type=(click.IntRange(0,None), click.IntRange(0,None)), help = f'Sets axis inside which to plot legend.')
+@click.option('--main_colourmap', '-mc', default='cblue',required = False, show_default = True,
+              type = click.STRING, help = f'Sets main colourmap (e.g. colourmap corresponding to flows).')
+@click.option('--aux_colourmap', '-ac', multiple = True, required = False, default=['Greens','Blues'],
+              type = click.STRING, help = f'Sets auxiliary colourmap (e.g. colourmap corresponding to margins).')
+@click.option('--colour_segmentation_limits', '-csl', default=(0,1), show_default = False,
               type=(click.FloatRange(0,1), click.FloatRange(0,1)), 
-              help=f'Sets main colourbar\'s colour segmentation limits.')
-@click.option('--main_colourbar_limit', '-mcl', type=(float, float), help=f'Sets main colourbar limits.')
-@click.option('--auxiliary_colourbar_limit', '-acl', type=(float, float), multiple=True, help=f'Sets auxiliary colourbar(s) limits.')
-@click.option('--linewidth', '-lw', default=10, show_default=False,
-              type=click.INT, help=f'Sets line width in plots.')
-@click.option('--figure_title', '-ft', default=None, show_default=False,
-              type=click.STRING, help=f'Sets figure title.')
-@click.option('--colourbar_title', '-ct', default=None, show_default=False,
-              type=click.STRING, help=f'Sets colobar title (if colourbar exists).')
-@click.option('--annotation_label', '-al', default=None, show_default=False,
-              type=click.STRING, help=f'Sets annotation label variable.')
-@click.option('--opacity', '-op', default=1.0, show_default=True,
-              type=click.FloatRange(0,1), help=f'Sets level of transparency in plot.')
-@click.option('--axis_label_size', '-als', default=13, show_default=True,
-              type=click.INT, help=f'Sets axis label font size.')
-@click.option('--subaxis_label_size', '-sals', default=6, show_default=True,
-              type=click.INT, help=f'Sets subplot axis label font size.')
-@click.option('--tick_label_size', '-tls', default=13, show_default=True,
-              type=click.INT, help=f'Sets axis tick or colourbar font size.')
-@click.option('--axis_label_pad', '-alp', default=7, show_default=True,
-              type=click.INT, help=f'Sets axis label padding.')
-@click.option('--subaxis_label_pad', '-salp', default=3, show_default=True,
-              type=click.INT, help=f'Sets subplot axis label padding.')
-@click.option('--axis_label_rotation', '-alr', default=0, show_default=True,
-              type=click.INT, help=f'Sets axis label rotation.')
-@click.option('--subaxis_label_rotation', '-salr', default=0, show_default=True,
-              type=click.INT, help=f'Sets subplot axis label rotation.')
-@click.option('--colourbar_labelpad', '-clp', default=7, show_default=True,
-              type=click.INT, help=f'Sets colourbar label padding.')
-@click.option('--colourbar_label_rotation', '-clr', default=0, show_default=True,
-              type=click.INT, help=f'Sets colourbar label rotation.')
-@click.option('--title_label_size', '-ttls', default=16, show_default=True,
-              type=click.INT, help=f'Sets title font size.')
-@click.option('--legend_label_size', '-lls', default=None, show_default=False,
-              type=click.INT, help=f'Sets legend font size.')
-@click.option('--annotation_label_size', '-anls', default=15, show_default=False,
-              type=click.INT, help=f'Sets text annotation font size.')
+              help = f'Sets main colourbar\'s colour segmentation limits.')
+@click.option('--main_colourbar_limit', '-mcl', type=(float, float), help = f'Sets main colourbar limits.')
+@click.option('--auxiliary_colourbar_limit', '-acl', type=(float, float), multiple = True, help = f'Sets auxiliary colourbar(s) limits.')
+@click.option('--linewidth', '-lw', default = 10, show_default = False,
+              type = click.INT, help = f'Sets line width in plots.')
+@click.option('--figure_title', '-ft', default = None, show_default = False,
+              type = click.STRING, help = f'Sets figure title.')
+@click.option('--colourbar_title', '-ct', default = None, show_default = False,
+              type = click.STRING, help = f'Sets colobar title (if colourbar exists).')
+@click.option('--annotation_label', '-al', default = None, show_default = False,
+              type = click.STRING, help = f'Sets annotation label variable.')
+@click.option('--opacity', '-op', default = 1.0, show_default = True,
+              type = click.FloatRange(0,1), help = f'Sets level of transparency in plot.')
+@click.option('--axis_label_size', '-als', default = 13, show_default = True,
+              type = click.INT, help = f'Sets axis label font size.')
+@click.option('--subaxis_label_size', '-sals', default = 6, show_default = True,
+              type = click.INT, help = f'Sets subplot axis label font size.')
+@click.option('--tick_label_size', '-tls', default = 13, show_default = True,
+              type = click.INT, help = f'Sets axis tick or colourbar font size.')
+@click.option('--axis_label_pad', '-alp', default = 7, show_default = True,
+              type = click.INT, help = f'Sets axis label padding.')
+@click.option('--subaxis_label_pad', '-salp', default = 3, show_default = True,
+              type = click.INT, help = f'Sets subplot axis label padding.')
+@click.option('--axis_label_rotation', '-alr', default = 0, show_default = True,
+              type = click.INT, help = f'Sets axis label rotation.')
+@click.option('--subaxis_label_rotation', '-salr', default = 0, show_default = True,
+              type = click.INT, help = f'Sets subplot axis label rotation.')
+@click.option('--colourbar_labelpad', '-clp', default = 7, show_default = True,
+              type = click.INT, help = f'Sets colourbar label padding.')
+@click.option('--colourbar_label_rotation', '-clr', default = 0, show_default = True,
+              type = click.INT, help = f'Sets colourbar label rotation.')
+@click.option('--title_label_size', '-ttls', default = 16, show_default = True,
+              type = click.INT, help = f'Sets title font size.')
+@click.option('--legend_label_size', '-lls', default = None, show_default = False,
+              type = click.INT, help = f'Sets legend font size.')
+@click.option('--annotation_label_size', '-anls', default = 15, show_default = False,
+              type = click.INT, help = f'Sets text annotation font size.')
 @click.option('--marker_frequency','-mf', default = None, show_default = False,
-            type=click.INT, help='Plots marker every n-th poInt in dataset')
+            type = click.INT, help='Plots marker every n-th poInt in dataset')
 @click.option('--marker_size','-ms', default = 1, show_default = True,
-            type=click.INT, help='Sets marker size in plot')
-@click.option('--by_experiment/--no-by_experiment', '-be', default=False, is_flag=True, show_default=True,
-              help=f'Flag for plotting data separately for each experiment or not.')
-@click.option('--benchmark/--no-benchmark', '-bm', default=None, is_flag=True, show_default=True,
-              help=f'Flag for plotting data along with benchmark/baseline (if provided).')
-@click.option('--annotate/--no-annotate', default=None, is_flag=True, show_default=True,
-              help=f'Flag for annotating plot with text')
-@click.option('--transpose/--no-transpose', default=None, is_flag=True, show_default=True,
-              help=f'Flag for taking switching origins with destinations in plots.')
-@click.option('--colourbar/--no-colourbar', default=None, is_flag=True, show_default=True,
-              help=f'Flag for plotting colourbars or not.')
-@click.option('--equal_aspect/--no-equal_aspect', default=False, is_flag=True, show_default=True,
-              help=f'Flag for setting aspect ratio to equal or not.')
+            type = click.INT, help='Sets marker size in plot')
+@click.option('--by_experiment/--no-by_experiment', '-be', default = False, is_flag = True, show_default = True,
+              help = f'Flag for plotting data separately for each experiment or not.')
+@click.option('--benchmark/--no-benchmark', '-bm', default = None, is_flag = True, show_default = True,
+              help = f'Flag for plotting data along with benchmark/baseline (if provided).')
+@click.option('--annotate/--no-annotate', default = None, is_flag = True, show_default = True,
+              help = f'Flag for annotating plot with text')
+@click.option('--transpose/--no-transpose', default = None, is_flag = True, show_default = True,
+              help = f'Flag for taking switching origins with destinations in plots.')
+@click.option('--colourbar/--no-colourbar', default = None, is_flag = True, show_default = True,
+              help = f'Flag for plotting colourbars or not.')
+@click.option('--equal_aspect/--no-equal_aspect', default = False, is_flag = True, show_default = True,
+              help = f'Flag for setting aspect ratio to equal or not.')
 @plot_coordinate_options
 @click.pass_context
 def plot(
@@ -817,24 +817,24 @@ def plot(
     )
     # Run plot
     Plot(
-        plot_view=plot_view,
-        outputs_directories=list(directories),
-        settings=settings,
-        logger=logger
+        plot_view = plot_view,
+        outputs_directories = list(directories),
+        settings = settings,
+        logger = logger
     )
 
     logger.info('Done')
 
-@cli.command(name='summarise',context_settings=dict(
-    ignore_unknown_options=True,
-    allow_extra_args=True,
+@cli.command(name='summarise',context_settings = dict(
+    ignore_unknown_options = True,
+    allow_extra_args = True,
 ))
 @output_options
 @common_options
-@click.option('--algorithm', '-a', default=['linear'], show_default=True, multiple=True,
-              type=click.STRING, help=f'Sets algorithm name for use in.')
-@click.option('--sort_by','-sort', multiple=True, type=click.STRING, required=False)
-@click.option('--ascending','-asc', default=None, is_flag=True, show_default=True, required=False)
+@click.option('--algorithm', '-a', default=['linear'], show_default = True, multiple = True,
+              type = click.STRING, help = f'Sets algorithm name for use in.')
+@click.option('--sort_by','-sort', multiple = True, type = click.STRING, required = False)
+@click.option('--ascending','-asc', default = None, is_flag = True, show_default = True, required = False)
 @click.pass_context
 def summarise(
         ctx,
@@ -902,8 +902,8 @@ def summarise(
 
     # Run output handler
     outsum = OutputSummary(
-        settings=settings,
-        logger=logger
+        settings = settings,
+        logger = logger
     )
     # Collect
     experiment_metadata = outsum.collect_metadata()

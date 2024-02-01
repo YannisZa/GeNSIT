@@ -176,7 +176,7 @@ class NeuralNet(nn.Module):
             layer = nn.Linear(
                 self.architecture[i],
                 self.architecture[i + 1],
-                bias=self.bias[i] is not None,
+                bias = self.bias[i] is not None,
             )
 
             # Initialise the biases of the layers with a uniform distribution
@@ -191,7 +191,7 @@ class NeuralNet(nn.Module):
             self.layers.append(layer)
 
         # Get the optimizer
-        self.optimizer = OPTIMIZERS[optimizer](self.parameters(), lr=learning_rate)
+        self.optimizer = OPTIMIZERS[optimizer](self.parameters(), lr = learning_rate)
 
     # ... Evaluation functions .........................................................................................
 
@@ -313,9 +313,9 @@ class HarrisWilson_NN:
             else:
                 raise Exception(f"Loss {name} is missing function {function}. Loss function is set to {loss_func}.")
 
-        self._loss_sample = torch.tensor(0.0, requires_grad=False)
+        self._loss_sample = torch.tensor(0.0, requires_grad = False)
         self._theta_sample = torch.stack(
-            [torch.tensor(0.0, requires_grad=False)] * len(self.physics_model.params_to_learn)
+            [torch.tensor(0.0, requires_grad = False)] * len(self.physics_model.params_to_learn)
         )
 
     def update_loss(
@@ -324,7 +324,7 @@ class HarrisWilson_NN:
             n_processed_steps:dict,
             prediction_data:dict,
             validation_data:dict,
-            loss_function_names:list=None,
+            loss_function_names:list = None,
             aux_inputs:dict={},
             **kwargs
         ):
@@ -380,11 +380,11 @@ class HarrisWilson_NN:
                 if name in ['total_distance_loss','total_distance_likelihood_loss']:
                     # Calculate total cost incurred by travelling from every origin
                     total_cost_predicted = torch.mul(
-                        prediction_data['table'][n].to(dtype=float32),
+                        prediction_data['table'][n].to(dtype = float32),
                         validation_data['cost_matrix']
-                    ).sum(dim=1)
+                    ).sum(dim = 1)
                     # Normalise to 1
-                    normalised_total_cost_predicted = total_cost_predicted / total_cost_predicted.sum(dim=0)
+                    normalised_total_cost_predicted = total_cost_predicted / total_cost_predicted.sum(dim = 0)
                     
                     # Reshape loss kwargs if needed
                     for key, value in deepcopy( self.loss_kwargs.get(name,{})).items():
@@ -427,8 +427,8 @@ class HarrisWilson_NN:
 
                     # Add to total loss
                     res = self.loss_functions[name](
-                        prediction_data[pred_dataset][n].to(dtype=float32),
-                        validation_data[validation_dataset].to(dtype=float32),
+                        prediction_data[pred_dataset][n].to(dtype = float32),
+                        validation_data[validation_dataset].to(dtype = float32),
                         **{k:v for k,v in self.loss_kwargs[name].items() \
                             if k in loss_fn_name_keys}
                     )

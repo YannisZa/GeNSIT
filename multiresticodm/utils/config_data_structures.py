@@ -29,9 +29,9 @@ def instantiate_data_type(
         raise Exception('>'.join(list(map(str,key_path))))
     if len(data_type) > 0 and hasattr(sys.modules[__name__], data_type):
         return getattr(sys.modules[__name__], data_type)(
-            data=data,
-            schema=schema,
-            key_path=key_path
+            data = data,
+            schema = schema,
+            key_path = key_path
         )
     else:
         raise ValueError(f"Data type '{data_type}' not found for {'>'.join(list(map(str,key_path)))}")
@@ -51,7 +51,7 @@ class Entry(object):
     def value(self) -> Any:
         return None if is_null(self.data) else self.data
     
-    def check_type(self,data_type=None):
+    def check_type(self,data_type = None):
         # print("Check type")
         data_type = data_type if data_type is not None else self.schema.get("dtype",data_type)
         allow_nan = self.schema.get("allow-nan",False)
@@ -60,13 +60,13 @@ class Entry(object):
                 assert isinstance(self.data,self.dtype) or allow_nan
             except:
                 raise InvalidTypeException(
-                    message=f"Expected type {self.dtype}. Got {type(self.data)}",
-                    key_path=self.key_path,
-                    data=self.data
+                    message = f"Expected type {self.dtype}. Got {type(self.data)}",
+                    key_path = self.key_path,
+                    data = self.data
                 )
         else:
             raise TypeNotFoundException(
-                key_path=self.key_path
+                key_path = self.key_path
             )
         return True
 
@@ -97,7 +97,7 @@ class PrimitiveEntry(Entry):
             inclusive = self.schema.get("inclusive",True)
             allow_nan = self.schema.get("allow-nan",False)
             try: 
-                assert in_range(self.data,valid_range,allow_nan=allow_nan,inclusive=inclusive)
+                assert in_range(self.data,valid_range,allow_nan = allow_nan,inclusive = inclusive)
             except:
                 raise InvalidRangeException(
                     f"Data {self.data} is out of range {valid_range}",
@@ -125,8 +125,8 @@ class PrimitiveEntry(Entry):
             except:
                 raise InvalidScopeException(
                     f"None of the substrings {', '.join(substrings)} are contained in data {self.data}",
-                    key_path=self.key_path,
-                    data=self.data
+                    key_path = self.key_path,
+                    data = self.data
                 )
         return True
 
@@ -146,8 +146,8 @@ class Bool(PrimitiveEntry):
         except:
             raise InvalidBooleanException(
                 f"Boolean {str(self.data)} is not equal to 'True' or 'False'",
-                key_path=self.key_path,
-                data=self.data
+                key_path = self.key_path,
+                data = self.data
             )
 
 class Numeric(PrimitiveEntry):
@@ -161,8 +161,8 @@ class Numeric(PrimitiveEntry):
         except:
             raise StringNotNumericException(
                 f"String {self.data} is not numeric",
-                key_path=self.key_path,
-                data=self.data
+                key_path = self.key_path,
+                data = self.data
             )
         return True
 
@@ -176,8 +176,8 @@ class Numeric(PrimitiveEntry):
             except:
                 raise InfiniteNumericException(
                     f"Infinite data {self.data} provided",
-                    key_path=self.key_path,
-                    data=self.data
+                    key_path = self.key_path,
+                    data = self.data
                 )
 
     def check(self):
@@ -260,8 +260,8 @@ class Path(Str):
             except:
                 raise PathNotExistException(
                     f"Path to file {self.data} does not exist",
-                    key_path=self.key_path,
-                    data=self.data
+                    key_path = self.key_path,
+                    data = self.data
                 )
         return True
 
@@ -273,8 +273,8 @@ class Path(Str):
         except:
             raise DirectoryNotFoundException(
                 f"Path to file {self.data} is not a directory",
-                key_path=self.key_path,
-                data=self.data
+                key_path = self.key_path,
+                data = self.data
             )
         return True
 
@@ -286,8 +286,8 @@ class Path(Str):
         except:
             raise FileNotFoundException(
                 f"Path to file {self.data} is not a file",
-                key_path=self.key_path,
-                data=self.data
+                key_path = self.key_path,
+                data = self.data
             )
         return True
 
@@ -302,8 +302,8 @@ class Path(Str):
             except:
                 raise InvalidExtensionException(
                     f"File {self.data} does not have extension {extension}.",
-                    key_path=self.key_path,
-                    data=self.data
+                    key_path = self.key_path,
+                    data = self.data
                 )
         return True
 
@@ -367,12 +367,12 @@ class NonPrimitiveEntry(Entry):
         if length is not None:
             if isinstance(length,Iterable):
                 try: 
-                    assert in_range(len(self.data),length,allow_nan=False,inclusive=True)
+                    assert in_range(len(self.data),length,allow_nan = False,inclusive = True)
                 except:
                     raise InvalidLengthException(
                         f"Length {len(self.data)} is not in range {length}.",
-                        key_path=self.key_path,
-                        data=self.data
+                        key_path = self.key_path,
+                        data = self.data
                     )
             else:
                 try: 
@@ -380,8 +380,8 @@ class NonPrimitiveEntry(Entry):
                 except:
                     raise InvalidLengthException(
                         f"Length {len(self.data)} is not equal to {length}.",
-                        key_path=self.key_path,
-                        data=self.data
+                        key_path = self.key_path,
+                        data = self.data
                     )
         return True
 
@@ -397,8 +397,8 @@ class NonPrimitiveEntry(Entry):
             except:
                 raise DataUniquenessException(
                     f"Data {data} is not unique",
-                    key_path=self.key_path,
-                    data=data
+                    key_path = self.key_path,
+                    data = data
                 )
         return True
 
@@ -453,10 +453,10 @@ class List(NonPrimitiveEntry):
         # Check that correct length is provided
         self.check_length()
         # Check that all values are unique
-        self.check_uniqueness(vals=self.data)
+        self.check_uniqueness(vals = self.data)
         # Check that each element of the list is valid 
         # by calling their respective check functions
-        self.check_elements(vals=self.data)
+        self.check_elements(vals = self.data)
 
 
 class List2D(NonPrimitiveEntry):
@@ -504,21 +504,21 @@ class List2D(NonPrimitiveEntry):
             if isinstance(ncols,Iterable) or isinstance(nrows,Iterable):
                 if isinstance(nrows,Iterable):
                     try: 
-                        assert in_range(shape(self.data)[0],nrows,allow_nan=False,inclusive=True)
+                        assert in_range(shape(self.data)[0],nrows,allow_nan = False,inclusive = True)
                     except:
                         raise InvalidLengthException(
                             f"#rows {shape(self.data)[0]} is not in range {nrows}.",
-                            key_path=self.key_path,
-                            data=self.data
+                            key_path = self.key_path,
+                            data = self.data
                         )
                 if isinstance(ncols,Iterable):
                     try: 
-                        assert in_range(shape(self.data)[1],ncols,allow_nan=False,inclusive=True)
+                        assert in_range(shape(self.data)[1],ncols,allow_nan = False,inclusive = True)
                     except:
                         raise InvalidLengthException(
                             f"#cols {shape(self.data)[1]} is not in range {ncols}.",
-                            key_path=self.key_path,
-                            data=self.data
+                            key_path = self.key_path,
+                            data = self.data
                         )
             else:
                 try: 
@@ -526,8 +526,8 @@ class List2D(NonPrimitiveEntry):
                 except:
                     raise InvalidLengthException(
                         f"Shape {shape(self.data)} is not equal to {(nrows,ncols)}.",
-                        key_path=self.key_path,
-                        data=self.data
+                        key_path = self.key_path,
+                        data = self.data
                     )
         return True
 
@@ -536,7 +536,7 @@ class List2D(NonPrimitiveEntry):
         self.check_dims()
         # Check that each element of the list is valid 
         # by calling their respective check functions
-        self.check_elements(vals=self.data)
+        self.check_elements(vals = self.data)
 
 
 class CustomList(NonPrimitiveEntry):
@@ -636,8 +636,8 @@ class CustomList(NonPrimitiveEntry):
         except:
             raise CustomListParsingException(
                 f"Data {self.data} contain > 2 or < 0 ':' strings.",
-                key_path=self.key_path,
-                data=self.data
+                key_path = self.key_path,
+                data = self.data
             )
         return True
 
@@ -648,7 +648,7 @@ class CustomList(NonPrimitiveEntry):
         self.check_length()
         # Check that each element of the list is valid 
         # by calling their respective check functions
-        self.check_elements(vals=self.data)
+        self.check_elements(vals = self.data)
 
 class Dict(NonPrimitiveEntry):
     def __init__(self,data,schema,key_path):
@@ -708,10 +708,10 @@ class Dict(NonPrimitiveEntry):
         # Check that correct length is provided
         self.check_length()
         # Check that all keys are unique
-        self.check_uniqueness(vals=self.data.keys())
+        self.check_uniqueness(vals = self.data.keys())
         # Check that all values are unique
-        self.check_uniqueness(vals=self.data.values())
+        self.check_uniqueness(vals = self.data.values())
         # Check that each key is valid
-        self.check_elements(vals=self.data.keys())
+        self.check_elements(vals = self.data.keys())
         # Check that each value is valid
-        self.check_elements(vals=self.data.values())
+        self.check_elements(vals = self.data.values())

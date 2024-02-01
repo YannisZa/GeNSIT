@@ -181,7 +181,7 @@ def test_2d_contingency_table_generation(ct,dummy_generated_2x3_config):
 # def test_2d_contingency_table_augmentation(ct,dummy_augmented_5x7_config):
 #
 #     # Augment by 1 row and column
-#     ct.resize(addRows=1,addCols=1)
+#     ct.resize(addRows = 1,addCols = 1)
 #
 #     # Import true contingency table
 #     true_ct = ContingencyTable2D(dummy_augmented_5x7_config)
@@ -481,7 +481,7 @@ def test_logsumexp():
     print(log_lambdas)
 
     lambdas = np.exp(log_lambdas)
-    my_num = np.sum(lambdas,axis=0)
+    my_num = np.sum(lambdas,axis = 0)
     my_denum = np.sum(lambdas)
     my_lse = my_num/my_denum
 

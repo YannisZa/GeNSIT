@@ -12,7 +12,7 @@ from scipy.stats import gaussian_kde
 from multiresticodm.utils.misc_utils import set_seed
 from multiresticodm.utils.math_utils import log_factorial_sum, logfactorialsum, logsumexp
 
-def uniform_binary_choice(n:int=1):
+def uniform_binary_choice(n:int = 1):
     choices = [-1,1]
     x = torch.rand(n)
     var = torch.zeros(n)
@@ -30,12 +30,12 @@ def product_multinomial_sample(log_intensity:torch.tensor,rsums:torch.tensor):
     # Compute probabilities for each row
     # log_rsums = torch.tensor([torch.logsumexp(log_intensity[i,:]) for i in range(rsums.shape[0])])
     p = torch.exp(log_intensity-torch.log(rsums).reshape((rsums.shape[0],1)))
-    p = p / p.sum(dim=1).reshape((log_intensity.shape[1],1))
+    p = p / p.sum(dim = 1).reshape((log_intensity.shape[1],1))
     # Initialise table
-    tab = torch.empty(p.shape,dtype=float32)
+    tab = torch.empty(p.shape,dtype = float32)
     # Loop through each row and sample it
     for i in range(rsums.shape[0]):
-        tab[i,:] = distr.multinomial.Multinomial(total_count=rsums[i],probs=p[i,:])
+        tab[i,:] = distr.multinomial.Multinomial(total_count = rsums[i],probs = p[i,:])
     return tab
 
 
@@ -43,9 +43,9 @@ def log_odds_ratio_wrt_intensity(log_intensity: torch.tensor):
     # Extract dimensions of intensity
     nrows,ncols = np.shape(log_intensity)
     # Computes log of odds ratio of intensity
-    log_intensity_rowsums = torch.logsumexp(log_intensity,dim=1).unsqueeze(1)
-    log_intensity_colsums = torch.logsumexp(log_intensity,dim=0).unsqueeze(0)
-    log_intensity_total = torch.logsumexp(log_intensity_rowsums.ravel(),dim=0)
+    log_intensity_rowsums = torch.logsumexp(log_intensity,dim = 1).unsqueeze(1)
+    log_intensity_colsums = torch.logsumexp(log_intensity,dim = 0).unsqueeze(0)
+    log_intensity_total = torch.logsumexp(log_intensity_rowsums.ravel(),dim = 0)
     # Computes log of odds ratio of intensity
     log_or = log_intensity + \
         log_intensity_total - \
@@ -82,7 +82,7 @@ def log_odds_cross_ratio(log_intensity: torch.tensor, cell1: Union[Tuple, list, 
 
 def log_poisson_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
     # Compute log pmf
-    return - torch.sum(log_intensity) + (table.to(dtype=float32)*log_intensity).sum() - log_factorial_sum(table.ravel())
+    return - torch.sum(log_intensity) + (table.to(dtype = float32)*log_intensity).sum() - log_factorial_sum(table.ravel())
 
 def log_poisson_loss(table:xr.DataArray,log_intensity:xr.DataArray,**kwargs) -> float:
     # Compute negative log pmf
@@ -96,16 +96,16 @@ def log_poisson_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor,**k
     # Return log pmf
     return log_poisson_pmf_unnormalised(log_intensity,table)
 
-def poisson_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int=None) -> float:
+def poisson_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int = None) -> float:
     return torch.exp(log_intensity)
 
 
 
 def log_multinomial_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
     # Normalise log intensites by log rowsums to create multinomial probabilities
-    log_probabilities = (log_intensity - torch.logsumexp(log_intensity.ravel(),dim=0))
+    log_probabilities = (log_intensity - torch.logsumexp(log_intensity.ravel(),dim = 0))
     # Compute log pmf
-    return (table.to(dtype=float32).ravel()*log_probabilities.ravel()).sum() - log_factorial_sum(table.ravel())
+    return (table.to(dtype = float32).ravel()*log_probabilities.ravel()).sum() - log_factorial_sum(table.ravel())
 
 def log_multinomial_loss(table:xr.DataArray,log_intensity:xr.DataArray,**kwargs) -> float:
     # Compute negative log pmf
@@ -121,20 +121,20 @@ def log_multinomial_loss(table:xr.DataArray,log_intensity:xr.DataArray,**kwargs)
 
 def log_multinomial_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor,) -> float:
     # Return log pmf
-    return ((log_multinomial_pmf_unnormalised(log_intensity,table)) + log_factorial_sum(table.sum())).to(dtype=float32)
+    return ((log_multinomial_pmf_unnormalised(log_intensity,table)) + log_factorial_sum(table.sum())).to(dtype = float32)
 
-def multinomial_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int=None) -> float:
+def multinomial_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int = None) -> float:
     return torch.sum(table)/torch.sum(torch.exp(log_intensity)) * torch.exp(log_intensity)
 
 
 
 def log_product_multinomial_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
     # Compute log margins of intensity matrix
-    log_rowsums = torch.logsumexp(log_intensity,dim=1).unsqueeze(1)
+    log_rowsums = torch.logsumexp(log_intensity,dim = 1).unsqueeze(1)
     # Normalise log intensites by log rowsums to create multinomial probabilities
     log_probabilities = (log_intensity - log_rowsums)
     # Compute log pmf
-    return (table.to(dtype=float32).ravel()*log_probabilities.ravel()).sum() - log_factorial_sum(table.ravel())
+    return (table.to(dtype = float32).ravel()*log_probabilities.ravel()).sum() - log_factorial_sum(table.ravel())
 
 def log_product_multinomial_loss(table:xr.DataArray,log_intensity:xr.DataArray,**kwargs) -> float:
     # Compute log margins of intensity matrix
@@ -152,23 +152,23 @@ def log_product_multinomial_loss(table:xr.DataArray,log_intensity:xr.DataArray,*
 def log_product_multinomial_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
     # Return log pmf
     log_target = log_product_multinomial_pmf_unnormalised(log_intensity,table) + \
-        log_factorial_sum(table.sum(dim=1).to(dtype=int32))
+        log_factorial_sum(table.sum(dim = 1).to(dtype = int32))
     return log_target
 
-def product_multinomial_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int=None) -> float:
+def product_multinomial_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int = None) -> float:
     if axis is None:
         axis = 1
-    return torch.sum(table,dim=axis)/torch.sum(torch.exp(log_intensity),dim=axis) * torch.exp(log_intensity)
+    return torch.sum(table,dim = axis)/torch.sum(torch.exp(log_intensity),dim = axis) * torch.exp(log_intensity)
 
 
 def log_fishers_hypergeometric_pmf_unnormalised(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
     # Compute log odds ratio
     log_or = log_odds_ratio_wrt_intensity(log_intensity)
     # Compute log_probabilities
-    log_or_colsums = torch.logsumexp(log_or,dim=0).unsqueeze(0).to(dtype=float32)
+    log_or_colsums = torch.logsumexp(log_or,dim = 0).unsqueeze(0).to(dtype = float32)
     log_or_probabilities = log_or - log_or_colsums
     # Compute log pmf
-    return (table.to(dtype=float32).ravel() * log_or_probabilities.ravel()).sum() - log_factorial_sum(table.ravel()).sum()
+    return (table.to(dtype = float32).ravel() * log_or_probabilities.ravel()).sum() - log_factorial_sum(table.ravel()).sum()
 
 def log_fishers_hypergeometric_loss(table:xr.DataArray,log_intensity:xr.DataArray,**kwargs) -> float:
     origins = log_intensity.coords['origin'].values
@@ -189,14 +189,14 @@ def log_fishers_hypergeometric_loss(table:xr.DataArray,log_intensity:xr.DataArra
 def log_fishers_hypergeometric_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
     # Return log pmf
     return  log_fishers_hypergeometric_pmf_unnormalised(log_intensity,table) + \
-        log_factorial_sum(table.sum(dim=0).to(dtype=int32))
+        log_factorial_sum(table.sum(dim = 0).to(dtype = int32))
 
-def fishers_hypergeometric_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int=None) -> float:
+def fishers_hypergeometric_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int = None) -> float:
     if axis is None:
         axis = 0
     # Compute odds ratio
-    odds_ratio = torch.exp(log_odds_ratio_wrt_intensity(log_intensity=log_intensity))
-    return torch.sum(table,dim=axis) * (odds_ratio / torch.sum(odds_ratio,dim=axis))
+    odds_ratio = torch.exp(log_odds_ratio_wrt_intensity(log_intensity = log_intensity))
+    return torch.sum(table,dim = axis) * (odds_ratio / torch.sum(odds_ratio,dim = axis))
 
 
 def table_similarity_measure(tab:torch.tensor,tab0:Union[float,torch.tensor],log_intensity:torch.tensor,**kwargs) -> float:
@@ -212,11 +212,11 @@ def multinomial_mode(n,p):
     # Get length of probability vector
     r = np.shape(p)[0]
     # Make make first towards finding mode
-    kis = torch.floor((n+r/2)*p).to(dtype=int32)
+    kis = torch.floor((n+r/2)*p).to(dtype = int32)
     # Sum all elements to check if they sum up to n
     n0 = int(torch.sum(kis))
     # Generate random vector in [0,1]^r
-    fis = torch.rand(r,dtype=float32)
+    fis = torch.rand(r,dtype = float32)
 
     if n0 < n:
         qis = torch.divide(1-fis,kis+1)
@@ -237,7 +237,7 @@ def multinomial_mode(n,p):
             qis[min_index] = fis[min_index]/kis[min_index]
             n0 -= 1
 
-    return kis.to(dtype=int32)
+    return kis.to(dtype = int32)
 
 
 def generate_stopping_times(N:int,k_power:float,seed:int):
@@ -259,18 +259,18 @@ def compute_truncated_infinite_series(N:int,log_weights:torch.tensor,k_power:flo
     # Compute S = Y[0] + sum_{i>1} (Y[i] - Y[i-1])/P(N > i) using logarithms
     
     # Compute increasing averages estimator (Appendix C5)
-    ln_Y = torch.log(torch.range(1, N+2,device=device))
+    ln_Y = torch.log(torch.range(1, N+2,device = device))
     for i in range(0, N+1):
-        ln_Y[i] -=  torch.logsumexp(log_weights[:i+1].ravel(),dim=0)
+        ln_Y[i] -=  torch.logsumexp(log_weights[:i+1].ravel(),dim = 0)
     # Compute log of Y[i]/P(N > i) and Y[i-1]/P(N > i)
-    ln_Y_pos = ln_Y + torch.cat((torch.tensor([0],device=device),k_power*torch.log(torch.range(1, N+1,device=device))))
-    ln_Y_neg = ln_Y[:(N+1)] + k_power*torch.log(torch.range(1, N+1,device=device))
+    ln_Y_pos = ln_Y + torch.cat((torch.tensor([0],device = device),k_power*torch.log(torch.range(1, N+1,device = device))))
+    ln_Y_neg = ln_Y[:(N+1)] + k_power*torch.log(torch.range(1, N+1,device = device))
     
     # Sum of all positive and negative terms and convert back to log
-    positive_sum = torch.logsumexp(ln_Y_pos,dim=0)
-    negative_sum = torch.logsumexp(ln_Y_neg,dim=0)
+    positive_sum = torch.logsumexp(ln_Y_pos,dim = 0)
+    negative_sum = torch.logsumexp(ln_Y_neg,dim = 0)
 
-    ret = torch.empty(2,device=device)
+    ret = torch.empty(2,device = device)
     # If positive terms are larger in magnitude than negative terms
     if(positive_sum >= negative_sum):
         # This is just computing log(exp(positive_sum) - exp(negative_sum))
@@ -323,26 +323,26 @@ def random_vector(
                 f"Upper bound must be greater or equal to lower bound; got {l} and {u}!"
             )
 
-        return (u - l) * np.random.uniform(size=size,dtype='float32') + l
+        return (u - l) * np.random.uniform(size = size,dtype='float32') + l
 
     # Normal distribution
     elif distribution == "normal":
         return np.random.normal(
-            loc=parameters.get("mean",1.0),
-            scale=parameters.get("std",0.1),
-            size=size
+            loc = parameters.get("mean",1.0),
+            scale = parameters.get("std",0.1),
+            size = size
         ).astype('float32')
     
     elif distribution == "poisson":
         return np.random.poisson(
-            lam=parameters.get("lam",1.0),
-            size=size
+            lam = parameters.get("lam",1.0),
+            size = size
         ).astype('float32')
 
     else:
         raise ValueError(f"Unrecognised distribution type {distribution}!")
     
-def sample_multinomial_row(i,msum,margin_probabilities,free_cells,axis_uncostrained_flat,device:str='cpu',ndims:int=2):
+def sample_multinomial_row(i,msum,margin_probabilities,free_cells,axis_uncostrained_flat,device:str='cpu',ndims:int = 2):
     # Get cells for specific row
     current_cells = free_cells[free_cells[:,axis_uncostrained_flat].ravel() == i,:]
     free_indices = [ current_cells[:,i] for i in range(ndims) ]
@@ -351,7 +351,7 @@ def sample_multinomial_row(i,msum,margin_probabilities,free_cells,axis_uncostrai
         probs = margin_probabilities[free_indices].ravel()
     ).sample()
     # Update free cells
-    return updated_cells.to(device=device,dtype=float32)
+    return updated_cells.to(device = device,dtype = float32)
 
 def kernel_density(y,**kwargs):
     # Kernel density estimation

@@ -40,9 +40,9 @@ sys.path.append(wd)
 
 # Parse arguments from command line
 parser = argparse.ArgumentParser(description='Script to create stopping times for approximating the inverse of z(\theta) by truncating an infinite series')
-parser.add_argument("-data", "--dataset_name",nargs='?',type=str,choices=['commuter_borough','commuter_ward','retail','transport','synthetic'],default = 'synthetic',
+parser.add_argument("-data", "--dataset_name",nargs='?',type = str,choices=['commuter_borough','commuter_ward','retail','transport','synthetic'],default = 'synthetic',
                     help="Name of dataset (this is the directory name in data/inputs)")
-parser.add_argument("-n", "--n",nargs='?',type=int,default = 20000,
+parser.add_argument("-n", "--n",nargs='?',type = int,default = 20000,
                     help="Number of stopping times to create.")
 args = parser.parse_args()
 

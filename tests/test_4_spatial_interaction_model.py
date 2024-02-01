@@ -14,7 +14,7 @@ class Test4Helpers:
     def pytorch_totally_constrained_intensity(xx_tor,theta_tor,cost_matrix_tor,table_total_tor):
         # Compute log pmf
         wksp = theta_tor[0] * xx_tor - theta_tor[1] * cost_matrix_tor
-        log_norm = torch.logsumexp(wksp,dim=tuple(list(range(2))))
+        log_norm = torch.logsumexp(wksp,dim = tuple(list(range(2))))
         flows = torch.exp(wksp - log_norm) * table_total_tor
         return flows
     
@@ -32,7 +32,7 @@ class Test4Helpers:
         # Compute log unnormalised expected flow
         log_utility = alpha*xx_tor - beta*cost_mat_tor
         # Compute log normalisation factor
-        log_normalisation = torch.logsumexp(log_utility,dim=tuple(list(range(2))))
+        log_normalisation = torch.logsumexp(log_utility,dim = tuple(list(range(2))))
         # Compute potential
         if alpha == 0:
             return -np.infty
@@ -62,7 +62,7 @@ class Test4Helpers:
     def pytorch_production_constrained_intensity(xx_tor,theta_tor,origin_demand_tor,cost_matrix_tor,table_total_tor):
         nrows,ncols = cost_matrix_tor.size()
         wksp = theta_tor[0] * xx_tor - theta_tor[1] * cost_matrix_tor
-        log_norms = torch.logsumexp(wksp,dim=1,keepdim=True)
+        log_norms = torch.logsumexp(wksp,dim = 1,keepdim = True)
         origin_demand_tor = torch.reshape(origin_demand_tor,((nrows,1)))
         flows = torch.mul(torch.mul(origin_demand_tor,torch.exp(wksp - log_norms)),table_total_tor)
         return flows
@@ -76,12 +76,12 @@ class Test4Helpers:
         gamma = theta_tor[3]
         kappa = theta_tor[4]
         epsilon = theta_tor[5]
-        log_total_tor = torch.tensor(0,requires_grad=False)
+        log_total_tor = torch.tensor(0,requires_grad = False)
 
         # Compute log unnormalised expected flow
         log_utility = alpha*xx_tor - beta*cost_mat_tor
         # Compute log normalisation factor
-        log_norms = torch.logsumexp(log_utility,dim=1,keepdim=False)
+        log_norms = torch.logsumexp(log_utility,dim = 1,keepdim = False)
         # Compute utility potential
         utility_potential = torch.dot(
             origin_demand_tor,
@@ -181,10 +181,10 @@ def test_totally_constrained_log_intensity_jacobian(test4_helpers,totally_constr
     total = table_2x3_n100.sum()
     theta = np.array([0.8,0.5])
     xx = totally_constrained_sim.log_destination_attraction
-    xx_tor = torch.tensor(xx, requires_grad=True)
-    theta_tor = torch.tensor(theta, requires_grad=False)
-    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad=False)
-    table_total_tor = torch.tensor(total,requires_grad=False)
+    xx_tor = torch.tensor(xx, requires_grad = True)
+    theta_tor = torch.tensor(theta, requires_grad = False)
+    costmat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad = False)
+    table_total_tor = torch.tensor(total,requires_grad = False)
     
     torch_grad,_,_,_ = torch.autograd.functional.jacobian(test4_helpers.pytorch_totally_constrained_intensity, 
                                                     (xx_tor,theta_tor,costmat_tor,table_total_tor))
@@ -214,10 +214,10 @@ def test_totally_constrained_potential_value(test4_helpers,totally_constrained_s
     # xx = np.array([-0.91629073,-0.51082562])
     # Create theta
     theta = np.array([1.0,0.5*100,0.1,10000,1.1,1.0])
-    theta_tor = torch.tensor(theta,requires_grad=False)
-    cost_mat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad=False)
-    origin_demand_tor = torch.tensor(totally_constrained_sim.origin_demand,requires_grad=False)
-    xx_tor = torch.tensor(totally_constrained_sim.log_destination_attraction,requires_grad=True)
+    theta_tor = torch.tensor(theta,requires_grad = False)
+    cost_mat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad = False)
+    origin_demand_tor = torch.tensor(totally_constrained_sim.origin_demand,requires_grad = False)
+    xx_tor = torch.tensor(totally_constrained_sim.log_destination_attraction,requires_grad = True)
 
     # Compute gamma*V_{theta}(x)
     pot,gradPot = totally_constrained_sim.sde_potential_and_gradient(totally_constrained_sim.log_destination_attraction,theta)
@@ -230,11 +230,11 @@ def test_totally_constrained_potential_value(test4_helpers,totally_constrained_s
 def test_totally_constrained_potential_gradient(test4_helpers,totally_constrained_sim):
     # Create theta
     theta = np.array([1.0,0.5*100,0.1,10000,1.1,1.0])
-    theta_tor = torch.tensor(theta,requires_grad=False)
-    cost_mat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad=False)
-    origin_demand_tor = torch.tensor(totally_constrained_sim.origin_demand,requires_grad=False)
+    theta_tor = torch.tensor(theta,requires_grad = False)
+    cost_mat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad = False)
+    origin_demand_tor = torch.tensor(totally_constrained_sim.origin_demand,requires_grad = False)
     xx = totally_constrained_sim.log_destination_attraction
-    xx_tor = torch.tensor(xx,requires_grad=True)
+    xx_tor = torch.tensor(xx,requires_grad = True)
 
     # Compute gamma*V_{theta}(x) using my method
     pot,gradPot = totally_constrained_sim.sde_potential_and_gradient(totally_constrained_sim.log_destination_attraction,theta)
@@ -258,11 +258,11 @@ def test_production_constrained_log_expected_flows(production_constrained_sim,te
         100
     )
     # Convert objects to tensors
-    theta_tor = torch.tensor(theta,requires_grad=False)
-    log_destination_attraction_tor = torch.tensor(production_constrained_sim.log_destination_attraction,requires_grad=True)
-    cost_matrix_tor = torch.tensor(production_constrained_sim.cost_matrix,requires_grad=False)
-    origin_demand_tor = torch.tensor(production_constrained_sim.origin_demand,requires_grad=False)
-    table_total_tor = torch.tensor(table_2x3_n100.sum(),requires_grad=False)
+    theta_tor = torch.tensor(theta,requires_grad = False)
+    log_destination_attraction_tor = torch.tensor(production_constrained_sim.log_destination_attraction,requires_grad = True)
+    cost_matrix_tor = torch.tensor(production_constrained_sim.cost_matrix,requires_grad = False)
+    origin_demand_tor = torch.tensor(production_constrained_sim.origin_demand,requires_grad = False)
+    table_total_tor = torch.tensor(table_2x3_n100.sum(),requires_grad = False)
 
     true_lambdas = test4_helpers.pytorch_production_constrained_intensity(
         log_destination_attraction_tor,
@@ -284,11 +284,11 @@ def test_production_constrained_log_intensity_jacobian(test4_helpers,production_
     total = table_2x3_n100.sum()
     theta = np.array([0.8,0.5])
     xx = production_constrained_sim.log_destination_attraction
-    xx_tor = torch.tensor(xx, requires_grad=True)
-    theta_tor = torch.tensor(theta, requires_grad=False)
-    origin_demand_tor = torch.tensor(production_constrained_sim.origin_demand,requires_grad=False)
-    costmat_tor = torch.tensor(production_constrained_sim.cost_matrix,requires_grad=False)
-    table_total_tor = torch.tensor(total,requires_grad=False)
+    xx_tor = torch.tensor(xx, requires_grad = True)
+    theta_tor = torch.tensor(theta, requires_grad = False)
+    origin_demand_tor = torch.tensor(production_constrained_sim.origin_demand,requires_grad = False)
+    costmat_tor = torch.tensor(production_constrained_sim.cost_matrix,requires_grad = False)
+    table_total_tor = torch.tensor(total,requires_grad = False)
     
     torch_grad,_,_,_,_ = torch.autograd.functional.jacobian(test4_helpers.pytorch_production_constrained_intensity, 
                                                     (xx_tor,theta_tor,origin_demand_tor,costmat_tor,table_total_tor))
@@ -314,10 +314,10 @@ def test_production_constrained_potential_value(test4_helpers,production_constra
     nrows,ncols = np.shape(production_constrained_sim.cost_matrix)
     theta = np.array([1.0,0.5*100,0.1,10000,1.1,1.0])
     xx = production_constrained_sim.log_destination_attraction
-    xx_tor = torch.tensor(xx, requires_grad=True)
-    theta_tor = torch.tensor(theta, requires_grad=False)
-    origin_demand_tor = torch.tensor(production_constrained_sim.origin_demand,requires_grad=False)
-    costmat_tor = torch.tensor(production_constrained_sim.cost_matrix,requires_grad=False)
+    xx_tor = torch.tensor(xx, requires_grad = True)
+    theta_tor = torch.tensor(theta, requires_grad = False)
+    origin_demand_tor = torch.tensor(production_constrained_sim.origin_demand,requires_grad = False)
+    costmat_tor = torch.tensor(production_constrained_sim.cost_matrix,requires_grad = False)
 
     # Compute gamma*V_{theta}(x)
     pot,_ = production_constrained_sim.sde_potential_and_gradient(production_constrained_sim.log_destination_attraction,theta)
@@ -332,10 +332,10 @@ def test_production_constrained_potential_gradient(test4_helpers,production_cons
     nrows,ncols = np.shape(production_constrained_sim.cost_matrix)
     theta = np.array([1.0,0.5*100,0.1,10000,1.1,1.0])
     xx = production_constrained_sim.log_destination_attraction
-    xx_tor = torch.tensor(xx, requires_grad=True)
-    theta_tor = torch.tensor(theta, requires_grad=False)
-    origin_demand_tor = torch.tensor(production_constrained_sim.origin_demand,requires_grad=False)
-    costmat_tor = torch.tensor(production_constrained_sim.cost_matrix,requires_grad=False)
+    xx_tor = torch.tensor(xx, requires_grad = True)
+    theta_tor = torch.tensor(theta, requires_grad = False)
+    origin_demand_tor = torch.tensor(production_constrained_sim.origin_demand,requires_grad = False)
+    costmat_tor = torch.tensor(production_constrained_sim.cost_matrix,requires_grad = False)
 
     # Compute gamma*V_{theta}(x) using my method
     pot,gradPot = production_constrained_sim.sde_potential_and_gradient(production_constrained_sim.log_destination_attraction,theta)
@@ -354,11 +354,11 @@ def test_data_likelihood_and_gradient(test4_helpers,totally_constrained_sim):
     np.random.seed(1234)
     theta = np.array([1.0,0.5*100,0.1,10000,1.1,1.0])
     yy = totally_constrained_sim.log_destination_attraction
-    xx = yy + np.log(np.random.uniform(low=0.1, high=1.0, size=1))
-    theta_tor = torch.tensor(theta,requires_grad=False)
-    cost_mat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad=False)
-    yy_tor = torch.tensor(yy,requires_grad=False)
-    xx_tor = torch.tensor(xx,requires_grad=True)
+    xx = yy + np.log(np.random.uniform(low = 0.1, high = 1.0, size = 1))
+    theta_tor = torch.tensor(theta,requires_grad = False)
+    cost_mat_tor = torch.tensor(totally_constrained_sim.cost_matrix,requires_grad = False)
+    yy_tor = torch.tensor(yy,requires_grad = False)
+    xx_tor = torch.tensor(xx,requires_grad = True)
     noise_var_tor = torch.tensor(totally_constrained_sim.noise_var)
     
     # Compute log(p(y|x,theta))

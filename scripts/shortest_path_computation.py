@@ -47,7 +47,7 @@ home_ids_batches = np.array_split(home_ids,n_batches)
 # Start from last batch
 home_ids_batches[starting_batch:] = home_ids_batches
 
-individual_facility_distance_matrices = np.asarray(Parallel(n_jobs=num_cores,
+individual_facility_distance_matrices = np.asarray(Parallel(n_jobs = num_cores,
                                                 backend="multiprocessing")(
                                         delayed(compute_individual_facility_shortest_path)(i,
                                                 graph,
@@ -55,7 +55,7 @@ individual_facility_distance_matrices = np.asarray(Parallel(n_jobs=num_cores,
                                                 work_ids,
                                                 num_cores,
                                                 n_batches,
-                                                store) for i in tqdm(range(starting_batch,n_batches),desc='Shortest path computation',leave=True,position=0)),dtype=object)
+                                                store) for i in tqdm(range(starting_batch,n_batches),desc='Shortest path computation',leave = True,position = 0)),dtype = object)
 
 # Take loaded batches into account
 if starting_batch > 0:
@@ -75,11 +75,11 @@ if starting_batch > 0:
     
 else:
     # Merge all the computed batches
-    individual_facility_distance_matrices = np.concatenate(individual_facility_distance_matrices,axis=0)
+    individual_facility_distance_matrices = np.concatenate(individual_facility_distance_matrices,axis = 0)
     
 # Convert to df
 print('Convert to df')
-individual_facility_distance_matrix_gdf = pd.DataFrame(individual_facility_distance_matrices, columns = ['origin','destination',distance_method],index=None)
+individual_facility_distance_matrix_gdf = pd.DataFrame(individual_facility_distance_matrices, columns = ['origin','destination',distance_method],index = None)
 
 print('Merge origin geometry')
 # Merge origin geometry
@@ -87,14 +87,14 @@ individual_facility_distance_matrix_gdf = pd.merge(individual_facility_distance_
 # Rename columns
 individual_facility_distance_matrix_gdf = individual_facility_distance_matrix_gdf.rename(columns={'geometry_id':'origin_geometry_id','geometry':'origin_geometry'})
 # Drop columns
-individual_facility_distance_matrix_gdf.drop(columns=['facility_id'],inplace=True)
+individual_facility_distance_matrix_gdf.drop(columns=['facility_id'],inplace = True)
 print('Merge destination geometry')
 # Merge destination geometry
 individual_facility_distance_matrix_gdf = pd.merge(individual_facility_distance_matrix_gdf,work_locs[['facility_id','geometry_id','geometry']],left_on='destination',right_on='facility_id',how='left')
 # Rename columns
 individual_facility_distance_matrix_gdf = individual_facility_distance_matrix_gdf.rename(columns={'geometry_id':'destination_geometry_id','geometry':'destination_geometry'})
 # Drop columns
-individual_facility_distance_matrix_gdf.drop(columns=['facility_id'],inplace=True)
+individual_facility_distance_matrix_gdf.drop(columns=['facility_id'],inplace = True)
 
 print('Convert to geopandas df')
 # Convert data types

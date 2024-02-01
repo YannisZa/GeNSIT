@@ -24,18 +24,18 @@ from multiresticodm.harris_wilson_model_mcmc import instantiate_harris_wilson_mc
 from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 
 # Suppress scientific notation
-np.set_printoptions(suppress=True)
+np.set_printoptions(suppress = True)
 
 def instantiate_experiment(experiment_type:str,config:Config,**kwargs):
     if hasattr(sys.modules[__name__], experiment_type):
         # Get whether sweep is active
         if config.sweep_mode(settings = config.settings):
             return ExperimentSweep(
-                config=config,
+                config = config,
                 **kwargs
             )
         else:
-            return getattr(sys.modules[__name__], experiment_type)(config=config,**kwargs)
+            return getattr(sys.modules[__name__], experiment_type)(config = config,**kwargs)
     else:
         raise Exception(f'Experiment class {experiment_type} not found')
 
@@ -138,13 +138,13 @@ class Experiment(object):
         self.config.settings['load_data'] = False
         
         # Update config with current timestamp ( but do not overwrite)
-        datetime_results = list(deep_get(key='datetime',value=self.config.settings))
+        datetime_results = list(deep_get(key='datetime',value = self.config.settings))
         if len(datetime_results) > 0:
             deep_update(
                 self.config.settings, 
                 key='datetime', 
-                val=datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), 
-                overwrite=False
+                val = datetime.now().strftime("%d_%m_%Y_%H_%M_%S"), 
+                overwrite = False
             )
         else:
             self.config['datetime'] = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
@@ -155,7 +155,7 @@ class Experiment(object):
         self.outputs_base_dir = kwargs.get('base_dir',None)
 
         # Update current config
-        # self.config = self.sim.config.update_recursively(self.config,updated_config,overwrite=True)
+        # self.config = self.sim.config.update_recursively(self.config,updated_config,overwrite = True)
         # Decide how often to print statemtents
         self.store_progress = self.config.get('store_progress',1.0)
         self.print_percentage = min(0.05,self.store_progress)
@@ -203,7 +203,7 @@ class Experiment(object):
                 return None
         return None            
 
-    def reset(self,metadata:bool=False) -> None:
+    def reset(self,metadata:bool = False) -> None:
         self.logger.note(f"Resetting experimental results to release memory.")
         
         # Get shapes 
@@ -269,8 +269,8 @@ class Experiment(object):
             self.config.settings['inputs']['load_experiment'] = ''
             
             self.outputs.write_metadata(
-                dir_path=dir_path,
-                filename=filename
+                dir_path = dir_path,
+                filename = filename
             )
     
     def close_outputs(self):
@@ -308,7 +308,7 @@ class Experiment(object):
                         except:
                             self.logger.warning("Theta could not be initialised.")
                 self.params_to_learn = list(theta.keys())
-                initialisations['theta'] = torch.tensor(list(theta.values()),dtype=float32,device=self.device)
+                initialisations['theta'] = torch.tensor(list(theta.values()),dtype = float32,device = self.device)
                 
             elif param == 'log_destination_attraction':
                 # Arbitrarily initialise destination attraction
@@ -318,22 +318,22 @@ class Experiment(object):
                         dims['destination']
                     )
                 ).to(
-                    dtype=float32,
-                    device=self.device
+                    dtype = float32,
+                    device = self.device
                 )
                 initialisations['log_destination_attraction'].requires_grad = True
 
             elif param == 'sign':
-                initialisations['sign'] = torch.tensor(1,dtype=uint8,device=self.device)
+                initialisations['sign'] = torch.tensor(1,dtype = uint8,device = self.device)
             
             elif param == 'loss':
                 initialisations['loss'] = {
-                    nm:torch.tensor(0.0,dtype=float32,device=self.device,requires_grad=True) \
+                    nm:torch.tensor(0.0,dtype = float32,device = self.device,requires_grad = True) \
                     for nm in self.learning_model.loss_functions.keys()
                 }
             
             elif param == 'log_target':
-                initialisations['log_target'] = torch.tensor(0.0,dtype=float32,device=self.device)
+                initialisations['log_target'] = torch.tensor(0.0,dtype = float32,device = self.device)
 
         return initialisations
         
@@ -361,8 +361,8 @@ class Experiment(object):
                                 loss_name,
                                 (0,),
                                 maxshape=(None,),
-                                chunks=True,
-                                compression=3,
+                                chunks = True,
+                                compression = 3,
                             )
                         )
                         getattr(self,loss_name).attrs['dim_names'] = (
@@ -390,8 +390,8 @@ class Experiment(object):
                             p_name, 
                             (0,), 
                             maxshape=(None,),
-                            chunks=True, 
-                            compression=3
+                            chunks = True, 
+                            compression = 3
                         )
                         dset.attrs['dim_names'] = (
                             (['iter'] if DATA_SCHEMA[p_name].get('is_iterable',False) else [])+
@@ -453,8 +453,8 @@ class Experiment(object):
                                 sample,
                                 (0,*[dims[d] for d in DATA_SCHEMA[sample].get('dims',[])]),
                                 maxshape=(None,*[dims[d] for d in DATA_SCHEMA[sample].get('dims',[])]),
-                                chunks=True,
-                                compression=3
+                                chunks = True,
+                                compression = 3
                             )
                         )
                         getattr(self,sample).attrs[sample] = all_dims
@@ -511,7 +511,7 @@ class Experiment(object):
         
         # Reset loss
         loss = {
-            nm:torch.tensor(0.0,requires_grad=True) \
+            nm:torch.tensor(0.0,requires_grad = True) \
             for nm in self.learning_model.loss_functions.keys()    
         }
         # Reset number of epoch steps for loss calculation
@@ -532,14 +532,14 @@ class Experiment(object):
                     # Store samples
                     _loss_sample = kwargs.get(loss_name,None)
                     _loss_sample = _loss_sample.clone().detach().cpu().numpy().item() if _loss_sample is not None else None
-                    getattr(self,loss_name).resize(getattr(self,loss_name).shape[0] + 1, axis=0)
+                    getattr(self,loss_name).resize(getattr(self,loss_name).shape[0] + 1, axis = 0)
                     getattr(self,loss_name)[-1] = _loss_sample
 
             if 'theta' in self.output_names:
                 _theta_sample = kwargs.get('theta',[None]*len(self.thetas))
                 _theta_sample = _theta_sample.clone().detach().cpu() if _theta_sample is not None else None
                 for idx, dset in enumerate(self.thetas):
-                    dset.resize(dset.shape[0] + 1, axis=0)
+                    dset.resize(dset.shape[0] + 1, axis = 0)
                     dset[-1] = _theta_sample[idx]
 
             for sample in ['r2','log_posterior_approximation']:
@@ -559,12 +559,12 @@ class Experiment(object):
                         if torch.is_tensor(sample_value) \
                         else sample_value
                     # Resize h5 data
-                    getattr(self,sample).resize(getattr(self,sample).shape[0] + 1, axis=0)
+                    getattr(self,sample).resize(getattr(self,sample).shape[0] + 1, axis = 0)
                     # Store latest sample
                     getattr(self,sample)[-1] = sample_value
 
 
-    def print_initialisations(self,parameter_inits,print_lengths:bool=True,print_values:bool=False):
+    def print_initialisations(self,parameter_inits,print_lengths:bool = True,print_values:bool = False):
         for p,v in parameter_inits.items():
             if isinstance(v,(list,np.ndarray)):
                 if print_lengths and print_values:
@@ -579,16 +579,16 @@ class Experiment(object):
     
     def show_progress(self):
         if hasattr(self,'theta_acc'):
-            self.config['theta_acceptance'] = int(100*self.theta_acc[:].mean(axis=0))
+            self.config['theta_acceptance'] = int(100*self.theta_acc[:].mean(axis = 0))
             self.logger.progress(f"Theta acceptance: {self.config['theta_acceptance']}")
         if hasattr(self,'signs'):
-            self.config['positives_percentage'] = int(100*self.signs[:].sum(axis=0))
+            self.config['positives_percentage'] = int(100*self.signs[:].sum(axis = 0))
             self.logger.progress(f"Positives %: {self.config['positives_percentage']}")
         if hasattr(self,'log_destination_attraction_acc'):
-            self.config['log_destination_attraction_acceptance'] = int(100*self.log_destination_attraction_acc[:].mean(axis=0))
+            self.config['log_destination_attraction_acceptance'] = int(100*self.log_destination_attraction_acc[:].mean(axis = 0))
             self.logger.progress(f"Log destination attraction acceptance: {self.config['log_destination_attraction_acceptance']}")
         if hasattr(self,'table_acc'):
-            self.config['table_acceptance'] = int(100*self.table_acc[:].mean(axis=0))
+            self.config['table_acceptance'] = int(100*self.table_acc[:].mean(axis = 0))
             self.logger.progress(f"Table acceptance: {self.config['table_acceptance']}")
         if hasattr(self,'learning_model') and self.learning_model.model_type == 'neural_network':
             loss_names = list(self.learning_model.loss_functions.keys())
@@ -626,7 +626,7 @@ class Experiment(object):
                 self.logger.error(f"Table margins {self.ct_mcmc.ct.table_constrained_margins_summary_statistic(table_sample)}")
                 self.logger.error(f"""
                     Fixed margins {torch.cat([self.ct_mcmc.ct.data.margins[tuplize(ax)] 
-                    for ax in sorted(self.ct_mcmc.ct.constraints['constrained_axes'])],dim=0)}
+                    for ax in sorted(self.ct_mcmc.ct.constraints['constrained_axes'])],dim = 0)}
                 """)
                 raise InvalidDataRange(data = getattr(self,'table')[-1], rang = 'not admissible')
             
@@ -671,7 +671,7 @@ class RSquared_Analysis(Experiment):
 
         # Prepare inputs
         self.inputs = Inputs(
-            config=config,
+            config = self.config,
             synthetic_data = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -684,23 +684,23 @@ class RSquared_Analysis(Experiment):
         self.logger.note("Initializing the spatial interaction model ...")
 
         sim = instantiate_sim(
-            name = config['spatial_interaction_model']['name'],
-            config = config,
-            true_parameters = config['spatial_interaction_model']['parameters'],
+            name = self.config['spatial_interaction_model']['name'],
+            config = self.config,
+            true_parameters = self.config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data),
-            logger=self.logger
+            logger = self.logger
         )
 
         # Get and remove config
-        config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config')
 
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         self.physics_model = HarrisWilson(
             intensity_model = sim,
-            config = config,
-            dt = config['harris_wilson_model'].get('dt',0.001),
+            config = self.config,
+            dt = self.config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -719,7 +719,7 @@ class RSquared_Analysis(Experiment):
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -745,25 +745,25 @@ class RSquared_Analysis(Experiment):
         # Initialize search grid
         alpha_values = torch.linspace(
             *[self.grid_ranges['alpha'][k] for k in ['min','max','n']],
-            dtype=float32,
-            device=self.device
+            dtype = float32,
+            device = self.device
         )
         beta_values = torch.linspace(
             *[self.grid_ranges['beta'][k] for k in ['min','max','n']],
-            dtype=float32,
-            device=self.device
+            dtype = float32,
+            device = self.device
         )
 
         # Print initialisations
-        # self.print_initialisations(parameter_inits,print_lengths=False,print_values=True)
+        # self.print_initialisations(parameter_inits,print_lengths = False,print_values = True)
 
         # Search values
         max_r2 = 0 
         max_w_prediction = torch.exp(
             torch.ones(
-                self.inputs.data.dims['destination'],dtype=float32,device=self.device
+                self.inputs.data.dims['destination'],dtype = float32,device = self.device
             ) * torch.tensor(
-                1./self.inputs.data.dims['destination'],dtype=float32,device=self.device
+                1./self.inputs.data.dims['destination'],dtype = float32,device = self.device
             )
         )
         # Get destination attraction for last time dimension
@@ -781,7 +781,7 @@ class RSquared_Analysis(Experiment):
         progress = tqdm(
             total = len(alpha_values)*len(beta_values),
             disable = self.tqdm_disabled,
-            position=self.position,
+            position = self.position,
             desc = f"RSquared_Analysis instance: {self.position}",
             leave = False
         )
@@ -889,7 +889,7 @@ class LogTarget_Analysis(Experiment):
 
         # Prepare inputs
         self.inputs = Inputs(
-            config=config,
+            config = self.config,
             synthetic_data = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -902,41 +902,38 @@ class LogTarget_Analysis(Experiment):
         self.logger.note("Initializing the spatial interaction model ...")
 
         sim = instantiate_sim(
-            name = config['spatial_interaction_model']['name'],
-            config = config,
-            true_parameters = config['spatial_interaction_model']['parameters'],
+            name = self.config['spatial_interaction_model']['name'],
+            config = self.config,
+            true_parameters = self.config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data),
-            logger=self.logger
+            logger = self.logger
         )
 
         # Get and remove config
-        config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config')
 
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
-            config = config,
-            dt = config['harris_wilson_model'].get('dt',0.001),
+            config = self.config,
+            dt = self.config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(physics_model,'config')
+        self.config = pop_variable(physics_model,'config')
 
         # Spatial interaction model MCMC
         self.logger.note("Initializing the Harris Wilson model MCMC")
         self.learning_model = instantiate_harris_wilson_mcmc(
-            config = config,
+            config = self.config,
             physics_model = physics_model,
             logger = self.logger
         )
         self.learning_model.build(**kwargs)
-
-        # Store config
-        self.config = config
 
         # Create outputs
         self.outputs = Outputs(
@@ -949,7 +946,7 @@ class LogTarget_Analysis(Experiment):
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -974,17 +971,17 @@ class LogTarget_Analysis(Experiment):
         # Initialize search grid
         alpha_values = torch.linspace(
             *[self.grid_ranges['alpha'][k] for k in ['min','max','n']],
-            dtype=float32,
-            device=self.device
+            dtype = float32,
+            device = self.device
         )
         beta_values = torch.linspace(
             *[self.grid_ranges['beta'][k] for k in ['min','max','n']],
-            dtype=float32,
-            device=self.device
+            dtype = float32,
+            device = self.device
         )
 
         # Print initialisations
-        # self.print_initialisations(parameter_inits,print_lengths=False,print_values=True)
+        # self.print_initialisations(parameter_inits,print_lengths = False,print_values = True)
 
         # Search values
         max_target = -np.infty
@@ -1006,7 +1003,7 @@ class LogTarget_Analysis(Experiment):
         progress = tqdm(
             total = len(alpha_values)*len(beta_values),
             disable = self.tqdm_disabled,
-            position=self.position,
+            position = self.position,
             desc = f"LogTarget Analysis instance: {self.position}",
             leave = False
         )
@@ -1080,7 +1077,7 @@ class SIM_MCMC(Experiment):
 
         # Prepare inputs
         self.inputs = Inputs(
-            config=config,
+            config = self.config,
             synthetic_data = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -1093,41 +1090,41 @@ class SIM_MCMC(Experiment):
         self.logger.note("Initializing the spatial interaction model ...")
 
         sim = instantiate_sim(
-            name = config['spatial_interaction_model']['name'],
-            config = config,
-            true_parameters = config['spatial_interaction_model']['parameters'],
+            name = self.config['spatial_interaction_model']['name'],
+            config = self.config,
+            true_parameters = self.config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data),
-            logger=self.logger
+            logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config')
 
         # Build the Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
-            config = config,
-            dt = config['harris_wilson_model'].get('dt',0.001),
+            config = self.config,
+            dt = self.config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
 
         # Get and remove config
-        config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config')
 
         # Spatial interaction model MCMC
         self.logger.note("Initializing the Harris Wilson model MCMC")
         self.learning_model = instantiate_harris_wilson_mcmc(
-            config = config,
+            config = self.config,
             physics_model = physics_model,
             logger = self.logger
         )
         self.learning_model.build(**kwargs)
         
         # Get config
-        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
+        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
 
         # Create outputs
         self.outputs = Outputs(
@@ -1140,14 +1137,14 @@ class SIM_MCMC(Experiment):
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
         
         self.logger.note(f"{self.learning_model}")
         self.logger.info(f"Experiment: {self.outputs.experiment_id}")
-        # self.logger.critical(f"{json.dumps(kwargs.get('sweep',{}),indent=2)}")
+        # self.logger.critical(f"{json.dumps(kwargs.get('sweep',{}),indent = 2)}")
 
         
     def run(self,**kwargs) -> None:
@@ -1163,7 +1160,7 @@ class SIM_MCMC(Experiment):
         log_destination_attraction_sample = initial_params['log_destination_attraction']
         
         # Print initialisations
-        # self.print_initialisations(parameter_inits,print_lengths=False,print_values=True)
+        # self.print_initialisations(parameter_inits,print_lengths = False,print_values = True)
         
         # Expand theta
         theta_sample_scaled = deepcopy(theta_sample)
@@ -1189,9 +1186,9 @@ class SIM_MCMC(Experiment):
 
         for i in tqdm(
             range(N),
-            disable=self.tqdm_disabled,
-            leave=False,
-            position=self.position,
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
             desc = f"SIM_MCMC instance: {self.position}"
         ):
 
@@ -1201,8 +1198,8 @@ class SIM_MCMC(Experiment):
             # Run theta sampling
             for j in tqdm(
                 range(M),
-                disable=True,
-                leave=False
+                disable = True,
+                leave = False
             ):
 
                 # Gather all additional values
@@ -1234,8 +1231,8 @@ class SIM_MCMC(Experiment):
             # Run x sampling
             for l in tqdm(
                 range(L),
-                disable=True,
-                leave=False
+                disable = True,
+                leave = False
             ):
                 
                 # Gather all additional values
@@ -1290,7 +1287,7 @@ class JointTableSIM_MCMC(Experiment):
 
         # Prepare inputs
         self.inputs = Inputs(
-            config=config,
+            config = self.config,
             synthetic_data = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -1303,45 +1300,45 @@ class JointTableSIM_MCMC(Experiment):
         self.logger.note("Initializing the spatial interaction model ...")
 
         sim = instantiate_sim(
-            name = config['spatial_interaction_model']['name'],
-            config = config,
-            true_parameters = config['spatial_interaction_model']['parameters'],
+            name = self.config['spatial_interaction_model']['name'],
+            config = self.config,
+            true_parameters = self.config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data),
-            logger=self.logger
+            logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config')
 
         # Build the Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
-            config = config,
-            dt = config['harris_wilson_model'].get('dt',0.001),
+            config = self.config,
+            dt = self.config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(physics_model,'config')
+        self.config = pop_variable(physics_model,'config')
         
         # Spatial interaction model MCMC
         self.logger.note("Initializing the Harris Wilson model MCMC")
         self.learning_model = instantiate_harris_wilson_mcmc(
-            config = config,
+            config = self.config,
             physics_model = physics_model,
             logger = self.logger
         )
         self.learning_model.build(**kwargs)
         
         # Get config
-        config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
+        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
         ct = instantiate_ct(
-            config = config,
+            config = self.config,
             logger = self.logger,
             **vars(self.inputs.data)
         )
@@ -1355,7 +1352,7 @@ class JointTableSIM_MCMC(Experiment):
         )
 
         # Get config
-        self.config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else config
+        self.config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else self.config
 
         # Create outputs
         self.outputs = Outputs(
@@ -1368,7 +1365,7 @@ class JointTableSIM_MCMC(Experiment):
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -1390,7 +1387,7 @@ class JointTableSIM_MCMC(Experiment):
         log_destination_attraction_sample = initial_params['log_destination_attraction']
         
         # Print initialisations
-        # self.print_initialisations(parameter_inits,print_lengths=False,print_values=True)
+        # self.print_initialisations(parameter_inits,print_lengths = False,print_values = True)
         
         # Expand theta
         theta_sample_scaled = deepcopy(theta_sample)
@@ -1425,9 +1422,9 @@ class JointTableSIM_MCMC(Experiment):
 
         for i in tqdm(
             range(N),
-            disable=self.tqdm_disabled,
-            leave=False,
-            position=self.position,
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
             desc = f"JointTableSIM_MCMC instance: {self.position}"
         ):
 
@@ -1437,8 +1434,8 @@ class JointTableSIM_MCMC(Experiment):
             # Run theta sampling
             for j in tqdm(
                 range(M),
-                disable=True,
-                leave=False
+                disable = True,
+                leave = False
             ):
 
                 # Gather all additional values
@@ -1473,8 +1470,8 @@ class JointTableSIM_MCMC(Experiment):
             # Run x sampling
             for l in tqdm(
                 range(L),
-                disable=True,
-                leave=False
+                disable = True,
+                leave = False
             ):
                 
                 # Gather all additional values
@@ -1508,8 +1505,8 @@ class JointTableSIM_MCMC(Experiment):
             # Run table sampling
             for k in tqdm(
                 range(self.config.settings['mcmc']['contingency_table']['table_steps']),
-                disable=True,
-                leave=False
+                disable = True,
+                leave = False
             ):
                 
                 # Take step
@@ -1564,7 +1561,7 @@ class Table_MCMC(Experiment):
 
         # Prepare inputs
         self.inputs = Inputs(
-            config=config,
+            config = self.config,
             synthetic_data = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -1576,12 +1573,12 @@ class Table_MCMC(Experiment):
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
         ct = instantiate_ct(
-            config = config,
+            config = self.config,
             logger = self.logger,
             **vars(self.inputs.data)
         )
         # Update table distribution
-        config.settings['contingency_table']['distribution_name'] = ct.distribution_name
+        self.config.settings['contingency_table']['distribution_name'] = ct.distribution_name
 
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
@@ -1594,7 +1591,7 @@ class Table_MCMC(Experiment):
         self.ct_mcmc.table_steps = 1
 
         # Get config
-        config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else config
+        self.config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else self.config
 
         # Initialise intensity
         if (ct is not None) and (ct.ground_truth_table is not None):
@@ -1609,15 +1606,15 @@ class Table_MCMC(Experiment):
             try:
                 # Instantiate Spatial Interaction Model
                 sim = instantiate_sim(
-                    name = config['spatial_interaction_model']['name'],
-                    config = config,
-                    true_parameters = config['spatial_interaction_model']['parameters'],
+                    name = self.config['spatial_interaction_model']['name'],
+                    config = self.config,
+                    true_parameters = self.config['spatial_interaction_model']['parameters'],
                     instance = kwargs.get('instance',''),
                     **vars(self.inputs.data),
-                    logger=self.logger
+                    logger = self.logger
                 )
                 # Get and remove config
-                config = pop_variable(sim,'config')
+                self.config = pop_variable(sim,'config')
                 self.logger.note("Using SIM model as ground truth intensity")
                 
                 # Spatial interaction model for intensity
@@ -1630,9 +1627,6 @@ class Table_MCMC(Experiment):
             except:
                 raise Exception('No ground truth or table provided to construct table intensities.')
 
-        # Get config
-        self.config = config
-
         # Create outputs
         self.outputs = Outputs(
             self.config,
@@ -1644,7 +1638,7 @@ class Table_MCMC(Experiment):
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -1669,9 +1663,9 @@ class Table_MCMC(Experiment):
         # For each epoch
         for i in tqdm(
             range(N),
-            disable=self.tqdm_disabled,
-            leave=False,
-            position=self.position,
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
             desc = f"Table MCMC instance: {self.position}"
         ):
 
@@ -1725,7 +1719,7 @@ class SIM_NN(Experiment):
 
         # Prepare inputs
         self.inputs = Inputs(
-            config=config,
+            config = self.config,
             synthetic_data = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -1738,44 +1732,44 @@ class SIM_NN(Experiment):
         self.logger.note("Initializing the spatial interaction model ...")
 
         sim = instantiate_sim(
-            name = config['spatial_interaction_model']['name'],
-            config = config,
-            true_parameters = config['spatial_interaction_model']['parameters'],
+            name = self.config['spatial_interaction_model']['name'],
+            config = self.config,
+            true_parameters = self.config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data),
-            logger=self.logger
+            logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config')
 
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
-            config = config,
-            dt = config['harris_wilson_model'].get('dt',0.001),
+            config = self.config,
+            dt = self.config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(physics_model,'config')
+        self.config = pop_variable(physics_model,'config')
         
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
             input_size = self.inputs.data.dims['destination'],
-            output_size = len(config['inputs']['to_learn']),
-            **config['neural_network']['hyperparameters'],
+            output_size = len(self.config['inputs']['to_learn']),
+            **self.config['neural_network']['hyperparameters'],
             logger = self.logger
         ).to(self.device)
 
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
         self.learning_model = HarrisWilson_NN(
-            config = config,
+            config = self.config,
             neural_net = neural_network,
-            loss = config['neural_network'].pop('loss'),
+            loss = self.config['neural_network'],
             physics_model = physics_model,
             write_every = self._write_every,
             write_start = self._write_start,
@@ -1783,7 +1777,7 @@ class SIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
+        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
 
         # Create outputs
         self.outputs = Outputs(
@@ -1796,7 +1790,7 @@ class SIM_NN(Experiment):
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -1817,7 +1811,7 @@ class SIM_NN(Experiment):
 
         # Initialise samples
         log_intensity_sample = None
-        grand_total = torch.tensor(1.0,dtype=float32,device=self.device)
+        grand_total = torch.tensor(1.0,dtype = float32,device = self.device)
 
         # Track the training loss
         loss_sample = {
@@ -1835,9 +1829,9 @@ class SIM_NN(Experiment):
         # For each epoch
         for i in tqdm(
             range(N),
-            disable=self.tqdm_disabled,
-            leave=False,
-            position=self.position,
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
             desc = f"SIM_NN instance: {self.position}"
         ):
 
@@ -1854,7 +1848,7 @@ class SIM_NN(Experiment):
                 )            
                 # Add axis to every sample to ensure compatibility 
                 # with the functions used below
-                theta_sample_expanded = torch.unsqueeze(theta_sample,0).split(1,dim=1)
+                theta_sample_expanded = torch.unsqueeze(theta_sample,0).split(1,dim = 1)
                 training_data_expanded = training_data.clone()
                 training_data_expanded.requires_grad = True
                 
@@ -1932,12 +1926,12 @@ class NonJointTableSIM_NN(Experiment):
 
         # Prepare inputs
         self.inputs = Inputs(
-            config=config,
+            config = self.config,
             synthetic_data = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
-        
+
         # Pass inputs to device
         self.inputs.pass_to_device()
 
@@ -1945,33 +1939,33 @@ class NonJointTableSIM_NN(Experiment):
         self.logger.note("Initializing the spatial interaction model ...")
 
         sim = instantiate_sim(
-            name = config['spatial_interaction_model']['name'],
-            config = config,
-            true_parameters = config['spatial_interaction_model']['parameters'],
+            name = self.config['spatial_interaction_model']['name'],
+            config = self.config,
+            true_parameters = self.config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data),
-            logger=self.logger
+            logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config')
 
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
-            config = config,
-            dt = config['harris_wilson_model'].get('dt',0.001),
+            config = self.config,
+            dt = self.config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
             instance = kwargs.get('instance',''),
             logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(physics_model,'config')
+        self.config = pop_variable(physics_model,'config')
         
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
         ct = instantiate_ct(
-            config = config,
+            config = self.config,
             logger = self.logger,
             **vars(self.inputs.data)
         )
@@ -1984,23 +1978,23 @@ class NonJointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else config
+        self.config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else self.config
 
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
             input_size = self.inputs.data.dims['destination'],
-            output_size = len(config['inputs']['to_learn']),
-            **config['neural_network']['hyperparameters'],
+            output_size = len(self.config['inputs']['to_learn']),
+            **self.config['neural_network']['hyperparameters'],
             logger = self.logger
         ).to(self.device)
 
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
         self.learning_model = HarrisWilson_NN(
-            config = config,
+            config = self.config,
             neural_net = neural_network,
-            loss = config['neural_network'].pop('loss'),
+            loss = self.config['neural_network']['loss'],
             physics_model = physics_model,
             write_every = self._write_every,
             write_start = self._write_start,
@@ -2008,7 +2002,7 @@ class NonJointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
+        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
 
         # Create outputs
         self.outputs = Outputs(
@@ -2021,7 +2015,7 @@ class NonJointTableSIM_NN(Experiment):
         )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep=kwargs.get('sweep',{}))
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
 
         # Write metadata
         self.write_metadata()
@@ -2062,9 +2056,9 @@ class NonJointTableSIM_NN(Experiment):
         # For each epoch
         for i in tqdm(
             range(N),
-            disable=self.tqdm_disabled,
-            leave=False,
-            position=self.position,
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
             desc = f"NonJointTableSIM_NN instance: {self.position}"
         ):
 
@@ -2083,7 +2077,7 @@ class NonJointTableSIM_NN(Experiment):
                 )            
                 # Add axis to every sample to ensure compatibility 
                 # with the functions used below
-                theta_sample_expanded = torch.unsqueeze(theta_sample,0).split(1,dim=1)
+                theta_sample_expanded = torch.unsqueeze(theta_sample,0).split(1,dim = 1)
                 training_data_expanded = training_data.clone()
                 training_data_expanded.requires_grad = True
                 
@@ -2173,7 +2167,7 @@ class JointTableSIM_NN(Experiment):
 
         # Prepare inputs
         self.inputs = Inputs(
-            config = config,
+            config = self.config,
             synthetic_data = False,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -2186,12 +2180,12 @@ class JointTableSIM_NN(Experiment):
         self.logger.note("Initializing the spatial interaction model ...")
 
         sim = instantiate_sim(
-            name = config['spatial_interaction_model']['name'],
-            config = config,
-            true_parameters = config['spatial_interaction_model']['parameters'],
+            name = self.config['spatial_interaction_model']['name'],
+            config = self.config,
+            true_parameters = self.config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data),
-            logger=self.logger
+            logger = self.logger
         )
         # Get and remove config
         config = pop_variable(sim,'config')
@@ -2200,8 +2194,8 @@ class JointTableSIM_NN(Experiment):
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
-            config = config,
-            dt = config['harris_wilson_model'].get('dt',0.001),
+            config = self.config,
+            dt = self.config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.inputs.true_parameters,
             instance = kwargs.get('instance',''),
             logger = self.logger
@@ -2212,7 +2206,7 @@ class JointTableSIM_NN(Experiment):
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
         ct = instantiate_ct(
-            config = config,
+            config = self.config,
             logger = self.logger,
             **vars(self.inputs.data)
         )
@@ -2224,24 +2218,24 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else config
+        config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else self.config
         
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
             input_size = self.inputs.data.dims['destination'],
-            output_size = len(config['inputs']['to_learn']),
-            **config['neural_network']['hyperparameters'],
+            output_size = len(self.config['inputs']['to_learn']),
+            **self.config['neural_network']['hyperparameters'],
             logger = self.logger
         ).to(self.device)
 
         # Instantiate harris and wilson neural network model
         self.logger.note("Initializing the Harris Wilson Neural Network model ...")
         self.learning_model = HarrisWilson_NN(
-            config = config,
+            config = self.config,
             neural_net = neural_network,
             loss = dict(
-                **config['neural_network'].pop('loss'),
+                **self.config['neural_network'],
                 table_likelihood_loss = self.ct_mcmc.table_likelihood_loss
             ),
             physics_model = physics_model,
@@ -2251,7 +2245,7 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else config
+        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
 
         # Create outputs
         self.outputs = Outputs(
@@ -2304,9 +2298,9 @@ class JointTableSIM_NN(Experiment):
         # For each epoch
         for i in tqdm(
             range(N),
-            disable=self.tqdm_disabled,
-            leave=False,
-            position=self.position,
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
             desc = f"JointTableSIM_NN instance: {self.position}"
         ):
 
@@ -2325,7 +2319,7 @@ class JointTableSIM_NN(Experiment):
                 )            
                 # Add axis to every sample to ensure compatibility 
                 # with the functions used below
-                theta_sample_expanded = torch.unsqueeze(theta_sample,0).split(1,dim=1)
+                theta_sample_expanded = torch.unsqueeze(theta_sample,0).split(1,dim = 1)
                 training_data_expanded = training_data.clone()
                 training_data_expanded.requires_grad = True
                 
@@ -2421,7 +2415,7 @@ class ExperimentSweep():
         # Setup logger
         self.logger = setup_logger(
             __name__,
-            console_level = config.level,
+            console_level = self.config.level,
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
     
@@ -2498,7 +2492,7 @@ class ExperimentSweep():
             # Write to file
             self.outputs.write_metadata(
                 dir_path='',
-                filename=f"config"
+                filename = f"config"
             )
         
         # Restore dataset config entries
@@ -2548,20 +2542,20 @@ class ExperimentSweep():
             else:
                 self.run_sequential(self.config.sweep_configurations)
         
-    def prepare_experiment(self,sweep_configuration):
+    def prepare_experiment(self,config:Config,sweep_configuration:list):
         # Deactivate logging
         self.logger.setLevels(
             console_level='ERROR',#'ERROR','DEBUG'
             file_level='DEBUG'
         )
-        
-        return self.config.prepare_experiment_config(sweep_configuration)
+        return config.prepare_experiment_config(sweep_configuration)
         
     
-    def prepare_instantiate_and_run(self,instance_num:int,sweep_configuration:dict,active_positions=None):
+    def prepare_instantiate_and_run(self,config:Config,instance_num:int,sweep_configuration:dict,active_positions = None):
         try:
+
             # Prepare experiment
-            config,sweep = self.prepare_experiment(sweep_configuration)
+            new_config,sweep = self.prepare_experiment(config,sweep_configuration)
             self.logger.info(f'Instance = {str(instance_num)} START')
             
             # Find tqdm position
@@ -2578,8 +2572,8 @@ class ExperimentSweep():
             
             # Create new experiment
             new_experiment = instantiate_experiment(
-                experiment_type = config.settings['experiment_type'],
-                config = config,
+                experiment_type = new_config.settings['experiment_type'],
+                config = new_config,
                 sweep = sweep,
                 instance = str(instance_num),
                 base_dir = self.outputs_base_dir,
@@ -2587,8 +2581,7 @@ class ExperimentSweep():
                 position = (position_id+1),
                 logger = self.logger
             )
-            self.logger.debug('New experiment set up')
-            # print(f"{new_experiment.outputs.sweep_id} set up")
+            self.logger.progress(f"{new_experiment.outputs.sweep_id} set up")
 
             # Running experiment
             new_experiment.run()
@@ -2603,13 +2596,14 @@ class ExperimentSweep():
     def run_sequential(self,sweep_configurations):
         for instance,sweep_config in tqdm(
             enumerate(sweep_configurations),
-            total=len(sweep_configurations),
+            total = len(sweep_configurations),
             desc='Running sweeps in sequence',
-            leave=False,
-            position=0
+            leave = False,
+            position = 0
         ):
             try:
                 _ = self.prepare_instantiate_and_run(
+                    config = deepcopy(self.config),
                     instance_num = instance,
                     sweep_configuration = sweep_config,
                     active_positions = None
@@ -2628,10 +2622,10 @@ class ExperimentSweep():
         for chunk_id, sweep_config_chunk in enumerate(sweep_config_chunks):
             # Initialise progress bar
             progress = tqdm(
-                total=len(sweep_config_chunk), 
-                desc=f'Running sweeps concurrently: Batch {chunk_id+1}/{len(sweep_config_chunks)}',
-                leave=True,
-                position=0
+                total = len(sweep_config_chunk), 
+                desc = f'Running sweeps concurrently: Batch {chunk_id+1}/{len(sweep_config_chunks)}',
+                leave = True,
+                position = 0
             )
             
             with Manager() as manager:
@@ -2648,6 +2642,7 @@ class ExperimentSweep():
                     for instance,sweep_config in enumerate(sweep_config_chunk):
                         future = executor.submit(
                             self.prepare_instantiate_and_run,
+                            config = deepcopy(self.config),
                             instance_num = instance,
                             sweep_configuration = sweep_config,
                             active_positions = active_positions
@@ -2657,5 +2652,5 @@ class ExperimentSweep():
                 # Delete executor and progress bar
                 progress.close()
                 safe_delete(progress)
-                executor.shutdown(wait=True)
+                executor.shutdown(wait = True)
                 safe_delete(executor)

@@ -88,7 +88,7 @@ class HarrisWilson:
                 setattr(
                     self.params,
                     param,
-                    torch.tensor(true_param).to(device=self.device,dtype=float32)
+                    torch.tensor(true_param).to(device = self.device,dtype = float32)
                 )
                 if self.config is not None:
                     self.config.settings['harris_wilson_model']['parameters'][param] = to_json_format(
@@ -116,14 +116,14 @@ class HarrisWilson:
     def obs_noise_percentage_to_var(self,noise_percentage:float):
         return torch.pow(
             (
-                torch.tensor(noise_percentage,dtype=float32,device=self.device) / \
+                torch.tensor(noise_percentage,dtype = float32,device = self.device) / \
                 torch.tensor(100).float()
             ) * \
             torch.log(torch.tensor(self.intensity_model.dims['destination']).float()),
             2
         ).to(
-            dtype=float32,
-            device=self.device
+            dtype = float32,
+            device = self.device
         )
 
     def sde_potential(self,log_destination_attraction,**kwargs):
@@ -280,12 +280,12 @@ class HarrisWilson:
         kappa = self.params.kappa
         xx = kwargs['log_destination_attraction']
         gamma = kwargs['gamma'] if kwargs['gamma'] is not None else self.params.gamma
-        # Note that lim_{beta->0, alpha->0} gamma*V_{theta}(x) = gamma*kappa*\sum_{j=1}^J \exp(x_j) - gamma*(delta+1/J) * \sum_{j=1}^J x_j
+        # Note that lim_{beta->0, alpha->0} gamma*V_{theta}(x) = gamma*kappa*\sum_{j = 1}^J \exp(x_j) - gamma*(delta+1/J) * \sum_{j = 1}^J x_j
         gamma_kk_exp_xx = gamma*kappa*torch.exp(xx)
         # Function proportional to the potential function in the limit of alpha -> 0, beta -> 0
         V = -gamma*(delta+1./Ndestinations)*xx.sum() + gamma_kk_exp_xx.sum()
         # Gradient of function above
-        gradV = -gamma*(delta+1./Ndestinations)*torch.ones(Ndestinations,dtype=float32,device=self.device) + gamma_kk_exp_xx
+        gradV = -gamma*(delta+1./Ndestinations)*torch.ones(Ndestinations,dtype = float32,device = self.device) + gamma_kk_exp_xx
 
         return V, gradV
 
@@ -370,7 +370,7 @@ class HarrisWilson:
                 epsilon * (demand_normalised - kappa * curr_destination_attractions + delta)
                 + sigma
                 * 1
-                / torch.sqrt(torch.tensor(2, dtype=torch.float) * torch.pi * dt).to(
+                / torch.sqrt(torch.tensor(2, dtype = torch.float) * torch.pi * dt).to(
                     self.device
                 )
                 * torch.normal(0, 1, size=(self.intensity_model.dims['destination'],1)).to(self.device),
@@ -385,7 +385,7 @@ class HarrisWilson:
         init_destination_attraction,
         n_iterations: int,
         dt: float = None,
-        free_parameters=None,
+        free_parameters = None,
         requires_grad: bool = True,
         generate_time_series: bool = False,
         seed: int = None,
@@ -416,10 +416,10 @@ class HarrisWilson:
             sizes = init_destination_attraction.clone()
             for _ in range(n_iterations):
                 sizes = self.run_single(
-                    curr_destination_attractions=sizes,
-                    free_parameters=free_parameters,
-                    dt=dt,
-                    requires_grad=requires_grad,
+                    curr_destination_attractions = sizes,
+                    free_parameters = free_parameters,
+                    dt = dt,
+                    requires_grad = requires_grad,
                 )
                 sizes = torch.stack(sizes)
 
@@ -428,10 +428,10 @@ class HarrisWilson:
             for _ in range(n_iterations):
                 sizes.append(
                     self.run_single(
-                        curr_destination_attractions=sizes[-1],
-                        free_parameters=free_parameters,
-                        dt=dt,
-                        requires_grad=requires_grad,
+                        curr_destination_attractions = sizes[-1],
+                        free_parameters = free_parameters,
+                        dt = dt,
+                        requires_grad = requires_grad,
                     )
                 )
             sizes = torch.squeeze(torch.stack(tuple(sizes)))

@@ -34,7 +34,7 @@ if __name__ == '__main__':
     geometries_path = f'./data/raw/cambridge_commuter/cambridge_{geometry_name}.geojson'
 
     # Read table
-    table = pd.read_csv(table_path,index_col=0)
+    table = pd.read_csv(table_path,index_col = 0)
     # Store first column
     origin_geometry_ids = sorted(table.index.values)
     destination_geometry_ids = sorted(table.columns.values)
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     # Read geometries
     geometries = gpd.read_file(geometries_path)
     # Reproject
-    geometries = geometries.set_crs('epsg:27700',allow_override=True)
+    geometries = geometries.set_crs('epsg:27700',allow_override = True)
 
     # Number of facilities per geographical unit
     n_facilities = None #20
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     # Read graph pickle from file
     # graph = nx.read_gpickle(os.path.join(f'./data/raw/cambridge_commuter/{geometry_name}_graph.gpickle'))
 
-    network_and_origin_destination_vertices = gpd.read_file(f'./data/raw/cambridge_commuter/{geometry_name}_graph_nodes_network_and_origin_destination.geojson',index_col=0)
+    network_and_origin_destination_vertices = gpd.read_file(f'./data/raw/cambridge_commuter/{geometry_name}_graph_nodes_network_and_origin_destination.geojson',index_col = 0)
 
     # Read edge corrections
     edge_corrections = gpd.read_file(f'./data/inputs/{dataset}/edge_corrections.geojson')
@@ -75,9 +75,9 @@ if __name__ == '__main__':
 
     # Initialise cluster
     with LocalCluster(
-        n_workers=num_cores,
-        processes=True,
-        threads_per_worker=2,
+        n_workers = num_cores,
+        processes = True,
+        threads_per_worker = 2,
         memory_limit='50GB',
         dashboard_address=':49053',
         # worker_dashboard_address=':19971998',
@@ -103,7 +103,7 @@ if __name__ == '__main__':
                             ])
         [network_and_origin_destination_vertices_future] = my_client.scatter(
             [network_and_origin_destination_vertices],
-            broadcast=True
+            broadcast = True
         )
         # Compile params
         params = []
@@ -185,7 +185,7 @@ if __name__ == '__main__':
         edge_corrections.to_file(
                 f'./data/inputs/{dataset}/edge_corrections.geojson',
                 driver='GeoJSON',
-                index=False
+                index = False
             )
 
         # Close client
