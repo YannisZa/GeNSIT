@@ -211,7 +211,6 @@ class Outputs(object):
         
             # Create coordinate slice conditions
             self.create_slicing_conditions()
-            
             if self.coordinate_slice or self.settings.get('burnin_thinning_trimming',[]):
                 self.logger.info("//////////////////////////////////////////////////////////////////////////////////")
                 self.logger.info("Slicing coordinates:")
@@ -234,6 +233,8 @@ class Outputs(object):
         ))
         # Update config
         self_copy.config.update(sweep)
+        # sweep_configuration = self_copy.config.convert_sweep(sweep)
+        # self_copy.config = self_copy.config.prepare_experiment_config(sweep_configuration)[0]
         return self_copy
 
     def strip_data(self,keep_inputs:list=[],keep_outputs:list=[],keep_collection_ids:list=[]):
@@ -315,7 +316,6 @@ class Outputs(object):
             removed_collection_ids = set()
 
             for i in range(len(samples)):
-
                 # Apply coordinate value slice
                 try:
                     samples[i] = self.slice_coordinates_by_value(
@@ -742,16 +742,6 @@ class Outputs(object):
                 except Exception as exc:
                     self.logger.error(traceback.format_exc())
                     raise exc
-                
-            # Slice according to coordinate and index slice
-            self.slice_coordinates()
-
-            # If output dataset is empty raise Error
-            if self.data.size() <= 0:
-                raise EmptyData(
-                    message = 'Outputs data is empty after slicing by coordinates and/or indices',
-                    data_names = 'all'
-                )
 
         else:
             # Load data array for this given sweep
@@ -766,7 +756,17 @@ class Outputs(object):
                     sample_name,
                     [sample_data]
                 )
-            
+        
+        # Slice according to coordinate and index slice
+        self.slice_coordinates()
+
+        # If output dataset is empty raise Error
+        if self.data.size() <= 0:
+            raise EmptyData(
+                message = 'Outputs data is empty after slicing by coordinates and/or indices',
+                data_names = 'all'
+            )
+        
         # Stack sweep and iter dimensions
         self.stack_sweep_and_iter_dims(self)
 
@@ -1083,14 +1083,14 @@ class Outputs(object):
             samples_not_loaded = deepcopy(sorted(self.output_names))
             # Get all sample names and collection ids (all of that constitutes the group ids)
             samples_to_load_group_ids = {}
-            print([x[-1] for x in os.walk(dirpath)])
-            for group_id in list(set([x[-1] for x in os.walk(dirpath)])):
+            for group_id in list(os.walk(dirpath))[0][-1]:
                 samples_to_load_group_ids.setdefault(
-                    group_id.split('>')[1],
-                    [group_id.split('>')[2:]]
-                ).append(group_id.split('>')[2:])
+                    group_id.split('>')[0],
+                    [x.replace('.nc','') for x in group_id.split('>')[1:]]
+                ).extend([x.replace('.nc','') for x in group_id.split('>')[1:]])
+            # Find unique group ids by sample name and sort them
+            samples_to_load_group_ids = {k:sorted(list(set(v)),key=lambda x: eval(x)) for k,v in samples_to_load_group_ids.items()}
             
-            print(samples_to_load_group_ids)
             # Raise error if no data collection elements found
             if len(samples_to_load_group_ids) <= 0:
                 return self.output_names
@@ -1129,14 +1129,14 @@ class Outputs(object):
             
             data_arrs = []
             # Gather all group and group elements that need to be combined
-            if self.settings.get('n_workers',1) > 1:
-                data_arrs = self.read_xr_data_concurrently(
+            if False:#self.settings.get('n_workers',1) > 1:
+                data_arrs,samples_not_loaded = self.read_xr_data_concurrently(
                     all_groups = all_groups,
                     samples_not_loaded = samples_not_loaded,
                     dirpath = dirpath
                 )
             else:
-                data_arrs = self.read_xr_data_sequentially(
+                data_arrs,samples_not_loaded = self.read_xr_data_sequentially(
                     all_groups = all_groups,
                     samples_not_loaded = samples_not_loaded,
                     dirpath = dirpath
@@ -1180,6 +1180,7 @@ class Outputs(object):
                     f"Reading {','.join(samples_not_loaded)} group",
                     name = 'read_xarray_group'
                 )
+        return data_arrs,samples_not_loaded
     
     def read_xr_data_concurrently(self,all_groups,samples_not_loaded:list,dirpath:str):
         # Gather h5 data from multiple files
@@ -1209,7 +1210,6 @@ class Outputs(object):
                     # since it has been succesfully loaded
                     if sample_name in samples_not_loaded and sample_data is not None:
                         samples_not_loaded.remove(sample_name)
-                        data_arrs.append(res)
             except (MissingFiles,CorruptedFileRead):
                 pass
             except Exception as exc:
@@ -1238,7 +1238,7 @@ class Outputs(object):
             executor.shutdown(wait=True)
             safe_delete(executor)
 
-        return data_arrs
+        return data_arrs,samples_not_loaded
         
     def get_sweep_outputs_sequentially(
         self,
