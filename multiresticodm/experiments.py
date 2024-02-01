@@ -476,14 +476,13 @@ class Experiment(object):
             **kwargs
         ):
         self.logger.note('Update and export')
-        kwargs_copy = deepcopy(kwargs)
         # Update the model parameters after every batch and clear the loss
         if t % batch_size == 0 or t == data_size - 1:
             # Update time
             self._time += 1
 
             # Update gradients
-            loss = kwargs_copy.pop('loss',None)
+            loss = kwargs.get('loss',None)
             if loss is not None:
                 # Extract values from each sub-loss
                 loss_values = sum([val for val in loss.values()])
@@ -493,7 +492,7 @@ class Experiment(object):
                 self.learning_model._neural_net.optimizer.zero_grad()
 
                 # Compute average losses here
-                n_processed_steps = kwargs_copy.pop('n_processed_steps',None)
+                n_processed_steps = loss.get('n_processed_steps',None)
 
                 if n_processed_steps is not None:
                     for name in loss.keys():
@@ -503,7 +502,7 @@ class Experiment(object):
 
             # Write to file
             self.write_data(
-                **kwargs_copy,
+                **{k:v for k,v in kwargs.items() if k not in ['loss','n_processed_steps']},
                 **loss
             )
             # Delete loss
@@ -1770,7 +1769,7 @@ class SIM_NN(Experiment):
         self.learning_model = HarrisWilson_NN(
             config = self.config,
             neural_net = neural_network,
-            loss = self.config['neural_network'],
+            loss = self.config['neural_network']['loss'],
             physics_model = physics_model,
             write_every = self._write_every,
             write_start = self._write_start,
@@ -2236,7 +2235,7 @@ class JointTableSIM_NN(Experiment):
             config = self.config,
             neural_net = neural_network,
             loss = dict(
-                **self.config['neural_network'],
+                **self.config['neural_network']['loss'],
                 table_likelihood_loss = self.ct_mcmc.table_likelihood_loss
             ),
             physics_model = physics_model,
