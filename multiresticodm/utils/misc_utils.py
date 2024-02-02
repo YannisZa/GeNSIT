@@ -18,10 +18,14 @@ import xarray as xr
 import matplotlib.pyplot as plt
 
 
+from tqdm import tqdm
+from copy import deepcopy
 from itertools import chain, count
 from difflib import SequenceMatcher
+from itertools import chain, product
 from typing import Dict, List, Union, Tuple
 from collections.abc import Iterable,MutableMapping,Mapping,Sequence
+
 
 
 from multiresticodm.utils.exceptions import *
@@ -1231,6 +1235,14 @@ def xr_expand_multiindex_dims(data,expanded_coords:dict,multiindex_dim:str):
 
     # Expand coordinates
     data = data.assign_coords(expanded_coords)
+    
+    return xr_restack(
+        data,
+        multiindex_dim = multiindex_dim,
+        added_dims = list(expanded_coords.keys())
+    )
+
+def xr_restack(data,multiindex_dim:str,added_dims:list=[]):
 
     # Get all names in multi-index
     multiindex_dim_names = list(data.get_index(multiindex_dim).names)
@@ -1239,6 +1251,146 @@ def xr_expand_multiindex_dims(data,expanded_coords:dict,multiindex_dim:str):
     data = data.unstack(multiindex_dim)
     
     # Re stack updated multi-index
-    data = data.stack({multiindex_dim: multiindex_dim_names+list(expanded_coords.keys())})
-    
+    data = data.stack({multiindex_dim: (multiindex_dim_names+added_dims)})
+
     return data
+
+
+def xr_islice(data,dim:str='',start:int=0,step:int=1,end:int=None,**kwargs):
+    # Get sizes for the data's dim
+    try:
+        assert dim in data.dims
+    except:
+        raise MissingData(
+            missing_data_name = dim,
+            data_names = list(data.dims),
+            location = 'xr_islice'
+        )
+
+    # Get all possible data sizes
+    size_slice = slice(
+        start if start is not None else 0,
+        end if end is not None else min(data.sizes[dim],end),
+        step if step is not None else 1
+    )
+
+    return data.isel(**{dim:size_slice})
+
+def xr_apply_and_combine_wrapper(
+    data,
+    functions:list=[],
+    fixed_kwargs:dict={},
+    isolated_sweeped_kwargs:dict={},
+    coupled_sweeped_kwargs:dict={},
+    existing_dim:str = 'sweep'
+):
+    # Find all combinations of sweep function arguments
+    sweep_keys = list(isolated_sweeped_kwargs.keys())+list(coupled_sweeped_kwargs.keys())
+    
+    isolated_sweep_vals = [vals for vals in isolated_sweeped_kwargs.values()]
+    coupled_sweep_vals = []
+    for target_name_keyvals in coupled_sweeped_kwargs.values():
+        coupled_sweep_vals += [list(zip(*list(target_name_keyvals.values)))]
+
+    if not coupled_sweeped_kwargs and isolated_sweeped_kwargs:
+        sweep_vals = list(product(*isolated_sweep_vals))
+    elif coupled_sweeped_kwargs and not isolated_sweeped_kwargs:
+        sweep_vals = list(product(*coupled_sweep_vals))
+    elif coupled_sweeped_kwargs and not isolated_sweeped_kwargs:
+        sweep_vals = list(product(*(isolated_sweep_vals+coupled_sweep_vals)))
+    else:
+        sweep_vals = []
+
+    # Find interesection of fixed and sweeped function arguments.
+    # This intersection should be empty - assert it
+    keyword_key_intersection = set(
+        sweep_keys
+    ).intersection(
+        set(
+            list(fixed_kwargs.keys())
+        )
+    )
+    try:
+        assert len(keyword_key_intersection) == 0
+    except:
+        raise DataConflict(
+            property = 'function keyword keys',
+            data = list(keyword_key_intersection),
+            problem = 'Sweeped and fixed keyword arguments should not have any common keys'
+        )        
+
+    # Keep list of function composition outputs
+    function_composition_outputs = []
+    # For every sweeped function argument
+    for function_sweeped_vals in tqdm(
+        sweep_vals, 
+        leave = False,
+        disable = True,
+        desc = f"Applying function(s) {', '.join([list(fn.keys())[0] for fn in functions])} over multiple inputs"
+    ):
+        # Apply each function composition in order 
+        # specified by functions argument
+        function_output = deepcopy(data)
+        for function_composition in functions:
+            # Elicit fixed argument and function callable
+            function_name = list(function_composition.keys())[0]
+            try:
+                # Elicit important function settings
+                function_settings = list(function_composition.values())[0]
+                # such as the function callable
+                function_callable = function_settings['callable']
+                # Flag for whether to apply function over ufunc or not
+                function_apply_ufunc = function_settings.get('apply_ufunc',False)
+                # Gather all function keyword arguments
+                function_sweeped_kwargs = dict(zip(sweep_keys, function_sweeped_vals))
+                function_kwargs = {**fixed_kwargs[function_name], **function_sweeped_kwargs}
+
+                # Apply function either through xr.apply_ufunc or directly
+                if function_apply_ufunc:
+                    function_output = xr.apply_ufunc(
+                        function_callable,
+                        function_output,
+                        kwargs = function_kwargs
+                    )
+                else:
+                    function_output = function_callable(
+                        function_output,
+                        **function_kwargs
+                    )
+            except Exception:
+                raise FunctionFailed(
+                    name = function_name,
+                    keys = list(function_kwargs.keys())
+                )
+
+        # Convert sweep values to iterables
+        function_sweeped_kwargs = {
+            k:(v if isinstance(v,Iterable) \
+                and not isinstance(v,str) \
+               else [v]) 
+            for k,v in function_sweeped_kwargs.items()
+        }
+        
+        # Expand dimensions
+        function_output = function_output.expand_dims(function_sweeped_kwargs)
+
+        # Expand coordinates
+        function_output = function_output.assign_coords(function_sweeped_kwargs)
+
+        # Append to function composition outputs list
+        function_composition_outputs.append(function_output)
+
+    # Combine all function composition xarrays
+    combined_xarray = xr.combine_by_coords(
+        function_composition_outputs,
+        compat = "no_conflicts"
+    )
+
+    # Add sweep dimensions to combined xarray's sweep dimension
+    return xr_restack(
+        combined_xarray,
+        multiindex_dim = existing_dim,
+        added_dims = sweep_keys
+    )
+
+    
