@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import xarray as xr
 
+from tqdm import tqdm
 from numpy import shape 
 from copy import deepcopy
 from scipy import optimize
@@ -10,7 +11,7 @@ from torch import int32, float32
 from scipy.special import gammaln
 from itertools import chain, combinations
 
-from multiresticodm.utils.misc_utils import flatten,is_sorted,xr_expand_multiindex_dims
+from multiresticodm.utils.misc_utils import flatten,is_sorted
 
 
 def log_factorial_sum(arr):
@@ -27,7 +28,7 @@ def powerset(iterable):
     return chain.from_iterable(combinations(s, r) for r in range(1,len(s)+1))
 
 
-def normalised_manhattan_distance(prediction:xr.DataArray,ground_truth:xr.DataArray):
+def normalised_manhattan_distance(prediction:xr.DataArray,ground_truth:xr.DataArray=None):
 
     # Take difference
     difference = prediction - ground_truth
@@ -42,7 +43,7 @@ def map_distance_name_to_function(distance_name):
     else:
         raise Exception(f"Distance function {distance_name} does not exist.")
 
-def apply_norm(prediction:xr.DataArray,ground_truth:xr.DataArray,name:str,**kwargs:dict):
+def apply_norm(prediction:xr.DataArray,ground_truth:xr.DataArray=None,name:str='',**kwargs):
     try:
         norm_function = globals()[name]
     except:
@@ -55,7 +56,7 @@ def apply_norm(prediction:xr.DataArray,ground_truth:xr.DataArray,name:str,**kwar
     )
     return norm
 
-def l_0(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
+def l_0(prediction:xr.DataArray,ground_truth:xr.DataArray=None,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
         ground_truth = torch.unsqueeze(ground_truth,dim = 0)
@@ -63,7 +64,7 @@ def l_0(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant
     return res
 
 
-def relative_l_0(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
+def relative_l_0(prediction:xr.DataArray,ground_truth:xr.DataArray=None,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
         ground_truth = torch.unsqueeze(ground_truth,dim = 0)
@@ -74,14 +75,14 @@ def relative_l_0(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation
         res = ((prediction - ground_truth)/normalisation_constant).to(dtype = float32)
     return res
 
-def l_1(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
+def l_1(prediction:xr.DataArray,ground_truth:xr.DataArray=None,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
         ground_truth = torch.unsqueeze(ground_truth,dim = 0)
     res = torch.absolute(prediction - ground_truth).to(device = float32)
     return res
 
-def relative_l_1(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
+def relative_l_1(prediction:xr.DataArray,ground_truth:xr.DataArray=None,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
         ground_truth = torch.unsqueeze(ground_truth,dim = 0)
@@ -91,7 +92,7 @@ def relative_l_1(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation
         res = (torch.absolute(prediction - ground_truth)/normalisation_constant).astype('float32')
     return res
 
-def l_2(prediction:xr.DataArray,ground_truth:xr.DataArray,progress_proxy):
+def l_2(prediction:xr.DataArray,ground_truth:xr.DataArray=None,progress_proxy=None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
         ground_truth = torch.unsqueeze(ground_truth,dim = 0)
@@ -99,7 +100,7 @@ def l_2(prediction:xr.DataArray,ground_truth:xr.DataArray,progress_proxy):
     return res
 
 
-def p_distance(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
+def p_distance(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     # Type of norm
     p = float(kwargs.get('p_norm',2))
     # Get dimensions
@@ -131,7 +132,7 @@ def torch_optimize(init,**kwargs):
         return None
 
 
-def relative_l_2(prediction:xr.DataArray,ground_truth:xr.DataArray,normalisation_constant:float = None,progress_proxy = None):
+def relative_l_2(prediction:xr.DataArray,ground_truth:xr.DataArray=None,normalisation_constant:float = None,progress_proxy = None):
     N,I,J = shape(prediction)
     if shape(ground_truth) != (N,I,J):
         ground_truth = torch.unsqueeze(ground_truth,dim = 0)
@@ -150,17 +151,17 @@ def l_p_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
         ord = int(kwargs['ord']) if kwargs['ord'].isnumeric() else kwargs['ord']
     )
 
-def edit_distance_degree_one(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs):
+def edit_distance_degree_one(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     dims = kwargs.get("dims",None)
     if dims is not None:
         prediction = prediction.reshape(dims)
         ground_truth = ground_truth.reshape(dims)
     return torch.sum(torch.absolute(prediction - ground_truth))/2
 
-def edit_degree_one_error(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs):
+def edit_degree_one_error(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     return torch.sum(torch.absolute(prediction - ground_truth,dim = 0))/2
 
-def edit_distance_degree_higher(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs):
+def edit_distance_degree_higher(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     return torch.sum((prediction - ground_truth) > 0,axis = slice(1,None))
 
 def chi_squared_row_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
@@ -186,7 +187,7 @@ def chi_squared_distance(tab1:xr.DataArray,tab2:xr.DataArray,**kwargs):
     return chi_squared_column_distance(tab1,tab2,dims) + chi_squared_row_distance(tab1,tab2,dims)
 
 
-def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
+def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     """ Computes standardised root mean square error. See equation (22) of
     "A primer for working with the Spatial Interaction modeling (SpInt) module
     in the python spatial analysis library (PySAL)" for more details.
@@ -222,7 +223,7 @@ def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
     # print('srmse',srmse.values.tolist())
     return srmse
 
-def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
+def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     """ Computes Sorensen similarity index. See equation (23) of
     "A primer for working with the Spatial Interaction modeling (SpInt) module
     in the python spatial analysis library (PySAL)" for more details.
@@ -249,7 +250,7 @@ def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
     ssi = xr.divide(numerator,denominator).mean(dim=['origin','destination'])
     return ssi
 
-def shannon_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
+def shannon_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     """Computes entropy for a table X
     E = sum_{i}^I sum_{j = 1}^{J} X_{ij}log(X_{ij})
     
@@ -271,7 +272,7 @@ def shannon_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:d
     return res
 
 
-def von_neumann_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs):
+def von_neumann_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     # Convert matrix to square
     matrix = (prediction@prediction.T).astype('float32')
     # Add jitter
@@ -285,7 +286,7 @@ def von_neumann_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwar
 
     return res
 
-def sparsity(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
+def sparsity(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     """Computes percentage of zero cells in table
 
     Parameters
@@ -304,42 +305,30 @@ def sparsity(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
     return res
 
 
-def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs:dict):
+def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,region_mass:float=0.95,**kwargs):
+    # High posterior density mass
+    alpha = 1-region_mass
+    
+    # Stack iteration-related dimensions and space-related dimensions
+    prediction = prediction.stack(space=['origin','destination'])
+    
+    # Copy stacked dimensions and coordinates
+    stacked_dims = deepcopy(prediction.dims)
 
-    cell_coverages = None
-    for region_mass in kwargs.get('region_mass',[0.95]):
-        # High posterior density mass
-        alpha = 1-region_mass
-        
-        # Stack iteration-related dimensions and space-related dimensions
-        prediction = prediction.stack(space=['origin','destination'])
-        
-        # Copy stacked dimensions and coordinates
-        stacked_dims = deepcopy(prediction.dims)
-
-        # Sort all samples by iteration-seed
-        prediction[:] = np.sort(prediction.values, axis = stacked_dims.index('id'))
-        
-        # Get lower and upper bound high posterior density regions
-        lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(
-            prediction,
-            alpha
-        )
-        # Compute flag for whether ground truth table is covered
-        cell_coverage = (ground_truth >= lower_bound_hpdr) & (ground_truth <= upper_bound_hpdr)
-        # Update coordinates to include region mass
-        cell_coverage = xr_expand_multiindex_dims(
-            data = cell_coverage,
-            expanded_coords = {"region_mass":[region_mass]},
-            multiindex_dim = 'sweep'
-        )
-
-        if cell_coverages is None:
-            cell_coverages = cell_coverage
-        else:
-            cell_coverages = xr.combine_by_coords([cell_coverages,cell_coverage])
-
-    return cell_coverages
+    # Sort all samples by iteration-seed
+    prediction[:] = np.sort(prediction.values, axis = stacked_dims.index('id'))
+    
+    # Get lower and upper bound high posterior density regions
+    lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(
+        prediction,
+        alpha
+    )
+    
+    # Compute flag for whether ground truth table is covered
+    cell_coverage = (ground_truth >= lower_bound_hpdr) & (ground_truth <= upper_bound_hpdr)
+    
+    # Update coordinates to include region mass
+    return cell_coverage
 
 
 def calculate_min_interval(x, alpha):
