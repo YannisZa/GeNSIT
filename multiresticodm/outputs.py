@@ -27,6 +27,7 @@ from multiresticodm.utils.misc_utils import *
 from multiresticodm.utils.exceptions import *
 from multiresticodm.static.global_variables import *
 from multiresticodm.spatial_interaction_model import *
+from multiresticodm.utils import misc_utils as MiscUtils
 from multiresticodm.utils import math_utils as MathUtils
 from multiresticodm.contingency_table import instantiate_ct
 from multiresticodm.harris_wilson_model import HarrisWilson
@@ -2500,32 +2501,34 @@ class OutputSummary(object):
             )
             makedir(output_directory)
 
+            index_slice_str = '_'.join([
+                f"({var},burnin{setts['burnin']},thinning{setts['thinning']},trimming{setts['trimming']})"
+                for coord_slice in self.settings['burnin_thinning_trimming']
+                for var,setts in coord_slice.items()
+            ])
             if len(self.settings.get('directories',[])) > 0:
+                str_list = [
+                    (index_slice_str if index_slice_str else ''),
+                    f"{self.settings['filename_ending'] if len(self.settings['filename_ending']) else 'summaries'}.csv"
+                ]
                 filepath = os.path.join(
                     output_directory,
-                    f"{'_'+self.settings['filename_ending'] if len(self.settings['filename_ending']) else 'summaries'}" +\
-                    '_'.join([
-                        f"({var},burnin{setts['burnin']},thinning{setts['thinning']},trimming{setts['trimming']})"
-                        for coord_slice in self.settings['burnin_thinning_trimming']
-                        for var,setts in coord_slice.items()
-                    ]) +\
-                    ".csv"
+                    '_'.join([s for s in str_list if s])
                 )
             else:
                 # Gather all dates provided
                 date_strings = '__'.join(self.settings['dates'])
+                str_list = [
+                    "{'_'.join(list(self.settings['experiment_type']))}",
+                    f"{'_'.join(self.settings['title']) if len(self.settings['title']) > 0 else ''}",
+                    f"{'multiple_dates' if len(date_strings) > 4 else date_strings if len(date_strings) > 0 else ''}",
+                    (index_slice_str if index_slice_str else ''),
+                    f"{self.settings['filename_ending'] if len(self.settings['filename_ending']) else 'summaries'}.csv"
+                ]
 
                 filepath = os.path.join(
                     output_directory,
-                    f"{'_'.join(list(self.settings['experiment_type']))}"+\
-                    f"{'_'+'_'.join(self.settings['title']) if len(self.settings['title']) > 0 else ''}"+\
-                    f"{'_multiple_dates' if len(date_strings) > 4 else '_'+date_strings if len(date_strings) > 0 else ''}"+\
-                    '_'+'_'.join([
-                        f"({var},burnin{setts['burnin']},thinning{setts['thinning']},trimming{setts['trimming']})"
-                        for coord_slice in self.settings['burnin_thinning_trimming']
-                        for var,setts in coord_slice.items()
-                    ])+\
-                    f"{'_'+self.settings['filename_ending'] if len(self.settings['filename_ending']) else 'summaries'}.csv"
+                    '_'.join([s for s in str_list if s])
                 )
             # Write experiment summaries to file
             self.logger.info(f"Writing summaries to {filepath}")
