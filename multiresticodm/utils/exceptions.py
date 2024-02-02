@@ -86,6 +86,20 @@ class DataCollectionException(DataException):
     def __init__(self,message:str,**kwargs):
         super().__init__(message)
 
+class DataConflict(DataException):
+    def __init__(self,**kwargs):
+        super().__init__('')
+        self.property = kwargs.get('property','keys')
+        self.problem = kwargs.get('problem','')
+        self.data = kwargs.get('data','data')
+
+    def __str__(self):
+        return f"""
+            Data has conflicting {self.property}.
+            Conflict has to do with {self.data}.
+            {self.problem}
+        """
+
 class IrregularDataCollectionSize(DataCollectionException):
     def __init__(self,message:str,sizes:dict={},**kwargs):
         super().__init__(message)
@@ -98,16 +112,21 @@ class IrregularDataCollectionSize(DataCollectionException):
         """
 # ---
 
-class MultiprocessorFailed(Exception):
-    def __init__(self,message:str,**kwargs):
-        super().__init__(message)
-        self.message = message
-        self.processor_name = kwargs.get('name','')
+class FunctionFailed(Exception):
+    def __init__(self,**kwargs):
+        super().__init__('')
+        self.function_name = kwargs.get('name','')
+        self.function_keys = kwargs.get('keys',[])
 
     def __str__(self):
         return f"""
-            Multiprocessor {self.processor_name} has MultiprocessorFailed!
+            Function {self.processor_name} with arguments {self.function_keys} has failed!
         """
+
+class MultiprocessorFailed(FunctionFailed):
+    def __init__(self,keys:list=[],**kwargs):
+        super().__init__(name = 'Multiprocessor', keys = keys)
+
 
 # --
 
