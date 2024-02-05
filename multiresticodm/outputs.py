@@ -342,7 +342,7 @@ class Outputs(object):
                         i = i
                     )
                 except Exception as exc:
-                    traceback.print_exc()
+                    # traceback.print_exc()
                     # If coordinate slice failed remove group from data collection
                     removed_collection_ids.add(i)
                     self.logger.debug(exc)
@@ -458,6 +458,7 @@ class Outputs(object):
             # Keep track of slices that succeded
             if str(coord_slice) not in successful_slices:
                 self.logger.success(f"Slicing using {coord_slice} succeded")
+                successful_slices.add(str(coord_slice))
 
         self.logger.progress(f"After coordinate slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
         
