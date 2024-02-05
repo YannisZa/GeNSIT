@@ -267,17 +267,17 @@ class Plot(object):
                 # print(np.shape(ticks[i]['data']))
                 D = np.shape(ticks[i]['data'])[1]
                 # Sort each of their sub-dimensions and merge them into one
-                ticks[i]['data'] = sorted(ticks[i]['data'], key = lambda x: tuple([x[di] for di in range(D)]))
+                ticks[i]['data'] = sorted(ticks[i]['data'], key = lambda x: tuple([unstringify(x[di]) for di in range(D)]))
                 # print('sorted',ticks[i]['data'])
                 # Create string id over all &-separated dims in column 1
-                ticks[i]['data'] = np.array([stringify(td) for td in ticks[i]['data'] if td])
+                ticks[i]['data'] = np.array([stringify(td,scientific=True) for td in ticks[i]['data'] if td])
                 # print(tick_type,np.shape(ticks[i]['data']),ticks[i]['data'])
                 # Get unique tick string labels
                 unique_indices = np.unique(ticks[i]['data'], return_index=True)[1]
-                # print(tick_type,'unique indices', unique_indices)
                 # Assert that there is at least one tick label
                 assert len(unique_indices) > 0
                 ticks[i]['unique'] = [ticks[i]['data'][ind] for ind in sorted(unique_indices)]
+                print(tick_type,'unique',ticks[i]['data'])
                 # Make sure tick labels are repeated to match the length of the data
                 if (i+1) < len(ticks):
                     n_repetitions = len(ticks[i+1]['unique'])
@@ -285,7 +285,7 @@ class Plot(object):
                     n_repetitions = 1
                 # Repeat labels if required
                 ticks[i]['labels'] = ticks[i]['unique']*n_repetitions
-                # print(var,'labels',ticks[i]['labels'])
+                print(var,'labels',ticks[i]['labels'])
                 # Get tick locations
                 tick_start_loc = self.settings[tick_locator_var][i][0]
                 tick_step_loc = self.settings[tick_locator_var][i][1]
@@ -295,9 +295,9 @@ class Plot(object):
                     tick_end_loc,
                     tick_step_loc
                 )[:len(ticks[i]['labels'])]
-                # print(var,'locations',tick_type,ticks[i]['locations'])
+                print(var,'locations',tick_type,ticks[i]['locations'])
             except:
-                # traceback.print_exc()
+                traceback.print_exc()
                 ticks[i]['unique'] = [None]
                 pass
             # Remove data from ticks
@@ -307,7 +307,7 @@ class Plot(object):
         hashmap = {}
         # Get major and minor unique ticks
         for major,minor in list(product(ticks[0]['unique'],ticks[1]['unique'])):
-            # print(major,minor)
+            print(major,minor)
             # First find major index (there should be only one)
             major_index = ticks[0]['unique'].index(major)
             # Get tick location of minor if minor exists
@@ -437,6 +437,10 @@ class Plot(object):
                     plot_settings = plot_settings
                 )
         
+        print(plot_settings['x'])
+        print(discrete_hashmaps['x'])
+        # print(discrete_ticks['x'])
+        
         # Extract data
         x_range = list(map(lambda v: hash_major_minor_var(discrete_hashmaps['x'],v), plot_settings['x'])) \
                 if self.settings.get('x_discrete',False) \
@@ -470,9 +474,6 @@ class Plot(object):
         hatch = [hatch] if isinstance(hatch,str) else hatch
 
 
-        # print(plot_settings['x'])
-        # print(discrete_hashmaps['x'])
-        # print(discrete_ticks['x'])
         # print(x_range)
         # print(y_range)
 
@@ -1025,7 +1026,7 @@ class Plot(object):
                     )
                     # If no value found move on
                     if value is None:
-                        print('skipping',variable+derivative)
+                        # print('skipping',variable+derivative)
                         continue
 
                     # Set variable value
