@@ -757,11 +757,11 @@ class Outputs(object):
                             )
                         
                         # Write sample data collection to file
-                        filepath = self.write_data_collection(
+                        dirpath = self.write_data_collection(
                             sample_names = [sample_name]
                         )
                     
-                    self.logger.info(f'Wrote output collection to {filepath}')
+                    self.logger.info(f'Wrote output collection to {dirpath}')
                 except Exception as exc:
                     self.logger.error(traceback.format_exc())
                     raise exc
@@ -1029,6 +1029,7 @@ class Outputs(object):
             sample_names = sample_names,
             dirpath = output_directory
         )
+        return output_directory
     
     def write_xr_data_sequentially(self,group_ids,dirpath:str,sample_names:list):
         for grid in tqdm(
