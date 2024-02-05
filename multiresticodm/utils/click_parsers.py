@@ -51,13 +51,13 @@ def list_of_str(ctx, param, value):
         return list(map(str,list(value)))
     
 
-def to_list(ctx, param, value):
+def to_list(ctx, param, value, nargs:int=None):
     if value is None:
         return None
     elif len(value) == 0:
         return []
     else:
-        return list(value)
+        return list(value)[:nargs]
 
 def to_list2d(ctx, param, value):
     if value is None:
@@ -67,11 +67,27 @@ def to_list2d(ctx, param, value):
     else:
         return [list(value)]
 
-def split_to_list(ctx, param, value):
+def split_to_list(ctx, param, value, nargs:int=None):
     if value is None:
         return None
     else:
-        return [list(v.split("&")) for v in list(value) if v is not None]
+        return [list(v.split("&")) for v in list(value) if v is not None][:nargs]
+
+def coordinate_parse(ctx, param, value):
+    if value is None:
+        return None
+    else:
+        res = [[],[]]
+        value = list(value)
+        for i in range(2):
+            if i < len(value):
+                if not value[i]:
+                    res[i] = []
+                else:
+                    res[i] = list(value[i].split("&"))
+            else:
+                res[i] = []
+        return res
     
 def dims_to_list(ctx, param, value):
     if value is None:
