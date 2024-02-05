@@ -328,66 +328,64 @@ class Outputs(object):
                 miniters = 1,
                 desc = 'Slicing coordinates sequentially'
             )
-            successful_slices = set()
             # Based on first sample name slice the rest of sample names
             sample_name = list(self.data_vars().keys())[0]
             samples = self.data_vars()[sample_name]
+            # Keep track of removed collection ids
             removed_collection_ids = set()
-
             for i in range(len(samples)):
                 # Apply coordinate value slice
                 try:
                     samples[i] = self.slice_coordinates_by_value(
                         da = samples[i],
                         sample_name = sample_name,
-                        i = i,
-                        successful_slices = successful_slices
+                        i = i
                     )
                 except Exception as exc:
+                    traceback.print_exc()
+                    # If coordinate slice failed remove group from data collection
                     removed_collection_ids.add(i)
                     self.logger.debug(exc)
                     # Update progress
                     progress.update(1)
                     continue
 
-                
                 # Apply burning, thinning and trimming
                 try:
                     samples[i] = self.slice_coordinates_by_index(
                         samples = samples[i],
-                        sample_name = sample_name,
-                        successful_slices = successful_slices
+                        sample_name = sample_name
                     )
-                    self.logger.progress(f"After index slicing {sample_name}[{i}]: {({k:v for k,v in dict(samples[i].sizes).items() if v > 1})}")   
-                    # Make sure you keep the samples for this collection id
-                    getattr(self.data,sample_name)[i] = samples[i]
-                    # Slice the rest of the sample data
-                    for sam_name, current_samples in self.data_vars().items():
-                        if sam_name != sample_name:
-                            # Slice sam_name's data
-                            current_samples[i] = self.slice_coordinates_by_value(
-                                da = current_samples[i],
-                                sample_name = sam_name,
-                                i = i,
-                                successful_slices = successful_slices
-                            )
-                            current_samples[i] = self.slice_coordinates_by_index(
-                                samples = current_samples[i],
-                                sample_name = sam_name,
-                                successful_slices = successful_slices
-                            )
-                            # Update data with sliced data
-                            getattr(self.data,sam_name)[i] = current_samples[i]
+                    self.logger.progress(f"After index slicing {sample_name}[{i}]: {({k:v for k,v in dict(samples[i].sizes).items() if v > 1})}")
                 except Exception as exc:
+                    # If index slice failed do NOT remove group from data collection
+                    # Instead just keep the data as it was before index slicing
                     traceback.print_exc()
                     raise exc
+                
+                # Make sure you keep the samples for this collection id
+                getattr(self.data,sample_name)[i] = samples[i]
+                # Slice the rest of sample data
+                for sam_name, current_samples in self.data_vars().items():
+                    if sam_name != sample_name:
+                        # Slice sam_name's data
+                        current_samples[i] = self.slice_coordinates_by_value(
+                            da = current_samples[i],
+                            sample_name = sam_name,
+                            i = i
+                        )
+                        current_samples[i] = self.slice_coordinates_by_index(
+                            samples = current_samples[i],
+                            sample_name = sam_name
+                        )
+                        # Update data with sliced data
+                        getattr(self.data,sam_name)[i] = current_samples[i]
                 
                 # Update progress
                 progress.update(1)
                 
             # Remove collection ids that are not matching coordinate slice
             # print('removed',sorted(list(removed_collection_ids), reverse = True))
-            # print('kept',sorted(list(kept_collection_ids), reverse = True))
             for cid in sorted(list(removed_collection_ids), reverse = True):
                 for sam_name in self.data_vars().keys():
                     del getattr(self.data,sam_name)[cid]
@@ -428,15 +426,18 @@ class Outputs(object):
                                   which does not exist in {','.join(list(self.data_vars().keys()))}")
         return available
 
-    def slice_coordinates_by_value(self,da,sample_name:str,i:int,successful_slices:set):
+    def slice_coordinates_by_value(self,da,sample_name:str,i:int):
         # Get latest sample collection element
         # NOTE: you have to name this dataset 'da'
         # so that slice expressions can be evaluated in the next step
         self.logger.progress(f"Before coordinate slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
+        # Monitor successful coordinate slices
+        successful_slices = set()
         # print(sample_name,i,'/',len(samples))
         for coord_slice in self.coordinate_slice:
             try:
                 # Slice based on these conditions
+                # Reassign da to sliced data
                 da = da.where( 
                     eval(
                         coord_slice,
@@ -447,10 +448,9 @@ class Outputs(object):
             except Exception as exc:
                 self.logger.debug(f"Slicing using {sample_name}[{i}] {coord_slice} failed with {exc}")
                 continue
-            # Reassign da to sliced data
+            # Keep track of slices that succeded
             if str(coord_slice) not in successful_slices:
                 self.logger.success(f"Slicing using {coord_slice} succeded")
-                successful_slices.add(str(coord_slice))
 
         if da.size <= 0:
             raise EmptyData(
@@ -461,7 +461,7 @@ class Outputs(object):
         
         return da
     
-    def slice_coordinates_by_index(self,samples,sample_name:str,successful_slices:set):
+    def slice_coordinates_by_index(self,samples,sample_name:str):
 
         # Keep track of previous number of iterations
         prev_iter = deepcopy({
@@ -536,12 +536,10 @@ class Outputs(object):
                 # Success - samples were sliced
                 for d in dim_names: 
                     sliced_dims.add(d)
+                # Update current samples to be the sliced samples
                 samples = sliced_samples
-
-                # Monitor successful coordinate index slices
-                if ','.join(list(map(str,dim_names))) not in successful_slices:
-                    self.logger.success(f"Slicing {dim_names} {slice_setts} succeded {({k:v for k,v in dict(samples.sizes).items() if v > 1})}")
-                    successful_slices.add(','.join(list(map(str,dim_names))))
+                # Announce successful coordinate index slices
+                self.logger.success(f"Slicing {dim_names} {slice_setts} succeded {({k:v for k,v in dict(samples.sizes).items() if v > 1})}")
 
         # If no data remains after slicing raise exception
         if any([samples.sizes[k] <= 0 for k in samples.dims]):
@@ -549,6 +547,7 @@ class Outputs(object):
                 data_names = sample_name,
                 message = f"slicing {list(prev_iter.keys())} with shape {prev_iter} using {self.settings['burnin_thinning_trimming']}"
             )
+        
         return samples
     
     
@@ -1155,18 +1154,24 @@ class Outputs(object):
             data_arrs = []
             # Gather all group and group elements that need to be combined
             if False:#self.settings.get('n_workers',1) > 1:
-                data_arrs,samples_not_loaded = self.read_xr_data_concurrently(
+                data_arrs,sample_names_loaded = self.read_xr_data_concurrently(
                     all_groups = all_groups,
-                    samples_not_loaded = samples_not_loaded,
+                    samples_to_load = sorted(samples_to_load),
                     dirpath = dirpath
                 )
             else:
-                data_arrs,samples_not_loaded = self.read_xr_data_sequentially(
+                data_arrs,sample_names_loaded = self.read_xr_data_sequentially(
                     all_groups = all_groups,
-                    samples_not_loaded = samples_not_loaded,
+                    samples_to_load = sorted(samples_to_load),
                     dirpath = dirpath
                 )
             
+            # remove loaded samples from consideration
+            # since they has been succesfully loaded
+            for sample_name in sample_names_loaded:
+                if sample_name in samples_not_loaded:
+                    samples_not_loaded.remove(sample_name)
+                    
             self.logger.info(f"Creating Data Collection for each group.")
             # Pass all samples into a data collection object
             self.data = DataCollection(
@@ -1176,7 +1181,7 @@ class Outputs(object):
             )
             return samples_not_loaded
         
-    def read_xr_data_sequentially(self,all_groups,samples_not_loaded:list,dirpath:str):
+    def read_xr_data_sequentially(self,all_groups,samples_to_load:list,dirpath:str):
         data_arrs = []
         sample_names_loaded = set([])
         for group in tqdm(
@@ -1184,7 +1189,7 @@ class Outputs(object):
             leave = False,
             miniters = 1,
             position = 0,
-            desc = f"Reading {','.join(samples_not_loaded)} group"
+            desc = f"Reading group data"
         ):
             try:
                 sample_dict = read_xr_data(
@@ -1203,15 +1208,10 @@ class Outputs(object):
                 traceback.print_exc()
                 raise MultiprocessorFailed(
                     keys = 'read_xarray_group',
-                    message = f"Reading {','.join(samples_not_loaded)} group"
+                    message = f"Reading {','.join(samples_to_load)} group"
                 )
         
-        # remove loaded samples from consideration
-        # since they has been succesfully loaded
-        for sample_name in sample_names_loaded:
-            if sample_name in samples_not_loaded:
-                samples_not_loaded.remove(sample_name)
-        return data_arrs,samples_not_loaded
+        return data_arrs,sample_names_loaded
     
     def read_xr_data_concurrently(self,all_groups,samples_not_loaded:list,dirpath:str):
         # Gather h5 data from multiple files
