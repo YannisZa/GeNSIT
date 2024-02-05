@@ -92,18 +92,23 @@ COLOR_NAMES = {
     "yellow": "#F5DDA9",
     "darkblue": "#2F7194",
     "red": "#ec7070",
-    "skyblue": "#97c3d0",
+    "deepred": "#E20000",
+    "skyblue": "#1E88E5",
+    "lightblue": "#99dfff",
     "green": "#3cc969",
     "darkgreen": "#48675A",
+    "darkmagenta": "#8B008B",
+    "seagreen": "#2E8B57",
     "lightbrown": "#C6BFA2",
-    "orange": "#EC9F7E",
+    "brown": "#A52A2A",
+    "orange": "#FFA500",
     "lightgreen": "#AFD8BC",
     "grey": "#3D4244"
 }
 
 PLOT_COLOURS = {
     "type": {
-        "SIM_MCMC": COLOR_NAMES["skyblue"],
+        "SIM_MCMC": COLOR_NAMES["lightblue"],
         "SIM_NN": COLOR_NAMES["lightgreen"],
         "JointTableSIM_MCMC":COLOR_NAMES["darkblue"],
         "NonJointTableSIM_NN":COLOR_NAMES["green"],
@@ -111,8 +116,8 @@ PLOT_COLOURS = {
     },
     "title": {
         "_unconstrained":COLOR_NAMES["orange"],
-        "_total_constrained":COLOR_NAMES["lightbrown"],
-        "_row_constrained":COLOR_NAMES["yellow"],
+        "_total_constrained":COLOR_NAMES["darkmagenta"],
+        "_row_constrained":COLOR_NAMES["seagreen"],
         "_doubly_constrained":COLOR_NAMES["red"],
         "_doubly_10%_cell_constrained":COLOR_NAMES["darkgreen"],
         "_doubly_20%_cell_constrained":COLOR_NAMES["darkblue"],
