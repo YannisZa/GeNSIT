@@ -932,14 +932,16 @@
         "sweep": {
           "default": {
             "dtype": "file",
+            "file-exists": false,
             "file-extension": "txt",
-            "default-value": "cells.txt"
+            "default-value": ""
           },
           "range": {
             "dtype": "list",
+            "file-exists": false,
             "list-dtype": "file",
             "file-extension": "txt",
-            "default-value": "cells.txt"
+            "default-value": ""
           }
         }
       }
