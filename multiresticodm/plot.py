@@ -242,7 +242,7 @@ class Plot(object):
 
         return axes_lims[axes_id]
     
-    def get_discrete_ticks(self,plot_settings,var:str,tickfreq_var:str):
+    def get_discrete_ticks(self,plot_settings,var:str,tick_locator_var:str):
         # All ticks (element 0 for major and element 1 for minor)
         ticks = [
             {
@@ -293,8 +293,8 @@ class Plot(object):
                 ticks[i]['labels'] = ticks[i]['unique']*n_repetitions
                 # print(var,'labels',ticks[i]['labels'])
                 # Get tick locations
-                tick_start_loc = self.settings[tickfreq_var][i][0]
-                tick_step_loc = self.settings[tickfreq_var][i][1]
+                tick_start_loc = self.settings[tick_locator_var][i][0]
+                tick_step_loc = self.settings[tick_locator_var][i][1]
                 tick_end_loc = tick_start_loc + len(ticks[i]['labels'])*tick_step_loc
                 ticks[i]['locations'] = np.arange(
                     tick_start_loc,
@@ -322,14 +322,14 @@ class Plot(object):
                 minor_index = ticks[1]['unique'].index(minor)
                 # Use both to get the major tick location
                 # print(major_index,minor_index,len(ticks[0]['unique']),len(ticks[1]['unique']))
-                tick_location = major_index + minor_index*len(ticks[0]['unique']) + self.settings[tickfreq_var][0][0]
+                tick_location = major_index + minor_index*len(ticks[0]['unique']) + self.settings[tick_locator_var][0][0]
                 # print(tick_location)
                 # Create entry on hashmap
                 hashmap[f"({major},{minor})"] = tick_location
             else:
                 # If there is no minor tick then the location is simply the 
                 # major's first (and only location)
-                hashmap[f"({major})"] = major_index + self.settings[tickfreq_var][0][0]
+                hashmap[f"({major})"] = major_index + self.settings[tick_locator_var][0][0]
                 # Delete minor ticks from list
                 if len(ticks) == 2:
                     ticks.pop()
@@ -415,7 +415,7 @@ class Plot(object):
                 # Get group hashmap
                 _,group_hashmap[var] = self.get_discrete_ticks(
                     var = var+'_group',
-                    tickfreq_var = f"{var}_tick_frequency",
+                    tick_locator_var = f"{var}_tick_locations",
                     plot_settings = plot_settings
                 )
         # Store whether subplots will be created
@@ -439,7 +439,7 @@ class Plot(object):
                 # Get discrete ticks
                 discrete_ticks[var],discrete_hashmaps[var] = self.get_discrete_ticks(
                     var = var,
-                    tickfreq_var = f"{var}_tick_frequency",
+                    tick_locator_var = f"{var}_tick_locations",
                     plot_settings = plot_settings
                 )
         
@@ -590,9 +590,9 @@ class Plot(object):
                             f"{var}axis",
                             ax[r,c].xaxis
                         ).set_ticks(np.arange(
-                            start, 
+                            self.settings[f"{var}_tick_locations"][0], 
                             end,
-                            self.settings[f"{var}_tick_step_size"]
+                            self.settings[f"{var}_tick_locations"][1]
                         ))
                         # Get tick label pad (spacing from axis)
                         tick_pad = self.settings[f"{var}_tick_pad"][0]
@@ -697,15 +697,15 @@ class Plot(object):
                 )
 
             # Annotate data
-            # if group_axes_data[axes_id]['annotate']:
-            #     txt = group_axes_data[axes_id]['annotate']
-            #     ax[axes_id].annotate(
-            #         str(string_to_numeric(txt) 
-            #             if str(txt).isnumeric() 
-            #             else str(txt)), 
-            #         (group_axes_data[axes_id]['x'], group_axes_data[axes_id]['y']),
-            #         zorder = 10000 #len(plot_settings['x'])+1
-            #     )
+            if group_axes_data[axes_id]['annotate']:
+                txt = group_axes_data[axes_id]['annotate']
+                ax[axes_id].annotate(
+                    str(string_to_numeric(txt) 
+                        if str(txt).isnumeric() 
+                        else str(txt)), 
+                    (group_axes_data[axes_id]['x'], group_axes_data[axes_id]['y']),
+                    zorder = 10000 # bring annotation data to front
+                )
 
             # Get local group axes limits
             group_axes_limits[axes_id] = self.get_axes_limits(
