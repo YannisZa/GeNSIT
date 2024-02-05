@@ -487,7 +487,6 @@ class Config:
             if "sweep" in key_val_path and "range" in key_val_path:
                 # Index location of sweep in key value path
                 sweep_indx = key_val_path.index("sweep")
-                range_indx = key_val_path.index("range")
                 # Get sweep settings
                 sweep_settings,_ = self.path_get(
                     key_path = key_val_path[:(sweep_indx+1)],
