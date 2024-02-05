@@ -15,30 +15,30 @@ PLOT_AUX_COORDINATES = ["x_group","y_group","z_group"]
 PLOT_ALL_COORDINATES = PLOT_COORDINATES+PLOT_AUX_COORDINATES
 
 PLOT_CORE_FEATURES = {
-    "size": {"dtype": float},
-    "style": {"dtype": str},
+    "marker_size": {"dtype": float},
+    "line_width":{"dtype": float},
+    "line_style": {"dtype": str},
     "colour": {"dtype": str},
-    "visibility": {"dtype": float},
+    "opacity": {"dtype": float},
+    "hatch_opacity": {"dtype": float},
     "zorder": {"dtype": float},
+    "annotate": {"dtype": str},
     "label": {"dtype": str},
     "marker": {"dtype": str},
     "hatch": {"dtype": str},
 }
-PLOT_AUX_FEATURES = {}
 
-DERIVATIVES = ["_id"]
+PLOT_DERIVATIVES = ["_id"]
 
-PLOT_DERIVATIVES = []
-
+PLOT_COORDINATE_DERIVATIVES = []
 for var in PLOT_COORDINATES:
-    for derivative in DERIVATIVES:
-        PLOT_DERIVATIVES.append(var+derivative)
+    for derivative in PLOT_DERIVATIVES:
+        PLOT_COORDINATE_DERIVATIVES.append(var+derivative)
 
 PLOT_VARIABLES = PLOT_ALL_COORDINATES +\
-    list(PLOT_CORE_FEATURES.keys()) +\
-    list(PLOT_AUX_FEATURES.keys())
+    list(PLOT_CORE_FEATURES.keys())
     
-PLOT_VARIABLES_AND_DERIVATIVES = PLOT_VARIABLES + PLOT_DERIVATIVES
+PLOT_VARIABLES_AND_DERIVATIVES = PLOT_VARIABLES + PLOT_COORDINATE_DERIVATIVES
 
 # Type of plots
 PLOT_VIEWS = {
@@ -135,25 +135,29 @@ PLOT_HATCHES = {
     }
 }
 
-PLOT_LINESTYLES = {
-    ''
-}
+PLOT_LINESTYLES = {}
 
-MATH_EXPRESSIONS = {
-    "title": {
-        "_unconstrained":r"$\emtpyset$",
-        "_total_constrained":r"$T_{++}$",
-        "_row_constrained":r"$\mathbf{T}_{+\cdot}$",
-        "_doubly_constrained":r"$\mathbf{T}_{+\cdot},\mathbf{T}_{\cdot+}$",
-        "_doubly_10%_cell_constrained":r"$\mathbf{T}_{+\cdot},\mathbf{T}_{\cdot+},\mathbf{T}_{\mathcal{X}_1}$",
-        "_doubly_20%_cell_constrained":r"$\mathbf{T}_{+\cdot},\mathbf{T}_{\cdot+},\mathbf{T}_{\mathcal{X}_2}$"
-    },
-    "name": {
-        "TotallyConstrained":r"$\Lambda_{++}$",
-        "ProductionConstrained":r"$\boldsymbol{\Lambda}_{+\cdot}$"
-    },
-    "sigma": r'\sigma'
+RAW_EXPRESSIONS = {
+    "SIM_MCMC": 'S-MCMC',
+    "JointTableSIM_MCMC": 'TS-MCMC',
+    "SIM_NN": 'S-NN',
+    "JointTableSIM_NN": 'Ours (Joint)',
+    "NonJointTableSIM_NN": 'Ours (Disjoint)',
+    "_unconstrained":'$\\emptyset$',
+    "_total_constrained":'$T_{++}$',
+    "_total_intensity_row_table_constrained":'$\\mathbf{T}_{+\\cdot}$',
+    "_row_constrained":'$\\mathbf{T}_{+\\cdot}$',
+    "_doubly_constrained":'$\\mathbf{T}_{+\\cdot},\\mathbf{T}_{\\cdot +}$',
+    "_doubly_10%_cell_constrained":'$\\mathbf{T}_{+\\cdot},\\mathbf{T}_{\\cdot +},\\mathbf{T}_{\\mathcal{X}_1}$',
+    "_doubly_20%_cell_constrained":'$\\mathbf{T}_{+\\cdot},\\mathbf{T}_{\\cdot +},\\mathbf{T}_{\\mathcal{X}_2}$',
+    "TotallyConstrained":'$\\Lambda_{++}$',
+    "ProductionConstrained":'$\\boldsymbol{\\Lambda}_{+\\cdot}$'
 }
+LABEL_EXPRESSIONS = {
+    "sigma": '$\\sigma = '
+}
+LATEX_EXPRESSIONS = {**RAW_EXPRESSIONS,**LABEL_EXPRESSIONS}
+LATEX_COORDINATES = ['label','annotate']+PLOT_COORDINATES
 
 
 # Register colormaps
@@ -272,3 +276,22 @@ cred = LinearSegmentedColormap.from_list(
 )
 if not cmap_exists("cred"):
     cm.register_cmap(cmap = cred, name="cred")
+
+LATEX_PREAMBLE = r'''
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{xcolor}
+\usepackage{color}
+
+\newcommand{\skyblue}[1]{{\textcolor[HTML]{1E88E5}{#1}}}
+\newcommand{\deepred}[1]{{\textcolor[HTML]{E20000}{#1}}}
+
+\newcommand{\mytable}{\skyblue{\mathbf{T}}}
+\newcommand{\myintensity}{\deepred{\boldsymbol{\Lambda}}}
+'''
+
+LEGEND_LOCATIONS = [
+    'best', 'upper right', 'upper left', 'lower left', 'lower right', 'right', 
+    'center left', 'center right', 'lower center', 'upper center', 'center'
+]
