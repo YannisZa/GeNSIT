@@ -117,15 +117,17 @@ class FunctionFailed(Exception):
         super().__init__('')
         self.function_name = kwargs.get('name','')
         self.function_keys = kwargs.get('keys',[])
+        self.message = kwargs.get('message','')
 
     def __str__(self):
         return f"""
-            Function {self.processor_name} with arguments {self.function_keys} has failed!
+            Function {self.function_name} with arguments {self.function_keys} has failed!
+            {self.message}
         """
 
 class MultiprocessorFailed(FunctionFailed):
     def __init__(self,keys:list=[],**kwargs):
-        super().__init__(name = 'Multiprocessor', keys = keys)
+        super().__init__(name = 'Multiprocessor', keys = keys, **kwargs)
 
 
 # --
