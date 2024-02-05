@@ -1867,7 +1867,7 @@ class DataCollection(object):
                 # Combine coords for each list element of the Data Collection
                 for sample_name in vars(self).keys():
                     if sample_name in DATA_SCHEMA:
-                        for i,datum in tqdm(
+                        for i,group_datum in tqdm(
                             enumerate(getattr(
                                 self,
                                 sample_name
@@ -1875,13 +1875,20 @@ class DataCollection(object):
                             total = len(getattr(self,sample_name)),
                             desc = 'Combining Data Collection group elements'
                         ):
-                            getattr(
-                                self,
-                                sample_name
-                            )[i] = xr.combine_by_coords(
-                                datum,
-                                combine_attrs='drop_conflicts'
-                            )
+                            # Combine by coords iff there are more than one elements in the group
+                            if len(datum) > 1:
+                                getattr(
+                                    self,
+                                    sample_name
+                                )[i] = xr.combine_by_coords(
+                                    group_datum,
+                                    combine_attrs='drop_conflicts'
+                                )
+                            else:
+                                getattr(
+                                    self,
+                                    sample_name
+                                )[i] = group_datum[0]
             elif isinstance(data, dict):
                 # All items must be of type xarray data array
                 assert all([isinstance(datum,xr.DataArray) for datum in data.values()])
@@ -2019,7 +2026,7 @@ class DataCollection(object):
                     )
                     future.add_done_callback(my_callback)
                 except:
-                    traceback.print_exc()
+                    # traceback.print_exc()
                     raise MultiprocessorFailed(
                         keys = 'combine_by_coords_concurrently'
                     )
@@ -2369,7 +2376,7 @@ class OutputSummary(object):
                     )
                     future.add_done_callback(my_callback)
                 except:
-                    traceback.print_exc()
+                    # traceback.print_exc()
                     raise MultiprocessorFailed(
                         keys = 'get_experiment_metadata_concurrently'
                     )
