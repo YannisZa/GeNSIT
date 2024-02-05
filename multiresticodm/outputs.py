@@ -240,12 +240,18 @@ class Outputs(object):
         # Update config
         self_copy.config.update(sweep)
         # Update sweep mode flag
+        self_copy.config.find_sweep_key_paths()
         try:
-            assert not self_copy.config.sweep_mode()
+            # Either there are no sweep params
+            # or if there are then these are must be group_by dims
+            assert not self_copy.config.sweep_mode() or \
+                not (set(self_copy.config.sweep_param_names).difference(self.settings.get('group_by',[])))
         except:
-            self_copy.config.find_sweep_key_paths()
             raise InvalidMetadataType(
-                message = f"No sweeps should be contained in Outputs' config. {self_copy.config.sweep_param_names} found."
+                message = f"""
+                    No sweeps should be contained in Outputs' config. 
+                    {self_copy.config.sweep_param_names} found with {self.settings.get('group_by',[])} group by params specified.
+                """
             )
 
         return self_copy
@@ -997,6 +1003,7 @@ class Outputs(object):
         # Make output directory
         output_directory = os.path.join(self.outputs_path,'sample_collections')
         makedir(output_directory)
+        print(output_directory)
         
         # Get specific sample names
         sample_names = sample_names if sample_names is not None else list(self.data_vars().keys())
@@ -1010,18 +1017,18 @@ class Outputs(object):
 
         # Write data arrays each one of which 
         # corresponds to a different group
-        if self.settings.get('n_workers',1) > 1:
-            self.write_xr_data_concurrently(
-                group_ids = group_ids,
-                sample_names = sample_names,
-                dirpath = output_directory
-            )
-        else:
-            self.write_xr_data_sequentially(
-                group_ids = group_ids,
-                sample_names = sample_names,
-                dirpath = output_directory
-            )
+        # if self.settings.get('n_workers',1) > 1:
+        #     self.write_xr_data_concurrently(
+        #         group_ids = group_ids,
+        #         sample_names = sample_names,
+        #         dirpath = output_directory
+        #     )
+        # else:
+        self.write_xr_data_sequentially(
+            group_ids = group_ids,
+            sample_names = sample_names,
+            dirpath = output_directory
+        )
     
     def write_xr_data_sequentially(self,group_ids,dirpath:str,sample_names:list):
         for grid in tqdm(
