@@ -321,8 +321,8 @@ TABLE_SCHEMA = {
         "ndmin":2,
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "is_iterable": True,
-        "dims":["origin","destination"]
+        "dims":["origin","destination"],
+        "is_iterable": True
     }
 }
 INTENSITY_SCHEMA = {
@@ -331,57 +331,66 @@ INTENSITY_SCHEMA = {
         "dtype":"float32",
         "funcs":[],
         "args_dtype":[],
-        "is_iterable": True,
-        "dims":["origin","destination"]
+        "dims":["origin","destination"],
+        "is_iterable": True
+        
     },
     "log_destination_attraction":{
         "axes":[0,1],
         "dtype":"float32",
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
         "args_dtype":["int32","int32"],
-        "is_iterable": True,
-        "dims":["destination","time"]
+        "dims":["destination","time"],
+        "is_iterable": True
+        
     },
     "log_origin_attraction":{
         "axes":[0],
-        "dtype":"float32", 
+        "dtype":"float32"
     },
     "alpha":{
         "axes":[],
         "dtype":"float32", 
+        "dims":[],
         "is_iterable": True,
-        "dims":[]
+        "default":-1.0
     },
     "beta":{
         "axes":[],
         "dtype":"float32", 
+        "dims":[],
         "is_iterable": True,
-        "dims":[]
+        "default":-1.0
     },
     "delta":{
         "axes":[],
         "dtype":"float32", 
         "is_iterable": True,
+        "default":0.0
     },
     "kappa":{
         "axes":[],
         "dtype":"float32", 
         "is_iterable": True,
+        "default":1.0
     },
     "sigma":{
         "axes":[],
         "dtype":"float32", 
         "is_iterable": True,
+        "default":"learned"
     },
     "gamma":{
         "axes":[],
         "dtype":"float32", 
         "is_iterable": True,
+        "default":"learned"
     },
     "noise_percentage":{
         "axes":[],
         "dtype":"float32",
         "is_iterable": True,
+        "default":3.0
     }
 }
 
@@ -612,24 +621,6 @@ OPERATORS = {
 }
 SEPARATORS = ['.','[',']','(',')','()']
 
-
-COLORS = {"monte_carlo_sample_degree_one":"tab:blue",
-        "monte_carlo_sample_degree_higher":"tab:blue",
-        "iterative_residual_filling_solution_degree_one":"tab:orange",
-        "iterative_residual_filling_solution_degree_higher":"tab:orange",
-        "maximum_entropy_solution_degree_one":"tab:green",
-        "maximum_entropy_solution_degree_higher":"tab:green",
-        "iterative_uniform_residual_filling_solution_degree_one":"tab:red",
-        "iterative_uniform_residual_filling_solution_degree_higher":"tab:red"}
-
-LINESTYLES = {"monte_carlo_sample_degree_one":"dashed",
-            "iterative_residual_filling_solution_degree_one":"dashed",
-            "maximum_entropy_solution_degree_one":"dashed",
-            "iterative_uniform_residual_filling_solution_degree_one":"dashed",
-            "monte_carlo_sample_degree_higher":"solid",
-            "iterative_residual_filling_solution_degree_higher":"solid",
-            "maximum_entropy_solution_degree_higher":"solid",
-            "iterative_uniform_residual_filling_solution_degree_higher":"solid"}
 
 INTENSITY_MODELS = ["spatial_interaction_model"]
 
