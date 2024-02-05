@@ -235,10 +235,19 @@ class Outputs(object):
         # NOTE: We are not using config's native 'prepare_experiment_config' function
         # because some of the sweep dimensions might have be grouped when loading the outputs
         # e.g. seed is often grouped and does not appear in the sweep coordinates of the output data array
+        # Reset config-global quantities
+        self_copy.config.reset()
         # Update config
         self_copy.config.update(sweep)
         # Update sweep mode flag
-        self_copy.config.settings['sweep_mode'] = self_copy.config.sweep_mode()
+        try:
+            assert not self_copy.config.sweep_mode()
+        except:
+            self_copy.config.find_sweep_key_paths()
+            raise InvalidMetadataType(
+                message = f"No sweeps should be contained in Outputs' config. {self_copy.config.sweep_param_names} found."
+            )
+
         return self_copy
 
     def strip_data(self,keep_inputs:list=[],keep_outputs:list=[],keep_collection_ids:list=[]):
@@ -1060,8 +1069,8 @@ class Outputs(object):
                 except:
                     traceback.print_exc()
                     raise MultiprocessorFailed(
-                        f"Writing {','.join(sample_names)} group data failed",
-                        name = 'write_xr_data_concurrently'
+                        keys = 'write_xr_data_concurrently',
+                        message = f"Writing {','.join(sample_names)} group data failed"
                     )
 
             # Delete executor and progress bar
@@ -1185,8 +1194,8 @@ class Outputs(object):
             except:
                 traceback.print_exc()
                 raise MultiprocessorFailed(
-                    f"Reading {','.join(samples_not_loaded)} group",
-                    name = 'read_xarray_group'
+                    keys = 'read_xarray_group',
+                    message = f"Reading {','.join(samples_not_loaded)} group"
                 )
         return data_arrs,samples_not_loaded
     
@@ -1236,8 +1245,7 @@ class Outputs(object):
                 except:
                     traceback.print_exc()
                     raise MultiprocessorFailed(
-                        'Reading data collection.',
-                        name = 'read_xr_data_concurrently'
+                        keys = 'read_xr_data_concurrently'
                     )
 
             # Delete executor and progress bar
@@ -1314,8 +1322,7 @@ class Outputs(object):
                 except:
                     traceback.print_exc()
                     raise MultiprocessorFailed(
-                        'Getting sweep outputs failed.',
-                        name = 'get_sweep_outputs_concurrently'
+                        keys = 'get_sweep_outputs_concurrently'
                     )
 
             # Delete executor and progress bar
@@ -1986,8 +1993,7 @@ class DataCollection(object):
                 except:
                     traceback.print_exc()
                     raise MultiprocessorFailed(
-                        'Getting sweep outputs failed.',
-                        name = 'combine_by_coords_concurrently'
+                        keys = 'combine_by_coords_concurrently'
                     )
 
         # Delete executor and progress bar
@@ -2337,8 +2343,7 @@ class OutputSummary(object):
                 except:
                     traceback.print_exc()
                     raise MultiprocessorFailed(
-                        'Getting sweep outputs failed.',
-                        name = 'get_experiment_metadata_concurrently'
+                        keys = 'get_experiment_metadata_concurrently'
                     )
 
         # Delete executor and progress bar
@@ -2763,7 +2768,7 @@ class OutputSummary(object):
         if len(self.settings['evaluate']) == 0:
             return []
 
-        self.logger.info(f"Evaluating expressions for {outputs.experiment_id}")
+        self.logger.progress(f"Evaluating expressions for {outputs.experiment_id}")
 
         # Create a copy of global outputs
         sweep_outputs = deepcopy(outputs)
@@ -2834,11 +2839,11 @@ class OutputSummary(object):
                             **sweep_outputs.inputs.data_vars(),
                             **sweep_outputs.inputs.data.dims,
                             **sweep_outputs.data_vars(),
-                            "outputs":sweep_outputs
+                            "outputs":sweep_outputs,
+                            **{str(k):eval(str(k)) for k in self.settings['evaluation_library']}
                         },
                         {
-                            **keyword_args,
-                            **{str(k):eval(str(k)) for k in self.settings['evaluation_library']}
+                            **keyword_args
                         }
                     )
                 except Exception as exc:
@@ -2882,11 +2887,11 @@ class OutputSummary(object):
                         {
                             **outputs.inputs.data_vars(),
                             **outputs.inputs.data.dims,
+                            **{str(k):eval(str(k)) for k in self.settings['evaluation_library']}
                         },
                         {
                             **keyword_args,
-                            **evaluation_kwargs,
-                            **{str(k):eval(str(k)) for k in self.settings['evaluation_library']}
+                            **evaluation_kwargs
                         }
                     )
                     # Update list of evaluated expressions
@@ -2901,7 +2906,7 @@ class OutputSummary(object):
                 if 'sweep' in evaluation.dims:
                     self.logger.note(f"sweep: {evaluation['sweep'].values.tolist()}")
 
-            self.logger.success(f"Evaluation {operation_name} using {expression} succeded {np.shape(evaluation)}")
+            self.logger.success(f"Evaluation {operation_name} using {expression} succeded {np.shape(evaluation) if not isinstance(evaluation,xr.DataArray) else dict(evaluation.sizes)}")
             print('\n')
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
                 if 'sweep' in evaluation.dims:
@@ -2917,35 +2922,57 @@ class OutputSummary(object):
                         sweep = {k:get_value(sweep,k) for k in sweep.keys()}
                         # Get sweep id in string form
                         sweep_id = ' & '.join([str(k)+'_'+str(v) for k,v in sweep.items() if k not in [operation_name,'sweep']])
-
+                        # Get scalar if only one item is provided otherwise get list
+                        data = eval_data.values.ravel()
+                        try:
+                            data = data.item()
+                        except:
+                            data = data.tolist()
                         # Add every sweep configuration to this evaluation data
                         if sweep_id not in evaluation_data:
                             evaluation_data[sweep_id] = {
                                 **{
                                     f"{operation_name}_expression":expression,
-                                    operation_name:eval_data.values.ravel().tolist()
+                                    operation_name:data
                                 },
                                 **sweep
                             }
                             
                         else:
                             evaluation_data[sweep_id].update({
-                                operation_name:eval_data.values.ravel().tolist()
+                                operation_name:data
                             })
                 else:
+                    # Get scalar if only one item is provided otherwise get list
+                    data = evaluation.values.ravel()
+                    try:
+                        data = data.item()
+                    except:
+                        data = data.tolist()
                     # Rename xr data array
                     evaluation = evaluation.rename(operation_name.lower())
                     # Add data to every existing sweep
                     for sweep_id in evaluation_data.keys():
                         evaluation_data[sweep_id].update({
-                            operation_name:evaluation.values.ravel().tolist()
+                            operation_name:data
                         })
             else:
+                # Get data list
+                if isinstance(evaluation,np.generic):
+                    data = evaluation.tolist()
+                elif isinstance(evaluation,Iterable) and not isinstance(evaluation, str):
+                    data = evaluation
+                else:
+                    data = [evaluation]
                 # Add data to every existing sweep
                 for sweep_id in evaluation_data.keys():
-                    evaluation_data[sweep_id].update({
-                        operation_name:evaluation.tolist() if isinstance(evaluation,np.generic) else evaluation
-                    })
+                    for datum in data:
+                        if operation_name in evaluation_data[sweep_id]:
+                            evaluation_data[sweep_id]
+                        else:
+                            evaluation_data[sweep_id].update({
+                                operation_name:datum
+                            })
 
         return list(evaluation_data.values())
         
