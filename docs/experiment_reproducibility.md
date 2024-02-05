@@ -197,11 +197,11 @@ DITTO for the intensity samples:
 -et JointTableSIM_NN
 
 ```
-clear; multiresticodm plot 2d scatter -y srmse -x type -x 'iter&seed' --x_discrete  \
+clear; multiresticodm plot 2d scatter -y srmse -x type -x 'iter&seed' --x_discrete -gb seed  \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp2 -et NonJointTableSIM_NN_SweepedNoise_01_02_2024_14_38_56 \
 -el np -el MathUtils -el MiscUtils -el xr \
--e table_coverage_probability_size "xr.apply_ufunc(lambda x: np.exp(6*x), table_coverage.mean(['origin','destination'])).unstack('id')" \
--e table_srmse "srmse(prediction=mean_table,ground_truth=ground_truth).unstack('id')" \
+-e table_coverage_probability_size "xr.apply_ufunc(lambda x: np.exp(6*x), table_coverage.mean(['origin','destination']))" \
+-e table_srmse "srmse(prediction=mean_table,ground_truth=ground_truth)" \
 -ea table \
 -ea "mean_table=table.mean(['id'])" \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
@@ -212,7 +212,7 @@ clear; multiresticodm plot 2d scatter -y srmse -x type -x 'iter&seed' --x_discre
 -mrkr sigma -c title -msz table_coverage_probability_size -op 0.5 -or asc table_coverage_probability_size -l sigma -l title \
 -fs 10 10 -ft 'figure3/exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
 -xlab 'Method, ($N$, Ensemble size)' -ylab 'SRMSE$(\mathbb{E}\[\mytable^{(1:N)}\],\mytable^{\mathcal{D}})$' \
--ylim 0.0 2.2 -xtr 0 0 -xtp 0 100 -ytl 0.2 -xtl 1 1 -xtl 1 2 -lls 8 -xts 8 8 -xts 8 8 -nw 20
+-ylim 0.0 2.2 -xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1 2 -lls 8 -xts 8 8 -xts 8 8 -nw 20
 ```
 
 ```
@@ -236,7 +236,7 @@ clear; multiresticodm plot 2d scatter -y srmse -x type -x 'iter&seed' --x_discre
 ## Figure 4
 
 ```
-clear; multiresticodm plot 2d scatter -y srmse -x type -x 'iter&seed' --x_discrete  \
+clear; multiresticodm plot 2d scatter -y srmse -x loss_name --x_discrete  \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp3 -et JointTableSIM_NN_SweepedNoise_01_02_2024_14_55_23 \
 -el np -el MathUtils -el MiscUtils -el xr \
 -e table_coverage_probability_size "xr.apply_ufunc(lambda x: np.exp(6*x), table_coverage.mean(['origin','destination'])).unstack('id')" \
@@ -246,9 +246,8 @@ clear; multiresticodm plot 2d scatter -y srmse -x type -x 'iter&seed' --x_discre
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
 -ea "srmse=MathUtils.srmse" -ea "coverage_probability=MathUtils.coverage_probability" -ea "roundint=MathUtils.roundint" \
 -ea "table_coverage=coverage_probability(prediction=table,ground_truth=ground_truth)" \
--cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
 -k sigma -k type -k name -k title -k seed -k iter \
--mrkr sigma -c title -op 0.5 -or asc table_coverage_probability_size -msz 'table_coverage_probability_size' -l sigma -l title \
+-mrkr sigma -c title -msz table_coverage_probability_size -op 0.5 -or asc table_coverage_probability_size -l sigma -l title \
 -fs 10 10 -ft 'figure3/exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
 -xlab 'Method, ($N$, Ensemble size)' -ylab 'SRMSE$(\mathbb{E}\[\mytable^{(1:N)}\],\mytable^{\mathcal{D}})$' \
 -ylim 0.0 2.2 -xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 20
