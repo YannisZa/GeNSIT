@@ -9,20 +9,19 @@ import torch
 import random
 import numexpr
 import logging
+import numbers
+import decimal
 import operator
 import traceback
-import tikzplotlib
 import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 
-
 from tqdm import tqdm
 from copy import deepcopy
-from itertools import chain, count
 from difflib import SequenceMatcher
-from itertools import chain, product
+from itertools import chain, product, count
 from typing import Dict, List, Union, Tuple
 from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
@@ -31,6 +30,7 @@ from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 from multiresticodm.utils.exceptions import *
 from multiresticodm.utils.logger_class import *
 from multiresticodm.static.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS
+from multiresticodm.static.plot_variables import LABEL_EXPRESSIONS, RAW_EXPRESSIONS, LATEX_COORDINATES
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -124,16 +124,12 @@ def write_figure(figure,filepath,**settings):
         filepath += '.'+settings['figure_format']
     else:
         filepath += '_'+str(settings.get('filename_ending',''))+'.'+settings['figure_format']
-        
-    if settings['figure_format'] == 'tex':
-        # tikzplotlib.clean_figure(fig = figure)
-        tikzplotlib.save(filepath,figure = figure)
-    else:
-        figure.savefig(
-            filepath,
-            format = settings['figure_format'],
-            bbox_inches='tight'
-        )
+
+    figure.savefig(
+        filepath,
+        format = settings['figure_format'],
+        bbox_inches='tight'
+    )
     
     plt.close(figure)
 
@@ -656,15 +652,24 @@ def stringify_coordinate(d):
     else:
         return d
 
-def stringify(data):
+def stringify(data,**kwargs):
     if isinstance(data,Iterable) and not isinstance(data,str) and len(data) > 0:
-        return f"[{','.join([stringify(v) for v in data])}]"
-    elif data == '' or data is None:
+        return kwargs.get('preffix','')+','.join([stringify(v) for v in data])+kwargs.get('suffix','')
+    elif not data:
         return "none"
-    elif hasattr(data,'__len__') and len(data) == 0:
-        return "[]"
+    elif isinstance(data,numbers.Real):
+        try:
+            assert np.isfinite(data)
+        except:
+            return "nan"
+        if isinstance(data,decimal.Decimal):
+            return "{:.2e}".format(data)
+        elif data > 100:
+            return "{:.0e}".format(data)
+        else:
+            return data
     else:
-        return f"{str(data).replace(' ','')}"
+        return f"{str(data)}"#.replace(' ','')
 
 def unstringify(data):
     try:
@@ -949,7 +954,7 @@ def is_null(v):
 def dict_inverse(d:dict):
     return {v:k for k,v in d.items()}
 
-def get_value(d:dict,k:str,default:object = None):
+def get_value(d:dict,k:str,default:object = None,apply_latex:bool=False):
     try:
         value = d[k].item()
     except:
@@ -957,28 +962,31 @@ def get_value(d:dict,k:str,default:object = None):
             value = d[k]
         except:
             value = default
+    
     if k == 'sigma':
-        return sigma_to_noise_regime(value)
+        value = sigma_to_noise_regime(value)
+    # print(k,value,type(value))
+    if isinstance(value,str) and apply_latex:
+        return latex_it(
+            key = k,
+            value = value,
+            default = default
+        )
+    elif isinstance(value,str):
+        return unstringify(value)
     else:
         return value
 
-def hash_vars(d:dict,v:list):
-    if len(v) == 1:
-        return d.get(v[0],None) 
+def hash_major_minor_var(hashmap:dict,data:list):
+    # Join major and minor ticks
+    major = stringify(data[0])
+    minor = stringify(data[1])
+    if minor and minor != 'none':
+        # Apply hashmap
+        return hashmap.get(f"({major},{minor})")
     else:
-        key = '('
-        for k in v:
-            if isinstance(k,str):
-                for subk in k.strip('()').split(", "):
-                    key += (subk+', ')
-            else:
-                key += (str(k)+', ')
-        # Remove last comma and space
-        key = key[:-2]
-        # Close parenthesis
-        key += ')'
-
-        return d.get(key,None)
+        # Apply hashmap
+        return hashmap.get(f"({major})")
 
 def get_keys_in_path(d, target_key, path=[], paths_found = []):
     for key, value in d.items():
@@ -1202,6 +1210,20 @@ def tidy_label(label:str):
     label = label.replace('  ',' ')
     return label
 
+def strip_special_characters(string:str):
+    return ''.join(e for e in string if e.isalnum() and e != ',')
+
+def latex_it(key:str, value, default:str='learned',ndigits:int=3):
+    # If key has a math expression replace it with math expression
+    if str(value) in RAW_EXPRESSIONS:
+        return RAW_EXPRESSIONS[str(value)]
+    elif key in LABEL_EXPRESSIONS:
+        return (LABEL_EXPRESSIONS[key]+str(parse(value, default = default, ndigits = ndigits))+'$')
+    elif isinstance(value,str):
+        return tidy_label(str())
+    else:
+        return value
+
 
 def lexicographic_sort(arr):
     # Get the shape of the array
@@ -1343,7 +1365,7 @@ def xr_apply_and_combine_wrapper(
                 function_apply_ufunc = function_settings.get('apply_ufunc',False)
                 # Gather all function keyword arguments
                 function_sweeped_kwargs = dict(zip(sweep_keys, function_sweeped_vals))
-                function_kwargs = {**fixed_kwargs[function_name], **function_sweeped_kwargs}
+                function_kwargs = {**fixed_kwargs.get(function_name,{}), **function_sweeped_kwargs}
 
                 # Apply function either through xr.apply_ufunc or directly
                 if function_apply_ufunc:
@@ -1358,9 +1380,14 @@ def xr_apply_and_combine_wrapper(
                         **function_kwargs
                     )
             except Exception:
+                traceback.print_exc()
                 raise FunctionFailed(
                     name = function_name,
-                    keys = list(function_kwargs.keys())
+                    keys = (
+                        list(fixed_kwargs.get(function_name,{}).keys()) + \
+                        list(isolated_sweeped_kwargs.keys()) + \
+                        list(coupled_sweeped_kwargs.keys())
+                    )
                 )
 
         # Convert sweep values to iterables
@@ -1394,3 +1421,20 @@ def xr_apply_and_combine_wrapper(
     )
 
     
+def safe_list_get(l, idx, default):
+  try:
+    return l[idx]
+  except IndexError:
+    return default
+
+def unpack_data(data,index):
+    if data and isinstance(data,Iterable):
+        if len(data) == 1:
+            return data[0]
+        else:
+            return data[index]
+    else:
+        return data
+
+def flip(items, ncol):
+    return chain(*[items[i::ncol] for i in range(ncol)])
