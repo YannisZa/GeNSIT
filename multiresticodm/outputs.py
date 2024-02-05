@@ -336,7 +336,7 @@ class Outputs(object):
             for i in range(len(samples)):
                 # Apply coordinate value slice
                 try:
-                    samples[i] = self.slice_coordinates_by_value(
+                    samples[i],successful_value_slices = self.slice_coordinates_by_value(
                         da = samples[i],
                         sample_name = sample_name,
                         i = i
@@ -352,7 +352,7 @@ class Outputs(object):
 
                 # Apply burning, thinning and trimming
                 try:
-                    samples[i] = self.slice_coordinates_by_index(
+                    samples[i],successful_index_slices = self.slice_coordinates_by_index(
                         samples = samples[i],
                         sample_name = sample_name
                     )
@@ -370,12 +370,12 @@ class Outputs(object):
                     # Do not reslice the data you just sliced!
                     if sam_name != sample_name:
                         # Slice sam_name's data
-                        current_samples[i] = self.slice_coordinates_by_value(
+                        current_samples[i],_ = self.slice_coordinates_by_value(
                             da = current_samples[i],
                             sample_name = sam_name,
                             i = i
                         )
-                        current_samples[i] = self.slice_coordinates_by_index(
+                        current_samples[i],_ = self.slice_coordinates_by_index(
                             samples = current_samples[i],
                             sample_name = sam_name
                         )
@@ -386,11 +386,22 @@ class Outputs(object):
                 progress.update(1)
                 
             # Remove collection ids that are not matching coordinate slice
-            # print('removed',sorted(list(removed_collection_ids), reverse = True))
+            kept_collection_ids = set(list(range(self.data.size()))).difference(removed_collection_ids)
+            self.logger.info(f"""
+                {len(kept_collection_ids)} collection ids kept out of {self.data.size()}.
+                Kept ids: {list(sorted(kept_collection_ids))}
+            """)
             for cid in sorted(list(removed_collection_ids), reverse = True):
                 for sam_name in self.data_vars().keys():
                     del getattr(self.data,sam_name)[cid]
                     gc.collect()
+            
+            # Print successful slices
+            for cslice in successful_value_slices:
+                self.logger.success(f"Slicing using coordinate slice {cslice} succeded")
+            for dim_names,islice in successful_index_slices.items():
+                # Announce successful coordinate index slices
+                self.logger.success(f"Slicing {dim_names} {islice['slice_settings']} succeded {islice['new_shape']}")
             # Sleep for 3 secs so that gc cleans memory
             time.sleep(3)
 
@@ -457,12 +468,11 @@ class Outputs(object):
                 )
             # Keep track of slices that succeded
             if str(coord_slice) not in successful_slices:
-                self.logger.success(f"Slicing using {coord_slice} succeded")
                 successful_slices.add(str(coord_slice))
 
         self.logger.progress(f"After coordinate slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
         
-        return da
+        return da,successful_slices
     
     def slice_coordinates_by_index(self,samples,sample_name:str):
 
@@ -476,7 +486,7 @@ class Outputs(object):
         })
         
         # Keep track of sliced dimensions/variables
-        sliced_dims = set()
+        sliced_dims = {}
         for index_slice in self.settings['burnin_thinning_trimming']:
             
             # Extract variable name(s)
@@ -545,11 +555,11 @@ class Outputs(object):
             else:
                 # Success - samples were sliced
                 for d in dim_names: 
-                    sliced_dims.add(d)
+                    sliced_dims[d] = sliced_dims[d].setdefault(d,{})
+                    if d not in sliced_dims:
+                        sliced_dims[d] = {"slice_setts":slice_setts,"new_shape":({k:v for k,v in dict(samples.sizes).items() if v > 1})}
                 # Update current samples to be the sliced samples
                 samples = sliced_samples
-                # Announce successful coordinate index slices
-                self.logger.success(f"Slicing {dim_names} {slice_setts} succeded {({k:v for k,v in dict(samples.sizes).items() if v > 1})}")
 
         # If no data remains after slicing raise exception
         if any([samples.sizes[k] <= 0 for k in samples.dims]):
@@ -558,7 +568,7 @@ class Outputs(object):
                 message = f"Slicing {list(prev_iter.keys())} with shape {prev_iter} using {self.settings['burnin_thinning_trimming']}"
             )
         
-        return samples
+        return samples,sliced_dims
     
     
     def load_geometry(self,geometry_filename,default_crs:str='epsg:27700'):
