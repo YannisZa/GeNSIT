@@ -1166,7 +1166,8 @@ class Outputs(object):
                     samples_not_loaded = samples_not_loaded,
                     dirpath = dirpath
                 )
-
+            
+            self.logger.info(f"Creating Data Collection for each group.")
             # Pass all samples into a data collection object
             self.data = DataCollection(
                 data = data_arrs,
@@ -1177,6 +1178,7 @@ class Outputs(object):
         
     def read_xr_data_sequentially(self,all_groups,samples_not_loaded:list,dirpath:str):
         data_arrs = []
+        sample_names_loaded = set([])
         for group in tqdm(
             all_groups,
             leave = False,
@@ -1195,16 +1197,20 @@ class Outputs(object):
                 # append array to data arrays
                 if sample_data is not None:
                     data_arrs.append(sample_data)
-                # remove loaded sample from consideration
-                # since it has been succesfully loaded
-                if sample_name in samples_not_loaded and sample_data is not None:
-                    samples_not_loaded.remove(sample_name)
+                # add sample name to set of sample names loaded
+                sample_names_loaded.add(sample_name)
             except:
                 traceback.print_exc()
                 raise MultiprocessorFailed(
                     keys = 'read_xarray_group',
                     message = f"Reading {','.join(samples_not_loaded)} group"
                 )
+        
+        # remove loaded samples from consideration
+        # since they has been succesfully loaded
+        for sample_name in sample_names_loaded:
+            if sample_name in samples_not_loaded:
+                samples_not_loaded.remove(sample_name)
         return data_arrs,samples_not_loaded
     
     def read_xr_data_concurrently(self,all_groups,samples_not_loaded:list,dirpath:str):
