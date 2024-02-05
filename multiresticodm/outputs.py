@@ -1864,7 +1864,6 @@ class DataCollection(object):
                         datum,
                         group_by = kwargs.get('group_by',[])
                     )
-                
                 # Combine coords for each list element of the Data Collection
                 for sample_name in vars(self).keys():
                     if sample_name in DATA_SCHEMA:
@@ -1873,8 +1872,7 @@ class DataCollection(object):
                                 self,
                                 sample_name
                             )),
-                            total = len(getattr(self,sample_name)),
-                            disable = (self.logger.console.level <= 0)
+                            total = len(getattr(self,sample_name))
                         ):
                             getattr(
                                 self,
