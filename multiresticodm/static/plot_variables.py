@@ -291,10 +291,44 @@ LATEX_PREAMBLE = r'''
 
 \newcommand{\skyblue}[1]{{\textcolor[HTML]{1E88E5}{#1}}}
 \newcommand{\deepred}[1]{{\textcolor[HTML]{E20000}{#1}}}
+\newcommand{\skyblue}[1]{{\textcolor[HTML]{1E88E5}{#1}}}
+\newcommand{\deepred}[1]{{\textcolor[HTML]{E20000}{#1}}}
+\newcommand{\myseagreen}[1]{{\textcolor[HTML]{2E8B57}{#1}}}
+\newcommand{\myorange}[1]{{\textcolor[HTML]{FFA500}{#1}}}
+\newcommand{\mydarkmagenta}[1]{{\textcolor[HTML]{8B008B}{#1}}}
+\newcommand{\mybrown}[1]{{\textcolor[HTML]{A52A2A}{#1}}}
 
 \newcommand{\mytable}{\skyblue{\mathbf{T}}}
 \newcommand{\myintensity}{\deepred{\boldsymbol{\Lambda}}}
+
+\newcommand{\frameworkname}{ConTINePI}
+\newcommand{\frameworkfullname}{\textbf{Con}strained \textbf{T}able \textbf{I}nference with \textbf{Ne}ural Calibration of a \textbf{P}hysics-Driven \textbf{I}ntensity}
+\newcommand{\frameworkpackagelowercase}{continepi}
+\newcommand{\frameworktag}{\textsc{\frameworkname}}
+\newcommand{\frameworkpackage}{\texttt{\frameworkname}}
+\newcommand{\frameworkfig}{\hyperref[fig:framework]{\textsc{\frameworkname}}}
+\newcommand{\mytable}{\skyblue{\mathbf{T}}}
+\newcommand{\myintensity}{\deepred{\boldsymbol{\Lambda}}}
+\newcommand{\mytableoned}{\skyblue{T}}
+\newcommand{\myintensityoned}{\deepred{\Lambda}}
+\newcommand{\mytablerowsums}{\myseagreen{\mathbf{T}_{\cdot +}}}
+\newcommand{\mytablecolsums}{\myorange{\mathbf{T}_{+\cdot}}}
+\newcommand{\mytabletotal}{\mydarkmagenta{T_{++}}}
+\newcommand{\mytablecells}{\mybrown{\mathbf{T}_{\mathcal{X}}}}
+\newcommand{\myintensityrowsums}{\myseagreen{\boldsymbol{\Lambda}_{\cdot +}}}
+\newcommand{\myintensitycolsums}{\myorange{\boldsymbol{\Lambda}_{+\cdot}}}
+\newcommand{\myintensitytotal}{\mydarkmagenta{\Lambda_{++}}}
 '''
+
+LATEX_RC_PARAMETERS = {
+    "pgf.texsystem": "xelatex",
+    'text.usetex': True,
+    'font.family': 'serif',  # Choose your desired font family
+    'font.serif': ['Times New Roman'],  # Choose your desired serif font
+    "text.latex.unicode": True,
+    "pgf.rcfonts": False,
+    'text.latex.preamble': LATEX_PREAMBLE,
+}
 
 LEGEND_LOCATIONS = [
     'best', 'upper right', 'upper left', 'lower left', 'lower right', 'right', 

@@ -8,6 +8,9 @@ import geopandas as gpd
 import sklearn.manifold
 import scipy.stats as stats
 import matplotlib as mpl
+# Set-up PGF as the backend for saving a PDF
+from matplotlib.backends.backend_pgf import FigureCanvasPgf
+mpl.backend_bases.register_backend('pdf', FigureCanvasPgf)
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 
@@ -25,19 +28,10 @@ from multiresticodm.utils.misc_utils import *
 from multiresticodm.static.plot_variables import *
 from multiresticodm.static.global_variables import *
 from multiresticodm.outputs import Outputs,OutputSummary
-from multiresticodm.contingency_table import instantiate_ct
-from multiresticodm.spatial_interaction_model import instantiate_sim
-from multiresticodm.utils.probability_utils import log_odds_ratio_wrt_intensity
-from multiresticodm.utils.math_utils import map_distance_name_to_function
 
 
 # LaTeX font configuration
-mpl.rcParams['text.latex.preamble'] = LATEX_PREAMBLE
-mpl.rcParams.update({
-    'text.usetex': True,
-    'font.family': 'serif',  # Choose your desired font family
-    'font.serif': ['Times New Roman'],  # Choose your desired serif font
-})
+mpl.rcParams.update(LATEX_RC_PARAMETERS)
 
 
 class Plot(object):
