@@ -323,7 +323,6 @@ def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,
         prediction,
         alpha
     )
-    
     # Compute flag for whether ground truth table is covered
     cell_coverage = (ground_truth >= lower_bound_hpdr) & (ground_truth <= upper_bound_hpdr)
     
@@ -387,3 +386,9 @@ def logfactorialsum(arr, dim = None):
     
 def roundint(data):
     return np.rint(data)
+
+def sample_mean(data,**kwargs):
+    if kwargs.get('dim',None) is None:
+        return data.mean()
+    else:
+        return data.mean(kwargs.get('dim',None))
