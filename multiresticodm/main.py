@@ -11,7 +11,7 @@ from multiresticodm.utils.logger_class import *
 from multiresticodm.utils.click_parsers import *
 from multiresticodm.static.global_variables import *
 from multiresticodm.utils.misc_utils import setup_logger
-from multiresticodm.static.plot_variables import PLOT_VIEWS, PLOT_COORDINATES, PLOT_TYPES
+from multiresticodm.static.plot_variables import PLOT_VIEWS, PLOT_COORDINATES, PLOT_TYPES, LEGEND_LOCATIONS
 
 
 def set_threads(n_threads):
@@ -516,24 +516,34 @@ def output_options(func):
 _plot_coordinate_options = []
 for i,var in enumerate(PLOT_COORDINATES):
     _plot_coordinate_options += [
-        click.option(f'--{var}_group', f'-{var}grp', default = None, show_default = False, callback = split_to_list,
-            type = click.STRING, multiple = True, help = f'Sets {var} group (# groups corresponds to number of stacked axes).'),
+        # General axis-specific options
+        click.option(f'--{var}_group', f'-{var}grp', default = [], show_default = False, callback = to_list, type = click.STRING, multiple = True, help = f'Sets {var} group (# groups corresponds to number of subplots). Each call corresponds to a different group/subplot.'),
+        click.option(f'--{var}_discrete/--no-{var}_discrete', default = False, show_default = True, is_flag = True, help = f'Flag for whether {var} is discrete or not.'),
+        click.option(f'--{var}_shade/--no-{var}_shade', f'-{var}sh', show_default = False, default = False, is_flag = True, help = f'Sets flag for whether to shade area between lines and {var}-axis.'),
+        click.option(f'--{var}_limit', f'-{var}lim', default=[(None,None)], show_default = False, callback = to_list,
+            type=(click.FLOAT, click.FLOAT), multiple = True, help = f'Sets {var} min/max limits for each group only if {var} is numerical. Every call corresponds to a different group.'),
+        click.option(f'-{var}_scale', f'-{var}sc', default=None, show_default = False,
+            type=click.Choice(["linear", "log", "symlog", "logit"]), help = f'Sets {var} axis scaling'),
+        # Axis label-specific options
         click.option(f'--{var}_label', f'-{var}lab', default = None, show_default = False,
             type = click.STRING, help = f'Sets {var} axis label.'),
-        click.option(f'--{var}_shade/--no-{var}_shade', f'-{var}sh', show_default = False, default = False, is_flag = True, 
-                     help = f'Sets flag for whether to shade area between lines and {var}-axis.'),
-        click.option(f'--{var}_discrete/--no-{var}_discrete', default = False, show_default = True, 
-            is_flag = True, help = f'Flag for whether {var} is discrete or not.'),
-        click.option(f'--{var}_limit', f'-{var}lim', default=[(None,None)], show_default = False,
-            type=(click.FLOAT, click.FLOAT), multiple = True, help = f'Sets {var} limits.'),
-        click.option(f'--{var}_tick_frequency', f'-{var}tf', default=[(0, 1),(0, 1)], show_default = True, multiple = True, callback = to_list,
-            type=(click.INT,click.INT), help = f'Sets starting point and frequency of minor and major {var} global ticks.'),
-        click.option(f'--sub{var}_tick_frequency', f'-s{var}tf', default=[(0, 1),(0, 1)], show_default = True, multiple = True, callback = to_list,
-            type=(click.INT,click.INT), help = f'Sets starting point and frequency of minor and major {var} local ticks in subplot.'),
-        click.option(f'--{var}_tick_pad', f'-{var}tp', default=(2,10), show_default = True, multiple = False, callback = to_list,
-            type=(click.INT,click.INT), help = f'Sets tick label padding for minor and major {var} ticks.'),
-        click.option(f'--{var}_tick_rotation', f'-{var}tr', default=(0,45), show_default = True, multiple = False, callback = to_list,
-            type=(click.INT,click.INT), help = f'Sets tick label rotation for minor and major {var} ticks.')
+        click.option(f'--{var}_label_size', f'-{var}ls', default = 13, show_default = True,
+              type = click.INT, help = f'Sets {var} axis label font size.'),
+        click.option(f'--{var}_label_pad', f'-{var}lp', default = 7, show_default = True,
+            type = click.INT, help = f'Sets {var} axis label padding.'),
+        click.option(f'--{var}_label_rotation', f'-{var}lr', default = 0, show_default = True,
+            type = click.INT, help = f'Sets {var} axis label rotation.'),
+        # Axis tick-specific options
+        click.option(f'--{var}_tick_frequency', f'-{var}tf', callback=lambda ctx, param, value: to_list(ctx,param,value,nargs=2), multiple = True, default=[(0,1),(0,1)], show_default = True,
+            type=(click.IntRange(min=0),click.IntRange(min=1)), help = f'First call is for the major {var}-axis and second is for minor {var}-axis. Each call has a tuple consisting of a starting point and a step size. Applies to discrete ticks only'),
+        click.option(f'--{var}_tick_step_size', f'-{var}tss', default=0.01, show_default = True,
+            type=click.FloatRange(min=0), help = f'Sets step size in numeric ticks. Applies to continuous ticks only.'),
+        click.option(f'--{var}_tick_size', f'-{var}ts', default = (13,10), show_default = True,
+              type = (click.INT,click.INT), help = f'Sets {var} tick label size for minor and major axes (first and second arguments).'),
+        click.option(f'--{var}_tick_pad', f'-{var}tp', default=(2,10), show_default = True,
+            type=(click.INT,click.INT), help = f'Sets {var} tick label padding for minor and major axes (first and second arguments).'),
+        click.option(f'--{var}_tick_rotation', f'-{var}tr', default=(0,45), show_default = True,
+            type=(click.INT,click.INT), help = f'Sets {var} tick label rotation for minor and major axes (first and second arguments).')
     ]
 
 
@@ -550,31 +560,93 @@ def plot_coordinate_options(func):
 @click.argument('plot_type', type = click.Choice(PLOT_TYPES.keys()), default = None)
 @output_options
 @common_options
-@click.option('-x', type = click.STRING, required = False, callback = split_to_list, multiple = True,
-              default = [None], help='Sets x coordinate(s) in plot')
-@click.option('-y', type = click.STRING, required = False, callback = split_to_list, multiple = True,
-                default = [None], help='Sets y coordinate(s) in plot')
-@click.option('-z', type = click.STRING, required = False, callback = split_to_list, multiple = True,
-                default = [None], help='Sets z coordinate(s) in plot')
+# Plot-specific main arguments and options
+@click.option('-x', type = click.STRING, required = False, callback=coordinate_parse, multiple = True,
+              default = [None], help='Sets x coordinate(s) in plot. First call is for a &-separated major x-axis and second is for a &-separated minor x-axis.')
+@click.option('-y', type = click.STRING, required = False, callback=coordinate_parse, multiple = True,
+                default = [None], help='Sets y coordinate(s) in plot. First call is for a &-separated major y-axis and second is for a &-separated minor y-axis.')
+@click.option('-z', type = click.STRING, required = False, callback=coordinate_parse, multiple = True,
+                default = [None], help='Sets z coordinate(s) in plot. First call is for a &-separated major z-axis and second is for a &-separated minor z-axis.')
 @click.option('--plot_data_dir', '-pdd', type = click.Path(exists = True), multiple = True, required = False)
+# Data-read figure options
 @click.option('--label', '-l', default=[''], show_default = False, multiple = True, callback = to_list,
               type = click.STRING, help = f'Sets metadata key(s) to label figure elements by.')
 @click.option('--colour', '-c', default='', show_default = False,
               type = click.STRING, help = f'Sets metadata key(s) to colour figure elements by.')
-@click.option('--size', '-sz', default='1.0', show_default = False,
-              type = click.STRING, help = f'Sets metadata key(s) to size figure element markers by.')
-@click.option('--style', '-st', default='-', show_default = False,
-              type = click.STRING, help = f'Sets metadata key(s) to style figure element lines by.')
-@click.option('--visibility', '-v', default='1.0', show_default = False,
-              type = click.STRING, help = f'Sets metadata key(s) to determine figure element visibility (transparency) by.')
 @click.option('--marker', '-mrkr', default='.', show_default = False,
               type = click.STRING, help = f'Sets metadata key(s) to determine figure element marker type by.')
+@click.option('--marker_size', '-msz', default='1.0', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to size figure element markers by.')
+@click.option('--line_style', '-lst', default='-', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to style figure element lines by.')
+@click.option('--line_width', '-lw', default='1.0', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to size (control width of) figure element lines by.')
+@click.option('--opacity', '-op', default='1.0', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to determine figure element opacity/visibility/transparency by.')
+@click.option('--hatch_opacity', '-hchop', default='1.0', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to determine hatch pattern opacity/visibility/transparency by.')
 @click.option('--hatch', '-hch', default='', show_default = False,
               type = click.STRING, help = f'Sets metadata key(s) to determine figure element marker texture by.')
 @click.option('--zorder', '-or', default=[(None,None)], show_default = False, multiple = True, callback = to_list,
               type=(click.Choice(['asc','desc']),click.STRING),
               help = f'''Sets variable to order plot points/lines by in ascending or descending order. 
               If ascending order is set, smaller values are given priority (go on top) and vice versa''')
+@click.option('--annotate', '-an', default='', show_default = False,
+              type = click.STRING, help = f'Sets metadata key(s) to annotate figure element text type by.')
+# General figure options
+@click.option('--figure_size', '-fs', default=(7,5), show_default = True,
+              type=(click.FLOAT, click.FLOAT), help = f'Sets figure format.')
+@click.option('--legend_location', '-loc', default='best', show_default = True,
+              type=click.Choice(LEGEND_LOCATIONS), help = f'Sets the legend locations.')
+@click.option('--legend_cols', '-lc', default=1, show_default = True,
+              type=click.IntRange(min=1), help = f"Sets the legend's number of rows,columns.")
+@click.option('--bbox_to_anchor', '-bbta', default=None, show_default = True,
+              type=(click.FLOAT, click.FLOAT), help = f'Box that is used to position the legend in conjunction with legend_location.')
+@click.option('--legend_axis', '-la', default = None, show_default = True,
+              type=(click.IntRange(0,None), click.IntRange(0,None)), help = f'Sets axis inside which to plot legend.')
+@click.option('--figure_title', '-ft', default = None, show_default = False,
+              type = click.STRING, help = f'Sets figure title.')
+@click.option('--figure_title_size', '-fts', default = 16, show_default = True,
+              type = click.INT, help = f'Sets subplot (group) title font size.')
+@click.option('--group_title_size', '-gts', default = 12, show_default = True,
+              type = click.INT, help = f'Sets subplot (group) title font size.')
+@click.option('--legend_label_size', '-lls', default = 8, show_default = False,
+              type = click.INT, help = f'Sets legend font size.')
+@click.option('--annotation_size', '-as', default = 12, show_default = False,
+              type = click.INT, help = f'Sets text annotation font size.')
+@click.option('--colourmap', '-cm', default=['cblue'],required = False, show_default = True, multiple = True, callback = to_list,
+            type = click.STRING, help = f'Sets colourmap(s) (e.g. colourmap corresponding to flows).')
+@click.option('--colourbar/--no-colourbar', default = None, is_flag = True, show_default = True,
+              help = f'Flag for plotting colourbars or not.')
+@click.option('--colourbar_title', '-ct', default = [None], show_default = False, multiple = True, callback = to_list, 
+              type = click.STRING, help = f'Sets colobar(s) titles (if colourbar(s) exist).')
+@click.option('--colourbar_limit', '-cl', type=(click.FLOAT, click.FLOAT), multiple = True, callback = to_list, default = [(None,None)],
+              help = f'Sets main colourbar(s) min,max limits (if colourbar(s) exist).')
+@click.option('--colourbar_title_size', '-cts', default = None, show_default = False,
+              type = click.INT, help = f'Sets colourbar title font size.')
+@click.option('--colourbar_label_size', '-cts', default = None, show_default = False,
+              type = click.INT, help = f'Sets colourbar label font size.')
+@click.option('--colourbar_label_pad', '-clp', default = 7, show_default = True,
+              type = click.INT, help = f'Sets colourbar label padding.')
+@click.option('--colourbar_label_rotation', '-clr', default = 0, show_default = True,
+              type = click.INT, help = f'Sets colourbar label rotation.')
+@click.option('--colourmap_segmentation_limits', '-csl', default=[(0,1)], show_default = False, multiple = True, callback = to_list, 
+              type=(click.FloatRange(0,1), click.FloatRange(0,1)), 
+              help = f"Sets colourbar(s)' colour segmentation min,max limits.")
+@click.option('--by_experiment/--no-by_experiment', '-be', default = False, is_flag = True, show_default = True,
+              help = f'Flag for plotting data separately for each experiment or not.')
+@click.option('--benchmark/--no-benchmark', '-bm', default = None, is_flag = True, show_default = True,
+              help = f'Flag for plotting data along with benchmark/baseline (if provided).')
+@click.option('--transpose/--no-transpose', default = None, is_flag = True, show_default = True,
+              help = f'Flag for taking switching origins with destinations in plots.')
+@click.option('--equal_aspect/--no-equal_aspect', default = False, is_flag = True, show_default = True,
+              help = f'Flag for setting aspect ratio to equal or not.')
+@click.option('--figure_format', '-ff', default='pdf', show_default = True,
+              type = click.Choice(['eps', 'png', 'pdf']), help = f'Sets figure format.')#, case_sensitive = False)
+@click.option('--data_format', '-df', default='json', show_default = True,
+              type = click.Choice(['dat', 'txt', 'json', 'csv']), help = f'Sets figure data format.')#, case_sensitive = False)
+@click.option('--data_precision', '-dp', default = 5, show_default = True,
+              type = click.INT, help = f'Sets figure data precision.')#, case_sensitive = False)
 @click.option('--geometry','-g', multiple = False, type = click.File(), default = None, 
                 help='Defines path to geometry geojson for visualising flows on a map.')
 @click.option('--origin_geometry_type', '-ogt', default='lsoa', show_default = True,
@@ -587,90 +659,12 @@ def plot_coordinate_options(func):
               type = click.STRING, help = f'Subset of destination ids to use in various plots.')
 @click.option('--margin_plot', '-mp', default='destination_demand', show_default = True,
               type = click.Choice(['origin_demand', 'destination_demand']), help = f'Sets margin to plot in table flow plots.')
-@click.option('--embedding_method', '-emb', default='isomap', show_default = False,
-              type = click.Choice(['isomap','tsne']), help = f'Sets method for embedding tabular data Into lower dimensional manifold.')
-@click.option('--n_bins', '-nb', default = 100, show_default = True,
-              type = click.INT, help = f'Sets number of bins to use in histograms or number of lags in ACF or number of levels in countour plots.')
-@click.option('--nearest_neighbours', '-nn', default = 100, show_default = True,
-              type = click.INT, help = f'Sets number of nearest neigbours in table_distribution_low_dimensional_embedding.')
-@click.option('--distance_metric', '-dis', default='edit_distance_degree_one', show_default = True,
-              type = click.Choice(DISTANCE_FUNCTIONS), 
-              help = f'Sets distance metric for lower dimensional embedding method')
-@click.option('--figure_format', '-ff', default='pdf', show_default = True,
-              type = click.Choice(['eps', 'png', 'pdf', 'tex']), help = f'Sets figure format.')#, case_sensitive = False)
-@click.option('--data_format', '-df', default='json', show_default = True,
-              type = click.Choice(['dat', 'txt', 'json', 'csv']), help = f'Sets figure data format.')#, case_sensitive = False)
-@click.option('--data_precision', '-dp', default = 5, show_default = True,
-              type = click.INT, help = f'Sets figure data precision.')#, case_sensitive = False)
-@click.option('--figure_size', '-fs', default=(7,5), show_default = True,
-              type=(float, float), help = f'Sets figure format.')
-@click.option('--legend_location', '-lloc', default=(1.0,1.0), show_default = True,
-              type=(float, float), help = f'Sets legend bbox to anchor coordinates.')
-@click.option('--legend_axis', '-la', default = None, show_default = True,
-              type=(click.IntRange(0,None), click.IntRange(0,None)), help = f'Sets axis inside which to plot legend.')
-@click.option('--main_colourmap', '-mc', default='cblue',required = False, show_default = True,
-              type = click.STRING, help = f'Sets main colourmap (e.g. colourmap corresponding to flows).')
-@click.option('--aux_colourmap', '-ac', multiple = True, required = False, default=['Greens','Blues'],
-              type = click.STRING, help = f'Sets auxiliary colourmap (e.g. colourmap corresponding to margins).')
-@click.option('--colour_segmentation_limits', '-csl', default=(0,1), show_default = False,
-              type=(click.FloatRange(0,1), click.FloatRange(0,1)), 
-              help = f'Sets main colourbar\'s colour segmentation limits.')
-@click.option('--main_colourbar_limit', '-mcl', type=(float, float), help = f'Sets main colourbar limits.')
-@click.option('--auxiliary_colourbar_limit', '-acl', type=(float, float), multiple = True, help = f'Sets auxiliary colourbar(s) limits.')
-@click.option('--linewidth', '-lw', default = 10, show_default = False,
-              type = click.INT, help = f'Sets line width in plots.')
-@click.option('--figure_title', '-ft', default = None, show_default = False,
-              type = click.STRING, help = f'Sets figure title.')
-@click.option('--colourbar_title', '-ct', default = None, show_default = False,
-              type = click.STRING, help = f'Sets colobar title (if colourbar exists).')
-@click.option('--annotation_label', '-al', default = None, show_default = False,
-              type = click.STRING, help = f'Sets annotation label variable.')
-@click.option('--opacity', '-op', default = 1.0, show_default = True,
-              type = click.FloatRange(0,1), help = f'Sets level of transparency in plot.')
-@click.option('--axis_label_size', '-als', default = 13, show_default = True,
-              type = click.INT, help = f'Sets axis label font size.')
-@click.option('--subaxis_label_size', '-sals', default = 6, show_default = True,
-              type = click.INT, help = f'Sets subplot axis label font size.')
-@click.option('--tick_label_size', '-tls', default = 13, show_default = True,
-              type = click.INT, help = f'Sets axis tick or colourbar font size.')
-@click.option('--axis_label_pad', '-alp', default = 7, show_default = True,
-              type = click.INT, help = f'Sets axis label padding.')
-@click.option('--subaxis_label_pad', '-salp', default = 3, show_default = True,
-              type = click.INT, help = f'Sets subplot axis label padding.')
-@click.option('--axis_label_rotation', '-alr', default = 0, show_default = True,
-              type = click.INT, help = f'Sets axis label rotation.')
-@click.option('--subaxis_label_rotation', '-salr', default = 0, show_default = True,
-              type = click.INT, help = f'Sets subplot axis label rotation.')
-@click.option('--colourbar_labelpad', '-clp', default = 7, show_default = True,
-              type = click.INT, help = f'Sets colourbar label padding.')
-@click.option('--colourbar_label_rotation', '-clr', default = 0, show_default = True,
-              type = click.INT, help = f'Sets colourbar label rotation.')
-@click.option('--title_label_size', '-ttls', default = 16, show_default = True,
-              type = click.INT, help = f'Sets title font size.')
-@click.option('--legend_label_size', '-lls', default = None, show_default = False,
-              type = click.INT, help = f'Sets legend font size.')
-@click.option('--annotation_label_size', '-anls', default = 15, show_default = False,
-              type = click.INT, help = f'Sets text annotation font size.')
-@click.option('--marker_frequency','-mf', default = None, show_default = False,
-            type = click.INT, help='Plots marker every n-th poInt in dataset')
-@click.option('--marker_size','-ms', default = 1, show_default = True,
-            type = click.INT, help='Sets marker size in plot')
-@click.option('--by_experiment/--no-by_experiment', '-be', default = False, is_flag = True, show_default = True,
-              help = f'Flag for plotting data separately for each experiment or not.')
-@click.option('--benchmark/--no-benchmark', '-bm', default = None, is_flag = True, show_default = True,
-              help = f'Flag for plotting data along with benchmark/baseline (if provided).')
-@click.option('--annotate/--no-annotate', default = None, is_flag = True, show_default = True,
-              help = f'Flag for annotating plot with text')
-@click.option('--transpose/--no-transpose', default = None, is_flag = True, show_default = True,
-              help = f'Flag for taking switching origins with destinations in plots.')
-@click.option('--colourbar/--no-colourbar', default = None, is_flag = True, show_default = True,
-              help = f'Flag for plotting colourbars or not.')
-@click.option('--equal_aspect/--no-equal_aspect', default = False, is_flag = True, show_default = True,
-              help = f'Flag for setting aspect ratio to equal or not.')
+# Additional axis-specific option
 @plot_coordinate_options
 @click.pass_context
 def plot(
         ctx,
+        # Output-specific options
         out_directory,
         dataset_name,
         directories,
@@ -702,85 +696,93 @@ def plot(
         force_reload,
         plot_view,
         plot_type,
+        # Plot-specific main arguments and options
         x,
         y,
         z,
         plot_data_dir,
+        # Data-read figure options
         label,
         colour,
-        size,
-        style,
-        visibility,
         marker,
+        marker_size,
+        line_style,
+        line_width,
+        opacity,
+        hatch_opacity,
         hatch,
         zorder,
+        annotate,
+        # General figure options
+        figure_size,
+        legend_location,
+        legend_cols,
+        bbox_to_anchor,
+        legend_axis,
+        figure_title,
+        figure_title_size,
+        group_title_size,
+        legend_label_size,
+        annotation_size,
+        colourmap,
+        colourbar,
+        colourbar_title,
+        colourbar_limit,
+        colourbar_title_size,
+        colourbar_label_size,
+        colourbar_label_pad,
+        colourbar_label_rotation,
+        colourmap_segmentation_limits,
+        by_experiment,
+        benchmark,
+        transpose,
+        equal_aspect,
+        figure_format,
+        data_format,
+        data_precision,
         geometry,
         origin_geometry_type,
         destination_geometry_type,
         origin_ids,
         destination_ids,
         margin_plot,
-        embedding_method,
-        n_bins,
-        nearest_neighbours,
-        distance_metric,
-        figure_format,
-        data_format,
-        data_precision,
-        figure_size,
-        legend_location,
-        legend_axis,
-        main_colourmap,
-        aux_colourmap,
-        colour_segmentation_limits,
-        main_colourbar_limit,
-        auxiliary_colourbar_limit,
-        linewidth,
-        opacity,
-        figure_title,
-        colourbar_title,
-        annotation_label,
-        axis_label_pad,
-        subaxis_label_pad,
-        colourbar_labelpad,
-        axis_label_rotation,
-        subaxis_label_rotation,
-        colourbar_label_rotation,
-        title_label_size,
-        legend_label_size,
-        annotation_label_size,
-        axis_label_size,
-        subaxis_label_size,
-        tick_label_size,
-        marker_size,
-        marker_frequency,
-        by_experiment,
-        benchmark,
-        annotate,
-        transpose,
-        colourbar,
-        equal_aspect,
+        # Additional axis-specific option
         x_group,
         y_group,
         z_group,
-        x_label,
-        y_label,
-        z_label,
-        x_limit,
-        y_limit,
-        z_limit,
         x_discrete,
         y_discrete,
         z_discrete,
         x_shade,
         y_shade,
         z_shade,
+        x_limit,
+        y_limit,
+        z_limit,
+        x_scale,
+        y_scale,
+        z_scale,
+        x_label,
+        y_label,
+        z_label,
+        x_label_size,
+        y_label_size,
+        z_label_size,
+        x_label_pad,
+        y_label_pad,
+        z_label_pad,
+        x_label_rotation,
+        y_label_rotation,
+        z_label_rotation,
         x_tick_frequency,
         y_tick_frequency,
         z_tick_frequency,
-        subx_tick_frequency,
-        suby_tick_frequency,
-        subz_tick_frequency,
+        x_tick_step_size,
+        y_tick_step_size,
+        z_tick_step_size,
+        x_tick_size,
+        y_tick_size,
+        z_tick_size,
         x_tick_pad,
         y_tick_pad,
         z_tick_pad,
