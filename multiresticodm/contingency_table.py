@@ -320,7 +320,7 @@ class ContingencyTable(object):
             if with_margins:
                 assert ndims(self) == 2
 
-                # Flip table for viz purposes (clear visibility)
+                # Flip table for viz purposes (clear opacity)
                 row_margin,col_margin = (0,),(1,)
                 if self.data.dims['destination'] >= self.data.dims['origin']:
                     table_constraints = table_constraints.T
