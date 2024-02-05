@@ -468,7 +468,7 @@ class Config:
                 else:
                     value = sweep[v]
                 # Add to key-value pair to unique sweep id
-                sweep_id.append(f"{str(v)}_{stringify(value,preffix='[',suffix=']')}")
+                sweep_id.append(f"{str(v)}_{stringify(value,preffix='[',suffix=']',scientific=False)}")
             # Join all grouped sweep vars into one sweep id 
             # which will be used to create an output folder
             if len(sweep_id) > 0:

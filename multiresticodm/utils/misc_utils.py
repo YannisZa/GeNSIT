@@ -654,10 +654,12 @@ def stringify_coordinate(d):
 
 def stringify(data,**kwargs):
     if isinstance(data,Iterable) and not isinstance(data,str) and len(data) > 0:
-        return kwargs.get('preffix','')+','.join([stringify(v) for v in data])+kwargs.get('suffix','')
+        return kwargs.get('preffix','')+ \
+            ','.join([stringify(v,**kwargs) for v in data])+ \
+            kwargs.get('suffix','')
     elif not data:
         return "none"
-    elif isinstance(data,numbers.Real):
+    elif isinstance(data,numbers.Real) and kwargs.get('scientific',True):
         try:
             assert np.isfinite(data)
         except:
@@ -667,9 +669,9 @@ def stringify(data,**kwargs):
         elif data > 100:
             return "{:.0e}".format(data)
         else:
-            return data
+            return str(data)
     else:
-        return f"{str(data)}"#.replace(' ','')
+        return str(data)#.replace(' ','')
 
 def unstringify(data):
     try:
@@ -977,10 +979,10 @@ def get_value(d:dict,k:str,default:object = None,apply_latex:bool=False):
     else:
         return value
 
-def hash_major_minor_var(hashmap:dict,data:list):
+def hash_major_minor_var(hashmap:dict,data:list,**kwargs):
     # Join major and minor ticks
-    major = stringify(data[0])
-    minor = stringify(data[1])
+    major = stringify(data[0],**kwargs)
+    minor = stringify(data[1],**kwargs)
     if minor and minor != 'none':
         # Apply hashmap
         return hashmap.get(f"({major},{minor})")
