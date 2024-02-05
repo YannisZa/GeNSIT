@@ -415,13 +415,13 @@ class Config:
         if settings is None:
             settings = self.settings
         
-        if not self.settings.get('sweep_mode',False):
+        if not settings.get('sweep_mode',False):
             return False
         
         # Try to find all sweep configs
         variable_key_paths = list(self.path_find(
             key = 'sweep',
-            settings = self.settings,
+            settings = settings,
             current_key_path = [],
             all_key_paths = []
         ))
@@ -468,7 +468,7 @@ class Config:
                 else:
                     value = sweep[v]
                 # Add to key-value pair to unique sweep id
-                sweep_id.append(f"{str(v)}_{stringify(value)}")
+                sweep_id.append(f"{str(v)}_{stringify(value,preffix='[',suffix=']')}")
             # Join all grouped sweep vars into one sweep id 
             # which will be used to create an output folder
             if len(sweep_id) > 0:
@@ -478,8 +478,11 @@ class Config:
         
         return sweep_id
     
-    def find_sweep_key_paths(self):
-        for key_val_path in deep_walk(self.settings):
+    def find_sweep_key_paths(self,settings:dict=None):
+        if settings is None:
+            settings = self.settings
+        
+        for key_val_path in deep_walk(settings):
 
             if "sweep" in key_val_path and "range" in key_val_path:
                 # Index location of sweep in key value path
@@ -488,7 +491,7 @@ class Config:
                 # Get sweep settings
                 sweep_settings,_ = self.path_get(
                     key_path = key_val_path[:(sweep_indx+1)],
-                    settings = self.settings
+                    settings = settings
                 )
                 # If the sweep setting is coupled add to coupled sweep paths
                 if sweep_settings.get('coupled',False) and len(sweep_settings.get('target_name','')) > 0:
@@ -504,7 +507,7 @@ class Config:
                         # Find first instance of target name
                         target_name_paths = list(self.path_find(
                             key = target_name,
-                            settings = self.settings,
+                            settings = settings,
                             current_key_path = [],
                             all_key_paths = []
                         ))
