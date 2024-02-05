@@ -1209,7 +1209,7 @@ class Outputs(object):
                 sample_data = list(sample_dict.values())[0]
                 # append array to data arrays
                 if sample_data is not None:
-                    data_arrs.append(sample_data)
+                    data_arrs.append(sample_data.astype(DATA_SCHEMA[sample_name]["dtype"]))
                 # add sample name to set of sample names loaded
                 sample_names_loaded.add(sample_name)
             except:
@@ -1859,7 +1859,7 @@ class DataCollection(object):
                 assert all([isinstance(datum,xr.DataArray) for datum in data])
 
                 # Update sample data collection
-                for datum in data:
+                for datum in tqdm(data, desc = 'Grouping Data Collection samples sequentially'):
                     self.group_sample(
                         datum,
                         group_by = kwargs.get('group_by',[])
@@ -1872,12 +1872,16 @@ class DataCollection(object):
                                 self,
                                 sample_name
                             )),
-                            total = len(getattr(self,sample_name))
+                            total = len(getattr(self,sample_name)),
+                            desc = 'Combining Data Collection group elements'
                         ):
                             getattr(
                                 self,
                                 sample_name
-                            )[i] = xr.combine_by_coords(datum,combine_attrs='drop_conflicts')
+                            )[i] = xr.combine_by_coords(
+                                datum,
+                                combine_attrs='drop_conflicts'
+                            )
             elif isinstance(data, dict):
                 # All items must be of type xarray data array
                 assert all([isinstance(datum,xr.DataArray) for datum in data.values()])
