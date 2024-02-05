@@ -367,6 +367,7 @@ class Outputs(object):
                 getattr(self.data,sample_name)[i] = samples[i]
                 # Slice the rest of sample data
                 for sam_name, current_samples in self.data_vars().items():
+                    # Do not reslice the data you just sliced!
                     if sam_name != sample_name:
                         # Slice sam_name's data
                         current_samples[i] = self.slice_coordinates_by_value(
@@ -448,15 +449,16 @@ class Outputs(object):
             except Exception as exc:
                 self.logger.debug(f"Slicing using {sample_name}[{i}] {coord_slice} failed with {exc}")
                 continue
+            # Make sure dataset is not empty
+            if da.size <= 0:
+                raise EmptyData(
+                    message = f"Slicing using {sample_name}[{i}] {coord_slice} yielded zero size dataset. Removing collection id {i}.",
+                    data_names = sample_name
+                )
             # Keep track of slices that succeded
             if str(coord_slice) not in successful_slices:
                 self.logger.success(f"Slicing using {coord_slice} succeded")
 
-        if da.size <= 0:
-            raise EmptyData(
-                message = f"Slicing using {sample_name}[{i}] {coord_slice} yielded zero size dataset. Removing collection id {i}.",
-                data_names = sample_name
-            )
         self.logger.progress(f"After coordinate slicing {sample_name}[{i}]: {({k:v for k,v in dict(da.sizes).items() if v > 1})}")
         
         return da
@@ -511,10 +513,17 @@ class Outputs(object):
             # Trim iterations
             iters = iters[:trimming]
             
+            # Make sure you do not slice the same variable twice!
+            try:
+                assert all([dim not in sliced_dims for dim in sliced_dims])
+            except:
+                self.logger.debug(f"Slicing {dim_names} has already been applied.")
+                # Unstack temp dim
+                samples = samples.unstack('temp_dim')
+                continue
+
             # Apply burnin, thinning and trimming to samples
             try:
-                # Make sure you do not slice the same variable twice!
-                assert all([dim not in sliced_dims for dim in sliced_dims])
                 # Slice based on index
                 sliced_samples = samples.isel(temp_dim = iters)
             except:
@@ -545,7 +554,7 @@ class Outputs(object):
         if any([samples.sizes[k] <= 0 for k in samples.dims]):
             raise EmptyData(
                 data_names = sample_name,
-                message = f"slicing {list(prev_iter.keys())} with shape {prev_iter} using {self.settings['burnin_thinning_trimming']}"
+                message = f"Slicing {list(prev_iter.keys())} with shape {prev_iter} using {self.settings['burnin_thinning_trimming']}"
             )
         
         return samples
@@ -791,7 +800,6 @@ class Outputs(object):
         
         # Stack sweep and iter dimensions
         self.stack_sweep_and_iter_dims(self)
-
 
 
     def load_single(self,sample_names:list = None, group_by:list = None, sweep:dict = None):
@@ -1860,10 +1868,14 @@ class DataCollection(object):
                 # Combine coords for each list element of the Data Collection
                 for sample_name in vars(self).keys():
                     if sample_name in DATA_SCHEMA:
-                        for i,datum in enumerate(getattr(
-                            self,
-                            sample_name
-                        )):
+                        for i,datum in tqdm(
+                            enumerate(getattr(
+                                self,
+                                sample_name
+                            )),
+                            total = len(getattr(self,sample_name)),
+                            disable = (self.logger.console.level <= 0)
+                        ):
                             getattr(
                                 self,
                                 sample_name
