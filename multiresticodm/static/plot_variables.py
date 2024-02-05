@@ -325,7 +325,6 @@ LATEX_RC_PARAMETERS = {
     'text.usetex': True,
     'font.family': 'serif',  # Choose your desired font family
     'font.serif': ['Times New Roman'],  # Choose your desired serif font
-    "text.latex.unicode": True,
     "pgf.rcfonts": False,
     'text.latex.preamble': LATEX_PREAMBLE,
 }
