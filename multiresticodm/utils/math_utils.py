@@ -392,3 +392,20 @@ def sample_mean(data,**kwargs):
         return data.mean()
     else:
         return data.mean(kwargs.get('dim',None))
+
+def signed_mean(data,signs,**kwargs):
+    # Compute moments
+    data,signs = xr.align(data,signs, join='exact')
+    numerator = data.dot(signs,dims = kwargs['dim'])
+    denominator = signs.sum(kwargs['dim'])
+    numerator,denominator = xr.align(numerator,denominator, join='exact')
+    return (numerator/denominator)
+
+def signed_var(data,signs,**kwargs):
+    # Compute mean
+    samples_mean = signed_mean(data,signs,**kwargs)
+    # Compute moments
+    numerator = (data**2).dot(signs,dims = kwargs['dim'])
+    denominator = signs.sum(kwargs['dim'])
+    numerator,denominator = xr.align(numerator,denominator, join='exact')
+    return (numerator/denominator - samples_mean**2)
