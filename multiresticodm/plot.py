@@ -1,16 +1,14 @@
 import os
-
 os.environ['USE_PYGEOS'] = '0'
+
+import matplotlib as mpl
+mpl.use('ps')
 import sys
 import traceback
 import seaborn as sns
 import geopandas as gpd
 import sklearn.manifold
 import scipy.stats as stats
-import matplotlib as mpl
-# Set-up PGF as the backend for saving a PDF
-from matplotlib.backends.backend_pgf import FigureCanvasPgf
-mpl.backend_bases.register_backend('pdf', FigureCanvasPgf)
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 
@@ -54,7 +52,7 @@ class Plot(object):
     def print_data(self,plot_setting:dict,local_vars:dict,plot_vars:list = None,index:int = None,summarise:bool = False):
         for v in ['x','y','marker_size','colour','line_width','opacity','hatch_opacity','zorder','annotate','line_style','label','marker','hatch']:
             if v not in plot_setting:
-                self.logger.warning(f"{v} not found in plot settings.")
+                self.logger.debug(f"{v} not found in plot settings.")
                 continue
             if plot_vars is None or v in plot_vars:
                 if index is None:
@@ -270,14 +268,20 @@ class Plot(object):
                 ticks[i]['data'] = sorted(ticks[i]['data'], key = lambda x: tuple([unstringify(x[di]) for di in range(D)]))
                 # print('sorted',ticks[i]['data'])
                 # Create string id over all &-separated dims in column 1
-                ticks[i]['data'] = np.array([stringify(td,scientific=True) for td in ticks[i]['data'] if td])
+                ticks[i]['data'] = np.array([
+                    stringify(
+                        td,
+                        scientific = self.settings.get(f"{var}_scientific",False)
+                    ) 
+                    for td in ticks[i]['data'] if td
+                ])
                 # print(tick_type,np.shape(ticks[i]['data']),ticks[i]['data'])
                 # Get unique tick string labels
                 unique_indices = np.unique(ticks[i]['data'], return_index=True)[1]
                 # Assert that there is at least one tick label
                 assert len(unique_indices) > 0
                 ticks[i]['unique'] = [ticks[i]['data'][ind] for ind in sorted(unique_indices)]
-                print(tick_type,'unique',ticks[i]['data'])
+                # print(tick_type,'unique',ticks[i]['data'])
                 # Make sure tick labels are repeated to match the length of the data
                 if (i+1) < len(ticks):
                     n_repetitions = len(ticks[i+1]['unique'])
@@ -285,7 +289,7 @@ class Plot(object):
                     n_repetitions = 1
                 # Repeat labels if required
                 ticks[i]['labels'] = ticks[i]['unique']*n_repetitions
-                print(var,'labels',ticks[i]['labels'])
+                # print(var,'labels',ticks[i]['labels'])
                 # Get tick locations
                 tick_start_loc = self.settings[tick_locator_var][i][0]
                 tick_step_loc = self.settings[tick_locator_var][i][1]
@@ -295,7 +299,7 @@ class Plot(object):
                     tick_end_loc,
                     tick_step_loc
                 )[:len(ticks[i]['labels'])]
-                print(var,'locations',tick_type,ticks[i]['locations'])
+                # print(var,'locations',tick_type,ticks[i]['locations'])
             except:
                 traceback.print_exc()
                 ticks[i]['unique'] = [None]
@@ -307,16 +311,18 @@ class Plot(object):
         hashmap = {}
         # Get major and minor unique ticks
         for major,minor in list(product(ticks[0]['unique'],ticks[1]['unique'])):
-            print(major,minor)
+            # print(major,minor)
             # First find major index (there should be only one)
-            major_index = ticks[0]['unique'].index(major)
+            major_index = ticks[0]['labels'].index(major)
             # Get tick location of minor if minor exists
             if minor:
                 # Second minor index (there should be only one)
-                minor_index = ticks[1]['unique'].index(minor)
+                minor_index = ticks[1]['labels'].index(minor)
                 # Use both to get the major tick location
-                # print(major_index,minor_index,len(ticks[0]['unique']),len(ticks[1]['unique']))
-                tick_location = major_index + minor_index*len(ticks[0]['unique']) + self.settings[tick_locator_var][0][0]
+                # print(major,minor,major_index,minor_index,len(ticks[0]['unique']),len(ticks[1]['unique']))
+                tick_location = major_index + \
+                    minor_index*len(ticks[0]['unique'])*self.settings[tick_locator_var][0][1] + \
+                    self.settings[tick_locator_var][0][0]
                 # print(tick_location)
                 # Create entry on hashmap
                 hashmap[f"({major},{minor})"] = tick_location
@@ -437,17 +443,25 @@ class Plot(object):
                     plot_settings = plot_settings
                 )
         
-        print(plot_settings['x'])
+        # print(plot_settings['x'])
         print(discrete_hashmaps['x'])
         # print(discrete_ticks['x'])
         
         # Extract data
-        x_range = list(map(lambda v: hash_major_minor_var(discrete_hashmaps['x'],v), plot_settings['x'])) \
-                if self.settings.get('x_discrete',False) \
-                else [dt[0] for dt in plot_settings['x']] # Keep only major axis data
-        y_range = list(map(lambda v: hash_major_minor_var(discrete_hashmaps['y'],v), plot_settings['y'])) \
-                if self.settings.get('y_discrete',False) \
-                else [dt[0] for dt in plot_settings['y']] # Keep only major axis data
+        x_range = list(map(lambda v: hash_major_minor_var(
+            discrete_hashmaps['x'],
+            v,
+            scientific=self.settings.get('x_scientific',False)
+        ), plot_settings['x'])) \
+        if self.settings.get('x_discrete',False) \
+        else [dt[0] for dt in plot_settings['x']] # Keep only major axis data
+        y_range = list(map(lambda v: hash_major_minor_var(
+            discrete_hashmaps['y'],
+            v,
+            scientific=self.settings.get('y_scientific',False)
+        ), plot_settings['y'])) \
+        if self.settings.get('y_discrete',False) \
+        else [dt[0] for dt in plot_settings['y']] # Keep only major axis data
         marker_size = plot_settings.get('marker_size',1.0)
         marker_size = [float(marker_size)] if not isinstance(marker_size,Iterable) else marker_size
         colour = plot_settings.get('colour','black')
@@ -585,9 +599,9 @@ class Plot(object):
                             f"{var}axis",
                             ax[r,c].xaxis
                         ).set_ticks(np.arange(
-                            self.settings[f"{var}_tick_locations"][0], 
+                            self.settings[f"{var}_tick_locations"][0][0], 
                             end,
-                            self.settings[f"{var}_tick_locations"][1]
+                            self.settings[f"{var}_tick_locations"][0][1]
                         ))
                         # Get tick label pad (spacing from axis)
                         tick_pad = self.settings[f"{var}_tick_pad"][0]
@@ -765,7 +779,6 @@ class Plot(object):
             
             # Ensure no duplicate entries in legend exist
             ax_handles, ax_labels = ax[axid].get_legend_handles_labels()
-            print(type(ax_handles),type(ax_labels))
             # Convert everything to numpy arrays
             ax_label_split = np.array([lab.split(', ') for lab in ax_labels],dtype='str')
 
@@ -781,10 +794,10 @@ class Plot(object):
                 ))
 
                 # Gather legend kwargs
-                bbox_to_anchor = self.settings.get('bbox_to_anchor',None)
                 leg_kwargs = {
-                    'bbox_to_anchor': bbox_to_anchor if not bbox_to_anchor else [bbta for bbta in bbox_to_anchor if bbta],
+                    'bbox_to_anchor': self.settings.get('bbox_to_anchor',None),
                     'ncols': self.settings.get('legend_cols',1),
+                    'columnspacing': self.settings.get('legend_col_spacing',1),
                     'loc': self.settings.get('legend_location','best')
                 }
                 print(leg_kwargs)
@@ -808,7 +821,10 @@ class Plot(object):
 
         
         # Tight layout
-        plt.tight_layout()
+        if self.settings.get('figure_format','pdf') == 'ps':
+            fig.tight_layout(rect=(0, 0, 0.8, 1))
+        else:
+            fig.tight_layout()
 
         # Write figure
         write_figure(
