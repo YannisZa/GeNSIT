@@ -519,6 +519,7 @@ for i,var in enumerate(PLOT_COORDINATES):
         # General axis-specific options
         click.option(f'--{var}_group', f'-{var}grp', default = [], show_default = False, callback = to_list, type = click.STRING, multiple = True, help = f'Sets {var} group (# groups corresponds to number of subplots). Each call corresponds to a different group/subplot.'),
         click.option(f'--{var}_discrete/--no-{var}_discrete', default = False, show_default = True, is_flag = True, help = f'Flag for whether {var} is discrete or not.'),
+        click.option(f'--{var}_scientific/--no-{var}_scientific', default = False, show_default = True, is_flag = True, help = f'Flag for whether {var} labels should be in scientific notation or not.'),
         click.option(f'--{var}_shade/--no-{var}_shade', f'-{var}sh', show_default = False, default = False, is_flag = True, help = f'Sets flag for whether to shade area between lines and {var}-axis.'),
         click.option(f'--{var}_limit', f'-{var}lim', default=[(None,None)], show_default = False, callback = to_list,
             type=(click.FLOAT, click.FLOAT), multiple = True, help = f'Sets {var} min/max limits for each group only if {var} is numerical. Every call corresponds to a different group.'),
@@ -597,9 +598,11 @@ def plot_coordinate_options(func):
 @click.option('--legend_location', '-loc', default='best', show_default = True,
               type=click.Choice(LEGEND_LOCATIONS), help = f'Sets the legend locations.')
 @click.option('--legend_cols', '-lc', default=1, show_default = True,
-              type=click.IntRange(min=1), help = f"Sets the legend's number of rows,columns.")
-@click.option('--bbox_to_anchor', '-bbta', default=None, show_default = True,
-              type=(click.FLOAT, click.FLOAT), help = f'Box that is used to position the legend in conjunction with legend_location.')
+              type=click.IntRange(min=1), help = f"Sets the legend's number of columns.")
+@click.option('--legend_col_spacing', '-lcs', default=1.0, show_default = True,
+              type=click.FloatRange(min=0.0), help = f"Sets the legend's spacing between columns.")
+@click.option('--bbox_to_anchor', '-bbta', default=None, show_default = True, multiple = True, callback = to_list,
+              type=click.FloatRange(min=0.0), help = f'Box that is used to position the legend in conjunction with legend_location.')
 @click.option('--legend_axis', '-la', default = None, show_default = True,
               type=(click.IntRange(0,None), click.IntRange(0,None)), help = f'Sets axis inside which to plot legend.')
 @click.option('--figure_title', '-ft', default = None, show_default = False,
@@ -640,7 +643,7 @@ def plot_coordinate_options(func):
 @click.option('--equal_aspect/--no-equal_aspect', default = False, is_flag = True, show_default = True,
               help = f'Flag for setting aspect ratio to equal or not.')
 @click.option('--figure_format', '-ff', default='pdf', show_default = True,
-              type = click.Choice(['eps', 'png', 'pdf']), help = f'Sets figure format.')#, case_sensitive = False)
+              type = click.Choice(['eps', 'png', 'pdf', 'ps']), help = f'Sets figure format.')#, case_sensitive = False)
 @click.option('--data_format', '-df', default='json', show_default = True,
               type = click.Choice(['dat', 'txt', 'json', 'csv']), help = f'Sets figure data format.')#, case_sensitive = False)
 @click.option('--data_precision', '-dp', default = 5, show_default = True,
@@ -715,6 +718,7 @@ def plot(
         figure_size,
         legend_location,
         legend_cols,
+        legend_col_spacing,
         bbox_to_anchor,
         legend_axis,
         figure_title,
@@ -751,6 +755,9 @@ def plot(
         x_discrete,
         y_discrete,
         z_discrete,
+        x_scientific,
+        y_scientific,
+        z_scientific,
         x_shade,
         y_shade,
         z_shade,
@@ -790,8 +797,10 @@ def plot(
     """
     # Gather all options in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
+    
     # Capitalise all single-letter arguments
     settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
+    
     # Add context arguments
     undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
 
@@ -800,6 +809,7 @@ def plot(
 
     # Update settings
     settings = update_settings(settings)
+    
     # Update number of workers
     set_threads(settings['n_threads'])
     
