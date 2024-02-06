@@ -157,18 +157,18 @@ RAW_EXPRESSIONS = {
     "_doubly_20%_cell_constrained":'$\\mathbf{T}_{+\\cdot},\\mathbf{T}_{\\cdot +},\\mathbf{T}_{\\mathcal{X}_2}$',
     "TotallyConstrained":'$\\Lambda_{++}$',
     "ProductionConstrained":'$\\boldsymbol{\\Lambda}_{+\\cdot}$',
-    "[dest_attraction_ts_likelihood_loss,table_likelihood_loss]":'$L\\left(\\mytable,\\myintensity,\\mathbf{x}; \\mathbf{y}, \\boldsymbol{\\sigma}_d\\right)$',
-    "[dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss,table_likelihood_loss]":'$L\\left(\\mytable,\\myintensity,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\myintenisty}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
-    "[dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss]":'$L\\left(\\myintensity,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\myintenisty}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
-    "[dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss,table_likelihood_loss]":'$L\\left(\\mytable,\\myintensity,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
-    "[dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss]":'$L\\left(\\mytable,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
-    "[table_likelihood_loss]":'$L\\left(\\mytable,\\myintensity\\right)$',
-    "[total_intensity_distance_likelihood_loss,table_likelihood_loss]":'$L\\left(\\mytable,\\myintensity; \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
-    "[total_intensity_distance_likelihood_loss]":'$L\\left(\\myintensity; \\mathbf{D}^{\\myintensity}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
-    "[total_intensity_distance_loss]":'$L\\left(\\myintensity; \\mathbf{D}^{\\myintensity}_{\cdot+}\\right)$',
-    "[total_table_distance_likelihood_loss,table_likelihood_loss]":'$L\\left(\\mytable,\\myintensity; \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
-    "[total_table_distance_likelihood_loss]":'$L\\left(\\mytable; \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
-    "[total_table_distance_loss]":'$L\\left(\\mytable; \\mathbf{D}^{\\mytable}_{\cdot+} \\right)$'
+    "['dest_attraction_ts_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity,\\mathbf{x}; \\mathbf{y}, \\boldsymbol{\\sigma}_d\\right)$',
+    "['dest_attraction_ts_likelihood_loss','total_intensity_distance_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\myintenisty}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
+    "['dest_attraction_ts_likelihood_loss','total_intensity_distance_likelihood_loss']":'$L\\left(\\myintensity,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\myintenisty}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
+    "['dest_attraction_ts_likelihood_loss','total_table_distance_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
+    "['dest_attraction_ts_likelihood_loss','total_table_distance_likelihood_loss']":'$L\\left(\\mytable,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
+    "['table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity\\right)$',
+    "['total_intensity_distance_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity; \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
+    "['total_intensity_distance_likelihood_loss']":'$L\\left(\\myintensity; \\mathbf{D}^{\\myintensity}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
+    "['total_intensity_distance_loss']":'$L\\left(\\myintensity; \\mathbf{D}^{\\myintensity}_{\cdot+}\\right)$',
+    "['total_table_distance_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity; \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
+    "['total_table_distance_likelihood_loss']":'$L\\left(\\mytable; \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
+    "['total_table_distance_loss']":'$L\\left(\\mytable; \\mathbf{D}^{\\mytable}_{\cdot+} \\right)$'
 }
 LABEL_EXPRESSIONS = {
     "sigma": '$\\sigma = '
@@ -298,20 +298,17 @@ LATEX_PREAMBLE = r'''
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{amssymb}
+\usepackage{amscd,dsfont}
+\usepackage{commath}
 \usepackage{xcolor}
 \usepackage{color}
 
-\newcommand{\skyblue}[1]{{\textcolor[HTML]{1E88E5}{#1}}}
-\newcommand{\deepred}[1]{{\textcolor[HTML]{E20000}{#1}}}
 \newcommand{\skyblue}[1]{{\textcolor[HTML]{1E88E5}{#1}}}
 \newcommand{\deepred}[1]{{\textcolor[HTML]{E20000}{#1}}}
 \newcommand{\myseagreen}[1]{{\textcolor[HTML]{2E8B57}{#1}}}
 \newcommand{\myorange}[1]{{\textcolor[HTML]{FFA500}{#1}}}
 \newcommand{\mydarkmagenta}[1]{{\textcolor[HTML]{8B008B}{#1}}}
 \newcommand{\mybrown}[1]{{\textcolor[HTML]{A52A2A}{#1}}}
-
-\newcommand{\mytable}{\skyblue{\mathbf{T}}}
-\newcommand{\myintensity}{\deepred{\boldsymbol{\Lambda}}}
 
 \newcommand{\frameworkname}{ConTINePI}
 \newcommand{\frameworkfullname}{\textbf{Con}strained \textbf{T}able \textbf{I}nference with \textbf{Ne}ural Calibration of a \textbf{P}hysics-Driven \textbf{I}ntensity}
@@ -332,12 +329,12 @@ LATEX_PREAMBLE = r'''
 \newcommand{\myintensitytotal}{\mydarkmagenta{\Lambda_{++}}}
 '''
 
+# "pgf.texsystem": "xelatex",
+# "pgf.rcfonts": False,
 LATEX_RC_PARAMETERS = {
-    "pgf.texsystem": "xelatex",
+    'font.serif': ['Times New Roman'],
+    'font.family': 'serif',
     'text.usetex': True,
-    'font.family': 'serif',  # Choose your desired font family
-    'font.serif': ['Times New Roman'],  # Choose your desired serif font
-    "pgf.rcfonts": False,
     'text.latex.preamble': LATEX_PREAMBLE,
 }
 
