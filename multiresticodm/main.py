@@ -535,7 +535,7 @@ for i,var in enumerate(PLOT_COORDINATES):
         click.option(f'--{var}_label_rotation', f'-{var}lr', default = 0, show_default = True,
             type = click.INT, help = f'Sets {var} axis label rotation.'),
         # Axis tick-specific options
-        click.option(f'--{var}_tick_locations', f'-{var}tl', callback=lambda ctx, param, value: to_list(ctx,param,value,nargs=2), multiple = True, default=[(0,1),(0,1)], show_default = True,
+        click.option(f'--{var}_tick_locations', f'-{var}tl', callback=lambda ctx, param, value: to_list(ctx,param,value,nargs=2), multiple = True, default=[None], show_default = True,
             type=(click.FloatRange(min=0),click.FloatRange(min=0)), help = f'First call is for the major {var}-axis and second is for minor {var}-axis. Each call has a tuple consisting of a starting point and a step size.'),
         click.option(f'--{var}_tick_size', f'-{var}ts', default = (13,10), show_default = True,
               type = (click.INT,click.INT), help = f'Sets {var} tick label size for minor and major axes (first and second arguments).'),
@@ -601,8 +601,10 @@ def plot_coordinate_options(func):
               type=click.IntRange(min=1), help = f"Sets the legend's number of columns.")
 @click.option('--legend_col_spacing', '-lcs', default=1.0, show_default = True,
               type=click.FloatRange(min=0.0), help = f"Sets the legend's spacing between columns.")
+@click.option('--legend_pad', '-lp', default=0.1, show_default = True,
+              type=click.FloatRange(min=0.0), help = f"Sets the legend's spacing between handlers and labels.")
 @click.option('--bbox_to_anchor', '-bbta', default=None, show_default = True, multiple = True, callback = to_list,
-              type=click.FloatRange(min=0.0), help = f'Box that is used to position the legend in conjunction with legend_location.')
+              type=click.FLOAT, help = f'Box that is used to position the legend in conjunction with legend_location.')
 @click.option('--legend_axis', '-la', default = None, show_default = True,
               type=(click.IntRange(0,None), click.IntRange(0,None)), help = f'Sets axis inside which to plot legend.')
 @click.option('--figure_title', '-ft', default = None, show_default = False,
@@ -719,6 +721,7 @@ def plot(
         legend_location,
         legend_cols,
         legend_col_spacing,
+        legend_pad,
         bbox_to_anchor,
         legend_axis,
         figure_title,
