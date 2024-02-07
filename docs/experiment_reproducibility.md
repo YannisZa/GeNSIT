@@ -122,7 +122,7 @@ clear; multiresticodm summarise \
 
 ```
 clear; multiresticodm plot 2d line --y_shade --y_group 'type' -y table_density -x density_eval_points \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 -et NonJointTableSIM_NN -et JointTableSIM_NN -et JointTableSIM_MCMC \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp1 -et JointTableSIM_MCMC -et NonJointTableSIM_NN -et JointTableSIM_NN \
 -el np -el ProbabilityUtils -el xr \
 -e table_density "xr.apply_ufunc(kernel_density,table_like_loss.groupby('sweep'),kwargs={'x':xs},exclude_dims=set(['id']),input_core_dims=[['id']],output_core_dims=[['id']])" \
 -e density_eval_points "xr.DataArray(xs)" \
@@ -134,20 +134,23 @@ clear; multiresticodm plot 2d line --y_shade --y_group 'type' -y table_density -
 -ea "table_like_loss=table_lossfn(table/table.sum(['origin','destination']),np.log(intensity/intensity.sum(['origin','destination'])))" \
 -btt 'iter' 100 100 1000 \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
--cs "~da.title.isin(['_unconstrained','_total_constrained','_total_intensity_row_table_constrained'])" \
--hchv 0.5 -hch sigma -c title -op 1.0 -msz 1 -l title -l sigma -or asc table_density_height -k sigma -k type -k title \
--ft 'figure1_table_like_loss_kernel_density' -xlab 'Table loss' \
--fs 6 10 -lls 8 -sals 12 -salr 90 -salp 2 -tls 7 -xlim 2.8 3.7 -la 0 0 -nw 20
+-cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
+-k sigma -k type -k title \
+-hchv 0.5 -hch sigma -c title -op 1.0 -msz 1 -l title -l sigma -or asc table_density_height \
+-ft 'figure1/table_like_loss_kernel_density' -ff ps \
+-xlab '$L\left(\mathbf{T},\boldsymbol{\Lambda}\right)$' -ylab 'Kernel density' \
 ```
 
 Load plot data and replot
 
 ```
-clear; multiresticodm plot 2d line --y_shade \
--pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp1/paper_figures/ \
--ft 'figure1_table_like_loss_kernel_density' -xlab '$L\left(\mathbf{T},\boldsymbol{\Lambda}\right)$' \
--fs 6 10 -lls 9 -sals 12 -salr 90 -tls 10 -xtr 0 0 -ytr 0 0 -xtp 3 3 -ytp 3 3 \
--xlim 3.6 3.7 -xlim 2.8 3.7 -xlim 3.6 3.7 -la 1 0 -loc 'upper left' -nw 20
+clear; multiresticodm plot 2d line --y_shade --y_group 'type' -y table_density -x density_eval_points \
+-pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp1/paper_figures/figure1/ \
+-ft 'figure1_table_like_loss_kernel_density' -ff ps \
+-xlab '$\mathcal{L}\left(\mytable,\myintensity\right)$' -ylab 'Kernel density' \
+-fs 6 10 -lls 9 -lp 0.5 -la 2 0 -lc 2 -loc 'lower center' -bbta 0.5 -bbta -0.8  \
+-ylr 90 -xts 12 12 -yts 12 12 -xtp 0 0 -ytp 0 0 -ylp 2 -xlp 1 \
+-xlim 2.8 3.7 -xlim 3.6 3.7 -xlim 3.6 3.7 -ylim 0 50 -ylim 0 500 -ylim 0 500 -nw 20
 ```
 
 ## Figure 2
@@ -185,9 +188,10 @@ Load plot data and replot
 ```
 clear; multiresticodm plot 2d scatter -y table_srmse -x type -x end --x_discrete \
 -pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp1/paper_figures/figure2/ \
--ft 'cumulative_srmse_and_cp_by_method' -ylab 'SRMSE$(\mathbb{E}[\mytable^{(1:N)}],\mytable^{\mathcal{D}})$' -xlab '(Method,$N$)' \
--fs 10 10 -la 0 0 -lc 2 -loc 'upper right' -bbta 1.0 -bbta 1.0 -lls 16 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 18 18 \
--xtr 75 0 -xtp 0 100 -ytl 0.2 -xtl 1 1 -xtl 2 3 -xlim 0 19 -ylim 0 2.1 -nw 20
+-fs 10 10 -ff ps -ft 'cumulative_srmse_and_cp_by_method' \
+-ylab 'SRMSE$\left(\mathbb{E}[\mytable^{(1:N)}],\mytable^{\mathcal{D}}\right)$' -xlab 'Method,$N$' \
+-la 0 0 -lc 2 -loc 'upper right' -bbta 1.0 -bbta 1.0 -lls 16 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 12 16 \
+-xtr 75 0 -xtp 0 102 -ytl 0.0 0.2 -xtl 1 1 -xtl 2 3 -xlim 0 19 -ylim 0 2.8 -nw 20
 ```
 
 DITTO for the intensity samples:
@@ -233,32 +237,25 @@ clear; multiresticodm plot 2d scatter -y table_srmse -x type -x 'N&ensemble_size
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
 -ea "srmse=MathUtils.srmse" -ea "coverage_probability=MathUtils.coverage_probability" -ea "roundint=MathUtils.roundint" \
 -ea "table_coverage=coverage_probability(prediction=table,ground_truth=ground_truth)" \
--cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
+-cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
 -cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
 -k sigma -k type -k name -k title -k N \
 -mrkr sigma -c title -msz table_coverage_probability_size -op 1.0 -or asc table_coverage_probability_size -l sigma -l title \
--fs 10 10 -ft 'figure3/exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
--ylim 0.0 2.2 -ylr 90 -xtp 0 120 -ytl 0.0 0.2 -ytl 0.0 0.0 -xtl 5 8 -xtl 5 8 -lls 8 -yts 18 18 -xts 18 18 -xts 18 18 \
--xtr 70 0 -xls 20 -yls 20 -xlim 0 100 -la 0 0 -lls 12 -loc 'center' -bbta 0.7 -bbta 0.5 -nw 20
-```
-
-```
--e intensity_srmse "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \
--ea intensity -ea sign \
--ea "signed_mean_func=outputs.compute_statistic" \
--ea "mean_intensity=signed_mean_func(intensity,'intensity','signedmean',dim=['id'])" \
--ea "mean_intensity=intensity.mean(['id'])" \
+-fs 10 10 -ff ps -ft 'figure3/exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
+-xlab 'Method, ($N$, Ensemble size)' -ylab 'SRMSE$\left(\mathbb{E}[\mytable^{(1:N)}],\mytable^{\mathcal{D}}\right)$' \
+-ylim 0.0 4.2 -ylr 90 -xtp 0 120 -ytl 0.0 0.2 -ytl 0.0 0.0 -xtl 5 8 -xtl 9 16 -lls 8 -yts 18 18 -xts 18 18 -xts 18 18 \
+-xtr 70 0 -xls 20 -yls 20 -xlim 0 124 -la 0 0 -lls 12 -loc 'upper left' -bbta 0.0 -bbta 0.0 -bbta 0.3 -bbta 1 -lc 3 -lcs 0.1 -lp 0.1 -nw 20
 ```
 
 Load plot data and replot
 
 ```
-clear; multiresticodm plot 2d scatter -y table_srmse -x type -x 'n_samples&ensemble_size' --x_discrete -gb seed  \
+clear; multiresticodm plot 2d scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
 -pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp2/paper_figures/figure3/ \
--fs 10 10 -ft 'exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' -ff ps \
+-fs 10 10 -ff ps -ft 'exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
 -xlab 'Method, ($N$, Ensemble size)' -ylab 'SRMSE$\left(\mathbb{E}[\mytable^{(1:N)}],\mytable^{\mathcal{D}}\right)$' \
--ylim 0.0 4.0 -ylr 90 -xtp 0 120 -ytl 0.0 0.2 -ytl 0.0 0.0 -xtl 5 8 -xtl 5 8 -lls 8 -yts 18 18 -xts 18 18 -xts 18 18 \
--xtr 70 0 -xls 20 -yls 20 -xlim 0 61 -la 0 0 -lls 12 -loc 'upper left' -bbta 0.0 -bbta 0.0 -bbta 0.3 -bbta 1 -lc 3 -lcs 0.1 -nw 20
+-ylim 0.0 4.2 -ylr 90 -xtp 0 80 -ytl 0.0 0.2 -ytl 0.0 0.0 -xtl 5 8 -xtl 9 16 -lls 8 -yts 18 18 -xts 18 18 -xts 18 18 \
+-xtr 70 0 -xls 20 -yls 20 -xlim 0 124 -la 0 0 -lls 12 -loc 'upper left' -bbta 0.0 -bbta 0.0 -bbta 0.3 -bbta 1 -lc 3 -lcs 0.1 -lp 0.1 -nw 20
 ```
 
 DITTO for the intensity samples:
@@ -276,7 +273,7 @@ clear; multiresticodm plot 2d scatter -y intensity_srmse -x type -x 'N&ensemble_
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
 -ea "srmse=MathUtils.srmse" -ea "coverage_probability=MathUtils.coverage_probability" -ea "roundint=MathUtils.roundint" \
 -ea "intensity_coverage=coverage_probability(prediction=intensity,ground_truth=ground_truth)" \
--cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
+-cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
 -cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
 -k sigma -k type -k name -k title -k N \
 -mrkr sigma -c title -msz intensity_coverage_probability_size -op 1.0 -or asc intensity_coverage_probability_size -l sigma -l title \
@@ -290,12 +287,11 @@ clear; multiresticodm plot 2d scatter -y intensity_srmse -x type -x 'N&ensemble_
 ```
 clear; multiresticodm plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp3 -et JointTableSIM_NN_SweepedNoise_01_02_2024_14_55_23 \
--el np -el MathUtils -el MiscUtils -el xr \
+-el 'np.exp' -el 'MathUtils.srmse' -el 'MathUtils.coverage_probability' -el 'xr.apply_ufunc' -el 'MathUtils.srmse' \
 -e table_coverage_probability_size "xr.apply_ufunc(lambda x: np.exp(6*x), coverage_probability(prediction=table,ground_truth=ground_truth).mean(['origin','destination']))" \
 -e table_srmse "srmse(prediction=table.mean(['id']),ground_truth=ground_truth)" \
 -ea table \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
--ea "srmse=MathUtils.srmse" -ea "coverage_probability=MathUtils.coverage_probability" \
 -k sigma -k type -k name -k title -k loss_name \
 -cs "~da.loss_name.isin([str(['total_table_distance_loss','total_intensity_distance_loss'])])" \
 -cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
