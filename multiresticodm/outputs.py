@@ -556,9 +556,8 @@ class Outputs(object):
             else:
                 # Success - samples were sliced
                 for d in dim_names: 
-                    sliced_dims[d] = sliced_dims[d].setdefault(d,{})
                     if d not in sliced_dims:
-                        sliced_dims[d] = {"slice_setts":slice_setts,"new_shape":({k:v for k,v in dict(samples.sizes).items() if v > 1})}
+                        sliced_dims[d] = {"slice_settings":slice_setts,"new_shape":({k:v for k,v in dict(samples.sizes).items() if v > 1})}
                 # Update current samples to be the sliced samples
                 samples = sliced_samples
 
@@ -2360,7 +2359,7 @@ class OutputSummary(object):
             folder = os.path.join(outputs.outputs_path),
             **useful_metadata
         )
-
+        
         # Return all data as list of dictionaries
         return expression_data_df.to_dict('records')
 
@@ -2674,13 +2673,10 @@ class OutputSummary(object):
                     data = [evaluation]
                 # Add data to every existing sweep
                 for sweep_id in evaluation_data.keys():
-                    for datum in data:
-                        if operation_name in evaluation_data[sweep_id]:
-                            evaluation_data[sweep_id]
-                        else:
-                            evaluation_data[sweep_id].update({
-                                operation_name:datum
-                            })
+                    if operation_name in evaluation_data[sweep_id]:
+                        evaluation_data[sweep_id][operation_name].append(data)
+                    else:
+                        evaluation_data[sweep_id].update({operation_name:data})
 
         return list(evaluation_data.values())
         
