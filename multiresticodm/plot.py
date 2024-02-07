@@ -207,11 +207,17 @@ class Plot(object):
                 else:
                     # If var is not discrete read only major axis data, i.e. axis 0
                     if isinstance(plot_settings[var],Iterable):
-                        min_val = min(np.nanmin([dt[0] for dt in plot_settings[var]]),min_val)
+                        try:
+                            min_val = min(np.nanmin(np.ravel(plot_settings[var])),min_val)
+                        except:
+                            min_val = min(np.nanmin(np.ravel([dt[0] for dt in plot_settings[var]])),min_val)
                     else:
                         min_val = min(plot_settings[var],min_val)
                     if isinstance(plot_settings[var],Iterable):
-                        max_val = max(np.nanmax([dt[0] for dt in plot_settings[var]]),max_val)
+                        try:
+                            max_val = max(np.nanmax(np.ravel(plot_settings[var])),max_val)
+                        except:
+                            max_val = max(np.nanmax(np.ravel([dt[0] for dt in plot_settings[var]])),max_val)
                     else:
                         max_val = max(plot_settings[var],max_val)
                 
@@ -234,7 +240,7 @@ class Plot(object):
 
         return axes_lims[axes_id]
     
-    def get_discrete_ticks(self,plot_settings,var:str,tick_locator_var:str):
+    def get_discrete_ticks(self,plot_settings,var:str,tick_locator_var:str=None):
         # All ticks (element 0 for major and element 1 for minor)
         ticks = [
             {
@@ -254,6 +260,7 @@ class Plot(object):
         # For each subtick (one for major and one for minor ticks)
         for i, tick_type in reversed(list(enumerate(['major','minor']))):
             try:
+                # print(var,i,len(plot_settings[var]),len(plot_settings[var][0]))
                 # Get major or minor ticks
                 ticks[i]['data'] = [v[i] for v in plot_settings[var]]
                 # print(var,tick_type,ticks[i]['data'])
@@ -281,6 +288,7 @@ class Plot(object):
                 # Assert that there is at least one tick label
                 assert len(unique_indices) > 0
                 ticks[i]['unique'] = [ticks[i]['data'][ind] for ind in sorted(unique_indices)]
+                # Stringify and latex if required
                 # print(tick_type,'unique',ticks[i]['data'])
                 # Make sure tick labels are repeated to match the length of the data
                 if (i+1) < len(ticks):
@@ -290,46 +298,66 @@ class Plot(object):
                 # Repeat labels if required
                 ticks[i]['labels'] = ticks[i]['unique']*n_repetitions
                 # print(var,'labels',ticks[i]['labels'])
+                
                 # Get tick locations
-                tick_start_loc = self.settings[tick_locator_var][i][0]
-                tick_step_loc = self.settings[tick_locator_var][i][1]
-                tick_end_loc = tick_start_loc + len(ticks[i]['labels'])*tick_step_loc
-                ticks[i]['locations'] = np.arange(
-                    tick_start_loc,
-                    tick_end_loc,
-                    tick_step_loc
-                )[:len(ticks[i]['labels'])]
+                if self.settings.get(tick_locator_var,None):
+                    tick_start_loc = self.settings[tick_locator_var][i][0]
+                    tick_step_loc = self.settings[tick_locator_var][i][1]
+                    tick_end_loc = tick_start_loc + len(ticks[i]['labels'])*tick_step_loc
+                    ticks[i]['locations'] = np.arange(
+                        tick_start_loc,
+                        tick_end_loc,
+                        tick_step_loc
+                    )[:len(ticks[i]['labels'])]
                 # print(var,'locations',tick_type,ticks[i]['locations'])
-            except:
+            except IndexError:
                 traceback.print_exc()
                 ticks[i]['unique'] = [None]
                 pass
+            except Exception:
+                traceback.print_exc()
+                sys.exit()
             # Remove data from ticks
             ticks[i].pop('data')
         
         # Second, create a hashmap
         hashmap = {}
+        # print(self.settings[tick_locator_var])
         # Get major and minor unique ticks
         for major,minor in list(product(ticks[0]['unique'],ticks[1]['unique'])):
-            # print(major,minor)
             # First find major index (there should be only one)
-            major_index = ticks[0]['labels'].index(major)
+            major_index = ticks[0]['unique'].index(major)
             # Get tick location of minor if minor exists
             if minor:
                 # Second minor index (there should be only one)
-                minor_index = ticks[1]['labels'].index(minor)
+                minor_index = ticks[1]['unique'].index(minor)
                 # Use both to get the major tick location
                 # print(major,minor,major_index,minor_index,len(ticks[0]['unique']),len(ticks[1]['unique']))
-                tick_location = major_index + \
-                    minor_index*len(ticks[0]['unique'])*self.settings[tick_locator_var][0][1] + \
+                # tick_location = major_index + \
+                #     minor_index*len(ticks[0]['unique'])*self.settings[tick_locator_var][0][1] + \
+                #     self.settings[tick_locator_var][0][0]
+                tick_location = minor_index*self.settings[tick_locator_var][1][1] + \
+                    major_index*self.settings[tick_locator_var][0][1] + \
                     self.settings[tick_locator_var][0][0]
                 # print(tick_location)
                 # Create entry on hashmap
-                hashmap[f"({major},{minor})"] = tick_location
+                hashmap[stringify(
+                    [major,minor],
+                    scientific = self.settings.get(f"{var}_scientific",False)
+                )] = tick_location
             else:
                 # If there is no minor tick then the location is simply the 
                 # major's first (and only location)
-                hashmap[f"({major})"] = major_index + self.settings[tick_locator_var][0][0]
+                if self.settings.get(tick_locator_var,None):
+                    hashmap[stringify(
+                        major,
+                        scientific = self.settings.get(f"{var}_scientific",False)
+                    )] = major_index + self.settings[tick_locator_var][0][0]
+                else:
+                    hashmap[stringify(
+                        major,
+                        scientific = self.settings.get(f"{var}_scientific",False)
+                    )] = major_index
                 # Delete minor ticks from list
                 if len(ticks) == 2:
                     ticks.pop()
@@ -347,14 +375,20 @@ class Plot(object):
                 # Get current group
                 if index < len(plot_settings.get(f"{var}_group")): 
                     # print(plot_settings.get(f"{var}_group"))
-                    group_id = plot_settings.get(f"{var}_group")[index]
-                    # print(group_id)
+                    # Get group id and stringify it
+                    # print(plot_settings.get(f"{var}_group")[index])
+                    group_id = stringify(
+                        plot_settings.get(f"{var}_group")[index],
+                        scientific = self.settings.get(f"{var}_scientific",False)
+                    )
+                    # print(var,group_id)
                     # Get index of group id
-                    if group_id in group_hashmap:
-                        axes[var] = group_hashmap[stringify(group_id)]
+                    if group_id in group_hashmap[var]:
+                        axes[var] = group_hashmap[var][group_id]
             # Set axes to zero if no group was found
             if var not in axes:
                 axes[var] = 0
+            # print(axes[var])
         return axes
 
     '''
@@ -415,9 +449,9 @@ class Plot(object):
                 # Get group hashmap
                 _,group_hashmap[var] = self.get_discrete_ticks(
                     var = var+'_group',
-                    tick_locator_var = f"{var}_tick_locations",
                     plot_settings = plot_settings
                 )
+                print(var,group_hashmap[var])
         # Store whether subplots will be created
         subplots_exist = any([v for v in group_hashmap.values()])
         
@@ -427,7 +461,7 @@ class Plot(object):
         counter = 0
         # Set ticks
         for r in range(max(len(group_hashmap['y']),1)):
-            for c in range(max(len(group_hashmap['y']),1)):
+            for c in range(max(len(group_hashmap['x']),1)):
                 self.axids[(r,c)] = counter
                 counter += 1
 
@@ -444,7 +478,8 @@ class Plot(object):
                 )
         
         # print(plot_settings['x'])
-        print(discrete_hashmaps['x'])
+        # print(discrete_hashmaps['x'])
+        # print(group_hashmap)
         # print(discrete_ticks['x'])
         
         # Extract data
@@ -454,14 +489,14 @@ class Plot(object):
             scientific=self.settings.get('x_scientific',False)
         ), plot_settings['x'])) \
         if self.settings.get('x_discrete',False) \
-        else [dt[0] for dt in plot_settings['x']] # Keep only major axis data
+        else [dt[0] for dt in plot_settings['x']] # keep only major axis data
         y_range = list(map(lambda v: hash_major_minor_var(
             discrete_hashmaps['y'],
             v,
             scientific=self.settings.get('y_scientific',False)
         ), plot_settings['y'])) \
         if self.settings.get('y_discrete',False) \
-        else [dt[0] for dt in plot_settings['y']] # Keep only major axis data
+        else [dt[0] for dt in plot_settings['y']] # keep only major axis data
         marker_size = plot_settings.get('marker_size',1.0)
         marker_size = [float(marker_size)] if not isinstance(marker_size,Iterable) else marker_size
         colour = plot_settings.get('colour','black')
@@ -487,20 +522,22 @@ class Plot(object):
         hatch = plot_settings.get('hatch','')
         hatch = [hatch] if isinstance(hatch,str) else hatch
 
-
-        # print(x_range)
         # print(y_range)
+        # print(x_range)
 
-        # Write figure data
-        write_figure_data(
-            [plot_settings],
-            filepath = filepath,
-            key_type={'x':'float','y':'float'},
-            aux_keys = PLOT_VARIABLES_AND_DERIVATIVES+['outputs'],
-            **self.settings,
-            print_data = False
-        )
-        self.logger.success(f"Figure data exported to {dirpath}")
+        if not self.loaded:
+            # Write figure data
+            write_figure_data(
+                [plot_settings],
+                filepath = filepath,
+                key_type={'x':'float','y':'float'},
+                aux_keys = PLOT_VARIABLES_AND_DERIVATIVES+['outputs'],
+                **self.settings,
+                print_data = False
+            )
+            self.logger.success(f"Figure data exported to {dirpath}")
+        else:
+            self.logger.success(f"Figure data has already been exported from {dirpath}. No need to export them again.")
         
 
         # Figure size 
@@ -585,8 +622,8 @@ class Plot(object):
                             f"{var}axis",
                             ax[r,c].xaxis
                         ).remove_overlapping_locs = False
-                    # Set tick parameters for continuous ticks
-                    else:
+                    # Set tick parameters for continuous ticks if there are properly specified
+                    if self.settings[f"{var}_tick_locations"] and self.settings[f"{var}_tick_locations"][0]:
                         # Read axis limits
                         start, end = getattr(
                             ax[r,c],
@@ -603,34 +640,39 @@ class Plot(object):
                             end,
                             self.settings[f"{var}_tick_locations"][0][1]
                         ))
-                        # Get tick label pad (spacing from axis)
-                        tick_pad = self.settings[f"{var}_tick_pad"][0]
-                        # Get tick label rotation degrees
-                        tick_rotation = self.settings[f"{var}_tick_rotation"][0]
-                        # Get tick label size
-                        tick_size = self.settings[f"{var}_tick_size"][0]
-                        ax[r,c].tick_params(
-                            axis = var, 
-                            which = 'both',
-                            pad = tick_pad,
-                            bottom = True,
-                            labelsize = tick_size,
-                            rotation = tick_rotation
-                        )
+                    tick_params = {
+                        "pad": self.settings[f"{var}_tick_pad"][0] if self.settings[f"{var}_tick_pad"] else None,
+                        "labelsize": self.settings[f"{var}_tick_size"][0] if self.settings[f"{var}_tick_size"] else None,
+                        "rotation": self.settings[f"{var}_tick_rotation"][0] if self.settings[f"{var}_tick_rotation"] else None
+                    }
+                    ax[r,c].tick_params(
+                        axis = var, 
+                        which = 'both',
+                        bottom = True,
+                        **tick_params
+                    )
 
         # Keep track of each group's axes limits
         group_axes_limits = {}
         group_axes_data = {}
+        
+        heights = []
         # Loop over sweeps
         for sid in range(len(y_range)):
-            
+            heights.append((str(max(y_range[sid]))))
+        # zorders = np.zeros(len(heights))
+        # for i,j in enumerate(np.argsort(heights)):
+        #     zorders[j] = 40 - i
+
+        # Loop over sweeps
+        for sid in range(len(y_range)):
             # Get axes id 
             axes_id = self.map_groups_to_axes(
                 index = sid,
                 plot_settings = plot_settings,
                 group_hashmap = group_hashmap
             )
-            axes_id = tuple([axes_id[var] for var in ['y','x']])
+            axes_id = tuple([int(axes_id[var]) for var in ['y','x']])
             
             # Initialise group axes data (if required)
             group_axes_data.setdefault(axes_id,{})
@@ -675,7 +717,6 @@ class Plot(object):
                 if group_axes_data[axes_id]['hatch_opacity'] \
                 else (group_axes_data[axes_id]['facecolor'],group_axes_data[axes_id]['hatch_opacity'])
             
-
             # Plot x versus y
             self.plot_wrapper(
                 ax = ax[axes_id],
@@ -699,7 +740,7 @@ class Plot(object):
                     x = group_axes_data[axes_id]['x'],
                     y1 = 0,
                     y2 = group_axes_data[axes_id]['y'],
-                    **{
+                    **{ 
                         k:v for k,v in group_axes_data[axes_id].items()
                         if k in ['facecolor', 'edgecolor', 'zorder', 'hatch', 'label', 'alpha']
                     }
@@ -729,21 +770,20 @@ class Plot(object):
                 discrete_hashmaps = discrete_hashmaps
             )
 
-            
-
         # Set local group axes limits, label etc..
         for r in range(max(len(group_hashmap['y']),1)):
             for c in range(max(len(group_hashmap['x']),1)):
-                for var in  ['x','y']:
-                    # Set axis limits for var that is grouped
-                    getattr(
-                        ax[r,c],
-                        f"set_{var}lim",
-                        ax[r,c].set_ylim
-                    )(
-                        group_axes_limits[(r,c)][var][0], 
-                        group_axes_limits[(r,c)][var][1]
-                    )
+                for var in ['x','y']:
+                    if var in group_axes_limits[(r,c)]:
+                        # Set axis limits for var that is grouped
+                        getattr(
+                            ax[r,c],
+                            f"set_{var}lim",
+                            ax[r,c].set_ylim
+                        )(
+                            group_axes_limits[(r,c)][var][0], 
+                            group_axes_limits[(r,c)][var][1]
+                        )
                     # Set axis scaling
                     if self.settings.get(f"{var}_scale",''):
                         getattr(
@@ -776,48 +816,51 @@ class Plot(object):
         handles, label, label_split = [],[],[]
         # Find each label from each plot
         for axid in self.axids.keys():
-            
             # Ensure no duplicate entries in legend exist
             ax_handles, ax_labels = ax[axid].get_legend_handles_labels()
             # Convert everything to numpy arrays
-            ax_label_split = np.array([lab.split(', ') for lab in ax_labels],dtype='str')
-
-            # If no legend axis specified
-            # Create a legend for each axis
-            if self.settings['legend_axis']:
-                # Sort label first by first label, then by second etc.
-                index_sorted = np.lexsort(ax_label_split.T)
-                # Create dictionary of label
-                by_label = dict(zip(
-                    np.array(ax_labels)[index_sorted].tolist(), 
-                    np.array(ax_handles)[index_sorted].tolist()
-                ))
-
-                # Gather legend kwargs
-                leg_kwargs = {
-                    'bbox_to_anchor': self.settings.get('bbox_to_anchor',None),
-                    'ncols': self.settings.get('legend_cols',1),
-                    'columnspacing': self.settings.get('legend_col_spacing',1),
-                    'loc': self.settings.get('legend_location','best')
-                }
-                print(leg_kwargs)
-                # Remove nulls 
-                leg_kwargs = {k:v for k,v in leg_kwargs.items() if v}
-                # If more than one column are provided split legend patches and keys
-                # into sublists of length ncols
-                leg = ax[axid].legend(
-                    flip(list(by_label.values()), self.settings.get('legend_cols',1)), 
-                    flip(list(by_label.keys()), self.settings.get('legend_cols',1)),
-                    frameon = False,
-                    prop = {'size': self.settings.get('legend_label_size',None)},
-                    **leg_kwargs
-                )
-                leg._ncol = 1
+            ax_label_split = [lab.split(', ') for lab in ax_labels]
             
             # Add legend handles and labels to list
-            handles.append(ax_handles)
-            label_split.append(ax_label_split)
-            label.append(ax_labels)
+            handles += ax_handles
+            label_split += ax_label_split
+            label += ax_labels
+        
+        # Create a legend for specific or all axes
+        plot_legend = self.settings['legend_axis'] in list(self.axids.keys())
+        if plot_legend:
+            label_split = np.array(label_split,dtype='str')
+            # Sort label first by first label, then by second etc.
+            index_sorted = np.lexsort(label_split.T)
+            # Do not worry about duplicates. These will be handled here
+            # Create dictionary of label
+            by_label = dict(zip(
+                np.array(label)[index_sorted].tolist(), 
+                np.array(handles)[index_sorted].tolist()
+            ))
+
+            # Gather legend kwargs
+            leg_kwargs = {
+                'bbox_to_anchor': self.settings.get('bbox_to_anchor',None),
+                'ncols': self.settings.get('legend_cols',1),
+                'columnspacing': self.settings.get('legend_col_spacing',1),
+                'handletextpad': self.settings.get('legend_pad',0.1),
+                'loc': self.settings.get('legend_location','best')
+            }
+            print(leg_kwargs)
+            # Remove nulls 
+            leg_kwargs = {k:v for k,v in leg_kwargs.items() if v}
+            # If more than one column are provided split legend patches and keys
+            # into sublists of length ncols
+            leg = ax[axid].legend(
+                flip(list(by_label.values()), self.settings.get('legend_cols',1)), 
+                flip(list(by_label.keys()), self.settings.get('legend_cols',1)),
+                frameon = False,
+                prop = {'size': self.settings.get('legend_label_size',None)},
+                **leg_kwargs
+            )
+            leg._ncol = 1
+        
 
         
         # Tight layout
@@ -867,13 +910,11 @@ class Plot(object):
                             default = DATA_SCHEMA.get(group_var,{}).get('default',value),
                             apply_latex = (var in LATEX_COORDINATES)
                         )
-                        # print(group_var,var_value,type(var_value))
                     # Data not found
                     else:
                         self.logger.error(f"Could not find {var} data for {group_var} var.")
                         return None
                     # TODO: Fix the fact that default sigma is none and not learned
-                    # print(group_var)
 
                     # Convert coordinate to list
                     if isinstance(var_value,Iterable) and \
@@ -889,7 +930,7 @@ class Plot(object):
                             grp_values.append(var_value)
                     else:
                         grp_values = var_value
-                    
+    
                 # Combine all sub-variable values iff they are not part of the core coordinates
                 if len(grp) > 1 and var not in (PLOT_COORDINATES+PLOT_COORDINATE_DERIVATIVES):
                     # If more than one variables are provided for this coordinate
@@ -1051,7 +1092,7 @@ class Plot(object):
                     
         return var_values
 
-    def merge_plot_settings(self,plot_settings:list):
+    def merge_plot_settings(self,plot_settings:list,apply_zorder:bool=True):
         merged_settings = {}
         # Iterate through the list of dictionaries
         if len(plot_settings) > 1:
@@ -1063,14 +1104,13 @@ class Plot(object):
                         # Append squeezed version of data
                         merged_settings.setdefault(key, []).append([])
                         continue
-                    if key in (PLOT_VARIABLES+PLOT_COORDINATE_DERIVATIVES):
+                    if key in (PLOT_VARIABLES+PLOT_AUX_COORDINATES+PLOT_COORDINATE_DERIVATIVES):
                         if isinstance(value,Iterable) and not isinstance(value,str):
                             # x,y,z vary across both major/minor axes AND &-separated dimensions
                             # so do NOT squeeze them
                             data = value if isinstance(value,list) else value.tolist()
                         else: 
                             data = value
-                        # print(key,data)
                         # Append squeezed version of data
                         merged_settings.setdefault(key, []).append(data)
                     else:
@@ -1080,34 +1120,41 @@ class Plot(object):
                             merged_settings[key] = value
             
             # print_json(merged_settings,newline=True)
+            # print(merged_settings['y_group'])
         else:
             merged_settings = plot_settings[0]
-                
-        # Create ordering of data points based on provided data
-        if 'zorder' in merged_settings:
-            # get value to order by
-            values = np.array(merged_settings['zorder'])
-            if len(values.shape) > 1:
-                # Number of elements to sort
-                ndims = values.shape[1]
-                # Use lexsort to argsort along each axis successively
-                sorted_indices = np.lexsort([values[:,i].ravel() for i in range(ndims)])
-            else:
-                sorted_indices = np.argsort(values)
-            # Update merged settings
-            # add 1.0 to avoid zorder = 0
-            merged_settings['zorder'] = list(map(float,sorted_indices+1.0))
-            # print(values)
-            # print(merged_settings['zorder'])
+        
+        if apply_zorder:
+            # print(merged_settings['y_group'])
+            # Create ordering of data points based on provided data
+            if 'zorder' in merged_settings:
+                # get value to order by
+                values = np.array(merged_settings['zorder'])
+                if len(values.shape) > 1:
+                    # Number of elements to sort
+                    ndims = values.shape[1]
+                    # Use lexsort to argsort along each axis successively
+                    sorted_indices = np.lexsort([values[:,i].ravel() for i in range(ndims)])
+                else:
+                    sorted_indices = np.argsort(values)
+                # Update merged settings
+                # add 1.0 to avoid zorder = 0
+                merged_settings['zorder'] = list(map(float,sorted_indices+1.0))
+                # print(values)
+                # print(merged_settings['zorder'])
 
         # Remove nulls from certain data
-        for key,value in merged_settings.items():
-            # All variable groups should NOT contain nulls
-            if key in PLOT_AUX_COORDINATES:
+        for key in PLOT_AUX_COORDINATES:
+            if key in merged_settings:
+                value = deepcopy(merged_settings[key])
+                # All variable groups should NOT contain nulls
                 if isinstance(value,Iterable) and \
                     not isinstance(value,str):
-                  merged_settings[key] = [v for subv in v for v in value if v and subv]
-            # if key in PLOT_COORDINATES:
+                    # All groups must list of lists (2d lists)
+                    # contrary to x,y,z which can (nonhomogeneous lists of 2d lists)
+                    merged_settings[key] = [list(flatten(v)) for v in value if v]
+                elif value:
+                    merged_settings[key] = [value]
                 # print(key,merged_settings[key])
 
         return [merged_settings]
@@ -1245,9 +1292,9 @@ class Plot(object):
         self.logger.info('Running data_plot')
     
         # Try to load plot data from file
-        loaded, plot_settings = self.read_plot_data()
+        self.loaded, plot_settings = self.read_plot_data()
         
-        if not loaded:
+        if not self.loaded:
 
             # Run output handler
             outputs_summary = OutputSummary(
@@ -1297,7 +1344,10 @@ class Plot(object):
                         # Merge all settings into one
                         # Plot
                         plot_func(
-                            plot_settings = self.merge_plot_settings(plot_settings),
+                            plot_settings = self.merge_plot_settings(
+                                plot_settings,
+                                apply_zorder = (not self.loaded)
+                            ),
                             dirpath = dirpath,
                             filename = filename
                         )
@@ -1319,14 +1369,20 @@ class Plot(object):
                 )
                 # Plot
                 plot_func(
-                    plot_settings = self.merge_plot_settings(plot_settings),
+                    plot_settings = self.merge_plot_settings(
+                        plot_settings,
+                        apply_zorder = (not self.loaded)
+                    ),
                     name = self.settings.get('title','NONAME'),
                     dirpath = dirpath,
                     filename = filename
                 )
         else:
             # Merge plot settings
-            merged_plot_settings = self.merge_plot_settings(plot_settings)
+            merged_plot_settings = self.merge_plot_settings(
+                plot_settings,
+                apply_zorder = (not self.loaded)
+            )
             # Create output dirpath and filename
             dirpath,filename = self.create_plot_filename(
                 plot_setting = merged_plot_settings[0],
