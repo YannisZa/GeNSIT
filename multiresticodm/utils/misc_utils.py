@@ -985,10 +985,16 @@ def hash_major_minor_var(hashmap:dict,data:list,**kwargs):
     minor = stringify(data[1],**kwargs)
     if minor and minor != 'none':
         # Apply hashmap
-        return hashmap.get(f"({major},{minor})")
+        return hashmap.get(stringify(
+            [major,minor],
+            **kwargs
+        ))
     else:
         # Apply hashmap
-        return hashmap.get(f"({major})")
+        return hashmap.get(stringify(
+            major,
+            **kwargs
+        ))
 
 def get_keys_in_path(d, target_key, path=[], paths_found = []):
     for key, value in d.items():
