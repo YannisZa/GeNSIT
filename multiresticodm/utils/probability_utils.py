@@ -353,10 +353,12 @@ def sample_multinomial_row(i,msum,margin_probabilities,free_cells,axis_uncostrai
     # Update free cells
     return updated_cells.to(device = device,dtype = float32)
 
+
 def kernel_density(y,**kwargs):
     # Kernel density estimation
     density = gaussian_kde(y)
-    density.covariance_factor = lambda : kwargs.get('cov',0.25)
+    density.set_bandwidth(bw_method=kwargs.get('bandwidth',density.factor))
+    # density.covariance_factor = lambda : kwargs.get('cov',0.25)
     density._compute_covariance()
     
     res = density(kwargs['x'])
