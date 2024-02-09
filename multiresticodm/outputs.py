@@ -255,6 +255,20 @@ class Outputs(object):
             )
 
         return self_copy
+
+    def pop(self):
+        if len(self.data) > 0:
+            # Get first element of data
+            self_copy = self.get(0)
+            # Delete it from data
+            safe_delete(self.data[0])
+            # Collect garbage
+            gc.collect()
+            # Sleep for three seconds
+            time.sleep(1)
+            return self_copy
+        else:
+            self.logger.warning(f"No data found to pop.")
     
 
     def strip_data(self,keep_inputs:list=[],keep_outputs:list=[],keep_collection_ids:list=[]):
@@ -388,10 +402,8 @@ class Outputs(object):
                 
             # Remove collection ids that are not matching coordinate slice
             kept_collection_ids = set(list(range(self.data.size()))).difference(removed_collection_ids)
-            self.logger.info(f"""
-                {len(kept_collection_ids)} collection ids kept out of {self.data.size()}.
-                Kept ids: {list(sorted(kept_collection_ids))}
-            """)
+            self.logger.info(f"""{len(kept_collection_ids)} collection ids kept out of {self.data.size()}.""")
+            # Kept ids: {list(sorted(kept_collection_ids))}
             for cid in sorted(list(removed_collection_ids), reverse = True):
                 for sam_name in self.data_vars().keys():
                     del getattr(self.data,sam_name)[cid]
@@ -2193,13 +2205,17 @@ class OutputSummary(object):
             __self__.logger.info(f"{len(output_dirs)} output folders found.")
         return output_dirs
     
-    def collect_metadata(self):
+    def collect_metadata(self,**kwargs):
         
         experiment_metadata = {}
         for indx,output_folder in enumerate(self.output_folders):
             
             # Get metadata collection for this 
-            metadata_collection,_ = self.collect_folder_metadata(indx,output_folder)
+            metadata_collection,_ = self.collect_folder_metadata(
+                indx,
+                output_folder,
+                **kwargs
+            )
             
             for metadata in metadata_collection:
                 if len(metadata) > 0:
@@ -2213,7 +2229,7 @@ class OutputSummary(object):
                         experiment_metadata[output_folder] = metadata
         return experiment_metadata
     
-    def collect_folder_metadata(self, indx:int, output_folder:str):
+    def collect_folder_metadata(self, indx:int, output_folder:str, **kwargs):
         self.logger.info(f"\n\n\n Scanning folder {indx+1}/{len(self.output_folders)}")
         self.logger.info(output_folder)
             
@@ -2222,9 +2238,17 @@ class OutputSummary(object):
 
         # Loop through each member of the data collection
         if self.settings.get('n_workers',1) > 1:
-            metadata_collection = self.get_experiment_metadata_concurrently(outputs)
+            metadata_collection = self.get_experiment_metadata_concurrently(
+                outputs,
+                index = indx,
+                pop = kwargs.get('pop',False)
+            )
         else:
-            metadata_collection = self.get_experiment_metadata_sequentially(outputs)
+            metadata_collection = self.get_experiment_metadata_sequentially(
+                outputs,
+                index = indx,
+                pop = kwargs.get('pop',False)
+            )
         
         # Convert generator to list
         metadata_collection = list(metadata_collection)
@@ -2242,7 +2266,7 @@ class OutputSummary(object):
         # Convert metric data collection to list
         return list(metadata_collection),outputs
 
-    def get_experiment_metadata_sequentially(self,outputs):
+    def get_experiment_metadata_sequentially(self,outputs,index:int = 0,pop:bool = False):
         # Every result corresponds to a unique pair of 
         # sweep id and sample name
         # Loop through each member of the data collection
@@ -2255,9 +2279,12 @@ class OutputSummary(object):
             position = 0
         ):
             # Collect metric metadata
-            yield self.get_experiment_metadata(outputs.get(j))
+            if pop:
+                yield self.get_experiment_metadata(outputs.pop(), index = index)
+            else:
+                yield self.get_experiment_metadata(outputs.get(j), index = index)
 
-    def get_experiment_metadata_concurrently(self,outputs):
+    def get_experiment_metadata_concurrently(self,outputs,index:int = 0,pop:bool = False):
         # Every result corresponds to a unique pair of 
         # sweep id and sample name
         # Initialise progress bar
@@ -2281,10 +2308,19 @@ class OutputSummary(object):
             # Start the processes and ignore the results
             for j in range(len(outputs.data)):
                 try:
-                    future = executor.submit(
-                        self.get_experiment_metadata,
-                        outputs = outputs.get(j),
-                    )
+                    # Collect metric metadata
+                    if pop:
+                        future = executor.submit(
+                            self.get_experiment_metadata,
+                            outputs = outputs.pop(),
+                            index = index
+                        )
+                    else:
+                        future = executor.submit(
+                            self.get_experiment_metadata,
+                            outputs = outputs.get(j),
+                            index = index
+                        )
                     future.add_done_callback(my_callback)
                 except:
                     # traceback.print_exc()
@@ -2299,7 +2335,7 @@ class OutputSummary(object):
         safe_delete(executor)
         return results
 
-    def get_experiment_metadata(self,outputs:Outputs):
+    def get_experiment_metadata(self,outputs:Outputs,index:int=0):
 
         # Read inputs if they are sweeped
         if outputs.inputs is None:
@@ -2312,7 +2348,7 @@ class OutputSummary(object):
         outputs.inputs.cast_to_xarray()
 
         # Apply these operations to the data 
-        expression_data = self.evaluate_expressions(outputs = outputs)
+        expression_data = self.evaluate_expressions(outputs = outputs, index = index)
 
         # Delete outputs
         safe_delete(outputs)
@@ -2470,7 +2506,7 @@ class OutputSummary(object):
             print('\n')
     
         
-    def evaluate_expressions(self,outputs:Outputs):
+    def evaluate_expressions(self,outputs:Outputs,index:int = 0):
         # Get outputs and unpack its statistics
         if len(self.settings['evaluate']) == 0:
             return []
@@ -2518,7 +2554,7 @@ class OutputSummary(object):
         
         keyword_expressions = [(k,v) for k,v in self.settings['evaluation_kwargs'] if k not in raw_data_keys]
         self.logger.progress([k for k,_ in keyword_expressions])
-
+        
         # Second, gather all data derivative arguments
         for key,expression in keyword_expressions:
             self.logger.progress(f"trying {key} {expression}")
@@ -2550,7 +2586,12 @@ class OutputSummary(object):
                             **{str(k):eval(str(k)) for k in self.settings['evaluation_library']}
                         },
                         {
-                            **keyword_args
+                            **keyword_args,
+                            **safe_list_get(
+                                self.settings.get('folder_kwargs',[]),
+                                index,
+                                self.settings.get('folder_kwargs',[])[0]
+                            )
                         }
                     )
                 except Exception as exc:
@@ -2598,7 +2639,12 @@ class OutputSummary(object):
                         },
                         {
                             **keyword_args,
-                            **evaluation_kwargs
+                            **evaluation_kwargs,
+                            **safe_list_get(
+                                self.settings.get('folder_kwargs',[]),
+                                index,
+                                self.settings.get('folder_kwargs',[])[0]
+                            )
                         }
                     )
                     # Update list of evaluated expressions
@@ -2612,7 +2658,7 @@ class OutputSummary(object):
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
                 if 'sweep' in evaluation.dims:
                     self.logger.note(f"sweep: {evaluation['sweep'].values.tolist()}")
-
+                    
             self.logger.success(f"Evaluation {operation_name} using {expression} succeded {np.shape(evaluation) if not isinstance(evaluation,xr.DataArray) else dict(evaluation.sizes)}")
             print('\n')
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
@@ -2650,6 +2696,7 @@ class OutputSummary(object):
                                 operation_name:data
                             })
                 else:
+                    # print('no sweep dims found in',operation_name,type(evaluation))
                     # Get scalar if only one item is provided otherwise get list
                     data = evaluation.values.ravel()
                     try:
@@ -2660,10 +2707,15 @@ class OutputSummary(object):
                     evaluation = evaluation.rename(operation_name.lower())
                     # Add data to every existing sweep
                     for sweep_id in evaluation_data.keys():
-                        evaluation_data[sweep_id].update({
-                            operation_name:data
-                        })
+                        if operation_name in evaluation_data[sweep_id]:
+                            evaluation_data[sweep_id][operation_name].append(data)
+                        else:
+                            evaluation_data[sweep_id].update({operation_name:data})
+                        # evaluation_data[sweep_id].update({
+                        #     operation_name:data
+                        # })
             else:
+                # print('no xarray found',operation_name,type(evaluation))
                 # Get data list
                 if isinstance(evaluation,np.generic):
                     data = evaluation.tolist()
