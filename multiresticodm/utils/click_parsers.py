@@ -2,7 +2,7 @@ import click
 from copy import deepcopy
 
 from multiresticodm.static.global_variables import *
-
+from multiresticodm.utils.misc_utils import unstringify
 def btt_callback(ctx, param, value):
     if value is None:
         return {}
@@ -42,6 +42,15 @@ def evaluate_kwargs_callback(ctx, param, value):
             kwargs.append((keyval.strip(' '),keyval.strip(' ')))
     return kwargs
 
+def unstringify_callback(ctx, param, value):
+    if not value:
+        return [{}]
+    res = []
+    for val in list(value):
+        # Unstringify argument
+        res.append(unstringify(val))
+    return res
+    
 def list_of_str(ctx, param, value):
     if value is None:
         return []
