@@ -29,8 +29,8 @@ from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
 from multiresticodm.utils.exceptions import *
 from multiresticodm.utils.logger_class import *
-from multiresticodm.static.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS
-from multiresticodm.static.plot_variables import LABEL_EXPRESSIONS, RAW_EXPRESSIONS, LATEX_COORDINATES
+from multiresticodm.static.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS, DATA_SCHEMA
+from multiresticodm.static.plot_variables import LABEL_EXPRESSIONS, RAW_EXPRESSIONS
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -134,45 +134,45 @@ def write_figure(figure,filepath,**settings):
     plt.close(figure)
 
 
-def write_figure_data(plot_settings:Union[dict,pd.DataFrame],filepath:str,key_type:dict={},aux_keys:list=[],**settings):
+def write_figure_data(plot_data:Union[dict,pd.DataFrame],filepath:str,keys:list=[],figure_settings:dict={}):
     
-    for plot_sett in plot_settings:
-        # Keys must be included in figure data
-        assert set(key_type.keys()).issubset(set(list(plot_sett.keys())))            
+    for plot_datum in plot_data:
         
-        if settings.get('data_format','dat') == 'dat':
+        # Keys must be included in figure data
+        assert set(list(plot_datum.keys())).issubset(set(keys))
+
+        if figure_settings.get('data_format','dat') == 'dat':
+            dtypes = {k:DATA_SCHEMA.get(k,'float') for k in keys},
             # Write dat file
             write_tex_data(
-                key_type = key_type,
-                data = list(zip(*[np.asarray(plot_sett[k],dtype = key_type[k]) for k in key_type.keys()])),
+                key_type = dtypes,
+                data = list(zip(*[np.asarray(plot_datum[k],dtype = dtypes[k]) for k in keys])),
                 filepath = filepath+'_data.dat',
-                precision = settings.get('data_precision',19)
+                precision = figure_settings.get('data_precision',19)
             )
-        elif settings.get('data_format','dat') == 'json':
+        elif figure_settings.get('data_format','dat') == 'json':
             write_json(
-                {k: plot_sett.get(k,np.array([])).tolist() 
-                    if isinstance(plot_sett.get(k),np.ndarray)
-                    else plot_sett.get(k,None)
+                {k: plot_datum.get(k,None)
                     if k != 'outputs'
-                    else plot_sett.get(k,None).config.settings
-                for k in list(key_type.keys())+aux_keys},
+                    else plot_datum.get(k,None).config.settings
+                for k in keys},
                 filepath+'_data.json'
             )
-        elif settings.get('data_format','dat') == 'csv':
+        elif figure_settings.get('data_format','dat') == 'csv':
             write_csv(
                 pd.DataFrame.from_dict(
                     {k:(
-                        plot_sett.get(k,np.array([])).tolist() 
-                        if isinstance(plot_sett.get(k),np.ndarray)
-                        else plot_sett.get(k,None)
+                        plot_datum.get(k,np.array([])).tolist() 
+                        if isinstance(plot_datum.get(k),np.ndarray)
+                        else plot_datum.get(k,None)
                     )
-                    for k in list(key_type.keys())+aux_keys}
+                    for k in keys}
                 ),
                 filepath+'_data.csv'
             )
         # Write plot settings to file
         write_json(
-            settings,
+            figure_settings,
             filepath+'_settings.json'
         )
 
@@ -256,12 +256,17 @@ def write_txt(data:Union[np.array,np.ndarray],filepath:str,**kwargs:Dict) -> Non
         filepath += '.txt'
     np.savetxt(filepath,data,**kwargs)
 
+def json_default(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    raise TypeError('Not serializable')
+
 
 def write_json(data:Dict,filepath:str,**kwargs:Dict) -> None:
     if not filepath.endswith('.json'):
         filepath += '.json'
     with open(filepath, 'w') as f:
-        json.dump(data,f,**kwargs)
+        json.dump(data,f,default=json_default,**kwargs)
 
 
 def print_json(data:Dict,**kwargs:Dict):
@@ -269,7 +274,7 @@ def print_json(data:Dict,**kwargs:Dict):
         for k in data.keys():
             print(f"{k}: {data[k]}",sep='')
     else:
-        print(json.dumps(data,cls = NumpyEncoder,**kwargs))
+        print(json.dumps(data,cls = NumpyEncoder, default = json_default, **kwargs))
 
 def write_compressed_string(data:str,filepath:str) -> None:
     with gzip.GzipFile(filename = filepath, mode="w") as f:
@@ -1272,7 +1277,9 @@ def xr_expand_multiindex_dims(data,expanded_coords:dict,multiindex_dim:str):
         added_dims = list(expanded_coords.keys())
     )
 
-def xr_restack(data,multiindex_dim:str,added_dims:list=[]):
+def xr_restack(data,multiindex_dim:str,added_dims:list=[],new_multiindex_dim:str=None):
+    # Decide on name of new multiindex dim
+    new_multiindex_dim = new_multiindex_dim if new_multiindex_dim else multiindex_dim
 
     # Get all names in multi-index
     multiindex_dim_names = list(data.get_index(multiindex_dim).names)
@@ -1281,7 +1288,7 @@ def xr_restack(data,multiindex_dim:str,added_dims:list=[]):
     data = data.unstack(multiindex_dim)
     
     # Re stack updated multi-index
-    data = data.stack({multiindex_dim: (multiindex_dim_names+added_dims)})
+    data = data.stack({new_multiindex_dim: (multiindex_dim_names+added_dims)})
 
     return data
 
@@ -1305,6 +1312,71 @@ def xr_islice(data,dim:str='',start:int=0,step:int=1,end:int=None,**kwargs):
     )
 
     return data.isel(**{dim:size_slice})
+
+
+def xr_apply_by_group(function,data,group_dims:list,sweep_dim:str='sweep',fixed_kwargs:dict={},sweeped_kwargs:dict={},**kwargs):
+    # Get data coordinates for every existing dim and find all possible combinations
+    sweep_dims = list(data.get_index(sweep_dim).names)
+    sweep_dimensions = [d for d in group_dims if d in sweep_dims]
+    nonsweep_dimensions = [d for d in group_dims if d in data.dims and d not in sweep_dimensions]
+    dimensions = sweep_dimensions + nonsweep_dimensions
+    # Gather all result data into list
+    results = []
+    print(sweep_dimensions,nonsweep_dimensions)
+    # Loop every possible coordinate
+    for group_label,group_data in xr_restack(
+        data,
+        multiindex_dim=sweep_dim,
+        added_dims=nonsweep_dimensions,
+        new_multiindex_dim=sweep_dim
+    ).groupby(sweep_dim):
+        print(group_label)
+        # Get part of group label you need 
+        group_sublabel = [
+            (list(group_label)[sweep_dims.index(d)] 
+            if d in sweep_dims
+            else list(group_label)[len(sweep_dims)-1+nonsweep_dimensions.index(d)])
+            for d in dimensions
+        ]
+        print(group_sublabel)
+        # Convert tuple to string 
+        group_sublabel_str = stringify(list(group_sublabel))
+        print(group_sublabel_str)
+        try:
+            assert group_sublabel_str in sweeped_kwargs
+        except:
+            raise MissingData(
+                missing_data_name = group_sublabel_str,
+                data_names = list(sweeped_kwargs.keys()),
+                location = 'xr_apply_by_group'
+            )
+        # Get sweeped function kwargs
+        sweeped_kwargs = sweeped_kwargs[group_sublabel_str]
+        # Add fixed function kwargs to get all function kwargs
+        fn_kwargs = {**sweeped_kwargs,**fixed_kwargs}
+        # Add to results
+        if kwargs.get('apply_ufunc',False):
+            results.append(
+                function(
+                    group_data,
+                    **fn_kwargs
+                )
+            )
+        else:
+            results.append(
+                xr.apply_ufunc(
+                    function,
+                    group_data,
+                    kwargs=fn_kwargs,
+                    exclude_dims=set(['id']),
+                    input_core_dims=[['id']],
+                    output_core_dims=[['id']]
+                )
+            )
+    
+    res = xr.merge(results)
+    print(res)
+    return res
 
 def xr_apply_and_combine_wrapper(
     data,
