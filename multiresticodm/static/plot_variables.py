@@ -35,9 +35,8 @@ for var in PLOT_COORDINATES:
     for derivative in PLOT_DERIVATIVES:
         PLOT_COORDINATE_DERIVATIVES.append(var+derivative)
 
-PLOT_VARIABLES = PLOT_ALL_COORDINATES +\
-    list(PLOT_CORE_FEATURES.keys())
-    
+PLOT_VARIABLES = PLOT_ALL_COORDINATES + list(PLOT_CORE_FEATURES.keys())
+PLOT_COORDINATES_AND_CORE_FEATURES = PLOT_ALL_COORDINATES + list(PLOT_CORE_FEATURES.keys())
 PLOT_VARIABLES_AND_DERIVATIVES = PLOT_VARIABLES + PLOT_COORDINATE_DERIVATIVES
 
 # Type of plots
@@ -93,7 +92,7 @@ PLOT_COLOURS = {
         "JointTableSIM_NN":COLOR_NAMES["tab20c_blue"],
     },
     "title": {
-        "_unconstrained":cnames["grey"],
+        "_unconstrained":cnames["silver"],
         "_total_constrained":COLOR_NAMES["tab20b_purple"],
         "_row_constrained":COLOR_NAMES["tab20b_green"],
         "_doubly_constrained":COLOR_NAMES["tab20b_orange"],
@@ -122,9 +121,9 @@ PLOT_LINESTYLES = {}
 
 
 RAW_EXPRESSIONS = {
-    "SIM_MCMC": 'SIM-MCMC',
-    "JointTableSIM_MCMC": 'SIMT-MCMC',
-    "SIM_NN": 'SIM-NN',
+    "SIM_MCMC": '\\ellamframeworktag',
+    "JointTableSIM_MCMC": '\\zachosframeworktag',
+    "SIM_NN": '\\gaskinframeworktag',
     "JointTableSIM_NN": 'Joint (\\frameworktag)',
     "NonJointTableSIM_NN": 'Disjoint (\\frameworktag)',
     "_unconstrained":'$\\emptyset$',
@@ -171,12 +170,26 @@ LATEX_PREAMBLE = r'''
 \newcommand{\mydarkmagenta}[1]{{\textcolor[HTML]{8B008B}{#1}}}
 \newcommand{\mybrown}[1]{{\textcolor[HTML]{A52A2A}{#1}}}
 
-\newcommand{\frameworkname}{NSITS}
-\newcommand{\frameworkfullname}{\textbf{N}eural \textbf{S}patial \textbf{I}nteraction \textbf{T}able \textbf{S}ynthesis}
-\newcommand{\frameworkpackagelowercase}{nsits}
+\newcommand{\zachosframeworkbasename}{SIMT-MCMC}
+\newcommand{\gaskinframeworkbasename}{SIM-NN}
+\newcommand{\ellamframeworkbasename}{SIM-MCMC}
+\newcommand{\zachosframework}{\zachosframeworkbasename \;}
+\newcommand{\gaskinframework}{\gaskinframeworkbasename \;}
+\newcommand{\ellamframework}{\ellamframeworkbasename \;}
+\newcommand{\zachosframeworktag}{\textsc{\zachosframeworkbasename}}
+\newcommand{\gaskinframeworktag}{\textsc{\gaskinframeworkbasename}}
+\newcommand{\ellamframeworktag}{\textsc{\ellamframeworkbasename}}
+\newcommand{\zachosframeworktagspace}{\textsc{\zachosframeworkbasename}\;}
+\newcommand{\gaskinframeworktagspace}{\textsc{\gaskinframeworkbasename}\;}
+\newcommand{\ellamframeworktagspace}{\textsc{\ellamframeworkbasename}\;}
+
+\newcommand{\frameworkname}{GeNSIT}
 \newcommand{\frameworktag}{\textsc{\frameworkname}}
-\newcommand{\frameworkpackage}{\texttt{\frameworkname}}
-\newcommand{\frameworkfig}{\hyperref[fig:framework]{\textsc{\frameworkname}}}
+\newcommand{\frameworkpackage}{\texttt{gensit}}
+\newcommand{\frameworkfullname}{\textbf{Ge}nerating \textbf{N}eural \textbf{S}patial \textbf{I}nteraction \textbf{T}ables \;}
+\newcommand{\frameworknamespace}{\frameworkname\;}
+\newcommand{\frameworktagspace}{\textsc{\frameworktag\;}}
+\newcommand{\frameworkpackagespace}{\frameworkpackage \;}
 \newcommand{\mytable}{\skyblue{\mathbf{T}}}
 \newcommand{\myintensity}{\deepred{\boldsymbol{\Lambda}}}
 \newcommand{\mytableoned}{\skyblue{T}}
@@ -192,6 +205,10 @@ LATEX_PREAMBLE = r'''
 \newcommand{\myintensityrowsumsoned}{\myseagreen{\Lambda_{i+}}}
 \newcommand{\myintensitycolsumsoned}{\myorange{\Lambda_{+j}}}
 \newcommand{\myintensitytotal}{\mydarkmagenta{\Lambda_{++}}}
+\newcommand{\tableconstraints}{\mathcal{C}_{\mytableoned}}
+\newcommand{\intensityconstraints}{\mathcal{C}_{\myintensityoned}}
+\newcommand{\allconstraints}{\mathcal{C}}
+\newcommand{\groundtruthtable}{\mytable^{\mathcal{D}}}
 '''
 
 # "pgf.texsystem": "xelatex",
