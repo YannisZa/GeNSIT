@@ -47,9 +47,11 @@ class Plot(object):
 
         # self.logger.info(f"{','.join([Path(out_dir).stem for out_dir in self.outputs_directories])}")
         # Run plotting
-        self.data_plot(plot_func = self.compile_plot(plot_view))
+        self.data_plot(plot_func = self.compile_plot(plot_view), **kwargs)
 
     def print_data(self,plot_setting:dict,local_vars:dict,plot_vars:list = None,index:int = None,summarise:bool = False):
+        if index:
+            self.logger.info(f"index: {index}")
         for v in ['x','y','marker_size','colour','line_width','opacity','hatch_opacity','zorder','annotate','line_style','label','marker','hatch']:
             if v not in plot_setting:
                 self.logger.debug(f"{v} not found in plot settings.")
@@ -61,7 +63,13 @@ class Plot(object):
                             self.logger.info(f"{v}: {np.shape(plot_setting[v])} {type(plot_setting[v])}")
                             self.logger.info(f"{v}: min = {np.nanmin(plot_setting[v])}, max = {np.nanmax(plot_setting[v])}")
                         except:
-                            self.logger.info(f"{v}: {type(plot_setting[v])}")
+                            try:
+                                self.logger.info(f"{v}: {np.shape(plot_setting[v])} {type(plot_setting[v])}")
+                            except:
+                                if isinstance(plot_setting[v],Iterable):
+                                    self.logger.info(f"{v}: {len(plot_setting[v])} {type(plot_setting[v])}")
+                                else:
+                                    self.logger.info(f"{v}: {type(plot_setting[v])}")
                     else:
                         self.logger.info(f"{v} = {plot_setting[v]}")
                 else:
@@ -71,27 +79,48 @@ class Plot(object):
                                 self.logger.info(f"{v}: {np.shape(plot_setting[v][index])} {type(plot_setting[v][index])}")
                                 self.logger.info(f"{v}: min = {np.nanmin(plot_setting[v][index])}, max = {np.nanmax(plot_setting[v][index])}")
                             except:
-                                self.logger.info(f"{v}: {type(plot_setting[v][index])}")
+                                try:
+                                    self.logger.info(f"{v}: {np.shape(plot_setting[v][index])} {type(plot_setting[v][index])}")
+                                except:
+                                    if isinstance(plot_setting[v],Iterable):
+                                        self.logger.info(f"{v}: {len(plot_setting[v][index])} {type(plot_setting[v][index])}")
+                                    else:
+                                        self.logger.info(f"{v}: {type(plot_setting[v][index])}")
                         else:
                             try:
                                 self.logger.info(f"{v}: {np.shape(plot_setting[v])} {type(plot_setting[v])}")
                                 self.logger.info(f"{v}: min = {np.nanmin(plot_setting[v])}, max = {np.nanmax(plot_setting[v])}")
                             except:
-                                self.logger.info(f"{v}: {type(plot_setting[v])}")
+                                try:
+                                    self.logger.info(f"{v}: {np.shape(plot_setting[v])} {type(plot_setting[v])}")
+                                except:
+                                    if isinstance(plot_setting[v],Iterable):
+                                        self.logger.info(f"{v}: {len(plot_setting[v])} {type(plot_setting[v])}")
+                                    else:
+                                        self.logger.info(f"{v}: {type(plot_setting[v])}")
                     else:
                         if plot_setting[v] and isinstance(plot_setting[v],Iterable) and index < len(plot_setting[v]):
                             self.logger.info(f"{v} = {plot_setting[v][index]}")
                         else:
                             self.logger.info(f"{v} = {plot_setting[v]}")
         for v in ['x_range','y_range']:
-            if plot_vars is None or v in plot_vars:
+            if v not in local_vars:
+                self.logger.debug(f"{v} not found in local variables.")
+                continue
+            if (plot_vars is None or v in plot_vars) :
                 if index is None:
                     if summarise:
                         try:
                             self.logger.info(f"{v}: {np.shape(list(flatten(local_vars[v])))} {type(list(flatten(local_vars[v])))}")
                             self.logger.info(f"{v}: min = {np.nanmin(list(flatten(local_vars[v])))}, max = {np.nanmax(list(flatten(local_vars[v])))}")
                         except:
-                            self.logger.info(f"{v}: {np.shape(local_vars[v])} {type(local_vars[v])}")
+                            try:
+                                self.logger.info(f"{v}: {np.shape(local_vars[v])} {type(local_vars[v])}")
+                            except:
+                                if isinstance(local_vars[v],Iterable):
+                                    self.logger.info(f"{v}: {len(local_vars[v])} {type(local_vars[v])}")
+                                else:
+                                    self.logger.info(f"{v}: {type(local_vars[v])}")
                     else:
                         try:
                             self.logger.info(f"{v} = {list(flatten(local_vars[v]))}")
@@ -104,13 +133,25 @@ class Plot(object):
                                 self.logger.info(f"{v}: {np.shape(list(flatten(local_vars[v][index])))} {type(list(flatten(local_vars[v][index])))}")
                                 self.logger.info(f"{v}: min = {np.nanmin(list(flatten(local_vars[v][index])))}, max = {np.nanmax(list(flatten(local_vars[v][index])))}")
                             except:
-                                self.logger.info(f"{v}: {np.shape(local_vars[v][index])} {type(local_vars[v][index])}")
+                                try:
+                                    self.logger.info(f"{v}: {np.shape(local_vars[v][index])} {type(local_vars[v][index])}")
+                                except:
+                                    if isinstance(plot_setting[v][index],Iterable):
+                                        self.logger.info(f"{v}: {len(plot_setting[v][index])} {type(plot_setting[v][index])}")
+                                    else:
+                                        self.logger.info(f"{v}: {type(plot_setting[v][index])}")
                         else:
                             try:
                                 self.logger.info(f"{v}: {np.shape(list(flatten(local_vars[v])))} {type(list(flatten(local_vars[v])))}")
                                 self.logger.info(f"{v}: min = {np.nanmin(list(flatten(local_vars[v])))}, max = {np.nanmax(list(flatten(local_vars[v])))}")
                             except:
-                                self.logger.info(f"{v}: {np.shape(local_vars[v])} {type(local_vars[v])}")
+                                try:
+                                    self.logger.info(f"{v}: {np.shape(local_vars[v])} {type(local_vars[v])}")
+                                except:
+                                    if isinstance(local_vars[v],Iterable):
+                                        self.logger.info(f"{v}: {len(local_vars[v])} {type(local_vars[v])}")
+                                    else:
+                                        self.logger.info(f"{v}: {type(local_vars[v])}")
                     else:
                         if local_vars[v] and isinstance(local_vars[v],Iterable) and index < len(local_vars[v]):
                             try:
@@ -336,15 +377,16 @@ class Plot(object):
                 # tick_location = major_index + \
                 #     minor_index*len(ticks[0]['unique'])*self.settings[tick_locator_var][0][1] + \
                 #     self.settings[tick_locator_var][0][0]
-                tick_location = minor_index*self.settings[tick_locator_var][1][1] + \
-                    major_index*self.settings[tick_locator_var][0][1] + \
-                    self.settings[tick_locator_var][0][0]
-                # print(tick_location)
-                # Create entry on hashmap
-                hashmap[stringify(
-                    [major,minor],
-                    scientific = self.settings.get(f"{var}_scientific",False)
-                )] = tick_location
+                if self.settings.get(tick_locator_var,None):
+                    tick_location = minor_index*self.settings[tick_locator_var][1][1] + \
+                        major_index*self.settings[tick_locator_var][0][1] + \
+                        self.settings[tick_locator_var][0][0]
+                    # print(tick_location)
+                    # Create entry on hashmap
+                    hashmap[stringify(
+                        [major,minor],
+                        scientific = self.settings.get(f"{var}_scientific",False)
+                    )] = tick_location
             else:
                 # If there is no minor tick then the location is simply the 
                 # major's first (and only location)
@@ -434,9 +476,6 @@ class Plot(object):
         filename = kwargs['filename']
         filepath = os.path.join(dirpath,filename)
 
-        # Make outputs directories (if necessary)
-        makedir(dirpath)
-
         # Flag for whether multiple subplots are plotted
         plot_settings = plot_settings[0]
         # Store whether either x or y are grouped by 
@@ -451,7 +490,7 @@ class Plot(object):
                     var = var+'_group',
                     plot_settings = plot_settings
                 )
-                print(var,group_hashmap[var])
+                # print(var,group_hashmap[var])
         # Store whether subplots will be created
         subplots_exist = any([v for v in group_hashmap.values()])
         
@@ -524,20 +563,6 @@ class Plot(object):
 
         # print(y_range)
         # print(x_range)
-
-        if not self.loaded:
-            # Write figure data
-            write_figure_data(
-                [plot_settings],
-                filepath = filepath,
-                key_type={'x':'float','y':'float'},
-                aux_keys = PLOT_VARIABLES_AND_DERIVATIVES+['outputs'],
-                **self.settings,
-                print_data = False
-            )
-            self.logger.success(f"Figure data exported to {dirpath}")
-        else:
-            self.logger.success(f"Figure data has already been exported from {dirpath}. No need to export them again.")
         
 
         # Figure size 
@@ -574,6 +599,7 @@ class Plot(object):
         # Count number of axes ids
         counter = 0
         # Set ticks
+        print(group_hashmap)
         for r in range(max(len(group_hashmap['y']),1)):
             for c in range(max(len(group_hashmap['x']),1)):
                 for j,var in enumerate(['x','y']):
@@ -609,6 +635,37 @@ class Plot(object):
                             )
                             # Increment discrete tick types
                             discrete_tick_types += 1
+                        else:
+                            # Set tick parameters for continuous ticks if there are properly specified
+                            if self.settings[f"{var}_tick_locations"] and self.settings[f"{var}_tick_locations"][0]:
+                                # Read axis limits
+                                start, end = getattr(
+                                    ax[r,c],
+                                    f"get_{var}lim()",
+                                    ax[r,c].get_xlim()
+                                )
+                                # Change frequency at which continuous ticks appear
+                                getattr(
+                                    ax[r,c],
+                                    f"{var}axis",
+                                    ax[r,c].xaxis
+                                ).set_ticks(np.arange(
+                                    self.settings[f"{var}_tick_locations"][0][0], 
+                                    end,
+                                    self.settings[f"{var}_tick_locations"][0][1]
+                                ))
+                            tick_params = {
+                                "pad": self.settings[f"{var}_tick_pad"][0] if self.settings[f"{var}_tick_pad"] else None,
+                                "labelsize": self.settings[f"{var}_tick_size"][0] if self.settings[f"{var}_tick_size"] else None,
+                                "rotation": self.settings[f"{var}_tick_rotation"][0] if self.settings[f"{var}_tick_rotation"] else None
+                            }
+                            ax[r,c].tick_params(
+                                axis = var, 
+                                which = 'both',
+                                bottom = True,
+                                **{k:v for k,v in tick_params.items() if v}
+                            )
+
                     
                     # Set gridlines for discrete ticks (major or (major and minor))
                     if discrete_tick_types > 0:
@@ -622,48 +679,11 @@ class Plot(object):
                             f"{var}axis",
                             ax[r,c].xaxis
                         ).remove_overlapping_locs = False
-                    # Set tick parameters for continuous ticks if there are properly specified
-                    if self.settings[f"{var}_tick_locations"] and self.settings[f"{var}_tick_locations"][0]:
-                        # Read axis limits
-                        start, end = getattr(
-                            ax[r,c],
-                            f"get_{var}lim()",
-                            ax[r,c].get_xlim()
-                        )
-                        # Change frequency at which continuous ticks appear
-                        getattr(
-                            ax[r,c],
-                            f"{var}axis",
-                            ax[r,c].xaxis
-                        ).set_ticks(np.arange(
-                            self.settings[f"{var}_tick_locations"][0][0], 
-                            end,
-                            self.settings[f"{var}_tick_locations"][0][1]
-                        ))
-                    tick_params = {
-                        "pad": self.settings[f"{var}_tick_pad"][0] if self.settings[f"{var}_tick_pad"] else None,
-                        "labelsize": self.settings[f"{var}_tick_size"][0] if self.settings[f"{var}_tick_size"] else None,
-                        "rotation": self.settings[f"{var}_tick_rotation"][0] if self.settings[f"{var}_tick_rotation"] else None
-                    }
-                    ax[r,c].tick_params(
-                        axis = var, 
-                        which = 'both',
-                        bottom = True,
-                        **tick_params
-                    )
-
+                    
         # Keep track of each group's axes limits
         group_axes_limits = {}
         group_axes_data = {}
         
-        heights = []
-        # Loop over sweeps
-        for sid in range(len(y_range)):
-            heights.append((str(max(y_range[sid]))))
-        # zorders = np.zeros(len(heights))
-        # for i,j in enumerate(np.argsort(heights)):
-        #     zorders[j] = 40 - i
-
         # Loop over sweeps
         for sid in range(len(y_range)):
             # Get axes id 
@@ -680,23 +700,6 @@ class Plot(object):
                             'zorder', 'label', 'marker', 'hatch', 'hatch_opacity',
                             'facecolor', 'edgecolor', 'annotate']:
                 group_axes_data[axes_id].setdefault(feature,[])
-
-            # print(sid,axes_id)
-            # Print plotting data
-            self.print_data(
-                index = sid,
-                plot_setting = plot_settings,
-                local_vars = dict(locals()),
-                plot_vars = [],
-                summarise = False
-            )
-            self.print_data(
-                index = sid,
-                plot_setting = plot_settings,
-                local_vars = dict(locals()),
-                plot_vars = [],
-                summarise = True
-            )
             
             # Unpack data
             group_axes_data[axes_id]['x'] = x_range[sid]
@@ -717,6 +720,25 @@ class Plot(object):
                 if group_axes_data[axes_id]['hatch_opacity'] \
                 else (group_axes_data[axes_id]['facecolor'],group_axes_data[axes_id]['hatch_opacity'])
             
+            # print(sid,axes_id)
+            # Print plotting data
+            self.print_data(
+                index = None,
+                plot_setting = plot_settings,
+                local_vars = group_axes_data[axes_id],
+                #dict(locals().vars)
+                plot_vars = [],
+                summarise = False
+            )
+            self.print_data(
+                index = None,
+                plot_setting = plot_settings,
+                local_vars = group_axes_data[axes_id],
+                #dict(locals().vars)
+                plot_vars = [],
+                summarise = True
+            )
+            
             # Plot x versus y
             self.plot_wrapper(
                 ax = ax[axes_id],
@@ -726,6 +748,7 @@ class Plot(object):
 
             # Shade area between line and axis
             if self.settings.get('x_shade',False):
+                plt.rcParams['hatch.linewidth'] = self.settings.get('hatch_linewidth',1.0)
                 ax[axes_id].fill_betweenx(
                     y = group_axes_data[axes_id]['y'],
                     x1 = 0,
@@ -736,6 +759,7 @@ class Plot(object):
                     }
                 )
             if self.settings.get('y_shade',False):
+                plt.rcParams['hatch.linewidth'] = self.settings.get('hatch_linewidth',1.0)
                 ax[axes_id].fill_between(
                     x = group_axes_data[axes_id]['x'],
                     y1 = 0,
@@ -843,8 +867,8 @@ class Plot(object):
             leg_kwargs = {
                 'bbox_to_anchor': self.settings.get('bbox_to_anchor',None),
                 'ncols': self.settings.get('legend_cols',1),
-                'columnspacing': self.settings.get('legend_col_spacing',1),
-                'handletextpad': self.settings.get('legend_pad',0.1),
+                'columnspacing': self.settings.get('legend_col_spacing',None),
+                'handletextpad': self.settings.get('legend_pad',None),
                 'loc': self.settings.get('legend_location','best')
             }
             print(leg_kwargs)
@@ -1095,7 +1119,7 @@ class Plot(object):
     def merge_plot_settings(self,plot_settings:list,apply_zorder:bool=True):
         merged_settings = {}
         # Iterate through the list of dictionaries
-        if len(plot_settings) > 1:
+        if isinstance(plot_settings,list):
             for d in plot_settings:
                 # print_json(d,newline = True)
                 # Concatenate values to the merged_dict
@@ -1122,7 +1146,7 @@ class Plot(object):
             # print_json(merged_settings,newline=True)
             # print(merged_settings['y_group'])
         else:
-            merged_settings = plot_settings[0]
+            merged_settings = plot_settings
         
         if apply_zorder:
             # print(merged_settings['y_group'])
@@ -1133,15 +1157,19 @@ class Plot(object):
                 if len(values.shape) > 1:
                     # Number of elements to sort
                     ndims = values.shape[1]
+                    print('lexsort')
                     # Use lexsort to argsort along each axis successively
                     sorted_indices = np.lexsort([values[:,i].ravel() for i in range(ndims)])
                 else:
-                    sorted_indices = np.argsort(values)
+                    print('argsort')
+                    sorted_indices = np.argsort(values,axis=0)
                 # Update merged settings
                 # add 1.0 to avoid zorder = 0
-                merged_settings['zorder'] = list(map(float,sorted_indices+1.0))
-                # print(values)
-                # print(merged_settings['zorder'])
+                merged_settings['zorder'] = np.zeros(len(sorted_indices))
+                for i,j in enumerate(sorted_indices):
+                    merged_settings['zorder'][j] = len(sorted_indices) - i
+                # Convert back to list
+                merged_settings['zorder'] = merged_settings['zorder'].tolist()
 
         # Remove nulls from certain data
         for key in PLOT_AUX_COORDINATES:
@@ -1287,7 +1315,7 @@ class Plot(object):
     ╩  ┴─┘└─┘ ┴   └┴┘┴└─┴ ┴┴  ┴  └─┘┴└─└─┘
     '''
     
-    def data_plot(self,plot_func):
+    def data_plot(self,plot_func,**kwargs):
             
         self.logger.info('Running data_plot')
     
@@ -1307,7 +1335,11 @@ class Plot(object):
             for indx,output_folder in enumerate(outputs_summary.output_folders):
                 
                 # Get metadata collection for this 
-                metadata_collection,outputs = outputs_summary.collect_folder_metadata(indx,output_folder)
+                metadata_collection,outputs = outputs_summary.collect_folder_metadata(
+                    indx,
+                    output_folder,
+                    **kwargs
+                )
 
                 # Create plot settings
                 plot_sett = {'outputs':outputs}
@@ -1327,27 +1359,40 @@ class Plot(object):
                                     meta = meta
                                 )
                             )
-                            # print_json({k:plot_sett[k] for k in PLOT_VARIABLES_AND_DERIVATIVES if k in plot_sett})
+                            # print_json({k:plot_sett[k] for k in PLOT_COORDINATES_AND_CORE_FEATURES if k in plot_sett})
 
                             # Add data
                             plot_settings.append(deepcopy(plot_sett))
                     
+
                     # If plot is by experiment
                     # plot all element from data collection
                     # for every output folder
                     if self.settings.get('by_experiment',False):
+                        # Export all plot settings
                         # Create output dirpath and filename
                         dirpath,filename = self.create_plot_filename(
                             plot_setting = plot_sett,
                             name = self.settings.get('figure_title','NONAME')
                         )
+                        merged_plot_settings = self.merge_plot_settings(
+                            plot_sett,
+                            apply_zorder = True
+                        )
+                        # Make outputs directories (if necessary)
+                        makedir(dirpath)
+                        # Write figure data
+                        write_figure_data(
+                            plot_data = merged_plot_settings,
+                            filepath = os.path.join(dirpath,filename),
+                            keys = PLOT_COORDINATES_AND_CORE_FEATURES+['outputs'],
+                            figure_settings = self.settings
+                        )
+                        self.logger.success(f"Figure data exported to {dirpath}")
                         # Merge all settings into one
                         # Plot
                         plot_func(
-                            plot_settings = self.merge_plot_settings(
-                                plot_settings,
-                                apply_zorder = (not self.loaded)
-                            ),
+                            merged_plot_settings,
                             dirpath = dirpath,
                             filename = filename
                         )
@@ -1358,6 +1403,7 @@ class Plot(object):
                     self.logger.error(f"Plot for folder {indx+1}/{len(outputs_summary.output_folders)} failed...")
                     continue
             
+
             # If plot is NOT by experiment
             # plot all elements from data collection
             # from all output folder(s)
@@ -1367,30 +1413,59 @@ class Plot(object):
                     plot_setting = {'outputs':outputs},
                     name = self.settings.get('figure_title','NONAME')
                 )
+                merged_plot_settings = self.merge_plot_settings(
+                    plot_settings,
+                    apply_zorder = True
+                )
+                # Make outputs directories (if necessary)
+                makedir(dirpath)
+                # Write figure data
+                write_figure_data(
+                    plot_data = merged_plot_settings,
+                    filepath = os.path.join(dirpath,filename),
+                    keys = PLOT_COORDINATES_AND_CORE_FEATURES+['outputs'],
+                    figure_settings = self.settings
+                )
+                self.logger.success(f"Figure data across experiments exported to {dirpath}")
                 # Plot
                 plot_func(
-                    plot_settings = self.merge_plot_settings(
-                        plot_settings,
-                        apply_zorder = (not self.loaded)
-                    ),
+                    plot_settings = merged_plot_settings,
                     name = self.settings.get('title','NONAME'),
                     dirpath = dirpath,
                     filename = filename
                 )
         else:
             # Merge plot settings
-            merged_plot_settings = self.merge_plot_settings(
-                plot_settings,
-                apply_zorder = (not self.loaded)
-            )
+            # merged_plot_settings = self.merge_plot_settings(
+            #     plot_settings,
+            #     apply_zorder = False
+            # )
+            # if 'zorder' in plot_settings[0]:
+            #     # get value to order by
+            #     values = np.array(plot_settings[0]['zorder'])
+            #     if len(values.shape) > 1:
+            #         # Number of elements to sort
+            #         ndims = values.shape[1]
+            #         # Use lexsort to argsort along each axis successively
+            #         sorted_indices = np.lexsort([values[:,i].ravel() for i in range(ndims)])
+            #     else:
+            #         sorted_indices = np.argsort(values,axis=0)
+            #     # Update merged settings
+            #     # add 1.0 to avoid zorder = 0
+            #     plot_settings[0]['zorder'] = np.zeros(len(sorted_indices))
+            #     for i,j in enumerate(sorted_indices):
+            #         plot_settings[0]['zorder'][i] = len(sorted_indices) - j
+            #     print(values)
+            #     print(plot_settings[0]['zorder'])
+            #     sys.exit()
             # Create output dirpath and filename
             dirpath,filename = self.create_plot_filename(
-                plot_setting = merged_plot_settings[0],
+                plot_setting = plot_settings,
                 name = self.settings.get('figure_title','NONAME')
             )
             # Plot
             plot_func(
-                plot_settings = merged_plot_settings,
+                plot_settings = plot_settings,
                 name = self.settings.get('title','NONAME'),
                 dirpath = dirpath,
                 filename = filename
