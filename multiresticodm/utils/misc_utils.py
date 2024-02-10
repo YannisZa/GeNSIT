@@ -676,7 +676,8 @@ def stringify(data,**kwargs):
         else:
             return str(data)
     else:
-        return str(data)#.replace(' ','')
+        return str(data)
+        
 
 def unstringify(data):
     try:

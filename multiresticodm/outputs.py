@@ -241,12 +241,16 @@ class Outputs(object):
         self_copy.config.update(sweep)
         # Update sweep mode flag
         self_copy.config.find_sweep_key_paths()
+        # print(sweep)
+        # print(self_copy.config.sweep_param_names)
         try:
             # Either there are no sweep params
             # or if there are then these are must be group_by dims
             assert not self_copy.config.sweep_mode() or \
                 not (set(self_copy.config.sweep_param_names).difference(self.settings.get('group_by',[])))
         except:
+            print(self_copy.config)
+            print(self_copy.config.sweep_param_names)
             raise InvalidMetadataType(
                 message = f"""
                     No sweeps should be contained in Outputs' config. 
@@ -310,28 +314,7 @@ class Outputs(object):
         time.sleep(3)
         gc.collect()
         time.sleep(3)
-    
-    def group_by(self,dim:str):
-        # Get all data vars by each group
-        data_by_group = {}
-        for sample_name,sample_data in self.data_vars().items(): 
-            # Stack sweep and iteration dims
-            self.stack_sweep_and_iter_dims(self)
-            try:
-                assert dim in sample_data.dims
-            except:
-                raise InvalidDataNames(
-                    f"Grouping {sample_name} by {dim} which is not included in {sample_data.dims}"
-                )
-            for group_id,group_data in sample_data.groupby(dim):
-                print(str(group_id))
-                # data_by_group[str(group_id)].setdefault(sample_name, group_data)
-                if str(group_id) in data_by_group:
-                    data_by_group[str(group_id)][sample_name] = group_data
-                else:
-                    data_by_group[str(group_id)] = {sample_name: group_data}
-            print('\n')
-        return data_by_group
+
 
     def slice_coordinates(self):
         # Slice according to coordinate value slice
@@ -724,7 +707,8 @@ class Outputs(object):
     def load(self,indx:int = 0):
         
         # Additionally group data collection by these attributes
-        group_by,combined_dims = self.config.get_group_id(
+        # apart from the ones listed in settings under 'group_by'
+        nonshared_coord_dims,shared_coord_dims = self.config.get_group_id(
             group_by = self.settings.get('group_by',[])
         )
 
@@ -732,7 +716,7 @@ class Outputs(object):
             # Attempt to load all samples
             # Keep track of samples not loaded
             samples_not_loaded = self.read_data_collection(
-                group_by = group_by
+                group_by = nonshared_coord_dims
             )
 
             # Load all necessary samples that were not loaded
@@ -743,14 +727,14 @@ class Outputs(object):
                 if self.settings.get('n_workers',1) > 1:
                     output_datasets = self.get_sweep_outputs_concurrently(
                         sample_names = samples_not_loaded,
-                        group_by = group_by
+                        group_by = nonshared_coord_dims
                     )
 
                 # Do it sequentially
                 else:
                     output_datasets = self.get_sweep_outputs_sequentially(
                         sample_names = samples_not_loaded,
-                        group_by = group_by
+                        group_by = nonshared_coord_dims
                     )
                 
                 # Create xarray dataset
@@ -761,10 +745,21 @@ class Outputs(object):
                         
                         # Homogeneous data arrays are the ones that have common coordinates
                         # along all core dimensions and group_by dimensions
+                        # Group by contains all sweeps + extra non-sweeped vars
+
+                        # If there is no extra var in group by apart from sweep vars and input dims
+                        # every output dataset correponds to a different group
+                        # otherwise some groups need to be merged 
+                        # if not self.settings.get('group_by',[]):
+                        #     self.data.initialise_sample_groups_sequentially(
+                        #         output_datasets = [x for x in [ds.pop(sample_name,None) for ds in output_datasets] if x is not None],
+                        #         sample_name = sample_name
+                        #     )
+                        # else:
                         self.data.group_samples_sequentially(
                             output_datasets = [x for x in [ds.pop(sample_name,None) for ds in output_datasets] if x is not None],
                             sample_name = sample_name,
-                            group_by = group_by
+                            group_by = nonshared_coord_dims
                         )
 
                         # Combine coords for each list element of the Data Collection
@@ -773,7 +768,7 @@ class Outputs(object):
                             combined_coords = self.data.combine_by_coords_concurrently(
                                 indx = indx,
                                 sample_name = sample_name,
-                                combined_dims = combined_dims
+                                combined_dims = shared_coord_dims
                             )
                             # Add results to self
                             for cc in combined_coords:
@@ -784,7 +779,7 @@ class Outputs(object):
                         else:
                             self.data.combine_by_coords_sequentially(
                                 sample_name = sample_name,
-                                combined_dims = combined_dims
+                                combined_dims = shared_coord_dims
                             )
                         
                         # Write sample data collection to file
@@ -801,7 +796,7 @@ class Outputs(object):
             # Load data array for this given sweep
             data_array = self.load_single(
                 sample_names = self.output_names,
-                group_by = group_by,
+                group_by = nonshared_coord_dims,
                 sweep = None,
             )
             for sample_name,sample_data in data_array.items():
@@ -1204,12 +1199,16 @@ class Outputs(object):
                     samples_not_loaded.remove(sample_name)
                     
             self.logger.info(f"Creating Data Collection for each group.")
+
             # Pass all samples into a data collection object
             self.data = DataCollection(
                 data = data_arrs,
                 group_by = group_by,
                 logger = self.logger
             )
+            # print('\n\n AFTER')
+            # for i in range(len(self.data)):
+            #     print(self.data.table[i].dims)
             return samples_not_loaded
         
     def read_xr_data_sequentially(self,all_groups,samples_to_load:list,dirpath:str):
@@ -1220,7 +1219,7 @@ class Outputs(object):
             leave = False,
             miniters = 1,
             position = 0,
-            desc = f"Reading group data"
+            desc = f"Reading {','.join(samples_to_load)} group data"
         ):
             try:
                 sample_dict = read_xr_data(
@@ -1244,15 +1243,16 @@ class Outputs(object):
         
         return data_arrs,sample_names_loaded
     
-    def read_xr_data_concurrently(self,all_groups,samples_not_loaded:list,dirpath:str):
+    def read_xr_data_concurrently(self,all_groups,samples_to_load:list,dirpath:str):
         # Gather h5 data from multiple files
         # and store them in xarrays
         data_arrs = []
+        sample_names_loaded = set([])
 
         # Initialise progress bar
         progress = tqdm(
             total = len(all_groups),
-            desc = f"Reading {','.join(samples_not_loaded)} group concurrently",
+            desc = f"Reading {','.join(samples_to_load)} group concurrently",
             leave = False,
             miniters = 1,
             position = 0
@@ -1267,15 +1267,14 @@ class Outputs(object):
                     sample_data = list(res.values())[0]
                     # append array to data arrays
                     if sample_data is not None:
-                        data_arrs.append(sample_data)
-                    # remove loaded sample from consideration
-                    # since it has been succesfully loaded
-                    if sample_name in samples_not_loaded and sample_data is not None:
-                        samples_not_loaded.remove(sample_name)
+                        data_arrs.append(sample_data.astype(DATA_SCHEMA[sample_name]["dtype"]))
+                    # add sample name to set of sample names loaded
+                    sample_names_loaded.add(sample_name)
+
             except (MissingFiles,CorruptedFileRead):
                 pass
             except Exception as exc:
-                raise ValueError(f"Reading {','.join(samples_not_loaded)} group concurrently failed") from exc
+                raise ValueError(f"Reading {','.join(samples_to_load)} group concurrently failed") from exc
 
         with BoundedQueueProcessPoolExecutor(max_waiting_tasks = 2*self.settings.get('n_workers',1)) as executor:
             # Start the processes and ignore the results
@@ -1299,7 +1298,7 @@ class Outputs(object):
             executor.shutdown(wait = True)
             safe_delete(executor)
 
-        return data_arrs,samples_not_loaded
+        return data_arrs,sample_names_loaded
         
     def get_sweep_outputs_sequentially(
         self,
@@ -1601,7 +1600,8 @@ class Outputs(object):
                 # Find sweep dimensions that are not core coordinates
                 sweep_dims = [d for d in sample_data.dims if d not in (list(CORE_COORDINATES_DTYPES.keys()))]
                 
-                # print(iter_dims,sweep_dims)
+                # print('existing',sample_data.dims)
+                # print('stacking',iter_dims,sweep_dims)
 
                 # Stack variables and reorder data
                 if len(sweep_dims) > 0 and len(iter_dims) > 0:
@@ -1775,18 +1775,39 @@ class DataCollection(object):
         self.logger.setLevels(
             console_level = level
         )
+        # Store length temporarily
+        self.data_length = deepcopy(len(data))
 
         if len(data) > 0:
+
             if isinstance(data, list):
                 # All items must be of type xarray data array
                 assert all([isinstance(datum,xr.DataArray) for datum in data])
 
                 # Update sample data collection
-                for datum in tqdm(data, desc = 'Grouping Data Collection samples sequentially'):
+                for i in tqdm(
+                    reversed(list(range(self.data_length))), 
+                    total = self.data_length,
+                    desc = 'Grouping/Initialising Data Collection samples sequentially'
+                ):
+                    # datum = 
+                    # if kwargs.get('group_by',[]):
                     self.group_sample(
-                        datum,
+                        data.pop(i),
                         group_by = kwargs.get('group_by',[])
                     )
+                    # else:
+                    #     # Get sample name
+                    #     sample_name = datum.attrs['arr_name']
+                    #     dat = Dataset()
+                    #     setattr(
+                    #         dat,
+                    #         sample_name,
+                    #         datum
+                    #     )
+                    #     # print(i,dict(datum.sizes))
+                    #     self[i] = dat
+                        
                 # Combine coords for each list element of the Data Collection
                 for sample_name in vars(self).keys():
                     if sample_name in DATA_SCHEMA:
@@ -1799,7 +1820,7 @@ class DataCollection(object):
                             desc = 'Combining Data Collection group elements'
                         ):
                             # Combine by coords iff there are more than one elements in the group
-                            if len(datum) > 1:
+                            if len(group_datum) > 1:
                                 getattr(
                                     self,
                                     sample_name
@@ -1849,33 +1870,38 @@ class DataCollection(object):
             # Compute intersection of shared dims provided
             # and dims existing in sample
             existing_dims = list(getattr(self,sample_name)[0][0].dims)
-            sample_shared_dims = sample_shared_dims.intersection(set(existing_dims))
+            existing_sample_shared_dims = sample_shared_dims.intersection(set(existing_dims))
+            # Are there any dims in the data that are not in the set of shared dims
+            non_shared_dims = set(existing_dims).difference(sample_shared_dims)
+            # print('sample_shared_dims',sample_shared_dims)
             # Create a slice of dimensions that should be shared
-            shared_dims_slice = dict(zip(list(sample_shared_dims),[slice(None)]*len(sample_shared_dims)))
-
-            for i,datum in enumerate(getattr(self,sample_name)):
-                # Check if old and new data arrays share exactly the same coordinates along specified dimensions
-                # Then update the old data array
-                coordinates_matched = all([
-                    set(datum[0].coords.get(k).values) == set(new_data.coords.get(k).values)
-                    for k in shared_dims_slice
-                ])
-                if coordinates_matched:
-                    getattr(
-                        self,
-                        sample_name
-                    )[i].append(new_data)
-                    complete = True
-                    # No need for more searching
-                    # Otherwise new outputs will be appended at the end
-                    break
+            shared_dims_slice = dict(zip(list(existing_sample_shared_dims),[slice(None)]*len(existing_sample_shared_dims)))
+            
+            if non_shared_dims:
+                for i,datum in enumerate(getattr(self,sample_name)):
+                    # Check if old and new data arrays share exactly the same coordinates along specified dimensions
+                    # Then update the old data array
+                    coordinates_matched = all([
+                        set(datum[0].coords.get(k).values) == set(new_data.coords.get(k).values)
+                        for k in shared_dims_slice
+                    ])
+                    if coordinates_matched:
+                        getattr(
+                            self,
+                            sample_name
+                        )[i].append(new_data)
+                        complete = True
+                        # No need for more searching
+                        # Otherwise new outputs will be appended at the end
+                        break
             # Just add this new data array to the collection
-            if not complete:
+            if not complete or not non_shared_dims:
                 getattr(
                     self,
                     sample_name
                 ).append([new_data])
-    
+
+
     def group_samples_sequentially(self,output_datasets,sample_name:str,group_by:list=[]):
         for datasets in tqdm(
             output_datasets,
@@ -1888,6 +1914,27 @@ class DataCollection(object):
                 new_data = datasets,
                 group_by = group_by
             )
+
+    def initialise_sample_groups_sequentially(self,output_datasets,sample_name:str):
+        # This corresponds to the case where every output dataset corresponds to a unique group
+        # Get number of output datasets
+        n_datasets = len(output_datasets)    
+        for i,dataset in tqdm(
+            enumerate(output_datasets),
+            total = n_datasets,
+            leave = False,
+            miniters = 1,
+            position = 0,
+            desc = f'Initialising {sample_name} sample groups sequentially'
+        ):
+            # Get sample name
+            dat = Dataset()
+            setattr(
+                dat,
+                sample_name,
+                dataset
+            )
+            self[i] = dat
 
     def combine_by_coords_sequentially(self,sample_name:str,combined_dims:list):
         dataset_list = getattr(
@@ -1992,7 +2039,7 @@ class DataCollection(object):
     def __getitem__(self,index:int,sample_names:list = None):
         new_data = deepcopy(self)
         # Get intersection of provided and available sample names
-        sample_names = sample_names if sample_names is not None else list(self._vars_().keys())
+        sample_names = sample_names if sample_names else list(self._vars_().keys())
         sample_names = set(sample_names).intersection(set(list(self._vars_().keys())))
         for sample_name, sample_data in self._vars_().items():
             if int(index) >= len(getattr(self,sample_name)):
@@ -2007,9 +2054,6 @@ class DataCollection(object):
 
     def __setitem__(self, index:int, new_data):
         for sample_name in vars(new_data).keys():
-            # Get intersection of provided and available sample names
-            sample_names = sample_names if sample_names is not None else list(self._vars_().keys())
-            sample_names = set(sample_names).intersection(set(list(self._vars_().keys())))
             if sample_name in DATA_SCHEMA and sample_name in self._vars_():
                 if int(index) >= len(getattr(self,sample_name)):
                     raise KeyError(f"Sample {sample_name} index {index} out of bounds for length {len(getattr(self,sample_name))}.")
@@ -2019,6 +2063,24 @@ class DataCollection(object):
                 )[index] = getattr(
                     new_data,
                     sample_name
+                )
+            elif sample_name in DATA_SCHEMA and sample_name not in self._vars_():
+                # Initialise sample data
+                setattr(
+                    self,
+                    sample_name,
+                    [[]]*self.data_length
+                )
+                getattr(
+                    self,
+                    sample_name
+                )[index] = getattr(
+                    new_data,
+                    sample_name
+                )
+            else: 
+                raise InvalidDataNames(
+                    f"Invalid data {list(vars(new_data).keys())} added to Data Collection"
                 )
     
     def __delitem__(self,index:int,sample_names:list = None):
@@ -2389,7 +2451,16 @@ class OutputSummary(object):
             # NOTE: If metadata key is sweeped
             # the metadata are included in the sweep columns 
             # of the expression_data_df
-                
+            # Convert all iterable metadata to strings 
+            if isinstance(useful_metadata[key],Iterable):
+                useful_metadata[key] = stringify(
+                    useful_metadata[key], 
+                    scientific = False
+                )
+
+        # for k,v in useful_metadata.items():
+            # print(k,type(v),v)
+
         # Add useful metadata to metric and operation data
         expression_data_df = expression_data_df.assign(
             folder = os.path.join(outputs.outputs_path),
@@ -2442,6 +2513,8 @@ class OutputSummary(object):
         
         # Load all output data
         outputs.load(indx = indx)
+
+        # print(outputs.data)
 
         return outputs
 

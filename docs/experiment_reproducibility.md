@@ -253,7 +253,7 @@ DITTO for the intensity samples:
 
 ```
 clear; multiresticodm plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
--dn cambridge_work_commuter_lsoas_to_msoas/exp3 -et JointTableSIM_NN_SweepedNoise_01_02_2024_14_55_23 \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp3 -et JointTableSIM_NN \
 -el np -el MathUtils -el xr \
 -e table_coverage_probability_size "xr.apply_ufunc(lambda x: np.exp(6*x), coverage_probability(prediction=table,ground_truth=ground_truth).mean(['origin','destination']))" \
 -e table_srmse "srmse(prediction=table.mean(['id']),ground_truth=ground_truth)" \
@@ -262,15 +262,51 @@ clear; multiresticodm plot 2d scatter -y table_srmse -x loss_name --x_discrete  
 -ea "srmse=MathUtils.srmse" -ea "coverage_probability=MathUtils.coverage_probability" \
 -k sigma -k type -k name -k title -k loss_name \
 -cs "~da.loss_name.isin([str(['total_table_distance_loss','total_intensity_distance_loss'])])" \
--cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
--mrkr sigma -c title -msz table_coverage_probability_size -op 0.5 -or asc table_coverage_probability_size -l sigma -l title \
--fs 10 10 -ff ps -ft 'figure4/loss_function_validation' \
+-cs "da.title.isin(['_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained'])" \
+-fs 10 10 -ff ps -ft 'figure4/loss_function_validation_intractable_odms' \
+-mrkr sigma -c title -msz table_coverage_probability_size -or asc table_coverage_probability_size -l sigma -l title \
 -xlab 'Loss operator $\mathcal{L}$' -ylab 'SRMSE$\left(\mathbb{E}\left[\mytable^{(1:N)}\right],\mytable^{\mathcal{D}}\right)$' \
 -ylim 0.0 2.2 -xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 1
+```
+
+-cs "da.title.isin(['_total_constrained','_row_constrained'])" \
+-fs 10 10 -ff ps -ft 'figure4/loss_function_validation_tractable_odms' \
+
+-cs "da.title.isin(['_total_constrained','_row_constrained','_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained'])" \
+-fs 10 10 -ff ps -ft 'figure4/loss_function_validation_all_odms' \
+Load plot data and replot
+
+```
+clear; multiresticodm plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
+-pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp3/paper_figures/figure4/ \
+-fs 10 10 -ff ps -ft 'figure4_loss_function_validation_all_odms' \
+-xlab 'Loss operator $\lossoperator$' -ylab 'SRMSE$\left(\mathbb{E}\left[\mytable^{(1:N)}\right],\mytable^{\mathcal{D}}\right)$' \
+-la 0 0 -lc 2 -loc 'upper center' -bbta 0.5 -bbta 1.4 -lls 14 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 12 16 \
+-xtp 0 92 -ytl 0.0 0.2 -xtl 3 3 -xtl 3 3 -xlim 0 27 -ylim 0 1.4 -xtr 75 0
 ```
 
 DITTO for the intensity samples:
 
 ```
 
+```
+
+### VARIOUS TESTS
+
+```
+clear; multiresticodm plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp3 -et JointTableSIM_NN \
+-el np -el MathUtils -el xr \
+-e table_srmse "srmse(prediction=table.mean(['id']),ground_truth=ground_truth)" \
+-ea table \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "srmse=MathUtils.srmse" \
+-k sigma -k type -k name -k title -k loss_name \
+-cs "~da.loss_name.isin([str(['total_table_distance_loss','total_intensity_distance_loss'])])" \
+-cs "da.title.isin(['_total_constrained','_row_constrained','_doubly_constrained'])" \
+-btt 'id' 100 100 1000 \
+-mrkr sigma -c title -l sigma -l title \
+-fs 10 10 -ff ps -ft 'figure4/loss_function_validation_table_with_cell_constraints' \
+-xlab 'Loss operator $\mathcal{L}$' -ylab 'SRMSE$\left(\mathbb{E}\left[\mytable^{(1:N)}\right],\mytable^{\mathcal{D}}\right)$' \
+-ylim 0.0 2.2 -xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 20
 ```

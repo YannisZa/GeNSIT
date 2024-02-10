@@ -539,25 +539,27 @@ class Config:
         sweep_dims = list(self.sweep_params['isolated'].keys())
         sweep_dims += list(self.sweep_params['coupled'].keys())
 
-        group_by = []
-        combined_dims = []
+        # Get list of all dimensions whose values will differ by group (collection id)
+        nonshared_coord_dims = set([])
+        # Get list of all dimensions whose values will be shared amongst groups 
+        # (they will be merged during grouping)
+        shared_coord_dims = set([])
         # Get all non-core sweep dims
         non_core_sweep_dims = [k for k in sweep_dims if k not in CORE_COORDINATES_DTYPES]
-        for gb in list(group_by)+non_core_sweep_dims:
+
+        for gb in sorted(list(group_by)+non_core_sweep_dims):
             # If this is an isolated sweep parameter
             # add it to the group by
             if gb in self.sweep_params['isolated']:
-                group_by.append(gb)
+                nonshared_coord_dims.add(gb)
             # If it is a coupled sweep parameter
             # add the coupled parameters too
             if gb in self.sweep_params['coupled']:
-                group_by.append(gb)
+                nonshared_coord_dims.add(gb)
                 # If this parameter is the target name
                 # add its coupled parameters to the group by
                 for coupled_param in self.sweep_params['coupled'].get(gb,[]):
-                    # Make sure there are no duplicate group by params
-                    if coupled_param['var'] not in group_by:
-                        group_by.append(coupled_param['var'])
+                    nonshared_coord_dims.add(coupled_param['var'])
             # If this parameter is the coupled parameter
             # of a target name add the target name and 
             # the rest of the coupled parameters to the group by
@@ -565,20 +567,21 @@ class Config:
             if target_name != 'none':
                 for coupled_param in self.sweep_params['coupled'].get(target_name,[]):
                     # Add target name
-                    if target_name not in group_by:
-                        group_by.append(target_name)
+                    nonshared_coord_dims.add(target_name)
                     # Add rest of coupled params
-                    if coupled_param['var'] not in group_by:
-                        group_by.append(coupled_param['var'])
+                    nonshared_coord_dims.add(coupled_param['var'])
         
         for dim in self.sweep_params['isolated'].keys():
-            if dim not in group_by:
-                combined_dims.append(dim)
+            if dim not in nonshared_coord_dims:
+                shared_coord_dims.add(dim)
         for vals in self.sweep_params['coupled'].values():
-            for coupled_dims in vals :
-                if coupled_dims['var'] not in group_by:
-                    combined_dims.append(coupled_dims['var'])
-        return group_by,combined_dims
+            for coupled_dims in vals:
+                if coupled_dims['var'] not in nonshared_coord_dims:
+                    shared_coord_dims.add(coupled_dims['var'])
+
+        # print(sorted(list(nonshared_coord_dims))) 
+        # print(sorted(list(shared_coord_dims)))
+        return sorted(list(nonshared_coord_dims)), sorted(list(shared_coord_dims))
         
     def validate(self,parameters = None,settings = None,base_schema = None,key_path=[],**kwargs):
         # Pass defaults if no meaningful arguments are provided

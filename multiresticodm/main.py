@@ -604,8 +604,6 @@ def plot_coordinate_options(func):
               type=click.Choice(LEGEND_LOCATIONS), help = f'Sets the legend locations.')
 @click.option('--legend_cols', '-lc', default=1, show_default = True,
               type=click.IntRange(min=1), help = f"Sets the legend's number of columns.")
-@click.option('--legend_cols', '-lc', default=1, show_default = True,
-              type=click.IntRange(min=1), help = f"Sets the legend's number of columns.")
 @click.option('--legend_col_spacing', '-lcs', default=None, show_default = True,
               type=click.FloatRange(min=0.0), help = f"Sets the legend's spacing between columns.")
 @click.option('--legend_pad', '-lp', default=None, show_default = True,

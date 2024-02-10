@@ -135,18 +135,19 @@ RAW_EXPRESSIONS = {
     "_doubly_20%_cell_constrained":'$\\mathbf{T}_{+\\cdot},\\mathbf{T}_{\\cdot +},\\mathbf{T}_{\\mathcal{X}_2}$',
     "TotallyConstrained":'$\\Lambda_{++}$',
     "ProductionConstrained":'$\\boldsymbol{\\Lambda}_{+\\cdot}$',
-    "['dest_attraction_ts_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity,\\mathbf{x}; \\mathbf{y}, \\boldsymbol{\\sigma}_d\\right)$',
-    "['dest_attraction_ts_likelihood_loss','total_intensity_distance_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\myintenisty}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
-    "['dest_attraction_ts_likelihood_loss','total_intensity_distance_likelihood_loss']":'$L\\left(\\myintensity,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\myintenisty}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
-    "['dest_attraction_ts_likelihood_loss','total_table_distance_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
-    "['dest_attraction_ts_likelihood_loss','total_table_distance_likelihood_loss']":'$L\\left(\\mytable,\\mathbf{x}; \\mathbf{y}, \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
-    "['table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity\\right)$',
-    "['total_intensity_distance_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity; \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d\\right)$',
-    "['total_intensity_distance_likelihood_loss']":'$L\\left(\\myintensity; \\mathbf{D}^{\\myintensity}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
-    "['total_intensity_distance_loss']":'$L\\left(\\myintensity; \\mathbf{D}^{\\myintensity}_{\cdot+}\\right)$',
-    "['total_table_distance_likelihood_loss','table_likelihood_loss']":'$L\\left(\\mytable,\\myintensity; \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
-    "['total_table_distance_likelihood_loss']":'$L\\left(\\mytable; \\mathbf{D}^{\\mytable}_{\cdot+}, \\boldsymbol{\\sigma}_d \\right)$',
-    "['total_table_distance_loss']":'$L\\left(\\mytable; \\mathbf{D}^{\\mytable}_{\cdot+} \\right)$'
+    "dest_attraction_ts_likelihood_loss":"$\\lossoperator\\left(\\mathbf{x} \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mathbf{x}, \\mytable, \\myintensity \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mathbf{x},\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss":"$\\lossoperator\\left( \\mathbf{x}, \\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mathbf{x},\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss":"$\\lossoperator\\left( \\mathbf{x}, \\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
+    "table_likelihood_loss":"$\\lossoperator\\left(\\mytable, \\myintensity \\right)$",
+    "total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
+    "total_intensity_distance_likelihood_loss":"$\\lossoperator\\left(\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
+    "total_intensity_distance_loss":"$\\lossoperator\\left(\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
+    "total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
+    "total_table_distance_likelihood_loss":"$\\lossoperator\\left(\\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
+    "total_table_distance_loss":"$\\lossoperator\\left(\\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$"
 }
 LABEL_EXPRESSIONS = {
     "sigma": '$\\sigma = '
@@ -208,7 +209,9 @@ LATEX_PREAMBLE = r'''
 \newcommand{\tableconstraints}{\mathcal{C}_{\mytableoned}}
 \newcommand{\intensityconstraints}{\mathcal{C}_{\myintensityoned}}
 \newcommand{\allconstraints}{\mathcal{C}}
-\newcommand{\groundtruthtable}{\mytable^{\mathcal{D}}}
+\newcommand{\lossoperator}{\mathcal{L}}
+\newcommand{\obsdata}{\mathcal{D}}
+\newcommand{\groundtruthtable}{\mytable^{\obsdata}}
 '''
 
 # "pgf.texsystem": "xelatex",

@@ -351,10 +351,10 @@ class Plot(object):
                         tick_step_loc
                     )[:len(ticks[i]['labels'])]
                 # print(var,'locations',tick_type,ticks[i]['locations'])
-            except IndexError:
+            except (IndexError,AssertionError):
                 traceback.print_exc()
                 ticks[i]['unique'] = [None]
-                pass
+                continue
             except Exception:
                 traceback.print_exc()
                 sys.exit()
@@ -388,18 +388,25 @@ class Plot(object):
                         scientific = self.settings.get(f"{var}_scientific",False)
                     )] = tick_location
             else:
+                # print(major,major_index,len(ticks[0]['unique']))
                 # If there is no minor tick then the location is simply the 
                 # major's first (and only location)
                 if self.settings.get(tick_locator_var,None):
+                    tick_location = major_index*self.settings[tick_locator_var][0][1] + \
+                        self.settings[tick_locator_var][0][0]
                     hashmap[stringify(
                         major,
                         scientific = self.settings.get(f"{var}_scientific",False)
-                    )] = major_index + self.settings[tick_locator_var][0][0]
+                    )] = tick_location
                 else:
+                    tick_location = major_index
                     hashmap[stringify(
                         major,
                         scientific = self.settings.get(f"{var}_scientific",False)
-                    )] = major_index
+                    )] = tick_location
+                    # print('default major tick loc')
+
+                # print(tick_location)
                 # Delete minor ticks from list
                 if len(ticks) == 2:
                     ticks.pop()
@@ -493,7 +500,6 @@ class Plot(object):
                 # print(var,group_hashmap[var])
         # Store whether subplots will be created
         subplots_exist = any([v for v in group_hashmap.values()])
-        
         # Get axes ids and arange them in order
         self.axids = {}
         # Count number of axes ids
@@ -517,7 +523,7 @@ class Plot(object):
                 )
         
         # print(plot_settings['x'])
-        # print(discrete_hashmaps['x'])
+        print(discrete_hashmaps['x'])
         # print(group_hashmap)
         # print(discrete_ticks['x'])
         
@@ -889,7 +895,7 @@ class Plot(object):
         
         # Tight layout
         if self.settings.get('figure_format','pdf') == 'ps':
-            fig.tight_layout(rect=(0, 0, 0.8, 1))
+            fig.tight_layout(rect=(0, 0, 0.7, 1.1))
         else:
             fig.tight_layout()
 
@@ -1186,7 +1192,14 @@ class Plot(object):
                 # print(key,merged_settings[key])
 
         return [merged_settings]
-
+    
+    def flatten_merged_settings(self,merged_data):
+        for key in merged_data.keys():
+            if key in ['outputs']:
+                continue
+            merged_data[key] = [x for xs in merged_data[key] for x in xs]
+        return merged_data
+    
     def create_plot_filename(self,plot_setting,**kwargs):
         # Get filename
         filename = [
@@ -1252,57 +1265,67 @@ class Plot(object):
                     # Find data in json format
                     # no other format is acceptable
                     files = list(glob(os.path.join(plot_data_dir,"*data.json"),recursive = False))
-
                     # If nothing was found return false
                     if len(files) <= 0:
                         continue
                     # Try to read first file
-                    plot_sett = read_file(files[0])
-
-                    # Canonicalise the data
-                    if isinstance(plot_sett,pd.DataFrame):
-                        plot_sett = dict(plot_sett.to_dict())
-                    elif isinstance(plot_sett,list):
-                        plot_sett = plot_sett[0]
+                    for fl in files:
+                        plot_sett = read_file(fl)
                     
-                    # Extract outputs
-                    if 'outputs' not in plot_sett:
-                        continue
-                    else:
-                        # Try to load outputs
-                        if isinstance(plot_sett['outputs'],dict):
-                            # Instantiate config
-                            config = Config(
-                                settings = plot_sett['outputs'],
-                                logger = self.logger
-                            )
-                            # Get sweep-related data
-                            config.get_sweep_data()
-                        elif isinstance(plot_sett['outputs'],str):
-                            # Instantiate config
-                            config = Config(
-                                settings = plot_sett['outputs'],
-                                logger = self.logger
-                            )
-                            # Get sweep-related data
-                            config.get_sweep_data()
-                        else:
-                            self.logger.warning(f"Outputs are of type {type(plot_sett['outputs'])} and not dict.")
+                        # Canonicalise the data
+                        if isinstance(plot_sett,pd.DataFrame):
+                            plot_sett = dict(plot_sett.to_dict())
+                        elif isinstance(plot_sett,list):
+                            plot_sett = plot_sett[0]
+                        
+                        # Extract outputs
+                        if 'outputs' not in plot_sett:
                             continue
+                        else:
+                            # Try to load outputs
+                            if isinstance(plot_sett['outputs'],dict):
+                                # Instantiate config
+                                config = Config(
+                                    settings = plot_sett['outputs'],
+                                    logger = self.logger
+                                )
+                                # Get sweep-related data
+                                config.get_sweep_data()
+                            elif isinstance(plot_sett['outputs'],str):
+                                # Instantiate config
+                                config = Config(
+                                    settings = plot_sett['outputs'],
+                                    logger = self.logger
+                                )
+                                # Get sweep-related data
+                                config.get_sweep_data()
+                            else:
+                                self.logger.warning(f"Outputs are of type {type(plot_sett['outputs'])} and not dict.")
+                                continue
+                        
+                            # Instantiate outputs
+                            plot_sett.update(dict(
+                                outputs = Outputs(
+                                    config = config,
+                                    settings = self.settings,
+                                    data_names = self.settings['sample'],
+                                    logger = self.logger,
+                                    slice = False
+                                )
+                            ))
                     
-                        # Instantiate outputs
-                        plot_sett.update(dict(
-                            outputs = Outputs(
-                                config = config,
-                                settings = self.settings,
-                                data_names = self.settings['sample'],
-                                logger = self.logger,
-                                slice = False
-                            )
-                        ))
-                    
-                    plot_settings.append(plot_sett)
-
+                        plot_settings.append(plot_sett)
+                
+                # merged_plot_settings = self.merge_plot_settings(
+                #     plot_settings,
+                #     apply_zorder = False
+                # )
+                # merged_plot_settings = self.flatten_merged_settings(
+                #     merged_data = merged_plot_settings[0]
+                # )
+                # print_json({k:(v.config.settings if isinstance(v,Outputs) else v) for k,v in merged_plot_settings.items()},indent=2)
+                # sys.exit()
+            # print(plot_settings)
             return True,plot_settings
 
         else:
@@ -1359,7 +1382,7 @@ class Plot(object):
                                     meta = meta
                                 )
                             )
-                            # print_json({k:plot_sett[k] for k in PLOT_COORDINATES_AND_CORE_FEATURES if k in plot_sett})
+                            print_json({k:plot_sett[k] for k in ['x','y','marker_size'] if k in plot_sett})
 
                             # Add data
                             plot_settings.append(deepcopy(plot_sett))
