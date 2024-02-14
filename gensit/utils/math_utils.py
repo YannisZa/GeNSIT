@@ -11,7 +11,7 @@ from torch import int32, float32
 from scipy.special import gammaln
 from itertools import chain, combinations
 
-from multiresticodm.utils.misc_utils import flatten,is_sorted
+from gensit.utils.misc_utils import flatten,is_sorted
 
 
 def log_factorial_sum(arr):

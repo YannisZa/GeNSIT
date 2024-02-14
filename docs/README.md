@@ -13,10 +13,10 @@ Give the repository a star and fork it if you like it!
 ## Installation
 
 ```
-conda create --name mrticodm
-conda activate mrticodm
+conda create --name gensit
+conda activate gensit
 python3 -m pip install -e .
-multiresticodm --help
+gensit --help
 ```
 
 ## Datasets

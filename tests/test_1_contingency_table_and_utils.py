@@ -7,10 +7,10 @@ import numpy as np
 # from pprint import pprint
 from copy import deepcopy
 from argparse import Namespace
-from multiresticodm.config import Config
-from multiresticodm.utils.misc_utils import f_to_df,df_to_f,f_to_array,array_to_f
-from multiresticodm.utils.math_utils import logsumexp,normalise,normalised_manhattan_distance
-from multiresticodm.contingency_table import ContingencyTable2D
+from gensit.config import Config
+from gensit.utils.misc_utils import f_to_df,df_to_f,f_to_array,array_to_f
+from gensit.utils.math_utils import logsumexp,normalise,normalised_manhattan_distance
+from gensit.contingency_table import ContingencyTable2D
 
 @pytest.fixture
 def default_config():

@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from argparse import Namespace
-from multiresticodm.config import Config
-from multiresticodm.utils.misc_utils import *
-from multiresticodm.contingency_table import instantiate_ct
-from multiresticodm.markov_basis import instantiate_markov_basis
-from multiresticodm.spatial_interaction_model import ProductionConstrained
-from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from gensit.config import Config
+from gensit.utils.misc_utils import *
+from gensit.contingency_table import instantiate_ct
+from gensit.markov_basis import instantiate_markov_basis
+from gensit.spatial_interaction_model import ProductionConstrained
+from gensit.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 
 @pytest.fixture
 def default_config():

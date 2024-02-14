@@ -13,10 +13,10 @@ from torch import int32, uint8
 from num2words import num2words
 from typing import List, Union, Callable
 
-from multiresticodm.config import Config
-from multiresticodm.static.global_variables import *
-from multiresticodm.utils.math_utils import powerset
-from multiresticodm.utils.misc_utils import ndims, setup_logger, unpack_dims, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast, print_json, deep_call
+from gensit.config import Config
+from gensit.static.global_variables import *
+from gensit.utils.math_utils import powerset
+from gensit.utils.misc_utils import ndims, setup_logger, unpack_dims, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast, print_json, deep_call
 
 # -> Union[ContingencyTable,None]:
 def instantiate_ct(config: Config, **kwargs):

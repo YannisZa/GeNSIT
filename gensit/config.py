@@ -9,11 +9,11 @@ from copy import deepcopy
 from itertools import product
 from collections.abc import Iterable
 
-from multiresticodm import ROOT
-from multiresticodm.utils.exceptions import *
-from multiresticodm.static.global_variables import deep_walk, CORE_COORDINATES_DTYPES
-from multiresticodm.utils.config_data_structures import instantiate_data_type
-from multiresticodm.utils.misc_utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify, string_to_numeric, print_json
+from gensit import ROOT
+from gensit.utils.exceptions import *
+from gensit.static.global_variables import deep_walk, CORE_COORDINATES_DTYPES
+from gensit.utils.config_data_structures import instantiate_data_type
+from gensit.utils.misc_utils import deep_apply, flatten, setup_logger, read_json, expand_tuple, unique, sigma_to_noise_regime, stringify, string_to_numeric, print_json
 
 class Config:
 

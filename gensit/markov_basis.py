@@ -8,8 +8,8 @@ from torch import int32
 from tqdm.auto import tqdm
 from typing import Dict,Tuple,List
 
-from multiresticodm.utils.misc_utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string, unpack_dims, ndims
-from multiresticodm.contingency_table import ContingencyTable
+from gensit.utils.misc_utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string, unpack_dims, ndims
+from gensit.contingency_table import ContingencyTable
 
 def instantiate_markov_basis(ct:ContingencyTable,**kwargs): #-> Union[MarkovBasis,None]:
     if hasattr(sys.modules[__name__], ct.markov_basis_class):

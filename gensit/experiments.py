@@ -9,19 +9,19 @@ from datetime import datetime
 from torch import float32, uint8
 from multiprocessing import Manager
 
-from multiresticodm.config import Config
-from multiresticodm.inputs import Inputs
-from multiresticodm.outputs import Outputs
-from multiresticodm.utils.misc_utils import *
-from multiresticodm.static.global_variables import *
-from multiresticodm.utils.math_utils import torch_optimize
-from multiresticodm.contingency_table import instantiate_ct
-from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.spatial_interaction_model import instantiate_sim
-from multiresticodm.utils.multiprocessor import BoundedQueueProcessPoolExecutor
-from multiresticodm.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
-from multiresticodm.harris_wilson_model_mcmc import instantiate_harris_wilson_mcmc
-from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from gensit.config import Config
+from gensit.inputs import Inputs
+from gensit.outputs import Outputs
+from gensit.utils.misc_utils import *
+from gensit.static.global_variables import *
+from gensit.utils.math_utils import torch_optimize
+from gensit.contingency_table import instantiate_ct
+from gensit.harris_wilson_model import HarrisWilson
+from gensit.spatial_interaction_model import instantiate_sim
+from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
+from gensit.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
+from gensit.harris_wilson_model_mcmc import instantiate_harris_wilson_mcmc
+from gensit.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 
 # Suppress scientific notation
 np.set_printoptions(suppress = True)

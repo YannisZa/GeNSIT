@@ -1,8 +1,8 @@
 import os
 import numpy as np
 
-from multiresticodm.utils.misc_utils import write_txt
-from multiresticodm.contingency_table import ContingencyTable2D
+from gensit.utils.misc_utils import write_txt
+from gensit.contingency_table import ContingencyTable2D
 
 # Specify path to table
 table_filenames = ['./data/inputs/cambridge_work_commuter_lsoas_to_msoas/table_lsoas_to_msoas.txt',

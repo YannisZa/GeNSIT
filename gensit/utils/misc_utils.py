@@ -27,10 +27,10 @@ from collections.abc import Iterable,MutableMapping,Mapping,Sequence
 
 
 
-from multiresticodm.utils.exceptions import *
-from multiresticodm.utils.logger_class import *
-from multiresticodm.static.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS, DATA_SCHEMA
-from multiresticodm.static.plot_variables import LABEL_EXPRESSIONS, RAW_EXPRESSIONS
+from gensit.utils.exceptions import *
+from gensit.utils.logger_class import *
+from gensit.static.global_variables import NUMPY_TYPE_TO_DAT_TYPE,OPERATORS, DATA_SCHEMA
+from gensit.static.plot_variables import LABEL_EXPRESSIONS, RAW_EXPRESSIONS
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):

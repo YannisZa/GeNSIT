@@ -1,8 +1,8 @@
 import click
 from copy import deepcopy
 
-from multiresticodm.static.global_variables import *
-from multiresticodm.utils.misc_utils import unstringify
+from gensit.static.global_variables import *
+from gensit.utils.misc_utils import unstringify
 def btt_callback(ctx, param, value):
     if value is None:
         return {}

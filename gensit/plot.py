@@ -21,11 +21,11 @@ from argparse import Namespace
 from statsmodels.graphics.tsaplots import plot_acf
 from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
 
-from multiresticodm.config import Config
-from multiresticodm.utils.misc_utils import *
-from multiresticodm.static.plot_variables import *
-from multiresticodm.static.global_variables import *
-from multiresticodm.outputs import Outputs,OutputSummary
+from gensit.config import Config
+from gensit.utils.misc_utils import *
+from gensit.static.plot_variables import *
+from gensit.static.global_variables import *
+from gensit.outputs import Outputs,OutputSummary
 
 
 # LaTeX font configuration

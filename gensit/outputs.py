@@ -21,21 +21,21 @@ from itertools import product
 from typing import Union,List,Tuple
 from itertools import product,chain
 
-from multiresticodm.config import Config
-from multiresticodm.inputs import Inputs
-from multiresticodm.utils.misc_utils import *
-from multiresticodm.utils.exceptions import *
-from multiresticodm.static.global_variables import *
-from multiresticodm.spatial_interaction_model import *
-from multiresticodm.utils import misc_utils as MiscUtils
-from multiresticodm.utils import math_utils as MathUtils
-from multiresticodm.contingency_table import instantiate_ct
-from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.utils import probability_utils as ProbabilityUtils
-from multiresticodm.utils.multiprocessor import BoundedQueueProcessPoolExecutor
-from multiresticodm.harris_wilson_model_mcmc import instantiate_harris_wilson_mcmc
-from multiresticodm.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
-from multiresticodm.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from gensit.config import Config
+from gensit.inputs import Inputs
+from gensit.utils.misc_utils import *
+from gensit.utils.exceptions import *
+from gensit.static.global_variables import *
+from gensit.spatial_interaction_model import *
+from gensit.utils import misc_utils as MiscUtils
+from gensit.utils import math_utils as MathUtils
+from gensit.contingency_table import instantiate_ct
+from gensit.harris_wilson_model import HarrisWilson
+from gensit.utils import probability_utils as ProbabilityUtils
+from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
+from gensit.harris_wilson_model_mcmc import instantiate_harris_wilson_mcmc
+from gensit.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
+from gensit.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 
 OUTPUTS_MODULE = sys.modules[__name__]
 

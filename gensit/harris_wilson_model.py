@@ -7,10 +7,10 @@ import xarray as xr
 
 from torch import float32
 
-from multiresticodm.config import Config
-from multiresticodm.spatial_interaction_model import SpatialInteraction2D
-from multiresticodm.utils.misc_utils import set_seed, setup_logger, to_json_format
-from multiresticodm.static.global_variables import PARAMETER_DEFAULTS,DATA_SCHEMA,Dataset
+from gensit.config import Config
+from gensit.spatial_interaction_model import SpatialInteraction2D
+from gensit.utils.misc_utils import set_seed, setup_logger, to_json_format
+from gensit.static.global_variables import PARAMETER_DEFAULTS,DATA_SCHEMA,Dataset
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
 

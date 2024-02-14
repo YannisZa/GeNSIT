@@ -11,14 +11,14 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path as PathLib
 from joblib import Parallel, delayed
-from multiresticodm.static.global_variables import TABLE_INFERENCE_EXPERIMENTS
+from gensit.static.global_variables import TABLE_INFERENCE_EXPERIMENTS
 
-import multiresticodm.utils.probability_utils as ProbabilityUtils
+import gensit.utils.probability_utils as ProbabilityUtils
 
-from multiresticodm.config import Config
-from multiresticodm.utils.math_utils import torch_optimize
-from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.utils.misc_utils import setup_logger, makedir, set_seed, unpack_dims
+from gensit.config import Config
+from gensit.utils.math_utils import torch_optimize
+from gensit.harris_wilson_model import HarrisWilson
+from gensit.utils.misc_utils import setup_logger, makedir, set_seed, unpack_dims
 
 AIS_SAMPLE_ARGS = ['alpha','beta','gamma','n_temperatures','ais_samples','leapfrog_steps','epsilon_step','semaphore','pbar']
 

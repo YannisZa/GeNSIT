@@ -7,12 +7,12 @@ import torch
 import psutil
 import subprocess
 
-from multiresticodm.config import Config
-from multiresticodm.utils.logger_class import *
-from multiresticodm.utils.click_parsers import *
-from multiresticodm.static.global_variables import *
-from multiresticodm.utils.misc_utils import setup_logger
-from multiresticodm.static.plot_variables import PLOT_VIEWS, PLOT_COORDINATES, PLOT_TYPES, LEGEND_LOCATIONS
+from gensit.config import Config
+from gensit.utils.logger_class import *
+from gensit.utils.click_parsers import *
+from gensit.static.global_variables import *
+from gensit.utils.misc_utils import setup_logger
+from gensit.static.plot_variables import PLOT_VIEWS, PLOT_COORDINATES, PLOT_TYPES, LEGEND_LOCATIONS
 
 
 def set_threads(n_threads):
@@ -44,7 +44,7 @@ AVAILABLE_CORES = psutil.cpu_count(logical = True)
 AVAILABLE_THREADS = psutil.cpu_count(logical = True)
 
 
-@click.group('multiresticodm')
+@click.group('gensit')
 def cli():
     """
     Command line tool for running multiresolution origin-destination matrix reconstruction
@@ -160,8 +160,8 @@ def create_and_run_options(func):
 
 def exec(logger,settings,config_path,**kwargs):
     # Import all modules
-    from multiresticodm.experiments import ExperimentHandler
-    from multiresticodm.utils.misc_utils import deep_updates,update_device
+    from gensit.experiments import ExperimentHandler
+    from gensit.utils.misc_utils import deep_updates,update_device
     
     # Read config
     config = Config(
@@ -274,8 +274,8 @@ def create(
     set_threads(settings['n_threads'])
 
     # Import modules
-    from multiresticodm.utils.misc_utils import deep_updates
-    from multiresticodm.experiments import ExperimentHandler
+    from gensit.utils.misc_utils import deep_updates
+    from gensit.experiments import ExperimentHandler
 
     # Setup logger
     logger = setup_logger(
@@ -824,7 +824,7 @@ def plot(
     set_threads(settings['n_threads'])
     
     # Import modules
-    from multiresticodm.plot import Plot
+    from gensit.plot import Plot
 
     # Setup logger
     logger = setup_logger(
@@ -909,7 +909,7 @@ def summarise(
     set_threads(settings['n_threads'])
 
     # Import modules
-    from multiresticodm.outputs import OutputSummary
+    from gensit.outputs import OutputSummary
 
     # Setup logger
     logger = setup_logger(
@@ -941,7 +941,7 @@ def reproduce(figure):
     """
     if figure == 'figure1':
         subprocess.check_output([
-            "multiresticodm", "plot", "2d", "line", "--y_shade", "--y_group", "type", "-y", "table_density", "-x", "density_eval_points", 
+            "gensit", "plot", "2d", "line", "--y_shade", "--y_group", "type", "-y", "table_density", "-x", "density_eval_points", 
             "-dn", "cambridge_work_commuter_lsoas_to_msoas/exp1", "-et", "JointTableSIM_MCMC", "-et", "NonJointTableSIM_NN", "-et", "JointTableSIM_NN",
             "-el", "np", "-el", "ProbabilityUtils", "-el", "xr", 
             "-e", "table_density", "xr.apply_ufunc(kernel_density,table_like_loss.groupby('sweep'),kwargs={'x':xs,'bandwidth':bandwidth},exclude_dims=set(['id']),input_core_dims=[['id']],output_core_dims=[['id']])", 
@@ -967,7 +967,7 @@ def reproduce(figure):
         ])
     elif figure == 'figure2':
         subprocess.check_output([
-            "multiresticodm", "plot", "2d", "scatter", "-y", "table_srmse", "-x", "type", "-x", "end", "--x_discrete", 
+            "gensit", "plot", "2d", "scatter", "-y", "table_srmse", "-x", "type", "-x", "end", "--x_discrete", 
             "-dn", "cambridge_work_commuter_lsoas_to_msoas/exp1", 
             "-et", "JointTableSIM_MCMC", "-et", "JointTableSIM_NN", "-et", "NonJointTableSIM_NN", 
             "-el", "np", "-el", "MathUtils", "-el", "MiscUtils", "-el", "xr", 
@@ -993,7 +993,7 @@ def reproduce(figure):
         ])
     elif figure == 'figure3':
         subprocess.check_output([
-            "multiresticodm", "plot", "2d", "scatter", "-y", "table_srmse", "-x", "type", "-x", "N&ensemble_size", "--x_discrete", "-gb", "seed", 
+            "gensit", "plot", "2d", "scatter", "-y", "table_srmse", "-x", "type", "-x", "N&ensemble_size", "--x_discrete", "-gb", "seed", 
             "-dn", "cambridge_work_commuter_lsoas_to_msoas/exp2",
             "-et", "NonJointTableSIM_NN", "-et", "JointTableSIM_NN",
             "-el", "np", "-el", "MathUtils", "-el", "MiscUtils", "-el", "xr",

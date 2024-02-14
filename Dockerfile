@@ -10,7 +10,7 @@ COPY . .
 
 RUN pip3 install --no-cache-dir --compile -e .
 
-RUN gcc -fPIC -shared -o ./multiresticodm/sim_models/production_constrained/spatial_interaction.so ./multiresticodm/sim_models/production_constrained/spatial_interaction.c -O3
-RUN gcc -fPIC -shared -o ./multiresticodm/helper_c_functions/helper_functions.so ./multiresticodm/helper_c_functions/helper_functions.c -O3
+RUN gcc -fPIC -shared -o ./gensit/sim_models/production_constrained/spatial_interaction.so ./gensit/sim_models/production_constrained/spatial_interaction.c -O3
+RUN gcc -fPIC -shared -o ./gensit/helper_c_functions/helper_functions.so ./gensit/helper_c_functions/helper_functions.c -O3
 
-ENTRYPOINT ["multiresticodm"]
+ENTRYPOINT ["gensit"]

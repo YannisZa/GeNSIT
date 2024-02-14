@@ -6,9 +6,9 @@ from typing import Any
 from collections.abc import Iterable
 from numpy import arange, isfinite, isnan, shape, array, repeat
 
-from multiresticodm import ROOT
-from multiresticodm.utils.exceptions import *
-from multiresticodm.utils.misc_utils import in_range,string_to_numeric,is_null,flatten
+from gensit import ROOT
+from gensit.utils.exceptions import *
+from gensit.utils.misc_utils import in_range,string_to_numeric,is_null,flatten
 
 def instantiate_data_type(
     data,

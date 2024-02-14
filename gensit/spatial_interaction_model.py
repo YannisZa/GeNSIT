@@ -4,11 +4,11 @@ import torch
 
 from numpy import array,ndarray
 
-from multiresticodm.config import Config
-from multiresticodm.utils.misc_utils import setup_logger, to_json_format
-from multiresticodm.static.global_variables import PARAMETER_DEFAULTS, Dataset, INTENSITY_INPUTS, INTENSITY_OUTPUTS
-from multiresticodm.utils.probability_utils import log_odds_ratio_wrt_intensity
-from multiresticodm.sim_models import ProductionConstrained,TotallyConstrained
+from gensit.config import Config
+from gensit.utils.misc_utils import setup_logger, to_json_format
+from gensit.static.global_variables import PARAMETER_DEFAULTS, Dataset, INTENSITY_INPUTS, INTENSITY_OUTPUTS
+from gensit.utils.probability_utils import log_odds_ratio_wrt_intensity
+from gensit.sim_models import ProductionConstrained,TotallyConstrained
 
 def instantiate_sim(
         config:Config,

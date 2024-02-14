@@ -12,11 +12,11 @@ import numpy as np
 from torch import nn, float32
 from typing import Any, List, Union
 
-from multiresticodm.config import Config
-from multiresticodm.utils.exceptions import *
-from multiresticodm.harris_wilson_model import HarrisWilson
-from multiresticodm.utils.misc_utils import setup_logger, fn_name
-from multiresticodm.static.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
+from gensit.config import Config
+from gensit.utils.exceptions import *
+from gensit.harris_wilson_model import HarrisWilson
+from gensit.utils.misc_utils import setup_logger, fn_name
+from gensit.static.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
 
 
 def get_architecture(

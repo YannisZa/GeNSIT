@@ -7,10 +7,10 @@ import pytest
 import pandas as pd
 from copy import deepcopy
 from argparse import Namespace
-from multiresticodm.config import Config
-from multiresticodm.contingency_table import ContingencyTable2D
-from multiresticodm.spatial_interaction_model import ProductionConstrainedSIM,TotallyConstrainedSIM
-from multiresticodm.utils.probability_utils import *
+from gensit.config import Config
+from gensit.contingency_table import ContingencyTable2D
+from gensit.spatial_interaction_model import ProductionConstrainedSIM,TotallyConstrainedSIM
+from gensit.utils.probability_utils import *
 from tests.test_4_spatial_interaction_model import Test4Helpers
 
 class Test5Helpers:

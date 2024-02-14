@@ -1,10 +1,10 @@
 import pytest
 import numpy as np
 from copy import deepcopy
-from multiresticodm.config import Config
-from multiresticodm.utils.misc_utils import ,f_to_array,deep_updates
-from multiresticodm.contingency_table import ContingencyTable2D
-from multiresticodm.markov_basis import instantiate_markov_basis
+from gensit.config import Config
+from gensit.utils.misc_utils import ,f_to_array,deep_updates
+from gensit.contingency_table import ContingencyTable2D
+from gensit.markov_basis import instantiate_markov_basis
 
 @pytest.fixture
 def default_config():

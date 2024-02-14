@@ -1,4 +1,4 @@
-name: multiresticodm
+name: gensit
 dependencies:
   - python==3.9
   - anaconda

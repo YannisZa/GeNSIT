@@ -9,8 +9,8 @@ from typing import Union, Tuple
 from torch import int32, float32
 from scipy.stats import gaussian_kde
 
-from multiresticodm.utils.misc_utils import set_seed
-from multiresticodm.utils.math_utils import log_factorial_sum, logfactorialsum, logsumexp
+from gensit.utils.misc_utils import set_seed
+from gensit.utils.math_utils import log_factorial_sum, logfactorialsum, logsumexp
 
 def uniform_binary_choice(n:int = 1):
     choices = [-1,1]

@@ -7,21 +7,21 @@ Set `ulimit -n 50000`
 ## Experiment 1
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 4 -nw 7
-clear; multiresticodm run ./data/inputs/configs/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 4 -nw 7
+clear; gensit run ./data/inputs/configs/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 4 -nw 7
+clear; gensit run ./data/inputs/configs/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 4 -nw 7
 ```
 
 ## Experiment 2
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment2_disjoint.toml -sm -et NonJointTableSIM_NN -nt 20 -nw 1
-clear; multiresticodm run ./data/inputs/configs/experiment2_joint.toml -sm -et JointTableSIM_NN -nt 20 -nw 1
+clear; gensit run ./data/inputs/configs/experiment2_disjoint.toml -sm -et NonJointTableSIM_NN -nt 20 -nw 1
+clear; gensit run ./data/inputs/configs/experiment2_joint.toml -sm -et JointTableSIM_NN -nt 20 -nw 1
 ```
 
 ## Experiment 3
 
 ```
-clear; multiresticodm run ./data/inputs/configs/experiment3_joint.toml -sm -et JointTableSIM_NN -nt 5 -nw 7
+clear; gensit run ./data/inputs/configs/experiment3_joint.toml -sm -et JointTableSIM_NN -nt 5 -nw 7
 ```
 
 # Summaries and Metrics
@@ -31,7 +31,7 @@ clear; multiresticodm run ./data/inputs/configs/experiment3_joint.toml -sm -et J
 Get SRMSEs for all samples and all experiments:
 
 ```
-clear; multiresticodm summarise \
+clear; gensit summarise \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
 -et SIM_NN -et SIM_MCMC -et JointTableSIM_NN -et JointTableSIM_MCMC -et NonJointTableSIM_NN  \
 -el np -el MathUtils -el xr \
@@ -52,7 +52,7 @@ clear; multiresticodm summarise \
 Get coverage probabilities for all samples and all experiments:
 
 ```
-clear; multiresticodm summarise \
+clear; gensit summarise \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
 -et SIM_NN -et SIM_MCMC -et JointTableSIM_NN -et JointTableSIM_MCMC -et NonJointTableSIM_NN  \ \
 -el np -el MathUtils -el xr \
@@ -75,7 +75,7 @@ clear; multiresticodm summarise \
 Get SRMSEs for all samples:
 
 ```
-clear; multiresticodm summarise \
+clear; gensit summarise \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
 -d NonJointTableSIM_NN_SweepedNoise_01_02_2024_16_51_58  \
 -el np -el MathUtils -el xr \
@@ -95,7 +95,7 @@ clear; multiresticodm summarise \
 Get coverage probabilities for all samples:
 
 ```
-clear; multiresticodm summarise \
+clear; gensit summarise \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
 -d NonJointTableSIM_NN_SweepedNoise_01_02_2024_16_51_58 \
 -el np -el MathUtils -el MiscUtils -el xr \
@@ -121,7 +121,7 @@ clear; multiresticodm summarise \
 ## Figure 1
 
 ```
-clear; multiresticodm plot 2d line --y_shade --y_group 'type' -y table_density -x density_eval_points \
+clear; gensit plot 2d line --y_shade --y_group 'type' -y table_density -x density_eval_points \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 -et JointTableSIM_MCMC -et NonJointTableSIM_NN -et JointTableSIM_NN \
 -el np -el ProbabilityUtils -el xr \
 -e table_density "xr.apply_ufunc(kernel_density,table_like_loss.groupby('sweep'),kwargs={'x':xs,'bandwidth':bandwidth},exclude_dims=set(['id']),input_core_dims=[['id']],output_core_dims=[['id']])" \
@@ -149,7 +149,7 @@ clear; multiresticodm plot 2d line --y_shade --y_group 'type' -y table_density -
 Load plot data and replot
 
 ```
-clear; multiresticodm plot 2d line --y_shade --y_group 'type' -y table_density -x density_eval_points \
+clear; gensit plot 2d line --y_shade --y_group 'type' -y table_density -x density_eval_points \
 -pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp1/paper_figures/figure1/ \
 -ft 'figure1_table_like_loss_kernel_density' -ff ps \
 -xlab '$\mathcal{L}\left(\mytable,\myintensity\right)$' -ylab 'Kernel density' \
@@ -165,7 +165,7 @@ clear; multiresticodm plot 2d line --y_shade --y_group 'type' -y table_density -
 Plot cumulative SRMSEs and CPs for every constraint and sampling method. Do this for the tables samples:
 
 ```
-clear; multiresticodm plot 2d scatter -y table_srmse -x type -x end --x_discrete \
+clear; gensit plot 2d scatter -y table_srmse -x type -x end --x_discrete \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
 -et JointTableSIM_MCMC -et JointTableSIM_NN -et NonJointTableSIM_NN \
 -el np -el MathUtils -el MiscUtils -el xr \
@@ -193,7 +193,7 @@ clear; multiresticodm plot 2d scatter -y table_srmse -x type -x end --x_discrete
 Load plot data and replot
 
 ```
-clear; multiresticodm plot 2d scatter -y table_srmse -x type -x end --x_discrete \
+clear; gensit plot 2d scatter -y table_srmse -x type -x end --x_discrete \
 -pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp1/paper_figures/figure2/ \
 -fs 10 10 -ff ps -ft 'cumulative_srmse_and_cp_by_method' \
 -ylab 'SRMSE$\left(\mathbb{E}\left[\mytable^{(1:N)}\right],\groundtruthtable\right)$' -xlab 'Method, $N$' \
@@ -210,7 +210,7 @@ DITTO for the intensity samples:
 ## Figure 3
 
 ```
-clear; multiresticodm plot 2d scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
+clear; gensit plot 2d scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
 -et NonJointTableSIM_NN -et JointTableSIM_NN \
 -el np -el MathUtils -el MiscUtils -el xr \
@@ -235,7 +235,7 @@ clear; multiresticodm plot 2d scatter -y table_srmse -x type -x 'N&ensemble_size
 Load plot data and replot
 
 ```
-clear; multiresticodm plot 2d scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
+clear; gensit plot 2d scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
 -pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp2/paper_figures/figure3/ \
 -fs 10 10 -ff ps -ft 'exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
 -xlab 'Method, ($N$, $E$)' -ylab 'SRMSE$\left(\mathbb{E}[\mytable^{(1:N)}],\mytable^{\mathcal{D}}\right)$' \
@@ -252,7 +252,7 @@ DITTO for the intensity samples:
 ## Figure 4
 
 ```
-clear; multiresticodm plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
+clear; gensit plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp3 -et JointTableSIM_NN \
 -el np -el MathUtils -el xr \
 -e table_coverage_probability_size "xr.apply_ufunc(lambda x: np.exp(6*x), coverage_probability(prediction=table,ground_truth=ground_truth).mean(['origin','destination']))" \
@@ -277,7 +277,7 @@ clear; multiresticodm plot 2d scatter -y table_srmse -x loss_name --x_discrete  
 Load plot data and replot
 
 ```
-clear; multiresticodm plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
+clear; gensit plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
 -pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp3/paper_figures/figure4/ \
 -fs 10 10 -ff ps -ft 'figure4_loss_function_validation_all_odms' \
 -xlab 'Loss operator $\lossoperator$' -ylab 'SRMSE$\left(\mathbb{E}\left[\mytable^{(1:N)}\right],\mytable^{\mathcal{D}}\right)$' \
@@ -294,7 +294,7 @@ DITTO for the intensity samples:
 ### VARIOUS TESTS
 
 ```
-clear; multiresticodm plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
+clear; gensit plot 2d scatter -y table_srmse -x loss_name --x_discrete  \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp3 -et JointTableSIM_NN \
 -el np -el MathUtils -el xr \
 -e table_srmse "srmse(prediction=table.mean(['id']),ground_truth=ground_truth)" \
