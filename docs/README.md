@@ -1,4 +1,4 @@
-# Table Inference for Combinatorial Origin-Destination Choices In Agent-Based Population Synthesis
+# Generating Origin-Destination Matrices in Neural Spatial Interaction Models
 
 [![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org)
 
