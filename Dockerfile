@@ -4,7 +4,7 @@ RUN apt-get update \
 && apt-get upgrade -y \
 && apt-get -y install gcc \
 && rm -rf /var/lib/apt/lists/* \
-&& /usr/local/bin/python -m pip3 install --upgrade pip3
+&& /usr/local/bin/python -m pip install --upgrade pip
 
 COPY . .
 
