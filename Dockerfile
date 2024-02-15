@@ -4,13 +4,10 @@ RUN apt-get update \
 && apt-get upgrade -y \
 && apt-get -y install gcc \
 && rm -rf /var/lib/apt/lists/* \
-&& /usr/local/bin/python -m pip install --upgrade pip
+&& /usr/local/bin/python -m pip3 install --upgrade pip3
 
 COPY . .
 
 RUN pip3 install --no-cache-dir --compile -e .
-
-RUN gcc -fPIC -shared -o ./gensit/sim_models/production_constrained/spatial_interaction.so ./gensit/sim_models/production_constrained/spatial_interaction.c -O3
-RUN gcc -fPIC -shared -o ./gensit/helper_c_functions/helper_functions.so ./gensit/helper_c_functions/helper_functions.c -O3
 
 ENTRYPOINT ["gensit"]
