@@ -54,11 +54,11 @@ class HarrisWilson:
 
         # Model parameters
         self.param_names = ['alpha','beta','kappa','sigma','delta','epsilon','bmax']
-        self.true_parameters = {k:v for k,v in true_parameters.items() if v is not None}
+        true_params = {k:v for k,v in true_parameters.items() if v is not None}
         # Add parameters to learn if None is provided as true parameter
-        for key,value in true_parameters.items():
-            if value is None and key not in self.config.settings['inputs']['to_learn']:
-                self.config.settings['inputs']['to_learn'].append(key)
+        for key,value in true_params.items():
+            if value is None and key not in self.config.settings['training']['to_learn']:
+                self.config.settings['training']['to_learn'].append(key)
         
         # Store noise variance
         self.noise_var = self.obs_noise_percentage_to_var(
@@ -68,23 +68,23 @@ class HarrisWilson:
 
         # Check that learnable parameters are in valid set
         try:
-            assert set(self.config.settings['inputs']['to_learn']).issubset(set(self.param_names))
+            assert set(self.config.settings['training']['to_learn']).issubset(set(self.param_names))
         except:
-            self.logger.error(f"Some parameters in {','.join(self.config.settings['inputs']['to_learn'])} cannot be learned.")
+            self.logger.error(f"Some parameters in {','.join(self.config.settings['training']['to_learn'])} cannot be learned.")
             self.logger.error(f"Acceptable parameters are {','.join(self.param_names)}.")
             raise Exception('Cannot instantiate Harris Wilson Model.') 
         
         # Set parameters to learn based on
         # kwargs or parameter defaults
         self.params_to_learn = {}
-        for i,param in enumerate(self.config.settings['inputs']['to_learn']):
+        for i,param in enumerate(self.config.settings['training']['to_learn']):
             self.params_to_learn[param] = i
 
         # Fixed hyperparameters
         self.params = Dataset()
         for param,default in PARAMETER_DEFAULTS.items():
             if not param in list(self.params_to_learn.keys()):
-                true_param = self.true_parameters.get(param,default)
+                true_param = true_params.get(param,default)
                 setattr(
                     self.params,
                     param,
@@ -92,7 +92,7 @@ class HarrisWilson:
                 )
                 if self.config is not None:
                     self.config.settings['harris_wilson_model']['parameters'][param] = to_json_format(
-                        self.true_parameters.get(param,default)
+                        true_params.get(param,default)
                     )
         # Update gamma for MCMC
         if hasattr(self.params,'sigma'):
@@ -414,10 +414,18 @@ class HarrisWilson:
 
         if not generate_time_series:
             sizes = init_destination_attraction.clone()
+
             for _ in range(n_iterations):
+                # Compute log intensity
+                log_intensity_sample = self.intensity_model.log_intensity(
+                    log_destination_attraction = torch.log(sizes[-1]),
+                    grand_total = torch.tensor(1.0),
+                    **dict(vars(self.params))
+                ).squeeze()
+
                 sizes = self.run_single(
                     curr_destination_attractions = sizes,
-                    free_parameters = free_parameters,
+                    log_intensity_normalised = log_intensity_sample,
                     dt = dt,
                     requires_grad = requires_grad,
                 )
@@ -426,10 +434,17 @@ class HarrisWilson:
         else:
             sizes = [init_destination_attraction.clone()]
             for _ in range(n_iterations):
+                # Compute log intensity
+                log_intensity_sample = self.intensity_model.log_intensity(
+                    log_destination_attraction = torch.log(sizes[-1]),
+                    grand_total = torch.tensor(1.0),
+                    **dict(vars(self.params))
+                ).squeeze()
+
                 sizes.append(
                     self.run_single(
                         curr_destination_attractions = sizes[-1],
-                        free_parameters = free_parameters,
+                        log_intensity_normalised = log_intensity_sample,
                         dt = dt,
                         requires_grad = requires_grad,
                     )

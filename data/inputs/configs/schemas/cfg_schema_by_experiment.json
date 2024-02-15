@@ -1,9 +1,13 @@
 {
+  "DataGeneration": {
+    "harris_wilson_model>parameters>noise_percentage>optional": true,
+    "training>N>exclude": true
+  },
   "SIM_MCMC": {
-    "inputs>to_learn>sweep>default>default-value": ["alpha", "beta"],
-    "inputs>to_learn>sweep>default>is-any-of": ["alpha", "beta"],
-    "inputs>to_learn>sweep>range>default-value": [["alpha", "beta"]],
-    "inputs>to_learn>sweep>range>is-any-of": ["alpha", "beta"],
+    "training>to_learn>sweep>default>default-value": ["alpha", "beta"],
+    "training>to_learn>sweep>default>is-any-of": ["alpha", "beta"],
+    "training>to_learn>sweep>range>default-value": [["alpha", "beta"]],
+    "training>to_learn>sweep>range>is-any-of": ["alpha", "beta"],
     "harris_wilson_model>parameters>sigma>sweep>default>allow-nan": false,
     "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false,
     "neural_network>exclude": true,
@@ -15,10 +19,10 @@
     "mcmc>destination_attraction>exclude": true
   },
   "JointTableSIM_MCMC": {
-    "inputs>to_learn>sweep>default>default-value": ["alpha", "beta"],
-    "inputs>to_learn>sweep>default>is-any-of": ["alpha", "beta"],
-    "inputs>to_learn>sweep>range>default-value": [["alpha", "beta"]],
-    "inputs>to_learn>sweep>range>is-any-of": ["alpha", "beta"],
+    "training>to_learn>sweep>default>default-value": ["alpha", "beta"],
+    "training>to_learn>sweep>default>is-any-of": ["alpha", "beta"],
+    "training>to_learn>sweep>range>default-value": [["alpha", "beta"]],
+    "training>to_learn>sweep>range>is-any-of": ["alpha", "beta"],
     "harris_wilson_model>parameters>sigma>sweep>default>allow-nan": false,
     "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false,
     "neural_network>exclude": true,

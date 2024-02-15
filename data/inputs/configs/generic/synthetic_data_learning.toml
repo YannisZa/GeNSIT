@@ -6,12 +6,8 @@ n_workers = +1
 n_threads = [+6,+6]
 device = 'cpu'
 load_experiment = ''
-to_learn = ['alpha', 'beta']
 in_directory = './data/inputs/synthetic/'
 seed = 8888
-# [inputs.seed.sweep]
-#   default = 1
-#   range = "1:30:1"
 [inputs.dataset.sweep]
   default = "synthetic_100x25_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.01"
   range = [
@@ -79,6 +75,7 @@ seed = 8888
 [training]
   batch_size = +1
   num_steps = +1
+  to_learn = ['alpha', 'beta']
   [training.N.sweep]
     default = +10_000
     range = [10_000,10_000,10_000,10_000,10_000,10_000,

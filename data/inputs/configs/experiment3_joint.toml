@@ -9,11 +9,6 @@ in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 seed = 1234
-[inputs.to_learn.sweep]
-  default = ['alpha', 'beta']
-  range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
-  coupled = true
-  target_name = 'sigma'
   
 [inputs.data]
     [inputs.data.origin_demand]
@@ -68,6 +63,11 @@ seed = 1234
   num_steps = +1
   batch_size = +1
   N = 100000
+  [training.to_learn.sweep]
+    default = ['alpha', 'beta']
+    range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
+    coupled = true
+    target_name = 'sigma'
 
 [mcmc]
     disable_tqdm = true

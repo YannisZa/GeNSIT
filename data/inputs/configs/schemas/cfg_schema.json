@@ -87,41 +87,6 @@
         }
       }
     },
-    "to_learn": {
-      "sweepable": true,
-      "optional": false,
-      "exclude": false,
-
-      "sweep": {
-        "default": {
-          "dtype": "list",
-          "list-dtype": "str",
-          "default-value": ["alpha", "beta", "sigma"],
-          "is-any-of": [
-            "alpha",
-            "beta",
-            "kappa",
-            "delta",
-            "sigma",
-            "noise_percentage"
-          ]
-        },
-        "range": {
-          "dtype": "list",
-          "list-dtype": "list",
-          "list-list-dtype": "str",
-          "default-value": ["alpha", "beta", "sigma"],
-          "is-any-of": [
-            "alpha",
-            "beta",
-            "kappa",
-            "delta",
-            "sigma",
-            "noise_percentage"
-          ]
-        }
-      }
-    },
     "load_experiment": {
       "sweepable": false,
       "optional": true,
@@ -206,6 +171,7 @@
               "dtype": "list",
               "list-length": [1, null],
               "list-dtype": "int",
+              "unique-vals": false,
               "default-value": 1
             }
           }
@@ -1572,6 +1538,41 @@
       "dtype": "int",
       "default-value": 1,
       "valid-range": [1, null]
+    },
+    "to_learn": {
+      "sweepable": true,
+      "optional": false,
+      "exclude": false,
+
+      "sweep": {
+        "default": {
+          "dtype": "list",
+          "list-dtype": "str",
+          "default-value": ["alpha", "beta", "sigma"],
+          "is-any-of": [
+            "alpha",
+            "beta",
+            "kappa",
+            "delta",
+            "sigma",
+            "noise_percentage"
+          ]
+        },
+        "range": {
+          "dtype": "list",
+          "list-dtype": "list",
+          "list-list-dtype": "str",
+          "default-value": ["alpha", "beta", "sigma"],
+          "is-any-of": [
+            "alpha",
+            "beta",
+            "kappa",
+            "delta",
+            "sigma",
+            "noise_percentage"
+          ]
+        }
+      }
     }
   },
   "neural_network": {

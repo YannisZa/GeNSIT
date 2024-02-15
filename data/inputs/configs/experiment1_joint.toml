@@ -9,11 +9,6 @@ in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
 seed = 1234
-[inputs.to_learn.sweep]
-  default = ['alpha', 'beta'] 
-  range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
-  coupled = true
-  target_name = 'sigma'
   
 [inputs.data]
     [inputs.data.origin_demand]
@@ -71,6 +66,11 @@ seed = 1234
   num_steps = +1
   batch_size = +1
   N = 100000
+  [training.to_learn.sweep]
+    default = ['alpha', 'beta'] 
+    range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
+    coupled = true
+    target_name = 'sigma'
 
 [mcmc]
     disable_tqdm = true
@@ -158,7 +158,7 @@ seed = 1234
   export_samples = true
   export_metadata = true
   overwrite = true
-  validate_sampels = false
+  validate_samples = false
 
 [[experiments]]
   type = 'JointTableSIM_MCMC'
@@ -167,7 +167,7 @@ seed = 1234
   export_samples = true
   export_metadata = true
   overwrite = true
-  validate_sampels = false
+  validate_samples = false
 
 [outputs]
     chunk_size = +20_000

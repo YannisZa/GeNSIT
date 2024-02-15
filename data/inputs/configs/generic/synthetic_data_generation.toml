@@ -1,18 +1,17 @@
 log_level = 'info'
-sweep_mode = true
+sweep_mode = false
 
 [inputs]
 n_workers = +1
 n_threads = [+6,+6]
 device = 'cpu'
 seed = 9876
-to_learn = []
-in_directory = './data/inputs/synthetic/'
-dataset = 'synthetic'
-# [inputs.seed.sweep]
-#   default = 1
-#   range = "1:10:1"
-
+in_directory = './data/inputs/'
+load_experiment = ''
+[inputs.dataset.sweep] 
+  default = 'synthetic_100x25'
+  range = ['synthetic_100x25','synthetic_100x50','synthetic_100x75', 
+  'synthetic_500x25','synthetic_500x50','synthetic_500x75', 'synthetic_500x100']
 
 [inputs.data]
   data_generation_seed = 4321
@@ -21,13 +20,15 @@ dataset = 'synthetic'
   [inputs.data.dims]
     time = +1
     [inputs.data.dims.origin.sweep]
-      default = +10
+      default = +100
       range = [100,100,100,500,500,500,500]
+      coupled = true
+      target_name = 'dataset'
     [inputs.data.dims.destination.sweep]
       default = +25
       range = [25,50,75,25,50,75,100]
       coupled = true
-      target_name = 'origin'
+      target_name = 'dataset'
   [inputs.data.origin_demand]
     distribution = 'normal'
     [inputs.data.origin_demand.parameters]
@@ -45,9 +46,9 @@ dataset = 'synthetic'
         std = 1.2
 
 [spatial_interaction_model]
-  # sim_type = 'ProductionConstrained','TotallyConstrained'
+  # name = 'ProductionConstrained','TotallyConstrained'
   name = 'TotallyConstrained'
-  grand_total = +1 #+33704
+  grand_total = +1
   [spatial_interaction_model.parameters]
     bmax = +10_000.0
     alpha = +1.2
@@ -56,7 +57,7 @@ dataset = 'synthetic'
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
-    # sigma = 0.0141421356 # 0.0141421356, 0.1414213562
+    noise_percentage = +0.01
     epsilon = 1.0
     # kappa = 0.5
     # delta = 0
@@ -65,15 +66,14 @@ dataset = 'synthetic'
       range = [0.0141421356,0.141421356]
 
 [training]
-  N = +0
   batch_size = +1
   table_inference = false
-  # num_steps = +3_000
+  to_learn = []
   [training.num_steps.sweep]
-    default = +3_000
+    default = +1_000
     range = [1_000,1_000,1_000,3_000,3_000,3_000,3_000]
     coupled = true
-    target_name = 'origin'
+    target_name = 'dataset'
 
 
 [[experiments]]
@@ -89,4 +89,5 @@ dataset = 'synthetic'
     write_start = +1
     write_every = +1
     out_directory = './data/outputs/'
-    experiment_title = ''
+    out_group = ''
+    title = ''

@@ -977,13 +977,13 @@ class Config:
         return sweep_configurations, param_sizes_str, total_size_str
 
     def parse_sweep_params(self):
+        sweep_params = {"coupled":{},"isolated":{}}
 
         # Find common keys between isolated and coupled paths
         common_keys = set(list(self.isolated_sweep_paths.keys())).intersection(set(list(self.coupled_sweep_paths.keys())))
         # Remove them from isolated sweeps
         for k in list(common_keys):
             del self.isolated_sweep_paths[k]
-        sweep_params = {"coupled":{},"isolated":{}}
         # Keep track of the target name for each sweeped variable
         for key_path in self.isolated_sweep_paths.values():
             # Get sweep configuration
@@ -1047,7 +1047,7 @@ class Config:
                                 {json.dumps(keypaths)}""")
 
         return sweep_params
-    
+
 
     def prepare_experiment_config(self,sweep_configuration,cast_to_str:bool = False):
         # Create new config
@@ -1092,24 +1092,25 @@ class Config:
 
     def get_sweep_data(self):
         
-        # Find config paths to sweeped parameters
-        self.find_sweep_key_paths()
+        if self.sweep_mode():
+            # Find config paths to sweeped parameters
+            self.find_sweep_key_paths()
 
-        # Parse sweep configurations
-        self.sweep_params = self.parse_sweep_params()
+            # Parse sweep configurations
+            self.sweep_params = self.parse_sweep_params()
 
-        # Get all sweep configurations
-        self.sweep_configurations, \
-        self.param_sizes_str, \
-        self.total_size_str = self.prepare_sweep_configurations(self.sweep_params)
-        # Get output folder
+            # Get all sweep configurations
+            self.sweep_configurations, \
+            self.param_sizes_str, \
+            self.total_size_str = self.prepare_sweep_configurations(self.sweep_params)
+            # Get output folder
 
-        self.base_dir = self.out_directory.split('samples/')[0]
-        if len(self.sweep_configurations) > 0:
-            self.logger.info("----------------------------------------------------------------------------------")
-            self.logger.info(f"Parameter space size: {self.param_sizes_str}")
-            self.logger.info(f"Total = {self.total_size_str}.")
-            self.logger.info("----------------------------------------------------------------------------------")
+            self.base_dir = self.out_directory.split('samples/')[0]
+            if len(self.sweep_configurations) > 0:
+                self.logger.info("----------------------------------------------------------------------------------")
+                self.logger.info(f"Parameter space size: {self.param_sizes_str}")
+                self.logger.info(f"Total = {self.total_size_str}.")
+                self.logger.info("----------------------------------------------------------------------------------")
 
     def slice_sweep_configurations(self,sweep:dict,group_by:list=[]):
         # Loop through each configuration

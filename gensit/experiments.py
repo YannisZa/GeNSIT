@@ -381,7 +381,7 @@ class Experiment(object):
             # Setup sampled/predicted theta
             if 'theta' in self.output_names:
                 self.thetas = []
-                for p_name in self.config['inputs']['to_learn']:
+                for p_name in self.config['training']['to_learn']:
                     if p_name in self.outputs.h5group and not load_experiment:
                         # Delete current dataset
                         safe_delete(getattr(self,p_name))
@@ -644,7 +644,7 @@ class DataGeneration(Experiment):
         super().__init__(config,**kwargs)
         
         self.config = config
-        self.instance = int(kwargs['instance'])
+        self.instance = int(kwargs.get('instance',0))
 
     def run(self,**kwargs) -> None:
         # Generate inputs
@@ -1759,7 +1759,7 @@ class SIM_NN(Experiment):
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
             input_size = self.inputs.data.dims['destination'],
-            output_size = len(self.config['inputs']['to_learn']),
+            output_size = len(self.config['training']['to_learn']),
             **self.config['neural_network']['hyperparameters'],
             logger = self.logger
         ).to(self.device)
@@ -1984,7 +1984,7 @@ class NonJointTableSIM_NN(Experiment):
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
             input_size = self.inputs.data.dims['destination'],
-            output_size = len(self.config['inputs']['to_learn']),
+            output_size = len(self.config['training']['to_learn']),
             **self.config['neural_network']['hyperparameters'],
             logger = self.logger
         ).to(self.device)
@@ -2224,7 +2224,7 @@ class JointTableSIM_NN(Experiment):
         self.logger.note("Initializing the neural net ...")
         neural_network = NeuralNet(
             input_size = self.inputs.data.dims['destination'],
-            output_size = len(self.config['inputs']['to_learn']),
+            output_size = len(self.config['training']['to_learn']),
             **self.config['neural_network']['hyperparameters'],
             logger = self.logger
         ).to(self.device)
@@ -2585,7 +2585,10 @@ class ExperimentSweep():
                 position = (position_id+1),
                 logger = self.logger
             )
-            self.logger.progress(f"{new_experiment.outputs.sweep_id} set up")
+            try:
+                self.logger.progress(f"{new_experiment.outputs.sweep_id} set up")
+            except:
+                pass
 
             # Running experiment
             new_experiment.run()

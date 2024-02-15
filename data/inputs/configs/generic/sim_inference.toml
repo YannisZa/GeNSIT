@@ -8,8 +8,6 @@ device = 'cpu'
 in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
 load_experiment = ''
-to_learn = ['alpha', 'beta']
-# seed = 1234
 [inputs.seed.sweep]
   default = 1234
   range = "1:10:1"
@@ -73,12 +71,7 @@ to_learn = ['alpha', 'beta']
   N = +10000 # number of epochs or mcmc samples
   num_steps = +1
   batch_size = +1
-  # [training.num_steps.sweep]
-  #   default = 10
-  #   range = []
-  # [training.N.sweep]
-  #   default = 10
-  #   range = [100,1000,10000]
+  to_learn = ['alpha', 'beta']
 
 [neural_network]
   disable_tqdm = true

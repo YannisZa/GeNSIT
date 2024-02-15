@@ -134,8 +134,8 @@ class Inputs:
             self.config.settings['inputs']["dims"] = self.data.dims
 
         # Extract parameters to learn
-        if 'to_learn' in list(self.config.settings['inputs'].keys()):
-            params_to_learn = self.config.settings['inputs']['to_learn']
+        if 'to_learn' in list(self.config.settings['training'].keys()):
+            params_to_learn = self.config.settings['training']['to_learn']
         else:
             params_to_learn = ['alpha','beta']
         # Extract the underlying parameters from the config
@@ -294,7 +294,7 @@ class Inputs:
                     getattr(self.data,input,None) is not None:
                         setattr(
                             self.data,
-                            input, 
+                            input,
                             torch.reshape(
                                 torch.from_numpy(getattr(self.data,input)).to(dtype = NUMPY_TO_TORCH_DTYPE[schema['dtype']]),
                                 tuple([self.data.dims[name] for name in schema["dims"]])
@@ -556,7 +556,7 @@ class Inputs:
         
         # Generate the initial origin sizes
         for key,value in self.config.settings['inputs']['data'].items():
-            if key in list(INPUT_SCHEMA.keys()) and not (key in ['cost_matrix']):
+            if key in list(INPUT_SCHEMA.keys()) and not (key in ['cost_matrix','dims']):
                 # Randomly generate data
                 data = np.abs(
                     random_vector(
@@ -575,7 +575,7 @@ class Inputs:
                 size=(self.data.dims['origin'], self.data.dims['destination']),
             )
         ).astype('float32')
-        self.data.total_cost_by_origin = self.data.cost_matrix.sum(dim = 0)
+        self.data.total_cost_by_origin = self.data.cost_matrix.sum(axis = 1)
 
         # Normalise to sum to one
         cost_matrix_max = deepcopy(self.data.cost_matrix.max())
@@ -624,7 +624,6 @@ class Inputs:
             destination_attraction_ts = self.sde_potential_in_sequence(HWM)
         elif synthetis_method == 'sde_solver':
             destination_attraction_ts = self.sde_solver_in_sequence(HWM)
-            # destination_attraction_ts = self.sde_solver_in_parallel(HWM)
         else:
             raise Exception(f'Cannot synthetise data using method {synthetis_method}')
 
@@ -668,7 +667,7 @@ class Inputs:
                 )
         self.logger.success(f"Created and populated synthetic dataset {dataset_name}")
 
-    def sde_solver_in_sequence(self,HWM):
+    def sde_solver_in_sequence(self,physics_model):
         samples = []
         # Run the ABM for n iterations, generating the entire time series
         num_samples = self.config['inputs']['data']['synthesis_n_samples']
@@ -680,7 +679,7 @@ class Inputs:
             position = self.instance+1
         ):
             samples.append(
-                HWM.run(
+                physics_model.run(
                     init_destination_attraction = self.data.destination_attraction_ts,
                     n_iterations = num_steps,
                     free_parameters = None,
@@ -693,78 +692,32 @@ class Inputs:
         # Take mean over seed
         return torch.stack(samples).mean(dim = 0)
     
-    def sde_solver_in_parallel(self,HWM):
-        # Run experiments in parallel
-        processes = []
-        n_workers = int(self.config['inputs']['n_workers'])
-        n_threads = int(self.config['inputs']['n_threads'])
-        semaphore = mp.Semaphore(n_threads)
-        manager = mp.Manager()
-        samples = manager.dict()
-        pbar = tqdm(
-            total = self.config['inputs']['data']['synthesis_n_samples'], 
-            desc="Generating time series in parallel",
-            leave = False,
-            position=(self.instance%n_workers)%n_threads+1
-        )
-        # Run the ABM for n iterations, generating the entire time series
-        num_samples = self.config['inputs']['data']['synthesis_n_samples']
-        num_steps = self.config.settings['training']['num_steps']
-        for instance in range(num_samples):
-            p = mp.Process(
-                target = HWM.run,
-                kwargs = dict(
-                    init_destination_attraction = self.data.destination_attraction_ts,
-                    n_iterations = num_steps,
-                    free_parameters = None,
-                    generate_time_series = True,
-                    requires_grad = False,
-                    seed = instance,
-                    semaphore = semaphore,
-                    samples = samples,
-                    pbar = pbar
-                )
-            )
-            processes.append(p)
-
-        for p in processes:
-            p.start()
-        
-        for p in processes:
-            p.join()
-        
-        pbar.close()
-
-        # Take mean over seed
-        destination_attraction_ts = torch.stack(list(samples.values())).mean(dim = 0)
-        return destination_attraction_ts
-    
-    def sde_potential_in_sequence(self,HWM):
+    def sde_potential_in_sequence(self,physics_model):
         # Delete destination attraction
         safe_delete(self.data.destination_attraction_ts)
         # Create partial function
         torch_optimize_partial = partial(
             torch_optimize,
-            function= HWM.sde_potential_and_gradient,
+            function= physics_model.sde_potential_and_gradient,
             method='L-BFGS-B',
             **self.true_parameters
         )
         # Create initialisations
         Ndests = self.data.dims['destination']
-        g = np.log(HWM.params.delta.item())*np.ones((Ndests,Ndests)) - \
-            np.log(HWM.params.delta.item())*np.eye(Ndests) + \
-            np.log(1+HWM.params.delta.item())*np.eye(Ndests)
+        g = np.log(physics_model.params.delta.item())*np.ones((Ndests,Ndests)) - \
+            np.log(physics_model.params.delta.item())*np.eye(Ndests) + \
+            np.log(1+physics_model.params.delta.item())*np.eye(Ndests)
         g = g.astype('float32')
         
         # Get minimum across different initialisations in parallel
         xs = [torch_optimize_partial(g[i,:]) for i in range(Ndests)]
         # Compute potential
         fs = np.asarray([
-            HWM.sde_potential(
+            physics_model.sde_potential(
                 torch.tensor(xs[i]
             ).to(
                 dtype = float32,
-                device = HWM.intensity_model.device
+                device = physics_model.intensity_model.device
             ),
             **self.true_parameters
             ).detach().cpu().numpy() for i in range(Ndests)

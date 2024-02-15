@@ -13,6 +13,7 @@ from gensit.utils.click_parsers import *
 from gensit.static.global_variables import *
 from gensit.utils.misc_utils import setup_logger
 from gensit.static.plot_variables import PLOT_VIEWS, PLOT_COORDINATES, PLOT_TYPES, LEGEND_LOCATIONS
+from gensit.utils.exceptions import MissingData
 
 
 def set_threads(n_threads):
@@ -204,8 +205,9 @@ def exec(logger,settings,config_path,**kwargs):
         os.makedirs(config.out_directory)
 
     logger.info(f"Validating config provided...")
+    
     # Validate config
-    config.validate()
+    # config.validate()
 
     # Intialise experiment handler
     eh = ExperimentHandler(
@@ -221,7 +223,7 @@ def exec(logger,settings,config_path,**kwargs):
 @cli.command('create')
 @common_options
 @create_and_run_options
-@click.option('--dims','-dims', type=(str, int), multiple = True,
+@click.option('--dims','-dim', type=(str, int), multiple = True,
                 default=[(None,None)], help = 'Overwrites input dimensions size')
 @click.option('--synthesis_method','-smthd', type = click.Choice(['sde_solver','sde_potential']),
                 default='sde_solver', help = 'Determines method for synthesing data')
@@ -257,6 +259,10 @@ def create(
     # Unpack dimensions
     if list(dims) != [(None,None)]:
         dims = {v[0]:v[1] for v in dims}
+        try: 
+            assert all([k in dims for k in ["origin","destination","time"]])
+        except:
+            raise Exception(f"Provided ({', '.join(list(dims.keys()))}) dims but need (origin, destination, time).")
     else:
         dims = None
 
@@ -290,6 +296,7 @@ def create(
         console_level = settings.get('logging_mode','info'),
         logger = logger
     )
+
     # Update settings with overwritten values
     deep_updates(config.settings,settings,overwrite = True)
 
@@ -307,7 +314,8 @@ def create(
     logger.info(f"Validating config provided...")
     
     # Validate config
-    config.validate(experiment_type=','.join(list(experiment_types.keys())))
+    config.experiment_validate()
+
     # Get sweep-related data
     config.get_sweep_data()
 

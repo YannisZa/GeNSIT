@@ -11,11 +11,6 @@ load_experiment = ''
 [inputs.seed.sweep]
   default = 1
   range = ["1:1333:1"]
-[inputs.to_learn.sweep]
-  default = ['alpha', 'beta'] 
-  range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
-  coupled = true
-  target_name = 'sigma'
   
 [inputs.data]
     [inputs.data.origin_demand]
@@ -75,6 +70,11 @@ load_experiment = ''
     range = ["repeat(10,1000)","repeat(50,200)","repeat(100,100)","repeat(500,20)","repeat(1000,10)","repeat(5000,2)","repeat(10000,1)"]
     coupled = true
     target_name = 'seed'
+  [training.to_learn.sweep]
+    default = ['alpha', 'beta'] 
+    range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
+    coupled = true
+    target_name = 'sigma'
 
 [mcmc]
     disable_tqdm = true

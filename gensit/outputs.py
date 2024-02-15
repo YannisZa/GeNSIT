@@ -71,6 +71,9 @@ class Outputs(object):
         # Store inputs
         self.inputs = inputs
 
+        # Store sweep id
+        self.sweep_id = ''
+
         # Sample names must be a subset of all data names
         if self.data_names is not None:
             try:
@@ -88,8 +91,6 @@ class Outputs(object):
         )
         # Enable garbage collector
         gc.enable()
-
-        self.sweep_id = ''
 
         if isinstance(config,Config):
             # Store config
@@ -872,7 +873,7 @@ class Outputs(object):
 
         noise_level = list(deep_get(key='noise_regime',value = self.config.settings))
         if len(noise_level) <= 0:
-            if 'sigma' in self.config.settings['inputs']['to_learn']:
+            if 'sigma' in self.config.settings['training']['to_learn']:
                 noise_level = 'learned'
             else:
                 sigma = list(deep_get(key='sigma',value = self.config.settings))
@@ -1734,7 +1735,7 @@ class Outputs(object):
                 )
                 __self__.neural_network = NeuralNet(
                     input_size = __self__.inputs.data.dims['destination'],
-                    output_size = len(__self__.config['inputs']['to_learn']),
+                    output_size = len(__self__.config['training']['to_learn']),
                     **__self__.config['neural_network']['hyperparameters'],
                     **kwargs
                 ).to(__self__.device)
