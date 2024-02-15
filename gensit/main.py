@@ -251,7 +251,7 @@ def create(
     synthesis_n_samples
 ):
     """
-    Create synthetic data for origin-destination matrix sampling.
+    Create synthetic data for spatial interaction table and intensity sampling.
     """
 
     # Unpack dimensions
@@ -426,7 +426,7 @@ def run(
         norm
     ):
     """
-    Sample discrete spatial interaction tables (origin-destination matrices) and/or their mean-field approximations (choice probabilities).
+    Sample discrete spatial interaction tables (origin-destination matrices) and/or their mean-field approximation (intensity / choice probabilities).
     """
     # Gather all arguments in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
