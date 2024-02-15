@@ -20,10 +20,11 @@
     - [Real-world](#real-world)
     - [Synthetic](#synthetic)
   - [Configs](#configs)
-- [Run](#run)
-- [Plot](#plot)
-- [Summarise](#summarise)
-- [Reproduce](#reproduce)
+- [Functionality](#functionality)
+  - [Run](#run)
+  - [Plot](#plot)
+  - [Summarise](#summarise)
+  - [Reproduce](#reproduce)
 - [Related publications](#related-publications)
 - [Acknowledgments](#acknowledgments)
 
@@ -43,7 +44,9 @@ A facet of this sampling problem that is pertinent to population synthesis for m
 
 ## Contribution
 
-This repository introduces a [computational framework named `GeNSIT`](#introduction) see for exploring the constrained discrete origin-destination matrices of agent trip location choices using closed-form or Gibbs Markov Basis sampling. The underlying continuous choice probability or intensity function (unnormalised probability function) is modelled by total and singly constrained **spatial interaction models** (SIMs) or _gravity models_ embedded in the well-known Harris Wilson stochastic differential equations (SDEs). We employ Neural Networks to calibrate the SIM parameters. We include Markov Chain Monte Carlo (MCMC) schemes leveraged to learn the SIM parameters in previous works. For more details please look at the [Publications section](#related-publications).
+This repository introduces a [computational framework named `GeNSIT`](#introduction) see for exploring the constrained discrete origin-destination matrices of agent trip location choices using closed-form or Gibbs Markov Basis sampling. The underlying continuous choice probability or intensity function (unnormalised probability function) is modelled by total and singly constrained **spatial interaction models** (SIMs) or _gravity models_ embedded in the well-known Harris Wilson stochastic differential equations (SDEs). We employ Neural Networks to calibrate the SIM parameters. We include Markov Chain Monte Carlo (MCMC) schemes leveraged to learn the SIM parameters in previous works. For more details on the mathematical aspects of this repository please look at the [Publications section](#related-publications).
+
+The `GeNSIT` package provides functionality for five different operations: [`create`](#synthetic), [`run`](#run), [`plot`](#plot), [`reproduce`](#reproduce), [`summarise`](#summarise).
 
 # Installation
 
@@ -172,9 +175,9 @@ You noticed that we load a configuration file named `synthetic_data_generation.t
 
 ## Configs
 
-Configuration files contain all settings (key-value pairs) required to `run` NN-based or MCMC-based algorithms for learning the discrete origin-destination table and/or underlying continuous SIM parameters. They are stored in a `toml` format and are consist of nine sections: [`inputs`](#inputs-1), [`contingency table`](#contingency-table), [`spatial interaction model`](#spatial-interaction-model), [`harris wilson model`](#harris-wilson-model), [`training`](#training), [`mcmc`](#mcmc), [`experiments`](experiments), and [`outputs`](#outputs).
+Configuration files contain all settings (key-value pairs) required to `run` NN-based or MCMC-based algorithms for learning the discrete origin-destination table and/or underlying continuous SIM parameters. They are stored in a `toml` format.
 
-Each type of algorithm is associated with an `experiment` type specified in the `experiments` section of the config. We hereby refer to the process of running one algorirthm for a given set of configuration parameters as `run`ning an `experiment`. Examples of experiments include `SIM_NN`, `SIM_MCMC`, `JointTableSIM_MCMC`, `DisjointTableSIM_NN`, and `JointTableSIM_NN`.
+Each type of algorithm is associated with an `experiment` type . We hereby refer to the process of running one algorirthm for a given set of configuration parameters as `run`ning an `experiment`. Examples of experiments include `SIM_NN`, `SIM_MCMC`, `JointTableSIM_MCMC`, `DisjointTableSIM_NN`, and `JointTableSIM_NN`.
 
 Most configuration keys can be `sweep`ed for each type of `experiment` being run. This means that a range of values over which the experiment will be run can be provided. For example, the `sigma` parameter below
 
@@ -199,15 +202,17 @@ means that each experiment in the [`experiments`](#experiments) section will run
 
 Here `sigma` is coupled with the `to_learn` parameter, meaning the vary together. In this case each experiment will be run for three different sweep settings: (`sigma = 0.0141421356`, `to_learn` = ['alpha','beta']), (`sigma` = 0.1414213562, `to_learn` = ['alpha','beta']), and (`sigma` = nan, `to_learn` = ['alpha','beta','sigma']). We note that more than one sweep keys can be coupled.
 
-> **_Note:_** More information on each key-value pair found in Configs can be found [here](./configuration_files.md).
+> **_Note:_** More information on each key-value pair found in Configs can be found [here](./configuration_settings.md).
 
-# Run
+# Functionality
 
-# Plot
+## Run
 
-# Summarise
+## Plot
 
-# Reproduce
+## Summarise
+
+## Reproduce
 
 # Related publications
 
