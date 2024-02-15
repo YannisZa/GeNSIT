@@ -1,8 +1,0 @@
-name: gensit
-dependencies:
-  - python==3.9.7
-  - anaconda
-  - pip
-  - pip:
-    - -e .
-      

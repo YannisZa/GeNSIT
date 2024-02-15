@@ -47,7 +47,7 @@ AVAILABLE_THREADS = psutil.cpu_count(logical = True)
 @click.group('gensit')
 def cli():
     """
-    Command line tool for running multiresolution origin-destination matrix reconstruction
+    Command line tool for Generating Neural Spatial Interaction Tables (origin-destination matrices)
     """
     pass
 
@@ -251,7 +251,7 @@ def create(
     synthesis_n_samples
 ):
     """
-    Create synthetic data for origin-destination matrix reconstruction.
+    Create synthetic data for origin-destination matrix sampling.
     """
 
     # Unpack dimensions
@@ -426,7 +426,7 @@ def run(
         norm
     ):
     """
-    Run Multiresolution Table Inference based on Physics-Driven Intensity Models.
+    Sample discrete spatial interaction tables (origin-destination matrices) and/or their mean-field approximations (choice probabilities).
     """
     # Gather all arguments in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
@@ -890,7 +890,7 @@ def summarise(
         ascending,
     ):
     """
-    Create tabular summary of metadata and metrics computed for experimental outputs.
+    Create tabular summary of metadata, metrics computed for experimental outputs.
     """
     # Gather all options in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
