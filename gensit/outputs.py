@@ -2728,13 +2728,14 @@ class OutputSummary(object):
                     self.logger.warning(f"{operation_name} with operation expression {expression} failed: {exc}")
                     self.logger.debug(traceback.format_exc())
                     continue
-            
+                
+                self.logger.success(f"Evaluation {operation_name} using {expression} succeded {np.shape(evaluation) if not isinstance(evaluation,xr.DataArray) else dict(evaluation.sizes)}")
+                print('\n')
+
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
                 if 'sweep' in evaluation.dims:
                     self.logger.note(f"sweep: {evaluation['sweep'].values.tolist()}")
                     
-            self.logger.success(f"Evaluation {operation_name} using {expression} succeded {np.shape(evaluation) if not isinstance(evaluation,xr.DataArray) else dict(evaluation.sizes)}")
-            print('\n')
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
                 if 'sweep' in evaluation.dims:
                     # Rename xr data array

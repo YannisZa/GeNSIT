@@ -949,7 +949,7 @@ def reproduce(figure):
     """
     if figure == 'figure1':
         subprocess.check_output([
-            "gensit", "plot", "2d", "line", "--y_shade", "--y_group", "type", "-y", "table_density", "-x", "density_eval_points", 
+            "gensit", "plot", "simple", "line", "--y_shade", "--y_group", "type", "-y", "table_density", "-x", "density_eval_points", 
             "-dn", "cambridge_work_commuter_lsoas_to_msoas/exp1", "-et", "JointTableSIM_MCMC", "-et", "NonJointTableSIM_NN", "-et", "JointTableSIM_NN",
             "-el", "np", "-el", "ProbabilityUtils", "-el", "xr", 
             "-e", "table_density", "xr.apply_ufunc(kernel_density,table_like_loss.groupby('sweep'),kwargs={'x':xs,'bandwidth':bandwidth},exclude_dims=set(['id']),input_core_dims=[['id']],output_core_dims=[['id']])", 
@@ -975,7 +975,7 @@ def reproduce(figure):
         ])
     elif figure == 'figure2':
         subprocess.check_output([
-            "gensit", "plot", "2d", "scatter", "-y", "table_srmse", "-x", "type", "-x", "end", "--x_discrete", 
+            "gensit", "plot", "simple", "scatter", "-y", "table_srmse", "-x", "type", "-x", "end", "--x_discrete", 
             "-dn", "cambridge_work_commuter_lsoas_to_msoas/exp1", 
             "-et", "JointTableSIM_MCMC", "-et", "JointTableSIM_NN", "-et", "NonJointTableSIM_NN", 
             "-el", "np", "-el", "MathUtils", "-el", "MiscUtils", "-el", "xr", 
@@ -1001,7 +1001,7 @@ def reproduce(figure):
         ])
     elif figure == 'figure3':
         subprocess.check_output([
-            "gensit", "plot", "2d", "scatter", "-y", "table_srmse", "-x", "type", "-x", "N&ensemble_size", "--x_discrete", "-gb", "seed", 
+            "gensit", "plot", "simple", "scatter", "-y", "table_srmse", "-x", "type", "-x", "N&ensemble_size", "--x_discrete", "-gb", "seed", 
             "-dn", "cambridge_work_commuter_lsoas_to_msoas/exp2",
             "-et", "NonJointTableSIM_NN", "-et", "JointTableSIM_NN",
             "-el", "np", "-el", "MathUtils", "-el", "MiscUtils", "-el", "xr",

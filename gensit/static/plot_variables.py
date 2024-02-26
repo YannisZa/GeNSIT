@@ -41,8 +41,9 @@ PLOT_VARIABLES_AND_DERIVATIVES = PLOT_VARIABLES + PLOT_COORDINATE_DERIVATIVES
 
 # Type of plots
 PLOT_VIEWS = {
-        "2d":"plot_2d",
-        "odm":"origin_destination_matrix"
+        "simple":"plot_simple",
+        "spatial":"plot_spatial",
+        "tabular":"plot_tabular"
 }
 
 PLOT_TYPES = {

@@ -476,7 +476,7 @@ class Plot(object):
         
         return ax
     
-    def plot_2d(self,plot_settings,**kwargs):
+    def plot_simple(self,plot_settings,**kwargs):
 
         # Get directory path and file name
         dirpath = kwargs['dirpath']
@@ -523,7 +523,7 @@ class Plot(object):
                 )
         
         # print(plot_settings['x'])
-        print(discrete_hashmaps['x'])
+        # print(discrete_hashmaps['x'])
         # print(group_hashmap)
         # print(discrete_ticks['x'])
         
@@ -605,7 +605,7 @@ class Plot(object):
         # Count number of axes ids
         counter = 0
         # Set ticks
-        print(group_hashmap)
+        # print(group_hashmap)
         for r in range(max(len(group_hashmap['y']),1)):
             for c in range(max(len(group_hashmap['x']),1)):
                 for j,var in enumerate(['x','y']):
@@ -877,7 +877,7 @@ class Plot(object):
                 'handletextpad': self.settings.get('legend_pad',None),
                 'loc': self.settings.get('legend_location','best')
             }
-            print(leg_kwargs)
+            # print(leg_kwargs)
             # Remove nulls 
             leg_kwargs = {k:v for k,v in leg_kwargs.items() if v}
             # If more than one column are provided split legend patches and keys
@@ -1163,11 +1163,11 @@ class Plot(object):
                 if len(values.shape) > 1:
                     # Number of elements to sort
                     ndims = values.shape[1]
-                    print('lexsort')
+                    # print('lexsort')
                     # Use lexsort to argsort along each axis successively
                     sorted_indices = np.lexsort([values[:,i].ravel() for i in range(ndims)])
                 else:
-                    print('argsort')
+                    # print('argsort')
                     sorted_indices = np.argsort(values,axis=0)
                 # Update merged settings
                 # add 1.0 to avoid zorder = 0
@@ -1382,7 +1382,7 @@ class Plot(object):
                                     meta = meta
                                 )
                             )
-                            print_json({k:plot_sett[k] for k in ['x','y','marker_size'] if k in plot_sett})
+                            # print_json({k:plot_sett[k] for k in ['x','y','marker_size'] if k in plot_sett})
 
                             # Add data
                             plot_settings.append(deepcopy(plot_sett))

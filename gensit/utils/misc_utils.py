@@ -135,7 +135,9 @@ def write_figure(figure,filepath,**settings):
 
 
 def write_figure_data(plot_data:Union[dict,pd.DataFrame],filepath:str,keys:list=[],figure_settings:dict={}):
-    
+    # Create output directory
+    makedir(os.path.dirname(filepath))
+
     for plot_datum in plot_data:
         
         # Keys must be included in figure data

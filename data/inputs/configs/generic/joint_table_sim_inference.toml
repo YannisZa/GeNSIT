@@ -26,13 +26,15 @@ load_experiment = ''
 
 [contingency_table]
   sparse_margins = false
-  contingency_table.constraints.axes = [[+0,+1]]
-  contingency_table.constraints.cells = ''
+  [contingency_table.constraints]
+    axes = [[+0,+1]]
+    cells = ''
   
 [spatial_interaction_model]
-  spatial_interaction_model.name = 'TotallyConstrained'  
+  name = 'TotallyConstrained'  
   [spatial_interaction_model.parameters]
     bmax = +1.0
+
 
 [harris_wilson_model]
   dt = +0.001
@@ -73,10 +75,11 @@ load_experiment = ''
 
 [neural_network]
   disable_tqdm = true
-  neural_network.loss.loss_name = ['table_likelihood_loss']
-  neural_network.loss.loss_function = 'custom'
-  [neural_network.loss.loss_kwargs]
-    nokey = nan
+  [neural_network.loss]
+    loss_name = ['table_likelihood_loss']
+    loss_function = ['custom']
+    [neural_network.loss.loss_kwargs]
+      nokey = nan
   [neural_network.hyperparameters]
     num_layers = +1
     optimizer = 'Adam'
@@ -107,5 +110,5 @@ load_experiment = ''
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'exp4'
-    outputs.title = '_group_constrained'
+    title = '_total_constrained'
   

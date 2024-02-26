@@ -20,11 +20,13 @@
     - [Real-world](#real-world)
     - [Synthetic](#synthetic)
   - [Configs](#configs)
+- [Problem setup](#problem-setup)
 - [Functionality](#functionality)
   - [Run](#run)
   - [Plot](#plot)
   - [Summarise](#summarise)
   - [Reproduce](#reproduce)
+- [Conclusion](#conclusion)
 - [Related publications](#related-publications)
 - [Acknowledgments](#acknowledgments)
 
@@ -45,8 +47,6 @@ A facet of this sampling problem that is pertinent to population synthesis for m
 ## Contribution
 
 This repository introduces a [computational framework named `GeNSIT`](#introduction) see for exploring the constrained discrete origin-destination matrices of agent trip location choices using closed-form or Gibbs Markov Basis sampling. The underlying continuous choice probability or intensity function (unnormalised probability function) is modelled by total and singly constrained **spatial interaction models** (SIMs) or _gravity models_ embedded in the well-known Harris Wilson stochastic differential equations (SDEs). We employ Neural Networks to calibrate the SIM parameters. We include Markov Chain Monte Carlo (MCMC) schemes leveraged to learn the SIM parameters in previous works. For more details on the mathematical aspects of this repository please look at the [Publications section](#related-publications).
-
-The `GeNSIT` package provides functionality for five different operations: [`create`](#synthetic), [`run`](#run), [`plot`](#plot), [`reproduce`](#reproduce), [`summarise`](#summarise).
 
 # Installation
 
@@ -204,15 +204,177 @@ Here `sigma` is coupled with the `to_learn` parameter, meaning the vary together
 
 > **_Note:_** More information on each key-value pair found in Configs can be found [here](./configuration_settings.md).
 
+# Problem setup
+
+Consider $M$ agents that travel from $I$ origins to $J$ destinations to work. Let the expected number of trips (intensity) of agents between origin $i$ and destination $j$ be denoted by $\Lambda_{ij}$. The residential population in each origin (row sums) is equal to
+
+$$
+    \Lambda_{i+} = \sum_{j=1}^{J} \Lambda_{ij}, \;\;\;\; i=1,\dots,I,
+$$
+
+while the working population at each destination (column sums) is
+
+$$
+    \Lambda_{+j} = \sum_{i=1}^{I} \Lambda_{ij}, \;\;\;\; j=1,\dots,J.
+$$
+
+We assume that the total origin and destination demand are both conserved:
+
+$$
+    M = \Lambda_{++} = \sum_{i=1}^{I} \Lambda_{i+} = \sum_{j=1}^{J} \Lambda_{+j}.
+$$
+
+The demand for destination zones depends on the destination's attractiveness denoted by $\mathbf{z} \coloneqq (z_1,\dots, z_J) \in \mathbb{R}_{>0}^{J}$. Let the log-attraction be $\mathbf{x} \coloneqq \log(\mathbf{z})$. Between two destinations of similar attractiveness, agents are assumed to prefer nearby zones. Therefore, a cost matrix $\mathbf{C} = (c_{i,j})_{i,j=1}^{I,J}$ is introduced to reflect travel impedance. The maximum entropy distribution of agent trips subject to the total number of agents being conserved is derived by maximising the Lagrangian
+
+$$
+\mathcal{E}(\boldsymbol{\Lambda}) = \sum_{i=1}^{I}\sum_{j=1}^J -\Lambda_{ij}\log(\Lambda_{ij}) - \zeta \sum_{i,j}^{I,J} \Lambda_{ij} + \alpha \sum_{j}^{J} x_j\Lambda_{ij}  - \beta \sum_{i,j}^{I,J} c_{ij}\Lambda_{ij},
+$$
+
+where $\zeta,\alpha$ and $\beta$ are the Lagrange multipliers. This yields a closed-form expression for the expected flows (intensity) of agents from $i$ to $j$ for the total constrained SIM:
+
+$$
+\Lambda_{ij} = \frac{\Lambda_{++}\exp(\alpha x_j -\beta c_{ij})}{\sum_{k,m}^{I,J} \exp(\alpha x_m-\beta c_{km})},
+$$
+
+where the multipliers $\alpha,\beta$ control the two competing forces of attractiveness and deterrence, respectively, while $\zeta$ bears no physical interpretation. A higher $\alpha$ relative to $\beta$ characterises a preference over destinations with higher job availability, while the contrary indicates a predilection for closer workplaces. If we further assume that origin demand ($\Lambda_{\cdot+}$) is also fixed then we get the singly constrained SIM:
+
+$$
+\Lambda_{ij} = \frac{\Lambda_{i+}\exp(\alpha x_j -\beta c_{ij})}{\sum_{k,m}^{I,J} \exp(\alpha x_m-\beta c_{km})}.
+$$
+
+Spatial interaction models are connected to physics models through the destination attractiveness term $\mathbf{z}$, which is governed by the Harris-Wilson system of $J$ coupled ordinary differential equations (ODEs):
+
+where $\epsilon$ is a responsiveness parameter, $\kappa>0$ is the number of agents competing for one job, $\delta>0$ is the smallest number of jobs a destination can have and $\Lambda_{+j}(t) - \kappa z_j(t)$ is the net job capacity in destination $j$. A positive net job capacity translates to a higher economic activity (more travellers than jobs) and a boost in local employment, and vice versa. A stochastic version of the Harris Wilson model is the following:
+
+$$
+\frac{dz_j}{dt} = \epsilon z_j \left( \Lambda_{+j} - \kappa z_j + \delta  \right) + \sigma z_j \circ B_{j,t}, \; \; \mathbf{z}(0) = \mathbf{z}'.
+$$
+
+We recommend you look at relevant [publications](#related-publications) for more information on the Harris Wilson model. Our first goal is to learn the parameters $\alpha,\beta$ using either sampling (MCMC) or optimisation (NN) algorithms. To achieve this goal we leverage data $\mathcal{D}$ about either the observed destination attraction (e.g. the number of jobs available at each destination) and/or the total distance/time traveled by agents in their work trips. In general, we can say that our first goal is to learn the distribution of the agent trip intensity $p(\boldsymbol{\Lambda}\vert \mathcal{C},\mathcal{D})$.
+
+We note that the discrete number of agents traveling to work is represented by
+
+$$
+T_{ij} \sim \text{Poisson}(\Lambda_{ij}).
+$$
+
+Although $\mathbf{T}$ and $\boldsymbol{\Lambda}$ look like similar quantities we emphasize that they are distinct. The former is a discrete quantity while the latter is a continuous quantity and many $T_{ij}$ may be ''plausible'' under a single $\Lambda_{ij}$. The SIM intensity $\boldsymbol{\Lambda}$ is a mean-field approximation and can be thought of as the expectation (average) of $\mathbf{T}$ across time for all work trips. We can also reason at a probability level by thinking of $0 \leq \Lambda_{ij}/\Lambda_{++}\leq 1$ as transition probabilities from an origin $i$ to a destination $j$. Depending on the available summary data (e.g. $\mathbf{T}_{\cdot+},\mathbf{T}_{+\cdot}$) we define a set of constraints $\mathcal{C}$. Our second goal is to sample $\mathbf{T}$ subject to these constraints, i.e. sample from $p(\mathbf{T}\vert \mathcal{C},\mathcal{D})$. More information is provided in the papers provided in the [publications](#related-publications) section.
+
 # Functionality
+
+The `GeNSIT` package provides functionality for five different operations: [`create`](#synthetic), [`run`](#run), [`plot`](#plot), [`reproduce`](#reproduce), [`summarise`](#summarise).
 
 ## Run
 
+This command runs `experiment`s using Markov Chain Monte Carlo and/or Neural Networks based on a `Config` file. For example, we can run joint table and intensity inference using the following command
+
+```
+docker run gensit run ./data/inputs/configs/generic/joint_table_sim_inference.toml \
+-et JointTableSIM_NN -nw 6 -nt 3
+```
+
+This config runs a `JointTableSIM_NN` experiment using 6 number of workers and 3 number of threads per worker. A list of experiments and the types of algorithms they use to learn $\boldsymbol{\Lambda}$, $\mathbf{T}$ is provided below. We note that experiments that use NNs to learn the intensity function parameters tend to be computationally much faster.
+
+| Experiment            | $\mathbf{T}$ | $\boldsymbol{\Lambda}$ |
+| --------------------- | :----------: | :--------------------: |
+| `SIM_MCMC`            |      -       |          MCMC          |
+| `JointTableSIM_MCMC`  |     MCMC     |          MCMC          |
+| `SIM_NN`              |      -       |           NN           |
+| `DisjointTableSIM_NN` |     MCMC     |           NN           |
+| `JointTableSIM_NN`    |     MCMC     |           NN           |
+
 ## Plot
+
+Once an experiment has been completed, we can use the following command to plot its data:
+
+```
+docker run gensit plot [PLOT_VIEW] [PLOT_TYPE] -x [X_DATA] -y [Y_DATA]
+```
+
+where `PLOT_VIEW` defines the type of view the data should be shown. Views can be simple, tabular or spatial. `PLOT_TYPE` can be either line or scatter. The `X_DATA` or `Y_DATA` are provided as names of experiment outputs or their evaluated expressions (see [Config settings](./configuration_settings.md)).
+
+For example, the code below plots the log destination attraction predictions (x-axis) against the observed data (y-axis) for experiments `JointTableSIM_MCMC`,`JointTableSIM_NN`,`NonJointTableSIM_NN`.
+
+```
+docker run gensit plot simple scatter \
+-y log_destination_attraction_data -x mean_log_destination_attraction_predictions \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-et JointTableSIM_MCMC -et JointTableSIM_NN -et NonJointTableSIM_NN \
+-el np -el xr -el MathUtils \
+-e mean_log_destination_attraction_predictions "signed_mean_func(log_destination_attraction,sign,dim=['id']).squeeze('time')" \
+-e mean_log_destination_attraction_predictions "log_destination_attraction.mean('id').squeeze('time')" \
+-e log_destination_attraction_data "np.log(destination_attraction_ts).squeeze('time')" \
+-ea log_destination_attraction -ea sign \
+-ea "destination_attraction_ts=outputs.inputs.data.destination_attraction_ts" \
+-ea "signed_mean_func=MathUtils.signed_mean" \
+-k sigma -k title \
+-cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
+-cs "~da.title.isin(['_unconstrained','_total_constrained','_total_intensity_row_table_constrained'])" \
+-c title -op 1.0 -mrkr sigma -l title -l sigma -msz 20 \
+-ft 'predictions_figure/destination_attraction_predictions_vs_observations' \
+-xlab '$\mathbb{E}\left[\mathbf{x}^{(1:N)}\right]$' \
+-ylab '$\mathbf{y}$'
+```
+
+The `-e`,`-ea`,`-el` arguments define the evaluated expressions, the keyword arguments used as input to these expressions (also evaluated) and the necessary libraries that are used to perform the operations, respectively. The evaluation is performed using Python's `eval` function. The first two types of argument allow for reading input and/or output data directly. For example, `-ea "destination_attraction_ts=outputs.inputs.data.destination_attraction_ts"` loads the input (observed) destination attraction time series data while `-ea log_destination_attraction -ea sign` loads `log_destination_attraction` and `sign` output datasets.
+
+The output data is sliced using the coordinate values specified by the `-cs` arguments. For instance, `-cs "~da.title.isin(['_unconstrained','_total_constrained','_total_intensity_row_table_constrained'])"` only keeps the datasets whose `title` variable is equal to any of the specified values. The `sweep` data are gathered either from the output dataset itself or from the output config file (in this case we elicit `sigma`,`title` `sweep` variables).
+
+The scatter plot is colored by the `title` variable and its markers are determined by the `sigma` variable. Both of these variables are contained in each `sweep` that was run. The exact mappings from say sigma values to marker types are contained in [this file](../gensit/static/plot_variables.py). Each point is labeled by both the `title` and `sigma` values. The resulting figure is shown below.
+
+<img src="./example_figure.jpg" alt="framework" width="500"/>
 
 ## Summarise
 
+This command summarised the output data and creates a `csv` file with each data summary from every `sweep`. For example, if we wish to compute the Standardised Root Mean Square Error (SRMSE) for `JointTableSIM_NN` we run
+
+```
+docker run gensit summarise \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-et JointTableSIM_NN \
+-el np -el MathUtils -el xr \
+-e table_srmse "srmse_func(prediction=mean_table,ground_truth=ground_truth)" \
+-e intensity_srmse "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \
+-ea table -ea intensity -ea sign \
+-ea "srmse_func=MathUtils.srmse" \
+-ea "signed_mean_func=MathUtils.signed_mean" \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "mean_table=table.mean(['id'])" \
+-ea "mean_intensity=signed_mean_func(intensity,'intensity','signedmean',dim=['id'])" \
+-ea "mean_intensity=intensity.mean(['id'])" \
+-cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
+-btt 'iter' 10000 90 1000 \
+-k sigma -k type -k name -k title -fe SRMSEs -nw 20
+```
+
+The arguments are similar to the `plot` command. Here we also use `-btt` refered to as burning, thinning and trimming to slice the `iter` coordinate values based on their index. In this occasion, we discard the first 10000 samples and then only keep every 90th sample. Finally, we trim this data array to 1000 elements. A small part of the summarised table is shown below.
+
+| type             | sigma                | title                                   | name               | proposal        | intensity_srmse      | table_srmse           |
+| ---------------- | -------------------- | --------------------------------------- | ------------------ | --------------- | -------------------- | --------------------- |
+| JointTableSIM_NN | 0.14142000675201416  | \_doubly_20%\_cell_constrained          | TotallyConstrained | degree_higher   | [1.983129620552063]  | [0.37612101435661316] |
+| JointTableSIM_NN | 0.014139999635517597 | \_unconstrained                         | TotallyConstrained | direct_sampling | [29.513639450073242] | [1.7274982929229736]  |
+| JointTableSIM_NN | 0.14142000675201416  | \_unconstrained                         | TotallyConstrained | direct_sampling | [29.513639450073242] | [1.7274982929229736]  |
+| JointTableSIM_NN | 0.14142000675201416  | \_doubly_constrained                    | TotallyConstrained | degree_higher   | [2.019375801086426]  | [0.4618358910083771]  |
+| JointTableSIM_NN | 0.014139999635517597 | \_doubly_10%\_cell_constrained          | TotallyConstrained | degree_higher   | [0.8903818130493164] | [0.42363834381103516] |
+| JointTableSIM_NN | 0.14142000675201416  | \_total_intensity_row_table_constrained | TotallyConstrained | direct_sampling | [5.928720951080322]  | [2.1622815132141113]  |
+| JointTableSIM_NN | 0.014139999635517597 | \_doubly_20%\_cell_constrained          | TotallyConstrained | degree_higher   | [0.9381942749023438] | [0.37765341997146606] |
+| JointTableSIM_NN | 0.14142000675201416  | \_doubly_constrained                    | TotallyConstrained | degree_higher   | [0.6841356754302979] | [0.5531010627746582]  |
+| JointTableSIM_NN | 0.14142000675201416  | \_unconstrained                         | TotallyConstrained | direct_sampling | [29.513639450073242] | [1.7273409366607666]  |
+
 ## Reproduce
+
+Finally, this command is run to reproduce the figures appearing in the [papers](#related-publications). The commands are self-explanatory:
+
+```
+docker run gensit reproduce figure1;
+docker run gensit reproduce figure2;
+docker run gensit reproduce figure3;
+docker run gensit reproduce figure4;
+```
+
+# Conclusion
+
+We have introduced `GeNSIT`, an efficient framework for sampling jointly the discrete combinatorial space of agent trips ($\mathbf{T}$) subject to summary statistic data $\mathcal{C}$ and its mean-field $\boldsymbol{\Lambda}$ limit. Therefore, users of this package can perform agent location choice synthesis based on the available data $\mathcal{C},\mathcal{D}$. Although our discussion has been limited to residence to work trips, other types of trips could be modelled too, such as residence to shopping center. The main limitations of this package are the inability to model **activity chains** as opposed to trips and the fact that only static (time-independent) origin destination matrices are considered.
 
 # Related publications
 
@@ -221,4 +383,6 @@ Here `sigma` is coupled with the `to_learn` parameter, meaning the vary together
 
 # Acknowledgments
 
-We acknowledge support from the [UK Research and Innovation (UKRI) Research Council](https://www.ukri.org/), [Arup](https://www.arup.com/) and Cambridge University's [Center for Doctoral Training in Future Infrastructure and Built Environment](https://www.fibe-cdt.eng.cam.ac.uk/). We thank [Arup's City Modelling Lab](https://www.arup.com/services/digital/city-modelling-lab) for their insightful discussions and feedback without which this repository would not have come to fruition.
+We acknowledge support from [Arup](https://www.arup.com/), the [UK Research and Innovation (UKRI) Research Council](https://www.ukri.org/) and Cambridge University's [Center for Doctoral Training in Future Infrastructure and Built Environment](https://www.fibe-cdt.eng.cam.ac.uk/). We thank [Arup's City Modelling Lab](https://www.arup.com/services/digital/city-modelling-lab) for their insightful discussions and feedback without which this project would not have come to fruition.
+
+Thank you for visiting our GitHub repository! We're thrilled to have you here. If you find our project useful or interesting, please consider showing your support by starring the repository and forking it to explore its features and contribute to its development. Your support means a lot to us and helps us grow the community around this project. If you have any questions or feedback, feel free to open an issue or reach out to us.
