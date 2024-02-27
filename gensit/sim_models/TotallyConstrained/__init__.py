@@ -48,12 +48,11 @@ def sde_pot(**kwargs):
     
     # Compute potential
     if alpha == 0:
-        potential = -float('inf')
+        potential = torch.tensor(-float('inf'))
     else:
         potential = -(1./alpha)*log_normalisation
         potential += kappa*(torch.exp(log_destination_attraction)).sum() - delta*torch.sum(log_destination_attraction)
         potential *= gamma*epsilon
-    
     return potential
 
 def sde_pot_jacobian(**kwargs):
