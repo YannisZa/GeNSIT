@@ -7,11 +7,9 @@ __pycache__/
 
 # Directories
 data/outputs/**
-data/outputs_backup/**
-data/raw/**
-data/inputs/**/google/**
 tests/test_outputs/**
-notebooks/io_processing/logs/**
+notebooks/logs/**
+notebooks/data/**
 
 # Files
 *temp*.log
@@ -21,13 +19,8 @@ notebooks/io_processing/logs/**
 *.swp
 *stopping_times*
 .api_key
-data/raw/cambridge_commuter/cambridge.osm.pbf
-data/raw/cambridge_commuter/home_locations.geojson
-data/raw/london_commuter/GLA_data/Sources/A 2013-TCHC-Technical-Annex.xls
-data/raw/london_commuter/GLA_data/Sources/B ward-atlas-data.xls
-data/raw/misc/london_wards_old.json
-data/raw/cambridge_commuter/facility_euclidean_cost_matrix_all_facilities_13_12_2022.pickle
 logs/**
+**/logs/**
 
 # Distribution / packaging
 .Python
@@ -59,24 +52,14 @@ MANIFEST
 # mkdocs documentation
 /site
 docs/._experiment_reproducibility.md
-docs/._neural_net_reproducibility.md
 .vscode/launch.json
 data/inputs/cambridge_work_commuter_lsoas/all_home_facilities_seed_1234.geojson
 data/inputs/cambridge_work_commuter_lsoas/all_work_facilities_seed_1234.geojson
 data/inputs/cambridge_work_commuter_lsoas/sample_20_home_facilities_seed_1234.geojson
 data/inputs/cambridge_work_commuter_lsoas/sample_20_work_facilities_seed_1234.geojson
-r_squared_analysis.sh
-data/raw/cambridge_commuter/facility_euclidean_all_facilities_13_12_2022.pickle
 data/inputs/cambridge_work_commuter_lsoas/._clustered_sample_21_work_facilities_seed_1234.geojson
 data/inputs/cambridge_work_commuter_lsoas_to_msoas/all_home_facilities_seed_1234.geojson
 data/inputs/cambridge_work_commuter_lsoas_to_msoas/all_work_facilities_seed_1234.geojson
-data/raw/cambridge_commuter/._employment_survey_lsoa.csv
-data/raw/cambridge_commuter/._employment_survey_msoa.csv
-data/raw/cambridge_commuter/._OA11_LSOA11_MSOA11_LAD11_EW_LUv2.csv
-data/raw/cambridge_commuter/lsoas_to_msoas_graph.gpickle
-data/raw/cambridge_commuter/euclidean_all_facilities_13_12_2022.pickle
-data/raw/cambridge_commuter/facility_euclidean_sample_20_facilities_17_01_2023.pickle
-data/raw/cambridge_commuter/facility_shortest_path_all_facilities_17_01_2023.pickle
 data/inputs/cambridge_work_commuter_lsoas/facilitiesall_home_facilities_seed_1234.geojson
 data/inputs/cambridge_work_commuter_lsoas/facilitiesall_work_facilities_seed_1234.geojson
 data/inputs/cambridge_work_commuter_lsoas/sample_21_work_clustered_facilities_seed_1234.geojson
@@ -87,6 +70,5 @@ data/inputs/cambridge_work_commuter_lsoas_to_msoas/sample_34_work_clustered_faci
 data/inputs/cambridge_work_commuter_lsoas_to_msoas/sample_40_home_clustered_facilities_seed_1234.geojson
 .vscode/settings.json
 gensit.zip
-gensit/notebooks/temp.ipynb
 gensit/static/uai2024.cls
 docs/README.pdf
