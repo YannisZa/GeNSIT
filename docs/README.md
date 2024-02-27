@@ -4,10 +4,7 @@
 
 [![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org) ![Python](https://img.shields.io/badge/Python-3.9-blue)
 
-# Table of Contents
-
 - [GeNSIT: Generating Neural Spatial Interaction Tables](#gensit-generating-neural-spatial-interaction-tables)
-- [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
   - [Motivation](#motivation)
   - [Contribution](#contribution)
@@ -47,6 +44,8 @@ A facet of this sampling problem that is pertinent to population synthesis for m
 ## Contribution
 
 This repository introduces a [computational framework named `GeNSIT`](#introduction) see for exploring the constrained discrete origin-destination matrices of agent trip location choices using closed-form or Gibbs Markov Basis sampling. The underlying continuous choice probability or intensity function (unnormalised probability function) is modelled by total and singly constrained **spatial interaction models** (SIMs) or _gravity models_ embedded in the well-known Harris Wilson stochastic differential equations (SDEs). We employ Neural Networks to calibrate the SIM parameters. We include Markov Chain Monte Carlo (MCMC) schemes leveraged to learn the SIM parameters in previous works. For more details on the mathematical aspects of this repository please look at the [Publications section](#related-publications).
+
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
 
 # Installation
 
@@ -126,6 +125,8 @@ Commands:
 
 Throughout the remainder of this readme we illustrate `GeNSIT's` command line tool capabilities assuming that a `docker` container has been installed.
 
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
+
 # Inputs
 
 Inputs to `GeNSIT` are [**data**](#data) and [**configuration**](#configs) files.
@@ -173,6 +174,8 @@ The command above creates synthetic data based on the requirements in [the secti
 
 You noticed that we load a configuration file named `synthetic_data_generation.toml` to achieve all this. We elaborate on the use of configs in the [next section](#configs).
 
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
+
 ## Configs
 
 Configuration files contain all settings (key-value pairs) required to `run` NN-based or MCMC-based algorithms for learning the discrete origin-destination table and/or underlying continuous SIM parameters. They are stored in a `toml` format.
@@ -202,7 +205,9 @@ means that each experiment in the [`experiments`](#experiments) section will run
 
 Here `sigma` is coupled with the `to_learn` parameter, meaning the vary together. In this case each experiment will be run for three different sweep settings: (`sigma = 0.0141421356`, `to_learn` = ['alpha','beta']), (`sigma` = 0.1414213562, `to_learn` = ['alpha','beta']), and (`sigma` = nan, `to_learn` = ['alpha','beta','sigma']). We note that more than one sweep keys can be coupled.
 
-> **_Note:_** More information on each key-value pair found in Configs can be found [here](./configuration_settings.md).
+> **_Note:_** More information on each key-value pair found in Configs can be found <a href="./configuration_settings.md" target="_blank">here</a>.
+
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
 
 # Problem setup
 
@@ -260,6 +265,8 @@ $$
 
 Although $\mathbf{T}$ and $\boldsymbol{\Lambda}$ look like similar quantities we emphasize that they are distinct. The former is a discrete quantity while the latter is a continuous quantity and many $T\_{ij}$ may be ''plausible'' under a single $\Lambda\_{ij}$. The SIM intensity $\boldsymbol{\Lambda}$ is a mean-field approximation and can be thought of as the expectation (average) of $\mathbf{T}$ across time for all work trips. We can also reason at a probability level by thinking of $0 \leq \Lambda\_{ij}/\Lambda\_{++}\leq 1$ as transition probabilities from an origin $i$ to a destination $j$. Depending on the available summary data (e.g. ${\mathbf{T}}\_{.+}, {\mathbf{T}}\_{+\.}$) we define a set of constraints $\mathcal{C}$. Our second goal is to sample $\mathbf{T}$ subject to these constraints, i.e. sample from $p(\mathbf{T}\vert \mathcal{C},\mathcal{D})$. More information is provided in the papers provided in the [publications](#related-publications) section.
 
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
+
 # Functionality
 
 The `GeNSIT` package provides functionality for five different operations: [`create`](#synthetic), [`run`](#run), [`plot`](#plot), [`reproduce`](#reproduce), [`summarise`](#summarise).
@@ -284,6 +291,8 @@ This config runs a `JointTableSIM_NN` experiment using 6 number of workers and 3
 | `JointTableSIM_NN`    |     MCMC     |           NN           |
 
 The `run` command can also be programmatically executed using the notebook <a href="../notebooks/Example%201%20-%20Running%20experiments.ipynb" target="_blank">Example 1 - Running experiments</a>.
+
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
 
 ## Plot
 
@@ -326,6 +335,8 @@ The scatter plot is colored by the `title` variable and its markers are determin
 
 <img src="./example_figure.jpg" alt="framework" width="500"/>
 
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
+
 ## Summarise
 
 This command summarised the output data and creates a `csv` file with each data summary from every `sweep`. For example, if we wish to compute the Standardised Root Mean Square Error (SRMSE) for `JointTableSIM_NN` we run
@@ -365,6 +376,8 @@ The arguments are similar to the `plot` command. Here we also use `-btt` refered
 
 Processing experimental outputs for uses similar to the ones provided by `plot` and `summarise` commands can also be achieved by following the steps of notebook <a href="../notebooks/Example%202%20-%20Reading%20outputs.ipynb" target="_blank">Example 2 - Reading outputs</a>.
 
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
+
 ## Reproduce
 
 Finally, this command is run to reproduce the figures appearing in the [papers](#related-publications). The commands are self-explanatory:
@@ -375,6 +388,8 @@ docker run gensit reproduce figure2;
 docker run gensit reproduce figure3;
 docker run gensit reproduce figure4;
 ```
+
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
 
 # Conclusion
 
@@ -390,3 +405,5 @@ We have introduced `GeNSIT`, an efficient framework for sampling jointly the dis
 We acknowledge support from [Arup](https://www.arup.com/), the [UK Research and Innovation (UKRI) Research Council](https://www.ukri.org/) and Cambridge University's [Center for Doctoral Training in Future Infrastructure and Built Environment](https://www.fibe-cdt.eng.cam.ac.uk/). We thank [Arup's City Modelling Lab](https://www.arup.com/services/digital/city-modelling-lab) for their insightful discussions and feedback without which this project would not have come to fruition.
 
 Thank you for visiting our GitHub repository! We're thrilled to have you here. If you find our project useful or interesting, please consider showing your support by starring the repository and forking it to explore its features and contribute to its development. Your support means a lot to us and helps us grow the community around this project. If you have any questions or feedback, feel free to open an issue or reach out to us.
+
+[Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
