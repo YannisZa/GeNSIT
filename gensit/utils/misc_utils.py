@@ -587,13 +587,13 @@ def deep_apply(ob, func, **kwargs):
             ob[k] = func(v,**kwargs)
     return ob
 
-def pop_variable(_self,var):
+def pop_variable(_self,var,default=None):
     if hasattr(_self,var):
         res = getattr(_self,var)
         delattr(_self,var)
         return res
     else:
-        return None
+        return default
 
 def extract_config_parameters(conf,fields = dict):
     trimmed_conf = {}
@@ -664,8 +664,6 @@ def stringify(data,**kwargs):
         return kwargs.get('preffix','')+ \
             ','.join([stringify(v,**kwargs) for v in data])+ \
             kwargs.get('suffix','')
-    elif not data:
-        return "none"
     elif isinstance(data,numbers.Real) and kwargs.get('scientific',True):
         try:
             assert np.isfinite(data)
@@ -677,6 +675,8 @@ def stringify(data,**kwargs):
             return "{:.0e}".format(data)
         else:
             return str(data)
+    elif not data and data != 0:
+        return "none"
     else:
         return str(data)
         
