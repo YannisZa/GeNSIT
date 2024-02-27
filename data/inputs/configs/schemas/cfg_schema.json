@@ -59,7 +59,7 @@
       "exclude": false,
       "dtype": "str",
       "default-value": "cpu",
-      "is-any-of": ["cpu", "mps", "cuda"]
+      "is-any-of": ["cpu", "cuda"]
     },
     "in_directory": {
       "sweepable": false,
