@@ -209,13 +209,13 @@ Here `sigma` is coupled with the `to_learn` parameter, meaning the vary together
 Consider $M$ agents that travel from $I$ origins to $J$ destinations to work. Let the expected number of trips (intensity) of agents between origin $i$ and destination $j$ be denoted by $\Lambda_{ij}$. The residential population in each origin (row sums) is equal to
 
 $$
-    \Lambda_{i+} = \sum_{j=1}^{J} \Lambda_{ij}, \;\;\;\; i=1,\dots,I,
+    \Lambda_{i+} = \sum_{j=1}^{J} \Lambda_{ij},    i=1,\dots,I,
 $$
 
 while the working population at each destination (column sums) is
 
 $$
-    \Lambda_{+j} = \sum_{i=1}^{I} \Lambda_{ij}, \;\;\;\; j=1,\dots,J.
+    \Lambda_{+j} = \sum_{i=1}^{I} \Lambda_{ij},     j=1,\dots,J.
 $$
 
 We assume that the total origin and destination demand are both conserved:
@@ -224,7 +224,7 @@ $$
     M = \Lambda_{++} = \sum_{i=1}^{I} \Lambda_{i+} = \sum_{j=1}^{J} \Lambda_{+j}.
 $$
 
-The demand for destination zones depends on the destination's attractiveness denoted by $\mathbf{z} = (z_1,\dots, z_J) \in \mathbb{R}_{>0}^{J}$. Let the log-attraction be $\mathbf{x} = \log(\mathbf{z})$. Between two destinations of similar attractiveness, agents are assumed to prefer nearby zones. Therefore, a cost matrix $\mathbf{C} = (c_{i,j})_{i,j=1}^{I,J}$ is introduced to reflect travel impedance. The maximum entropy distribution of agent trips subject to the total number of agents being conserved is derived by maximising the Lagrangian
+The demand for destination zones depends on the destination's attractiveness denoted by $\mathbf{z} = (z_1,\dots, z_J) \in R_{>0}^{J}$. Let the log-attraction be $\mathbf{x} = \text{log}(\mathbf{z})$. Between two destinations of similar attractiveness, agents are assumed to prefer nearby zones. Therefore, a cost matrix $\mathbf{C} = (c_{i,j})_{i,j=1}^{I,J}$ is introduced to reflect travel impedance. The maximum entropy distribution of agent trips subject to the total number of agents being conserved is derived by maximising the Lagrangian
 
 $$
 \mathcal{E}(\boldsymbol{\Lambda}) = \sum_{i=1}^{I}\sum_{j=1}^J -\Lambda_{ij}\log(\Lambda_{ij}) - \zeta \sum_{i,j}^{I,J} \Lambda_{ij} + \alpha \sum_{j}^{J} x_j\Lambda_{ij}  - \beta \sum_{i,j}^{I,J} c_{ij}\Lambda_{ij},
