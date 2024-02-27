@@ -33,7 +33,6 @@ from gensit.contingency_table import instantiate_ct
 from gensit.harris_wilson_model import HarrisWilson
 from gensit.utils import probability_utils as ProbabilityUtils
 from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
-from gensit.harris_wilson_model_mcmc import instantiate_harris_wilson_mcmc
 from gensit.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
 from gensit.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 
@@ -807,6 +806,13 @@ class Outputs(object):
                     [sample_data]
                 )
         
+        # If output dataset is empty raise Error
+        if self.data.size() <= 0:
+            raise EmptyData(
+                message = f"Outputs data {', '.join(self.output_names)} is empty",
+                data_names = ""
+            )
+        
         # Slice according to coordinate and index slice
         self.slice_coordinates()
 
@@ -814,7 +820,7 @@ class Outputs(object):
         if self.data.size() <= 0:
             raise EmptyData(
                 message = 'Outputs data is empty after slicing by coordinates and/or indices',
-                data_names = 'all'
+                data_names = ''
             )
         
         # Stack sweep and iter dimensions
