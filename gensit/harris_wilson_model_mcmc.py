@@ -22,20 +22,10 @@ from gensit.utils.misc_utils import setup_logger, makedir, set_seed, unpack_dims
 
 AIS_SAMPLE_ARGS = ['alpha','beta','gamma','n_temperatures','ais_samples','leapfrog_steps','epsilon_step','semaphore','pbar']
 
-def instantiate_harris_wilson_mcmc(config:Config,physics_model:HarrisWilson,**kwargs):
-    if hasattr(sys.modules[__name__], ('HarrisWilsonMarkovChainMonteCarlo')):
-        return getattr(sys.modules[__name__],f"HarrisWilson{len(unpack_dims(config['inputs']['dims'],time_dims = False))}DMarkovChainMonteCarlo")(
-            config = config,
-            physics_model = physics_model,
-            **kwargs
-        )
-    else:
-        raise Exception(f"Input class HarrisWilsonMarkovChainMonteCarlo not found")
-
-class HarrisWilsonMarkovChainMonteCarlo():
+class HarrisWilson_MCMC(object):
 
     def __init__(
-            self, 
+            self,
             config: Config,
             physics_model:HarrisWilson,
             **kwargs
@@ -75,9 +65,6 @@ class HarrisWilsonMarkovChainMonteCarlo():
         self.mcmc_workers = self.config.settings['mcmc'].get('mcmc_workers',1)
 
         self.logger.info(f'Building {self.physics_model.noise_regime} {self.physics_model.intensity_model.name} Markov Chain Monte Carlo Engine')
-
-    def __repr__(self):
-        return "MarkovChainMonteCarlo(SpatialInteraction)"
         
     def load_stopping_times(self):
         # Get total number of stopping times samples required
@@ -127,40 +114,11 @@ class HarrisWilsonMarkovChainMonteCarlo():
             self.logger.info('Exporting stopping times')
             np.savetxt(self.stopping_times_filepath,self.stopping_times.detach().cpu().numpy())
 
-
-class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
-
-    def __init__(
-        self, 
-        config:Config,
-        physics_model:HarrisWilson,
-        **kwargs
-    ):
-        
-        # Instantiate superclass
-        super().__init__(
-            config = config,
-            physics_model = physics_model,
-            **kwargs
-        )
-
-        # self.logger.info((self.__str__()))
-
     def __str__(self):
         return f"""
-            2D Spatial Interaction Model Markov Chain Monte Carlo algorithm
-            Dataset: {self.config.settings['inputs']['dataset']}
-            Cost matrix: {self.config.settings['inputs']['data']['cost_matrix']}
-            Cost matrix sum: {self.physics_model.intensity_model.data.cost_matrix.ravel().sum()}
-            Origin demand sum: {self.physics_model.intensity_model.data.origin_demand.sum()}
-            Delta: {self.physics_model.params.delta}
-            Kappa: {self.physics_model.params.kappa}
-            Epsilon: {self.physics_model.params.epsilon}
-            Gamma: {self.physics_model.params.gamma}
-            Beta scaling: {self.physics_model.params.bmax}
-            Table dimensions: {"x".join([str(x) for x in self.physics_model.intensity_model.dims])}
+            {'x'.join([str(d) for d in self.physics_model.intensity_model.dims])} Harris Wilson Markov Chain Monte Carlo using {self.physics_model.intensity_model.name}
+            Learned parameters: {', '.join(self.physics_model.params_to_learn)}
             Noise regime: {self.physics_model.noise_regime}
-            Number of threads per core: {str(self.mcmc_workers)}
         """
     
     def build(self,**kwargs):
@@ -217,18 +175,11 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
 
         # Get table distribution
         self.table_distribution = f"log_{self.table_distribution_name}_pmf"
-        # Get log table pmf unnormalised jacobian
-        self.log_table_likelihood_total_derivative_wrt_x = getattr(ProbabilityUtils, 'log_table_likelihood_total_derivative_wrt_x')
         if hasattr(ProbabilityUtils, (self.table_distribution+"_unnormalised")):
             self.table_unnormalised_log_likelihood = getattr(ProbabilityUtils, self.table_distribution+"_unnormalised")
             # print(self.table_unnormalised_log_likelihood)
         else:
             raise Exception(f"Input class ProbabilityUtils does not have distribution {(self.table_distribution+'_unnormalised')}")
-        self.table_log_likelihood_jacobian = None
-        if hasattr(ProbabilityUtils, (self.table_distribution+'_jacobian_wrt_intensity')):
-            self.table_log_likelihood_jacobian = getattr(ProbabilityUtils, (self.table_distribution+'_jacobian_wrt_intensity'))
-        else:
-            raise Exception(f"Input class ProbabilityUtils does not have distribution {(self.table_distribution+'wrt')} either intensity")
         
     
     def negative_table_log_likelihood(
@@ -1082,6 +1033,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         momentum_new = momentum
         # X-Proposal
         log_destination_attraction_new = log_destination_attraction_prev
+        # print(log_destination_attraction_prev)
         # Initial log potential energy and its gradient weighted by the likelihood function \pi(y|x)
         W_new, gradW_new = W, gradW
 
@@ -1099,8 +1051,7 @@ class HarrisWilson2DMarkovChainMonteCarlo(HarrisWilsonMarkovChainMonteCarlo):
         # print('gradV + negative_gradient_log_data_likelihood',gradV + negative_gradient_log_data_likelihood)
         # print('negative_gradient_log_table_likelihood',negative_gradient_log_table_likelihood)
         # print('\n')
-        # print(momentum_new -0.5*self.destination_attraction_step_size*gradW_new)
-
+        # print(momentum_new -0.5*self.destination_attraction_step_size*gradW_new))
         # Leapfrog integrator
         for j in range(self.destination_attraction_leapfrog_steps):
             # Make a half step for momentum in the beginning
