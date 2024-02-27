@@ -209,13 +209,13 @@ Here `sigma` is coupled with the `to_learn` parameter, meaning the vary together
 Consider $M$ agents that travel from $I$ origins to $J$ destinations to work. Let the expected number of trips (intensity) of agents between origin $i$ and destination $j$ be denoted by $\Lambda\_{ij}$. The residential population in each origin (row sums) is equal to
 
 $$
-    \Lambda\\_{i+} = \sum\\_{j=1}^{J} \Lambda\\_{ij},    i=1,\dots,I,
+    \Lambda\_{i+} = \sum\_{j=1}^{J} \Lambda\_{ij},    i=1,\dots,I,
 $$
 
 while the working population at each destination (column sums) is
 
 $$
-    \Lambda\_{+j} = \sum\\_{i=1}^{I} \Lambda\\_{ij},     j=1,\dots,J.
+    \Lambda\_{+j} = \sum\_{i=1}^{I} \Lambda\_{ij},     j=1,\dots,J.
 $$
 
 We assume that the total origin and destination demand are both conserved:
@@ -239,7 +239,7 @@ $$
 where the multipliers $\alpha,\beta$ control the two competing forces of attractiveness and deterrence, respectively, while $\zeta$ bears no physical interpretation. A higher $\alpha$ relative to $\beta$ characterises a preference over destinations with higher job availability, while the contrary indicates a predilection for closer workplaces. If we further assume that origin demand (${\boldsymbol{\Lambda}}\_{.+}$) is also fixed then we get the singly constrained SIM:
 
 $$
-\Lambda\\_{ij} = \frac{\Lambda\_{i+}\exp(\alpha x_j -\beta c\_{ij})}{\sum\_{k,m}^{I,J} \exp(\alpha x_m-\beta c\_{km})}.
+\Lambda\_{ij} = \frac{\Lambda\_{i+}\exp(\alpha x_j -\beta c\_{ij})}{\sum\_{k,m}^{I,J} \exp(\alpha x_m-\beta c\_{km})}.
 $$
 
 Spatial interaction models are connected to physics models through the destination attractiveness term $\mathbf{z}$, which is governed by the Harris-Wilson system of $J$ coupled ordinary differential equations (ODEs):
@@ -258,7 +258,7 @@ $$
 T\_{ij} \sim \text{Poisson}(\Lambda\_{ij}).
 $$
 
-Although $\mathbf{T}$ and $\boldsymbol{\Lambda}$ look like similar quantities we emphasize that they are distinct. The former is a discrete quantity while the latter is a continuous quantity and many $T\_{ij}$ may be ''plausible'' under a single $\Lambda\_{ij}$. The SIM intensity $\boldsymbol{\Lambda}$ is a mean-field approximation and can be thought of as the expectation (average) of $\mathbf{T}$ across time for all work trips. We can also reason at a probability level by thinking of $0 \leq \Lambda\_{ij}/\Lambda\_{++}\leq 1$ as transition probabilities from an origin $i$ to a destination $j$. Depending on the available summary data (e.g. ${\mathbf{T}}\\_{.+}, {\mathbf{T}}\_{+\.}$) we define a set of constraints $\mathcal{C}$. Our second goal is to sample $\mathbf{T}$ subject to these constraints, i.e. sample from $p(\mathbf{T}\vert \mathcal{C},\mathcal{D})$. More information is provided in the papers provided in the [publications](#related-publications) section.
+Although $\mathbf{T}$ and $\boldsymbol{\Lambda}$ look like similar quantities we emphasize that they are distinct. The former is a discrete quantity while the latter is a continuous quantity and many $T\_{ij}$ may be ''plausible'' under a single $\Lambda\_{ij}$. The SIM intensity $\boldsymbol{\Lambda}$ is a mean-field approximation and can be thought of as the expectation (average) of $\mathbf{T}$ across time for all work trips. We can also reason at a probability level by thinking of $0 \leq \Lambda\_{ij}/\Lambda\_{++}\leq 1$ as transition probabilities from an origin $i$ to a destination $j$. Depending on the available summary data (e.g. ${\mathbf{T}}\_{.+}, {\mathbf{T}}\_{+\.}$) we define a set of constraints $\mathcal{C}$. Our second goal is to sample $\mathbf{T}$ subject to these constraints, i.e. sample from $p(\mathbf{T}\vert \mathcal{C},\mathcal{D})$. More information is provided in the papers provided in the [publications](#related-publications) section.
 
 # Functionality
 
