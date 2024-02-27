@@ -18,55 +18,6 @@ def default_config():
     config = Config("tests/test_configs/test_0_default_config.toml")
     return config
 
-# @pytest.fixture
-# def dummy_generated_4x6_config():
-#     # Dummy config to import table
-#     config = Namespace(**{'settings':''})
-#     config.settings = {'inputs':{"generate_data":False,"contingency_table":{"dependence_model":False,"import":{"file":"tests/test_fixtures/generated_4x6_table.csv"}}}}
-#     return config
-#
-# @pytest.fixture
-# def dummy_updated_4x6_config():
-#     # Dummy config to import table
-#     config = Namespace(**{'settings':''})
-#     config.settings = {'inputs':{"generate_data":False,"contingency_table":{"dependence_model":False,"import":{"file":"tests/test_fixtures/updated_4x6_table.csv"}}}}
-#     return config
-#
-# @pytest.fixture
-# def dummy_augmented_5x7_config():
-#     # Dummy config to import table
-#     config = Namespace(**{'settings':''})
-#     config.settings = {'inputs':{"generate_data":False,"contingency_table":{"dependence_model":False,"import":{"file":"tests/test_fixtures/augmented_5x7_table.csv"}}}}
-#     return config
-#
-# @pytest.fixture
-# def dummy_monte_carlo_4x6_config():
-#     # Dummy config to import table
-#     config = Namespace(**{'settings':''})
-#     config.settings = {'inputs':{"generate_data":False,"contingency_table":{"dependence_model":False,"import":{"file":"tests/test_fixtures/monte_carlo_4x6_table.csv"}}}}
-#     return config
-#
-# @pytest.fixture
-# def dummy_max_entropy_4x6_table_config():
-#     # Dummy config to import table
-#     config = Namespace(**{'settings':''})
-#     config.settings = {'inputs':{"generate_data":False,"contingency_table":{"dependence_model":False,"import":{"file":"tests/test_fixtures/max_entropy_4x6_table.csv"}}}}
-#     return config
-#
-# @pytest.fixture
-# def dummy_iterative_res_filling_4x6_table_config():
-#     # Dummy config to import table
-#     config = Namespace(**{'settings':''})
-#     config.settings = {'inputs':{"generate_data":False,"contingency_table":{"dependence_model":False,"import":{"file":"tests/test_fixtures/iterative_res_filling_4x6_table.csv"}}}}
-#     return config
-#
-# @pytest.fixture
-# def dummy_iterative_uniform_res_filling_4x6_table_config():
-#     # Dummy config to import table
-#     config = Namespace(**{'settings':''})
-#     config.settings = {'inputs':{"generate_data":False,"contingency_table":{"dependence_model":False,"import":{"file":"tests/test_fixtures/iterative_uniform_res_filling_4x6_table.csv"}}}}
-#     return config
-
 @pytest.fixture
 def dummy_generated_2x3_config():
     # Dummy config to import table
@@ -471,26 +422,3 @@ def test_2d_contingency_table_iterative_uniform_residual_filling_solution(ct,dum
     imrf = ct.table_iterative_uniform_residual_filling_solution()
 
     assert ct.table_admissible(imrf) and ct.table_nonnegative(imrf)
-
-def test_logsumexp():
-    # Compute log lambdas
-    log_lambdas = np.array([[ 1.77625623, -2.39041044, -7.25022428],[-6.06175109, -1.89508443, 1.57843506]])
-
-    I,J = np.shape(log_lambdas)
-
-    print(log_lambdas)
-
-    lambdas = np.exp(log_lambdas)
-    my_num = np.sum(lambdas,axis = 0)
-    my_denum = np.sum(lambdas)
-    my_lse = my_num/my_denum
-
-    num = np.zeros(J)
-    for j in range(J):
-        num[j] = logsumexp(np.array(log_lambdas[:,j]))
-    den = logsumexp(log_lambdas)
-    lse = np.exp(num-den)
-
-    assert abs(np.exp(den)-11)<=1e-8
-    assert len(my_lse) == len(lse)
-    assert all([abs(a-b)<=1e-9 for a, b in zip(my_lse, lse)])
