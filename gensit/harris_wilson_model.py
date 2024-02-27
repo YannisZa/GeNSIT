@@ -64,7 +64,6 @@ class HarrisWilson:
         self.noise_var = self.obs_noise_percentage_to_var(
             self.config['harris_wilson_model']['parameters']['noise_percentage']
         )
-        # print('noise_percentage',self.config['harris_wilson_model']['parameters']['noise_percentage'])
 
         # Check that learnable parameters are in valid set
         try:
@@ -78,7 +77,7 @@ class HarrisWilson:
         # kwargs or parameter defaults
         self.params_to_learn = {}
         for i,param in enumerate(self.config.settings['training']['to_learn']):
-            self.params_to_learn[param] = i
+            self.params_to_learn[param] = PARAMETER_DEFAULTS[param]
 
         # Fixed hyperparameters
         self.params = Dataset()
@@ -204,7 +203,8 @@ class HarrisWilson:
         # Compute difference
         diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
         # Compute log likelihood (without constant factor) and its gradient
-        return 0.5*(1./self.noise_var)*(diff.dot(diff)), (1./self.noise_var)*diff
+        temp = 0.5*(1./self.noise_var)*(diff.dot(diff)), (1./self.noise_var)*diff
+        return temp
     
     
     def negative_destination_attraction_log_likelihood(self,**kwargs):
@@ -220,7 +220,6 @@ class HarrisWilson:
         noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage']) \
                     if kwargs.get('noise_percentage',None) is not None \
                     else self.noise_var
-        # print(noise_var,kwargs['noise_percentage'])
 
         if torch.is_tensor(log_destination_attraction_pred) and \
             torch.is_tensor(log_destination_attraction_ts):
@@ -468,7 +467,7 @@ class HarrisWilson:
         return f"""
             {'x'.join([str(d) for d in self.intensity_model.dims.values()])} Harris Wilson model using {self.intensity_model}
             Learned parameters: {', '.join(self.params_to_learn.keys())}
-            Epsilon: {self.main_params.epsilon}
-            Kappa: {self.main_params.kappa}
-            Delta: {self.main_params.delta}
+            Epsilon: {self.params.epsilon}
+            Kappa: {self.params.kappa}
+            Delta: {self.params.delta}
         """
