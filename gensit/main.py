@@ -184,38 +184,14 @@ def exec(logger,settings,config_path,**kwargs):
     # Update root
     config.path_sets_root()
 
-    # Get list of experiments to run provided through command line
-    experiment_types = list(kwargs.get('experiment_type',[]))
-
-    # Maintain a dictionary of available experiments and their list index
-    experiment_types = {
-        exp.get('type',''):i 
-        for i,exp in enumerate(config.settings['experiments']) 
-        if len(exp.get('type','')) > 0 and \
-            (
-            (len(experiment_types) > 0 and exp.get('type','') in experiment_types) or \
-            len(experiment_types) <= 0
-            )
-    }
-    config.settings.setdefault('experiment_type',experiment_types)
-    
-    # Create output folder if it does not exist
-    if not os.path.exists(config.out_directory):
-        logger.info(f"Creating new output directory {config.out_directory}")
-        os.makedirs(config.out_directory)
-
-    logger.info(f"Validating config provided...")
-    
-    # Validate config
-    # config.validate()
-
     # Intialise experiment handler
     eh = ExperimentHandler(
         config,
+        experiment_types = list(kwargs.get('experiment_type',[])),
         logger = logger
     )
     # Run experiments
-    eh.run_and_write_experiments_sequentially()
+    eh.run_experiments_sequentially()
 
     logger.success('Done')
     

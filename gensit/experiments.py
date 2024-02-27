@@ -20,7 +20,7 @@ from gensit.harris_wilson_model import HarrisWilson
 from gensit.spatial_interaction_model import instantiate_sim
 from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
 from gensit.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
-from gensit.harris_wilson_model_mcmc import instantiate_harris_wilson_mcmc
+from gensit.harris_wilson_model_mcmc import HarrisWilson_MCMC
 from gensit.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 
 # Suppress scientific notation
@@ -57,9 +57,25 @@ class ExperimentHandler(object):
         self.logger.setLevels(
             console_level = level
         )
-        
+
         # Get configuration
         self.config = config
+        
+        # Get list of experiments to run provided through command line
+        exp_types = list(kwargs.get('experiment_types',[]))
+        # Slice config experiment types based on list of experiment types provided
+        for i in reversed(list(range(len(self.config.settings['experiments'])))):
+            if self.config.settings['experiments'][i]['type'] not in exp_types:
+                del self.config.settings['experiments'][i]
+        experiment_types = {
+            exp['type']:i for i,exp in enumerate(config.settings['experiments'])
+        }
+        self.config.settings['experiment_type'] = experiment_types
+        
+        # Create output folder if it does not exist
+        if not os.path.exists(self.config.out_directory):
+            self.logger.info(f"Creating new output directory {self.config.out_directory}")
+            os.makedirs(self.config.out_directory)
 
         # Setup experiments
         self.setup_experiments(**kwargs)
@@ -80,14 +96,10 @@ class ExperimentHandler(object):
             ]
             # Update id, seed and logging detail
             experiment_config.settings['experiment_type'] = experiment_type
-
             # Reset config variables
             experiment_config.reset()
             # Validate experiment-specific config
             experiment_config.experiment_validate()
-
-            if self.config.settings['inputs'].get('dataset',None) is None:
-                raise Exception(f'No dataset found for experiment type {experiment_type}')
             # Instatiate new experiment
             experiment = instantiate_experiment(
                 experiment_type = experiment_type,
@@ -97,7 +109,7 @@ class ExperimentHandler(object):
             # Append it to list of experiments
             self.experiments[experiment_type] = experiment
 
-    def run_and_write_experiments_sequentially(self):
+    def run_experiments_sequentially(self):
         # Run all experiments sequential
         for _,experiment in self.experiments.items():
             # Run experiment
@@ -693,7 +705,7 @@ class RSquared_Analysis(Experiment):
         )
 
         # Get and remove config
-        self.config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config',self.config)
 
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
@@ -706,7 +718,7 @@ class RSquared_Analysis(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        self.config = pop_variable(self.physics_model,'config')
+        self.config = pop_variable(self.physics_model,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
@@ -911,7 +923,7 @@ class LogTarget_Analysis(Experiment):
         )
 
         # Get and remove config
-        self.config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config',self.config)
 
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
@@ -924,11 +936,10 @@ class LogTarget_Analysis(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        self.config = pop_variable(physics_model,'config')
-
+        self.config = pop_variable(physics_model,'config',self.config)
         # Spatial interaction model MCMC
         self.logger.note("Initializing the Harris Wilson model MCMC")
-        self.learning_model = instantiate_harris_wilson_mcmc(
+        self.learning_model = HarrisWilson_MCMC(
             config = self.config,
             physics_model = physics_model,
             logger = self.logger
@@ -1098,7 +1109,7 @@ class SIM_MCMC(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        self.config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config',self.config)
 
         # Build the Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
@@ -1112,11 +1123,11 @@ class SIM_MCMC(Experiment):
         )
 
         # Get and remove config
-        self.config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config',self.config)
 
         # Spatial interaction model MCMC
         self.logger.note("Initializing the Harris Wilson model MCMC")
-        self.learning_model = instantiate_harris_wilson_mcmc(
+        self.learning_model = HarrisWilson_MCMC(
             config = self.config,
             physics_model = physics_model,
             logger = self.logger
@@ -1124,7 +1135,7 @@ class SIM_MCMC(Experiment):
         self.learning_model.build(**kwargs)
         
         # Get config
-        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
+        self.config = getattr(self.learning_model,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
@@ -1244,7 +1255,7 @@ class SIM_MCMC(Experiment):
                 V, \
                 gradV = self.learning_model.log_destination_attraction_step(
                     theta_sample,
-                    self.inputs.data.log_destination_attraction,
+                    torch.log(self.inputs.data.destination_attraction_ts).flatten(),
                     log_destination_attraction_sample,
                     auxiliary_values
                 )
@@ -1308,7 +1319,7 @@ class JointTableSIM_MCMC(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        self.config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config',self.config)
 
         # Build the Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
@@ -1321,11 +1332,11 @@ class JointTableSIM_MCMC(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        self.config = pop_variable(physics_model,'config')
+        self.config = pop_variable(physics_model,'config',self.config)
         
         # Spatial interaction model MCMC
         self.logger.note("Initializing the Harris Wilson model MCMC")
-        self.learning_model = instantiate_harris_wilson_mcmc(
+        self.learning_model = HarrisWilson_MCMC(
             config = self.config,
             physics_model = physics_model,
             logger = self.logger
@@ -1333,7 +1344,7 @@ class JointTableSIM_MCMC(Experiment):
         self.learning_model.build(**kwargs)
         
         # Get config
-        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
+        self.config = getattr(self.learning_model,'config',self.config)
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -1352,7 +1363,7 @@ class JointTableSIM_MCMC(Experiment):
         )
 
         # Get config
-        self.config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else self.config
+        self.config = getattr(self.ct_mcmc.ct,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
@@ -1387,7 +1398,7 @@ class JointTableSIM_MCMC(Experiment):
         log_destination_attraction_sample = initial_params['log_destination_attraction']
         
         # Print initialisations
-        # self.print_initialisations(parameter_inits,print_lengths = False,print_values = True)
+        # self.print_initialisations(initial_params,print_lengths = False,print_values = True)
         
         # Expand theta
         theta_sample_scaled = deepcopy(theta_sample)
@@ -1485,7 +1496,7 @@ class JointTableSIM_MCMC(Experiment):
                 gradV, \
                 negative_log_table_likelihood = self.learning_model.log_destination_attraction_step(
                     theta_sample,
-                    self.inputs.data.log_destination_attraction,
+                    torch.log(self.inputs.data.destination_attraction_ts).flatten(),
                     log_destination_attraction_sample,
                     table_sample,
                     auxiliary_values
@@ -1591,7 +1602,7 @@ class Table_MCMC(Experiment):
         self.ct_mcmc.table_steps = 1
 
         # Get config
-        self.config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else self.config
+        self.config = getattr(self.ct_mcmc.ct,'config',self.config)
 
         # Initialise intensity
         if (ct is not None) and (ct.ground_truth_table is not None):
@@ -1614,7 +1625,7 @@ class Table_MCMC(Experiment):
                     logger = self.logger
                 )
                 # Get and remove config
-                self.config = pop_variable(sim,'config')
+                self.config = pop_variable(sim,'config',self.config)
                 self.logger.note("Using SIM model as ground truth intensity")
                 
                 # Spatial interaction model for intensity
@@ -1740,7 +1751,7 @@ class SIM_NN(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        self.config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config',self.config)
 
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
@@ -1753,7 +1764,7 @@ class SIM_NN(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        self.config = pop_variable(physics_model,'config')
+        self.config = pop_variable(physics_model,'config',self.config)
         
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
@@ -1777,7 +1788,7 @@ class SIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
+        self.config = getattr(self.learning_model,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
@@ -1947,7 +1958,7 @@ class NonJointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        self.config = pop_variable(sim,'config')
+        self.config = pop_variable(sim,'config',self.config)
 
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
@@ -1960,7 +1971,7 @@ class NonJointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        self.config = pop_variable(physics_model,'config')
+        self.config = pop_variable(physics_model,'config',self.config)
         
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -1978,7 +1989,7 @@ class NonJointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else self.config
+        self.config = getattr(self.ct_mcmc.ct,'config',self.config)
 
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
@@ -2002,7 +2013,7 @@ class NonJointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
+        self.config = getattr(self.learning_model,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
@@ -2188,7 +2199,7 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(sim,'config')
+        config = pop_variable(sim,'config',self.config)
 
         # Build Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
@@ -2201,7 +2212,7 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(physics_model,'config')
+        config = pop_variable(physics_model,'config',self.config)
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2218,7 +2229,7 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        config = getattr(self.ct_mcmc.ct,'config') if isinstance(self.ct_mcmc.ct,Config) else self.config
+        config = getattr(self.ct_mcmc.ct,'config',self.config)
         
         # Set up the neural net
         self.logger.note("Initializing the neural net ...")
@@ -2245,7 +2256,7 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        self.config = getattr(self.learning_model,'config') if hasattr(self.learning_model,'config') else self.config
+        self.config = getattr(self.learning_model,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
