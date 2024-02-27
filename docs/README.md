@@ -206,48 +206,48 @@ Here `sigma` is coupled with the `to_learn` parameter, meaning the vary together
 
 # Problem setup
 
-Consider $M$ agents that travel from $I$ origins to $J$ destinations to work. Let the expected number of trips (intensity) of agents between origin $i$ and destination $j$ be denoted by $\Lambda_{ij}$. The residential population in each origin (row sums) is equal to
+Consider $M$ agents that travel from $I$ origins to $J$ destinations to work. Let the expected number of trips (intensity) of agents between origin $i$ and destination $j$ be denoted by $\Lambda\_{ij}$. The residential population in each origin (row sums) is equal to
 
 $$
-    \Lambda_{i+} = \sum_{j=1}^{J} \Lambda_{ij},    i=1,\dots,I,
+    \Lambda\\_{i+} = \sum\\_{j=1}^{J} \Lambda\\_{ij},    i=1,\dots,I,
 $$
 
 while the working population at each destination (column sums) is
 
 $$
-    \Lambda_{+j} = \sum_{i=1}^{I} \Lambda_{ij},     j=1,\dots,J.
+    \Lambda\_{+j} = \sum\\_{i=1}^{I} \Lambda\\_{ij},     j=1,\dots,J.
 $$
 
 We assume that the total origin and destination demand are both conserved:
 
 $$
-    M = \Lambda_{++} = \sum_{i=1}^{I} \Lambda_{i+} = \sum_{j=1}^{J} \Lambda_{+j}.
+    M = \Lambda\_{++} = \sum\_{i=1}^{I} \Lambda\_{i+} = \sum\_{j=1}^{J} \Lambda\_{+j}.
 $$
 
-The demand for destination zones depends on the destination's attractiveness denoted by $\mathbf{z} = (z_1,\dots, z_J) \in R_{>0}^{J}$. Let the log-attraction be $\mathbf{x} = \text{log}(\mathbf{z})$. Between two destinations of similar attractiveness, agents are assumed to prefer nearby zones. Therefore, a cost matrix $\mathbf{C} = (c_{i,j})_{i,j=1}^{I,J}$ is introduced to reflect travel impedance. The maximum entropy distribution of agent trips subject to the total number of agents being conserved is derived by maximising the Lagrangian
+The demand for destination zones depends on the destination's attractiveness denoted by $\mathbf{z} = (z_1,\dots, z_J) \in R\_{>0}^{J}$. Let the log-attraction be $\mathbf{x} = \text{log}(\mathbf{z})$. Between two destinations of similar attractiveness, agents are assumed to prefer nearby zones. Therefore, a cost matrix $\mathbf{C} = (c\_{i,j})\_{i,j=1}^{I,J}$ is introduced to reflect travel impedance. The maximum entropy distribution of agent trips subject to the total number of agents being conserved is derived by maximising the Lagrangian
 
 $$
-\mathcal{E}(\boldsymbol{\Lambda}) = \sum_{i=1}^{I}\sum_{j=1}^J -\Lambda_{ij}\log(\Lambda_{ij}) - \zeta \sum_{i,j}^{I,J} \Lambda_{ij} + \alpha \sum_{j}^{J} x_j\Lambda_{ij}  - \beta \sum_{i,j}^{I,J} c_{ij}\Lambda_{ij},
+\mathcal{E}(\boldsymbol{\Lambda}) = \sum\_{i=1}^{I}\sum\_{j=1}^J -\Lambda\_{ij}\log(\Lambda\_{ij}) - \zeta \sum\_{i,j}^{I,J} \Lambda\_{ij} + \alpha \sum\_{j}^{J} x_j\Lambda\_{ij}  - \beta \sum\_{i,j}^{I,J} c\_{ij}\Lambda\_{ij},
 $$
 
 where $\zeta,\alpha$ and $\beta$ are the Lagrange multipliers. This yields a closed-form expression for the expected flows (intensity) of agents from $i$ to $j$ for the total constrained SIM:
 
 $$
-\Lambda_{ij} = \frac{\Lambda_{++}\exp(\alpha x_j -\beta c_{ij})}{\sum_{k,m}^{I,J} \exp(\alpha x_m-\beta c_{km})},
+\Lambda\_{ij} = \frac{\Lambda\_{++}\exp(\alpha x_j -\beta c\_{ij})}{\sum\_{k,m}^{I,J} \exp(\alpha x_m-\beta c\_{km})},
 $$
 
-where the multipliers $\alpha,\beta$ control the two competing forces of attractiveness and deterrence, respectively, while $\zeta$ bears no physical interpretation. A higher $\alpha$ relative to $\beta$ characterises a preference over destinations with higher job availability, while the contrary indicates a predilection for closer workplaces. If we further assume that origin demand (${\boldsymbol{\Lambda}}_{.+}$) is also fixed then we get the singly constrained SIM:
+where the multipliers $\alpha,\beta$ control the two competing forces of attractiveness and deterrence, respectively, while $\zeta$ bears no physical interpretation. A higher $\alpha$ relative to $\beta$ characterises a preference over destinations with higher job availability, while the contrary indicates a predilection for closer workplaces. If we further assume that origin demand (${\boldsymbol{\Lambda}}\_{.+}$) is also fixed then we get the singly constrained SIM:
 
 $$
-\Lambda_{ij} = \frac{\Lambda_{i+}\exp(\alpha x_j -\beta c_{ij})}{\sum_{k,m}^{I,J} \exp(\alpha x_m-\beta c_{km})}.
+\Lambda\\_{ij} = \frac{\Lambda\_{i+}\exp(\alpha x_j -\beta c\_{ij})}{\sum\_{k,m}^{I,J} \exp(\alpha x_m-\beta c\_{km})}.
 $$
 
 Spatial interaction models are connected to physics models through the destination attractiveness term $\mathbf{z}$, which is governed by the Harris-Wilson system of $J$ coupled ordinary differential equations (ODEs):
 
-where $\epsilon$ is a responsiveness parameter, $\kappa>0$ is the number of agents competing for one job, $\delta>0$ is the smallest number of jobs a destination can have and $\Lambda_{+j}(t) - \kappa z_j(t)$ is the net job capacity in destination $j$. A positive net job capacity translates to a higher economic activity (more travellers than jobs) and a boost in local employment, and vice versa. A stochastic version of the Harris Wilson model is the following:
+where $\epsilon$ is a responsiveness parameter, $\kappa>0$ is the number of agents competing for one job, $\delta>0$ is the smallest number of jobs a destination can have and $\Lambda\_{+j}(t) - \kappa z_j(t)$ is the net job capacity in destination $j$. A positive net job capacity translates to a higher economic activity (more travellers than jobs) and a boost in local employment, and vice versa. A stochastic version of the Harris Wilson model is the following:
 
 $$
-\frac{dz_j}{dt} = \epsilon z_j \left( \Lambda_{+j} - \kappa z_j + \delta  \right) + \sigma z_j \circ B_{j,t}, \; \mathbf{z}(0) = \mathbf{z}'.
+\frac{dz_j}{dt} = \epsilon z_j \left( \Lambda\_{+j} - \kappa z_j + \delta  \right) + \sigma z_j \circ B\_{j,t}, \; \mathbf{z}(0) = \mathbf{z}'.
 $$
 
 We recommend you look at relevant [publications](#related-publications) for more information on the Harris Wilson model. Our first goal is to learn the parameters $\alpha,\beta$ using either sampling (MCMC) or optimisation (NN) algorithms. To achieve this goal we leverage data $\mathcal{D}$ about either the observed destination attraction (e.g. the number of jobs available at each destination) and/or the total distance/time traveled by agents in their work trips. In general, we can say that our first goal is to learn the distribution of the agent trip intensity $p(\boldsymbol{\Lambda}\vert \mathcal{C},\mathcal{D})$.
@@ -255,10 +255,10 @@ We recommend you look at relevant [publications](#related-publications) for more
 We note that the discrete number of agents traveling to work is represented by
 
 $$
-T_{ij} \sim \text{Poisson}(\Lambda_{ij}).
+T\_{ij} \sim \text{Poisson}(\Lambda\_{ij}).
 $$
 
-Although $\mathbf{T}$ and $\boldsymbol{\Lambda}$ look like similar quantities we emphasize that they are distinct. The former is a discrete quantity while the latter is a continuous quantity and many $T_{ij}$ may be ''plausible'' under a single $\Lambda_{ij}$. The SIM intensity $\boldsymbol{\Lambda}$ is a mean-field approximation and can be thought of as the expectation (average) of $\mathbf{T}$ across time for all work trips. We can also reason at a probability level by thinking of $0 \leq \Lambda_{ij}/\Lambda_{++}\leq 1$ as transition probabilities from an origin $i$ to a destination $j$. Depending on the available summary data (e.g. ${\mathbf{T}}_{.+}$, ${\mathbf{T}}_{+.}$) we define a set of constraints $\mathcal{C}$. Our second goal is to sample $\mathbf{T}$ subject to these constraints, i.e. sample from $p(\mathbf{T}\vert \mathcal{C},\mathcal{D})$. More information is provided in the papers provided in the [publications](#related-publications) section.
+Although $\mathbf{T}$ and $\boldsymbol{\Lambda}$ look like similar quantities we emphasize that they are distinct. The former is a discrete quantity while the latter is a continuous quantity and many $T\_{ij}$ may be ''plausible'' under a single $\Lambda\_{ij}$. The SIM intensity $\boldsymbol{\Lambda}$ is a mean-field approximation and can be thought of as the expectation (average) of $\mathbf{T}$ across time for all work trips. We can also reason at a probability level by thinking of $0 \leq \Lambda\_{ij}/\Lambda\_{++}\leq 1$ as transition probabilities from an origin $i$ to a destination $j$. Depending on the available summary data (e.g. ${\mathbf{T}}\\_{.+}, {\mathbf{T}}\_{+\.}$) we define a set of constraints $\mathcal{C}$. Our second goal is to sample $\mathbf{T}$ subject to these constraints, i.e. sample from $p(\mathbf{T}\vert \mathcal{C},\mathcal{D})$. More information is provided in the papers provided in the [publications](#related-publications) section.
 
 # Functionality
 
