@@ -151,8 +151,8 @@ Optional datasets may be:
 
 We consider agent trips from residence to workplace locations in Cambridge, UK. We use the following datasets from the Census 2011 data provided by the [Office of National Statistics](https://www.ons.gov.uk):
 
-- [Lower super output areas (LSOAs), Middle super output areas (MSOAs)](../data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson) as origin, destination locations, respectively.
-- [Average shortest path in a transportation network](../data/inputs/cambridge_work_commuter_lsoas_to_msoas/cost_matrices/clustered_facilities_sample_20x20_20_01_2023_sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_prob_origin_destination_adjusted_normalised_boundary_only_edge_corrected_cost_matrix_max_normalised.txt) between a random sample of 20 residences inside each LSOA and 20 workplaces inside each MSOA as a cost matrix.
+- <a href="../data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson" target="_blank">Lower super output areas (LSOAs), Middle super output areas (MSOAs)</a> as origin, destination locations, respectively.
+- <a href="../data/inputs/cambridge_work_commuter_lsoas_to_msoas/cost_matrices/clustered_facilities_sample_20x20_20_01_2023_sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_prob_origin_destination_adjusted_normalised_boundary_only_edge_corrected_cost_matrix_max_normalised.txt" target="_blank">Average shortest path in a transportation network</a> between a random sample of 20 residences inside each LSOA and 20 workplaces inside each MSOA as a cost matrix.
 - [Number of jobs available at each MSOA](./data/inputs/cambridge_work_commuter_lsoas_to_msoas/destination_attraction_time_series_sum_normalised.txt) as a destination attraction proxy used in the NN's loss function.
 - [Total distance travelled to work from each LSOA](./data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_total_distance_to_work.txt) as an input to the NN's loss function.
 - [Ground truth agent trip table](./data/inputs/cambridge_work_commuter_lsoas_to_msoas/table_lsoas_to_msoas.txt) a validation dataset. Parts of this table such as origin/destination demand (row/colsums) and a random subset of trips (cells) are also conditioned upon acting as table constraint data.
@@ -283,7 +283,7 @@ This config runs a `JointTableSIM_NN` experiment using 6 number of workers and 3
 | `DisjointTableSIM_NN` |     MCMC     |           NN           |
 | `JointTableSIM_NN`    |     MCMC     |           NN           |
 
-The `run` command can also be programmatically executed using the notebook [Example 1 - Running experiments](../notebooks/Example%201%20-%20Running%20experiments.ipynb).
+The `run` command can also be programmatically executed using the notebook <a href="../notebooks/Example%201%20-%20Running%20experiments.ipynb" target="_blank">Example 1 - Running experiments</a>.
 
 ## Plot
 
@@ -322,7 +322,7 @@ The `-e`,`-ea`,`-el` arguments define the evaluated expressions, the keyword arg
 
 The output data is sliced using the coordinate values specified by the `-cs` arguments. For instance, `-cs "~da.title.isin(['_unconstrained','_total_constrained','_total_intensity_row_table_constrained'])"` only keeps the datasets whose `title` variable is equal to any of the specified values. The `sweep` data are gathered either from the output dataset itself or from the output config file (in this case we elicit `sigma`,`title` `sweep` variables).
 
-The scatter plot is colored by the `title` variable and its markers are determined by the `sigma` variable. Both of these variables are contained in each `sweep` that was run. The exact mappings from say sigma values to marker types are contained in [this file](../gensit/static/plot_variables.py). Each point is labeled by both the `title` and `sigma` values. The resulting figure is shown below.
+The scatter plot is colored by the `title` variable and its markers are determined by the `sigma` variable. Both of these variables are contained in each `sweep` that was run. The exact mappings from say sigma values to marker types are contained in <a href="../gensit/static/plot_variables.py" target="_blank">this file</a>. Each point is labeled by both the `title` and `sigma` values. The resulting figure is shown below.
 
 <img src="./example_figure.jpg" alt="framework" width="500"/>
 
@@ -363,7 +363,7 @@ The arguments are similar to the `plot` command. Here we also use `-btt` refered
 | JointTableSIM_NN | 0.141  | doubly_constrained                    | TotallyConstrained | degree_higher   | [0.68]          | [0.55]      |
 | JointTableSIM_NN | 0.141  | unconstrained                         | TotallyConstrained | direct_sampling | [29.51]         | [1.73]      |
 
-Processing experimental outputs for uses similar to the ones provided by `plot` and `summarise` commands can also be achieved by following the steps of notebook [Example 2 - Reading outputs](../notebooks/Example%202%20-%20Reading%20outputs.ipynb).
+Processing experimental outputs for uses similar to the ones provided by `plot` and `summarise` commands can also be achieved by following the steps of notebook <a href="../notebooks/Example%202%20-%20Reading%20outputs.ipynb" target="_blank">Example 2 - Reading outputs</a>.
 
 ## Reproduce
 
