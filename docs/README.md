@@ -283,6 +283,8 @@ This config runs a `JointTableSIM_NN` experiment using 6 number of workers and 3
 | `DisjointTableSIM_NN` |     MCMC     |           NN           |
 | `JointTableSIM_NN`    |     MCMC     |           NN           |
 
+The `run` command can also be programmatically executed using the notebook [Example 1 - Running experiments](../notebooks/Example%201%20-%20Running%20experiments.ipynb).
+
 ## Plot
 
 Once an experiment has been completed, we can use the following command to plot its data:
@@ -351,7 +353,7 @@ The arguments are similar to the `plot` command. Here we also use `-btt` refered
 
 | type             | sigma                | title                                   | name               | proposal        | intensity_srmse      | table_srmse           |
 | ---------------- | -------------------- | --------------------------------------- | ------------------ | --------------- | -------------------- | --------------------- |
-| JointTableSIM_NN | 0.14142000675201416  | \_doubly_20%\_cell_constrained          | TotallyConstrained | degree_higher   | [1.983129620552063]  | [0.37612101435661316] |
+| JointTableSIM_NN | 0.141                | \_doubly_20%\_cell_constrained          | TotallyConstrained | degree_higher   | [1.983129620552063]  | [0.37612101435661316] |
 | JointTableSIM_NN | 0.014139999635517597 | \_unconstrained                         | TotallyConstrained | direct_sampling | [29.513639450073242] | [1.7274982929229736]  |
 | JointTableSIM_NN | 0.14142000675201416  | \_unconstrained                         | TotallyConstrained | direct_sampling | [29.513639450073242] | [1.7274982929229736]  |
 | JointTableSIM_NN | 0.14142000675201416  | \_doubly_constrained                    | TotallyConstrained | degree_higher   | [2.019375801086426]  | [0.4618358910083771]  |
@@ -360,6 +362,8 @@ The arguments are similar to the `plot` command. Here we also use `-btt` refered
 | JointTableSIM_NN | 0.014139999635517597 | \_doubly_20%\_cell_constrained          | TotallyConstrained | degree_higher   | [0.9381942749023438] | [0.37765341997146606] |
 | JointTableSIM_NN | 0.14142000675201416  | \_doubly_constrained                    | TotallyConstrained | degree_higher   | [0.6841356754302979] | [0.5531010627746582]  |
 | JointTableSIM_NN | 0.14142000675201416  | \_unconstrained                         | TotallyConstrained | direct_sampling | [29.513639450073242] | [1.7273409366607666]  |
+
+Processing experimental outputs for uses similar to the ones provided by `plot` and `summarise` commands can also be achieved by following the steps of notebook [Example 2 - Reading outputs](../notebooks/Example%202%20-%20Reading%20outputs.ipynb).
 
 ## Reproduce
 
