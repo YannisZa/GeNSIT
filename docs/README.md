@@ -351,17 +351,17 @@ docker run gensit summarise \
 
 The arguments are similar to the `plot` command. Here we also use `-btt` refered to as burning, thinning and trimming to slice the `iter` coordinate values based on their index. In this occasion, we discard the first 10000 samples and then only keep every 90th sample. Finally, we trim this data array to 1000 elements. A small part of the summarised table is shown below.
 
-| type             | sigma                | title                                   | name               | proposal        | intensity_srmse      | table_srmse           |
-| ---------------- | -------------------- | --------------------------------------- | ------------------ | --------------- | -------------------- | --------------------- |
-| JointTableSIM_NN | 0.141                | \_doubly_20%\_cell_constrained          | TotallyConstrained | degree_higher   | [1.983129620552063]  | [0.37612101435661316] |
-| JointTableSIM_NN | 0.014139999635517597 | \_unconstrained                         | TotallyConstrained | direct_sampling | [29.513639450073242] | [1.7274982929229736]  |
-| JointTableSIM_NN | 0.14142000675201416  | \_unconstrained                         | TotallyConstrained | direct_sampling | [29.513639450073242] | [1.7274982929229736]  |
-| JointTableSIM_NN | 0.14142000675201416  | \_doubly_constrained                    | TotallyConstrained | degree_higher   | [2.019375801086426]  | [0.4618358910083771]  |
-| JointTableSIM_NN | 0.014139999635517597 | \_doubly_10%\_cell_constrained          | TotallyConstrained | degree_higher   | [0.8903818130493164] | [0.42363834381103516] |
-| JointTableSIM_NN | 0.14142000675201416  | \_total_intensity_row_table_constrained | TotallyConstrained | direct_sampling | [5.928720951080322]  | [2.1622815132141113]  |
-| JointTableSIM_NN | 0.014139999635517597 | \_doubly_20%\_cell_constrained          | TotallyConstrained | degree_higher   | [0.9381942749023438] | [0.37765341997146606] |
-| JointTableSIM_NN | 0.14142000675201416  | \_doubly_constrained                    | TotallyConstrained | degree_higher   | [0.6841356754302979] | [0.5531010627746582]  |
-| JointTableSIM_NN | 0.14142000675201416  | \_unconstrained                         | TotallyConstrained | direct_sampling | [29.513639450073242] | [1.7273409366607666]  |
+| type             | sigma  | title                                 | name               | proposal        | intensity_srmse | table_srmse |
+| ---------------- | ------ | ------------------------------------- | ------------------ | --------------- | --------------- | ----------- |
+| JointTableSIM_NN | 0.141  | doubly_20%\_cell_constrained          | TotallyConstrained | degree_higher   | [1.98]          | [0.38]      |
+| JointTableSIM_NN | 0.0141 | unconstrained                         | TotallyConstrained | direct_sampling | [29.51]         | [1.73]      |
+| JointTableSIM_NN | 0.141  | unconstrained                         | TotallyConstrained | direct_sampling | [29.51]         | [1.73]      |
+| JointTableSIM_NN | 0.141  | doubly_constrained                    | TotallyConstrained | degree_higher   | [2.02]          | [0.46]      |
+| JointTableSIM_NN | 0.0141 | doubly_10%\_cell_constrained          | TotallyConstrained | degree_higher   | [0.89]          | [0.42]      |
+| JointTableSIM_NN | 0.141  | total_intensity_row_table_constrained | TotallyConstrained | direct_sampling | [5.93]          | [2.16]      |
+| JointTableSIM_NN | 0.0141 | doubly_20%\_cell_constrained          | TotallyConstrained | degree_higher   | [0.94]          | [0.38]      |
+| JointTableSIM_NN | 0.141  | doubly_constrained                    | TotallyConstrained | degree_higher   | [0.68]          | [0.55]      |
+| JointTableSIM_NN | 0.141  | unconstrained                         | TotallyConstrained | direct_sampling | [29.51]         | [1.73]      |
 
 Processing experimental outputs for uses similar to the ones provided by `plot` and `summarise` commands can also be achieved by following the steps of notebook [Example 2 - Reading outputs](../notebooks/Example%202%20-%20Reading%20outputs.ipynb).
 
