@@ -1,5 +1,3 @@
-<!-- # Cambridge commuter LSOAs to MSOAs -->
-
 # Experiment runs
 
 Set `ulimit -n 50000`
