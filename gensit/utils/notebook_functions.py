@@ -746,3 +746,30 @@ def export_competitive_method_outputs(
     write_npy(thetas,os.path.join(output_path,'samples','theta_samples.npy'))
     write_npy(log_destination_attractions,os.path.join(output_path,'samples','log_destination_attraction_samples.npy'))
     write_json(metadata,os.path.join(output_path,output_folder+'_metadata.json'))
+
+def validate_tables(out):
+    if out.inputs is None:
+        out.inputs = Inputs(
+            config = out.config,
+            synthetic_data = False,
+            logger = out.logger
+        )
+    else:
+        try:
+            out.inputs.cast_from_xarray()
+        except:
+            pass
+    ct = instantiate_ct(
+        config = out.config,
+        **out.inputs.data_vars(),
+        level = 'EMPTY'
+    )
+    samples = out.get_sample('table')
+    print(dict(samples.sizes))
+    print('axes constraints',ct.constraints['constrained_axes'])
+    print('cell constraints',len(ct.constraints['cells']))
+    tables_admissible = all([ct.table_admissible(torch.tensor(tab.values.squeeze())) for _,tab in samples.groupby('id')])
+    print('Tables admissible',tables_admissible)
+    if not tables_admissible:
+        print('Tables margins admissible',any([ct.table_margins_admissible(torch.tensor(tab.values.squeeze())) for _,tab in samples.groupby('id')]))
+        print('Tables cells admissible',all([ct.table_cells_admissible(torch.tensor(tab.values.squeeze())) for _,tab in samples.groupby('id')]))
