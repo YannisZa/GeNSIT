@@ -3,7 +3,7 @@ sweep_mode = true
 
 [inputs]
 n_workers = +1
-n_threads = [+6,+6]
+n_threads = +6
 device = 'cpu'
 load_experiment = ''
 in_directory = './data/inputs/synthetic/'

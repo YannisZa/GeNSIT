@@ -3,7 +3,7 @@ sweep_mode = true
 
 [inputs]
 n_workers = +1
-n_threads = [+6,+6]
+n_threads = +6
 device = 'cpu'
 in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
@@ -56,7 +56,7 @@ seed = 1234
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
-    noise_percentage = +0.01
+    noise_percentage = +3.0 #+0.01
     epsilon = 1.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356

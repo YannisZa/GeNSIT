@@ -3,7 +3,7 @@ sweep_mode = true
 
 [inputs]
 n_workers = +1
-n_threads = [+6,+6]
+n_threads = +6
 device = 'cpu'
 in_directory = './data/inputs/'
 dataset = 'cambridge_work_commuter_lsoas_to_msoas'
