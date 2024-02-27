@@ -451,7 +451,7 @@ class HarrisWilson_NN:
     def __str__(self):
 
         return f"""
-            {'x'.join([str(d) for d in self.physics_model.intensity_model.dims])} Harris Wilson Neural Network using {self.physics_model.intensity_model.name} Constrained Spatial Interaction Model
+            {'x'.join([str(d) for d in self.physics_model.intensity_model.dims])} Harris Wilson Neural Network using {self.physics_model.intensity_model.name}
             Learned parameters: {', '.join(self.physics_model.params_to_learn)}
             dt: {self.config['harris_wilson_model'].get('dt',0.001) if hasattr(self,'config') else ''}
             Noise regime: {self.physics_model.noise_regime}
