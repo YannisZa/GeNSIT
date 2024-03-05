@@ -238,22 +238,22 @@ $$
 where $\zeta,\alpha$ and $\beta$ are the Lagrange multipliers. This yields a closed-form expression for the expected flows (intensity) of agents from $i$ to $j$ for the total constrained SIM:
 
 $$
-\Lambda\_{ij} = \frac{\Lambda\_{++}\exp(\alpha x_j -\beta c\_{ij})}{\sum\_{k,m}^{I,J} \exp(\alpha x_m-\beta c\_{km})},
+\Lambda\_{ij} = \frac{\Lambda\_{++}\exp(\alpha x_j -\beta c\_{ij})}{\sum\_{k,m} \exp(\alpha x_m-\beta c\_{km})},
 $$
 
 where the multipliers $\alpha,\beta$ control the two competing forces of attractiveness and deterrence, respectively, while $\zeta$ bears no physical interpretation. A higher $\alpha$ relative to $\beta$ characterises a preference over destinations with higher job availability, while the contrary indicates a predilection for closer workplaces. If we further assume that origin demand (${\boldsymbol{\Lambda}}\_{.+}$) is also fixed then we get the singly constrained SIM:
 
 $$
-\Lambda\_{ij} = \frac{\Lambda\_{i+}\exp(\alpha x_j -\beta c\_{ij})}{\sum\_{k,m}^{I,J} \exp(\alpha x_m-\beta c\_{km})}.
+\Lambda\_{ij} = \frac{\Lambda\_{i+}\exp(\alpha x_j -\beta c\_{ij})}{\sum\_{k,m} \exp(\alpha x_m-\beta c\_{km})}.
 $$
 
 Spatial interaction models are connected to physics models through the destination attractiveness term $\mathbf{z}$, which is governed by the Harris-Wilson system of $J$ coupled ordinary differential equations (ODEs):
 
-where $\epsilon$ is a responsiveness parameter, $\kappa>0$ is the number of agents competing for one job, $\delta>0$ is the smallest number of jobs a destination can have and $\Lambda\_{+j}(t) - \kappa z_j(t)$ is the net job capacity in destination $j$. A positive net job capacity translates to a higher economic activity (more travellers than jobs) and a boost in local employment, and vice versa. A stochastic version of the Harris Wilson model is the following:
-
 $$
 \frac{dz_j}{dt} = \epsilon z_j \left( \Lambda\_{+j} - \kappa z_j + \delta  \right) + \sigma z_j \circ B\_{j,t}, \; \mathbf{z}(0) = \mathbf{z}'.
 $$
+
+where $\epsilon$ is a responsiveness parameter, $\kappa>0$ is the number of agents competing for one job, $\delta>0$ is the smallest number of jobs a destination can have and $\Lambda\_{+j}(t) - \kappa z_j(t)$ is the net job capacity in destination $j$. A positive net job capacity translates to a higher economic activity (more travellers than jobs) and a boost in local employment, and vice versa. A stochastic version of the Harris Wilson model is the following:
 
 We recommend you look at relevant [publications](#related-publications) for more information on the Harris Wilson model. Our first goal is to learn the parameters $\alpha,\beta$ using either sampling (MCMC) or optimisation (NN) algorithms. To achieve this goal we leverage data $\mathcal{D}$ about either the observed destination attraction (e.g. the number of jobs available at each destination) and/or the total distance/time traveled by agents in their work trips. In general, we can say that our first goal is to learn the distribution of the agent trip intensity $p(\boldsymbol{\Lambda}\vert \mathcal{C},\mathcal{D})$.
 
