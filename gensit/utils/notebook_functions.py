@@ -694,16 +694,13 @@ def prepare_config_for_export(barebone_config,metadata_config):
         sigma = sim_metadata_config['HarrisWilson']['Training']['true_parameters'].get('sigma',-1)
         if sigma > 0.05:
             noise_regime = 'high'
-            gamma = int(np.round(2/sigma**2,0))
         elif sigma <= 0.05 and sigma >= 0:
             noise_regime = 'low'
-            gamma = int(np.round(2/sigma**2,0))
         else:
             noise_regime = 'learned'
-            gamma = -1
         updated_config = {
                 'N':sim_metadata_config['num_epochs']*(sim_metadata_config['seed']+1),
-                'gamma':gamma,
+                'sigma':sigma,
                 'name':sim_type,
                 'axes': [[1]] if sim_type == 'ProductionConstrained' else [[0,1]],
                 'noise_regime':str(noise_regime),

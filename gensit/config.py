@@ -534,7 +534,7 @@ class Config:
         self.sweep_param_names = list(flatten(sweep_param_names))
 
     def get_group_id(self,group_by:list=[]):
-
+        
         # Gather sweep dimension names
         sweep_dims = list(self.sweep_params['isolated'].keys())
         sweep_dims += list(self.sweep_params['coupled'].keys())

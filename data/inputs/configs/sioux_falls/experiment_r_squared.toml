@@ -1,0 +1,68 @@
+log_level = 'info'
+sweep_mode = false
+
+[inputs]
+n_workers = +1
+n_threads = +6
+device = 'cpu'
+in_directory = './data/inputs/'
+dataset = 'sioux_falls'
+load_experiment = ''
+  
+[inputs.data]
+    [inputs.data.origin_demand]
+      file = 'origin_demand_sum_normalised.txt'
+    [inputs.data.destination_attraction_ts]
+      file ='destination_attraction_ts_sum_normalised.txt'
+    [inputs.data.cost_matrix]
+      file = "cost_matrix.txt"
+    [inputs.data.ground_truth_table]
+      file = 'ground_truth_table.txt'
+
+
+[spatial_interaction_model]
+  name = 'TotallyConstrained'
+  grand_total = +360600
+  [spatial_interaction_model.parameters]
+    bmax = +1.0
+    alpha = +1.0
+    beta = +1.0
+
+[harris_wilson_model]
+  dt = +0.001
+  [harris_wilson_model.parameters]
+    noise_percentage = +0.01
+    epsilon = 1.0
+    sigma = 0.0141421356
+  
+
+[training]
+  num_steps = +1
+  batch_size = +1
+  N = 1000
+  to_learn = ['alpha', 'beta']
+
+[[experiments]]
+  type = 'RSquared_Analysis'
+  comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  [experiments.grid_ranges.alpha]
+    min = 0.01
+    max = 2.0
+    n = 50
+  [experiments.grid_ranges.beta]
+    min = 0.01
+    max = 2.0
+    n = 50
+
+
+[outputs]
+    chunk_size = +20_000
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/'
+    out_group = 'r_squared'
+    title = '_total_constrained'

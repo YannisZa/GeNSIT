@@ -77,7 +77,7 @@ class HarrisWilson:
         # kwargs or parameter defaults
         self.params_to_learn = {}
         for i,param in enumerate(self.config.settings['training']['to_learn']):
-            self.params_to_learn[param] = PARAMETER_DEFAULTS[param]
+            self.params_to_learn[param] = i#PARAMETER_DEFAULTS[param]
 
         # Fixed hyperparameters
         self.params = Dataset()
@@ -93,9 +93,6 @@ class HarrisWilson:
                     self.config.settings['harris_wilson_model']['parameters'][param] = to_json_format(
                         true_params.get(param,default)
                     )
-        # Update gamma for MCMC
-        if hasattr(self.params,'sigma'):
-            self.params.gamma = 2/(self.params.sigma)**2
         
         # Time discretisation step size
         self.dt = torch.tensor(dt).float().to(self.device)
@@ -132,7 +129,7 @@ class HarrisWilson:
         updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
         updated_kwargs.update(**vars(self.params))
         
-        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['gamma'])
+        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['sigma'])
 
         self.intensity_model.check_sample_availability(
             required,
@@ -147,7 +144,7 @@ class HarrisWilson:
         updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
         updated_kwargs.update(**vars(self.params))
 
-        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['gamma'])
+        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['sigma'])
 
         self.intensity_model.check_sample_availability(
             required,
@@ -164,7 +161,7 @@ class HarrisWilson:
         updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
         updated_kwargs.update(**vars(self.params))
 
-        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['gamma'])
+        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['sigma'])
 
         self.intensity_model.check_sample_availability(
             required,
@@ -180,7 +177,7 @@ class HarrisWilson:
         updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
         updated_kwargs.update(**vars(self.params))
 
-        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['gamma'])
+        required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['sigma'])
 
         self.intensity_model.check_sample_availability(
             required,
@@ -278,7 +275,8 @@ class HarrisWilson:
         delta = self.params.delta
         kappa = self.params.kappa
         xx = kwargs['log_destination_attraction']
-        gamma = kwargs['gamma'] if kwargs['gamma'] is not None else self.params.gamma
+        sigma = kwargs['sigma'] if kwargs['sigma'] is not None else self.params.sigma
+        gamma = 2/(sigma**2)
         # Note that lim_{beta->0, alpha->0} gamma*V_{theta}(x) = gamma*kappa*\sum_{j = 1}^J \exp(x_j) - gamma*(delta+1/J) * \sum_{j = 1}^J x_j
         gamma_kk_exp_xx = gamma*kappa*torch.exp(xx)
         # Function proportional to the potential function in the limit of alpha -> 0, beta -> 0
@@ -311,6 +309,7 @@ class HarrisWilson:
         """
         self.logger.debug(f"Forward solving SDE")
         self.logger.trace('Parsing parameters')
+
         # Parameters to learn
         alpha = (
             self.params.alpha
@@ -348,7 +347,6 @@ class HarrisWilson:
         self.logger.trace('Cloning dest attractions')
         new_sizes = curr_destination_attractions.clone()
         new_sizes.requires_grad = requires_grad
-
 
         # Compute normalised demand
         demand_normalised = torch.exp(

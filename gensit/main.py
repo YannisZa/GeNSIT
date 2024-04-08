@@ -855,6 +855,7 @@ def summarise(
         metric,
         metric_args,
         evaluate,
+        folder_kwargs,
         evaluation_kwargs,
         evaluation_library,
         dates,

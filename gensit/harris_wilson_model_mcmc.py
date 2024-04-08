@@ -20,7 +20,7 @@ from gensit.utils.math_utils import torch_optimize
 from gensit.harris_wilson_model import HarrisWilson
 from gensit.utils.misc_utils import setup_logger, makedir, set_seed, unpack_dims
 
-AIS_SAMPLE_ARGS = ['alpha','beta','gamma','n_temperatures','ais_samples','leapfrog_steps','epsilon_step','semaphore','pbar']
+AIS_SAMPLE_ARGS = ['alpha','beta','sigma','n_temperatures','ais_samples','leapfrog_steps','epsilon_step','semaphore','pbar']
 
 class HarrisWilson_MCMC(object):
 
@@ -286,7 +286,7 @@ class HarrisWilson_MCMC(object):
         index:int,
         alpha:torch.tensor,
         beta:torch.tensor,
-        gamma:torch.tensor,
+        sigma:torch.tensor,
         n_temperatures:int,
         ais_samples:int,
         leapfrog_steps:int,
@@ -298,7 +298,7 @@ class HarrisWilson_MCMC(object):
             index,
             alpha = alpha,
             beta = beta,
-            gamma = gamma,
+            sigma = sigma,
             n_temperatures = n_temperatures,
             ais_samples = ais_samples,
             leapfrog_steps = leapfrog_steps,
@@ -330,8 +330,8 @@ class HarrisWilson_MCMC(object):
         # Get parameters
         kwargs['alpha'] = kwargs['alpha'] if kwargs['alpha'] is not None else self.physics_model.params.alpha
         kwargs['beta'] = kwargs['beta'] if kwargs['beta'] is not None else self.physics_model.params.beta
-        kwargs['gamma'] = kwargs['gamma'] if kwargs['gamma'] is not None else self.physics_model.params.gamma
-        gamma = kwargs['gamma']
+        kwargs['sigma'] = kwargs['sigma'] if kwargs['sigma'] is not None else self.physics_model.params.sigma
+        sigma = kwargs['sigma']
         kappa = self.physics_model.params.kappa
         delta = self.physics_model.params.delta
         n_temperatures = kwargs['n_temperatures']
@@ -365,6 +365,7 @@ class HarrisWilson_MCMC(object):
 
             # Initialize
             # Log-gamma model with alpha,beta->0
+            gamma = 2/(sigma**2)
             gamma_distr = torch.distributions.gamma.Gamma(gamma*(delta+1./Ndestinations), 1./(gamma*kappa))
             xx = torch.log(gamma_distr.sample(torch.tensor((Ndestinations,))))
             # Compute potential of prior distribution (temperature = 0)
@@ -563,7 +564,7 @@ class HarrisWilson_MCMC(object):
                 n_temperatures = int(self.destination_attraction_n_bridging_distributions),
                 leapfrog_steps = int(self.destination_attraction_leapfrog_steps_ais),
                 epsilon_step = float(self.destination_attraction_leapfrog_step_size_ais),
-                **{p:theta[p] if theta.get(p,None) is not None else getattr(self.physics_model.params,p) for p in ['alpha','beta','gamma']}
+                **{p:theta[p] if theta.get(p,None) is not None else getattr(self.physics_model.params,p) for p in ['alpha','beta','sigma']}
             )
             log_weights = log_weights.to(dtype = float32,device = self.device)
         else:
@@ -576,7 +577,7 @@ class HarrisWilson_MCMC(object):
                     n_temperatures = int(self.destination_attraction_n_bridging_distributions),
                     leapfrog_steps = int(self.destination_attraction_leapfrog_steps_ais),
                     epsilon_step = float(self.destination_attraction_leapfrog_step_size_ais),
-                    **{p:theta[p] if theta.get(p,None) is not None else getattr(self.physics_model.params,p) for p in ['alpha','beta','gamma']}
+                    **{p:theta[p] if theta.get(p,None) is not None else getattr(self.physics_model.params,p) for p in ['alpha','beta','sigma']}
                 ))
             log_weights = torch.tensor(log_weights,dtype = float32,device = self.device)
         
@@ -609,7 +610,7 @@ class HarrisWilson_MCMC(object):
 
         ''' Theta update '''
         # Multiply beta by total cost
-        # theta_scaled_and_expanded = torch.concatenate([theta_prev,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
+        # theta_scaled_and_expanded = torch.concatenate([theta_prev,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.sigma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
         # theta_scaled_and_expanded[1] *= self.physics_model.intensity_model.data.bmax
         # print('theta',theta_scaled_and_expanded)
         # print('xx',log_destination_attraction)
@@ -764,14 +765,14 @@ class HarrisWilson_MCMC(object):
     
         # UNCOMMENT
         # Multiply beta by total cost
-        # theta_scaled_and_expanded_prev = torch.concatenate([theta_prev,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
+        # theta_scaled_and_expanded_prev = torch.concatenate([theta_prev,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.sigma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
         # theta_scaled_and_expanded_prev[1] *= self.physics_model.params.bmax
         # log_intensities_prev = self.physics_model.intensity_model.log_intensity(
         #                     log_destination_attraction,
         #                     theta_scaled_and_expanded_prev,
         #                     total_flow = torch.sum(table.ravel())
         #                 )
-        # theta_scaled_and_expanded_new = torch.concatenate([theta_new,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.gamma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
+        # theta_scaled_and_expanded_new = torch.concatenate([theta_new,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.sigma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
         # theta_scaled_and_expanded_new[1] *= self.physics_model.params.bmax
         # log_intensities_new = self.physics_model.intensity_model.log_intensity(
         #                     log_destination_attraction,

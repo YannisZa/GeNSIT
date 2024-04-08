@@ -24,7 +24,7 @@ class Test4Helpers:
         alpha = theta_tor[0]
         beta = theta_tor[1]
         delta = theta_tor[2]
-        gamma = theta_tor[3]
+        sigma = theta_tor[3]
         kappa = theta_tor[4]
         epsilon = theta_tor[5]
         log_total_tor = torch.log(torch.sum(origin_demand_tor))
@@ -37,7 +37,7 @@ class Test4Helpers:
         if alpha == 0:
             return -np.infty
         else:
-            return gamma*epsilon*(-(1./alpha)*torch.exp(log_total_tor)*log_normalisation + kappa*torch.sum(torch.exp(xx_tor)) - delta*torch.sum(xx_tor))
+            return (2/(sigma**2))*epsilon*(-(1./alpha)*torch.exp(log_total_tor)*log_normalisation + kappa*torch.sum(torch.exp(xx_tor)) - delta*torch.sum(xx_tor))
         
     @staticmethod
     def totally_constrained_intensity_gradient(totally_constrained_sim,xx,theta,table):
@@ -73,7 +73,7 @@ class Test4Helpers:
         alpha = theta_tor[0]
         beta = theta_tor[1]
         delta = theta_tor[2]
-        gamma = theta_tor[3]
+        sigma = theta_tor[3]
         kappa = theta_tor[4]
         epsilon = theta_tor[5]
         log_total_tor = torch.tensor(0,requires_grad = False)
@@ -91,7 +91,7 @@ class Test4Helpers:
         if alpha == 0:
             return -np.infty
         else:
-            return gamma*epsilon*(
+            return (2/(sigma**2))*epsilon*(
                 (-1./alpha)*utility_potential + \
                 kappa*torch.sum(torch.exp(xx_tor)) - \
                 delta*torch.sum(xx_tor)

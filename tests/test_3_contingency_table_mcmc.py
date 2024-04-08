@@ -461,7 +461,7 @@ def test_similarity_measure(ct,sim):
 #     # Random intialisation
 #     fold = ct_copy.table
 
-#     auxiliary_parameters = np.array([sim.delta,sim.gamma,sim.kappa,sim.epsilon])
+#     auxiliary_parameters = np.array([sim.delta,sim.sigma,sim.kappa,sim.epsilon])
 #     # Construct intensities
 #     log_intensities = sim.log_intensity(sim.log_true_destination_attraction,np.concatenate([np.array([0.9,0.3*100]),auxiliary_parameters]))
 
@@ -537,7 +537,7 @@ def test_similarity_measure(ct,sim):
 #     # Random intialisation
 #     fold = ct_copy.table
 
-#     auxiliary_parameters = np.array([sim.delta,sim.gamma,sim.kappa,sim.epsilon])
+#     auxiliary_parameters = np.array([sim.delta,sim.sigma,sim.kappa,sim.epsilon])
 #     # Construct intensities
 #     log_intensities = sim.log_intensity(sim.log_true_destination_attraction,np.concatenate([np.array([0.9,0.3*100]),auxiliary_parameters]))
 
@@ -1050,7 +1050,7 @@ def test_similarity_measure(ct,sim):
 #     # Random intialisation
 #     fold = ct_copy.table
 
-#     auxiliary_parameters = np.array([sim.delta,sim.gamma,sim.kappa,sim.epsilon])
+#     auxiliary_parameters = np.array([sim.delta,sim.sigma,sim.kappa,sim.epsilon])
 #     # Construct intensities
 #     log_intensities = sim.log_intensity(sim.log_true_destination_attraction,np.concatenate([np.array([0.9,0.3*100]),auxiliary_parameters]))
 
@@ -1230,7 +1230,7 @@ def test_similarity_measure(ct,sim):
 #     # Initialise Markov Chain Monte Carlo
 #     mcmc = ContingencyTableMarkovChainMonteCarlo(ct_copy)
 
-#     auxiliary_parameters = np.array([sim.delta,sim.gamma,sim.kappa,sim.epsilon])
+#     auxiliary_parameters = np.array([sim.delta,sim.sigma,sim.kappa,sim.epsilon])
 #     # Construct intensities
 #     log_intensities = sim.log_intensity(sim.log_true_destination_attraction,np.concatenate([np.array([0.9,0.3*100]),auxiliary_parameters]))
 
@@ -1383,7 +1383,7 @@ def test_similarity_measure(ct,sim):
 
 # def test_degree_higher_proposal_and_acceptance_product_multinomials(ct,ct_2x2,sim):
 
-#     auxiliary_parameters = np.array([sim.delta,sim.gamma,sim.kappa,sim.epsilon])
+#     auxiliary_parameters = np.array([sim.delta,sim.sigma,sim.kappa,sim.epsilon])
 #     # Construct intensities
 #     log_intensities = sim.log_intensity(sim.log_destination_attraction,np.concatenate([np.array([0.9,3.0]),auxiliary_parameters]))
 

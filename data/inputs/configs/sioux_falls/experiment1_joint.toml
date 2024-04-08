@@ -1,0 +1,168 @@
+log_level = 'info'
+sweep_mode = true
+
+[inputs]
+n_workers = +1
+n_threads = +6
+device = 'cpu'
+in_directory = './data/inputs/'
+dataset = 'sioux_falls'
+load_experiment = ''
+seed = 1234
+  
+[inputs.data]
+    [inputs.data.origin_demand]
+      file = 'origin_demand_sum_normalised.txt'
+    [inputs.data.destination_attraction_ts]
+      file ='destination_attraction_time_series_sum_normalised.txt'
+    [inputs.data.cost_matrix]
+      file = "cost_matrix.txt"
+    [inputs.data.ground_truth_table]
+      file = 'ground_truth_table.txt'
+
+[contingency_table]
+  sparse_margins = false
+  [contingency_table.constraints]
+    cells = 'empty_link_cells.txt'
+    [contingency_table.constraints.axes.sweep]
+      default = []
+      range = [[], [[+0,+1]], [[+1]], [[+1]], [[+0],[+1]]]
+      coupled = true
+      target_name = 'title'
+
+
+[spatial_interaction_model]
+  [spatial_interaction_model.name.sweep]
+    default = 'TotallyConstrained'
+    range = ['TotallyConstrained','TotallyConstrained','TotallyConstrained','ProductionConstrained', 'TotallyConstrained']
+    coupled = true
+    target_name = 'title'
+  grand_total = +360600
+  [spatial_interaction_model.parameters]
+    bmax = +1.0
+  
+[harris_wilson_model]
+  dt = +0.001
+  [harris_wilson_model.parameters]
+    noise_percentage = +3.0 #+0.01
+    epsilon = 1.0
+    [harris_wilson_model.parameters.sigma.sweep]
+      default = 0.0141421356
+      range = [0.0141421356, 0.1414213562, nan]
+
+[training]
+  num_steps = +1
+  batch_size = +1
+  N = 100000
+  [training.to_learn.sweep]
+    default = ['alpha', 'beta'] 
+    range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
+    coupled = true
+    target_name = 'sigma'
+
+[mcmc]
+    disable_tqdm = true
+    mcmc_workers = +1
+    
+    [mcmc.contingency_table]
+      table_steps = +1
+      table0 = 'maximum_entropy_solution'
+      margin0 = 'multinomial'
+      [mcmc.contingency_table.proposal.sweep]
+        default = 'direct_sampling'
+        range = ['direct_sampling','direct_sampling','direct_sampling','direct_sampling', 'degree_higher']
+        coupled = true
+        target_name = 'title'
+
+    [mcmc.parameters]
+      theta_steps = 1
+      step_size = 1.0
+      [mcmc.parameters.covariance.sweep]
+        default = [[0.0149674,0.00182529],[0.00182529,0.0109968]]
+        range = [
+          [[0.0149674,0.00182529],[0.00182529,0.0109968]],
+          [[1.0,0.0],[0.0,1.0]],
+          [[1.0,0.0],[0.0,1.0]]
+        ]
+        coupled = true
+        target_name = 'sigma'
+    [mcmc.destination_attraction]
+      log_destination_attraction_steps = 1
+      leapfrog_steps = 3#10
+      leapfrog_step_size = 0.01 #0.02
+      ais_leapfrog_steps = 3#10
+      ais_leapfrog_step_size = 0.2#0.1
+      ais_samples = 10
+      n_bridging_distributions = 50
+
+[neural_network]
+  disable_tqdm = true
+  [neural_network.loss.loss_name.sweep]
+    default = ['table_likelihood_loss']
+    range = [
+      ['table_likelihood_loss'],
+      ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+    ]
+  
+  [neural_network.loss.loss_function.sweep]
+    default = ['custom']
+    range = [
+      ['custom'],
+      ['custom','custom']
+    ]
+    coupled = true
+    target_name = 'loss_name'
+
+  [neural_network.loss.loss_kwargs.sweep]
+    coupled = true
+    target_name = 'loss_name'
+    [neural_network.loss.loss_kwargs.sweep.default]
+      nokey = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      nokey = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      noise_percentage = nan
+
+  [neural_network.hyperparameters]
+    num_layers = +1
+    optimizer = 'Adam'
+    learning_rate = +0.002
+    [neural_network.hyperparameters.biases]
+      default = [+0.0, +4.0]
+      [neural_network.hyperparameters.biases.layer_specific]
+    [neural_network.hyperparameters.nodes_per_layer]
+      default = +20
+      [neural_network.hyperparameters.nodes_per_layer.layer_specific]
+    [neural_network.hyperparameters.activation_funcs]
+      default = 'linear'
+      [neural_network.hyperparameters.activation_funcs.layer_specific]
+        1 = 'abs'
+
+
+[[experiments]]
+  type = 'JointTableSIM_NN'
+  comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[[experiments]]
+  type = 'JointTableSIM_MCMC'
+  comment = 'Joint Table and Spatial Interaction Model parameter learning using Markov Chain Monte Carlo'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[outputs]
+    chunk_size = +20_000
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/'
+    out_group = 'exp1'
+    [outputs.title.sweep]
+      default = '_unconstrained'
+      range = ['_unconstrained','_total_constrained','_total_intensity_row_table_constrained','_row_constrained','_doubly_constrained']

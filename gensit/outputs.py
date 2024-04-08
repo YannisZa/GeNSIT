@@ -708,11 +708,14 @@ class Outputs(object):
         
         # Additionally group data collection by these attributes
         # apart from the ones listed in settings under 'group_by'
-        nonshared_coord_dims,shared_coord_dims = self.config.get_group_id(
-            group_by = self.settings.get('group_by',[])
-        )
+        if getattr(self.config,'sweep_params',None):
+            nonshared_coord_dims,shared_coord_dims = self.config.get_group_id(
+                group_by = self.settings.get('group_by',[])
+            )
+        else:
+            nonshared_coord_dims = []
 
-        if len(self.config.sweep_configurations) > 0:
+        if getattr(self.config,'sweep_configurations', None) and len(self.config.sweep_configurations) > 0:
             # Attempt to load all samples
             # Keep track of samples not loaded
             samples_not_loaded = self.read_data_collection(
@@ -2569,7 +2572,7 @@ class OutputSummary(object):
                 # Gather all dates provided
                 date_strings = '__'.join(self.settings['dates'])
                 str_list = [
-                    "{'_'.join(list(self.settings['experiment_type']))}",
+                    f"{'_'.join(list(self.settings['experiment_type']))}",
                     f"{'_'.join(self.settings['title']) if len(self.settings['title']) > 0 else ''}",
                     f"{'multiple_dates' if len(date_strings) > 4 else date_strings if len(date_strings) > 0 else ''}",
                     (index_slice_str if index_slice_str else ''),
@@ -2670,12 +2673,12 @@ class OutputSummary(object):
                             **safe_list_get(
                                 self.settings.get('folder_kwargs',[]),
                                 index,
-                                self.settings.get('folder_kwargs',[])[0]
+                                {}
                             )
                         }
                     )
                 except Exception as exc:
-                    # traceback.print_exc()
+                    traceback.print_exc()
                     self.logger.warning(f"{key} with keyword expression {expression} failed: {exc}")
                     self.logger.debug(traceback.format_exc())
                     self.logger.debug(f"""Available data: {
@@ -2723,7 +2726,7 @@ class OutputSummary(object):
                             **safe_list_get(
                                 self.settings.get('folder_kwargs',[]),
                                 index,
-                                self.settings.get('folder_kwargs',[])[0]
+                                {}
                             )
                         }
                     )

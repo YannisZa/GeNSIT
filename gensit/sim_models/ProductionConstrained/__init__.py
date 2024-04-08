@@ -4,7 +4,7 @@ import xarray as xr
 from numpy import arange
 from torch import float32,float64
 
-SDE_POT_ARGS = ['log_destination_attraction','origin_demand','cost_matrix','grand_total','alpha','beta','delta','gamma','kappa','epsilon']
+SDE_POT_ARGS = ['log_destination_attraction','origin_demand','cost_matrix','grand_total','alpha','beta','delta','sigma','kappa','epsilon']
 FLOW_MATRIX_ARGS = ['log_destination_attraction','origin_demand','cost_matrix','grand_total','alpha','beta']
 
 def sde_pot_and_jacobian(**kwargs):
@@ -14,7 +14,7 @@ def sde_pot_and_jacobian(**kwargs):
     jacobian = sde_pot_jacobian(**kwargs)
     return potential,jacobian
 
-def sde_pot_expanded(log_destination_attraction,origin_demand,cost_matrix,grand_total,alpha,beta,delta,gamma,kappa,epsilon):
+def sde_pot_expanded(log_destination_attraction,origin_demand,cost_matrix,grand_total,alpha,beta,delta,sigma,kappa,epsilon):
     return sde_pot(
             **dict(
                 log_destination_attraction = log_destination_attraction,
@@ -24,7 +24,7 @@ def sde_pot_expanded(log_destination_attraction,origin_demand,cost_matrix,grand_
                 alpha = alpha,
                 beta = beta,
                 delta = delta,
-                gamma = gamma,
+                sigma = sigma,
                 kappa = kappa,
                 epsilon = epsilon
             )
@@ -39,7 +39,8 @@ def sde_pot(**kwargs):
     beta = kwargs['beta']
     delta = kwargs['delta']
     kappa = kwargs['kappa']
-    gamma = kwargs['gamma']
+    sigma = kwargs['sigma']
+    gamma = 2 / (sigma**2)
     epsilon = kwargs['epsilon']
     log_destination_attraction = kwargs['log_destination_attraction']
     

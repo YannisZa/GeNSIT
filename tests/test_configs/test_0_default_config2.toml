@@ -23,7 +23,6 @@ directory = ''
   # sim_type = 'ProductionConstrainedSIM2D'
   sim_type = 'TotallyConstrained'
   epsilon = 1.0
-  gamma = 10000.0
   kappa = 1.1
   delta = 0.1
   beta_max = 10

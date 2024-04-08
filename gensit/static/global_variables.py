@@ -380,7 +380,7 @@ INTENSITY_SCHEMA = {
         "is_iterable": True,
         "default":"learned"
     },
-    "gamma":{
+    "sigma":{
         "axes":[],
         "dtype":"float32", 
         "is_iterable": True,
