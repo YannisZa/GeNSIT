@@ -54,9 +54,7 @@ class ExperimentHandler(object):
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
 
         # Get configuration
         self.config = config
@@ -131,9 +129,7 @@ class Experiment(object):
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger lever
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
         
         # Enable garbage collections
         # gc.enable()
@@ -680,6 +676,7 @@ class RSquared_Analysis(Experiment):
 
         # Get config parameters
         self.grid_ranges = self.config.settings['experiments'][0]['grid_ranges']
+        self.method = self.config.settings['experiments'][0]['method']
 
         # Prepare inputs
         self.inputs = Inputs(
@@ -783,11 +780,19 @@ class RSquared_Analysis(Experiment):
         time_axis = DATA_SCHEMA['destination_attraction_ts']['axes'][time_index]
         w_data = deepcopy(self.inputs.data.destination_attraction_ts)
         w_data = w_data.select(dim = time_axis,index = -1)
-
-        x_data = torch.log(w_data)
-        # Total sum squares
-        w_data_centred = w_data - torch.mean(w_data)
-        ss_tot = torch.dot(w_data_centred, w_data_centred)
+        
+        if self.method == 'potential':
+            w_data = w_data.clone().detach().cpu().numpy()
+            x_data = np.log(w_data)
+            # Total sum squares
+            w_data_centred = w_data - np.mean(w_data)
+            ss_tot = np.dot(w_data_centred, w_data_centred)
+        elif self.method == 'solver':
+            # Total sum squares
+            w_data_centred = w_data - torch.mean(w_data)
+            ss_tot = torch.dot(w_data_centred, w_data_centred)
+        else:
+            raise Exception(f"Could not find method {self.method}.")
         
         # Progress bar
         progress = tqdm(
@@ -801,13 +806,14 @@ class RSquared_Analysis(Experiment):
         # Perform grid evaluations
         for i,alpha_val in enumerate(alpha_values):
             for j,beta_val in enumerate(beta_values):
-                try:
-                    theta_sample[0] = alpha_val
-                    theta_sample[1] = beta_val*self.physics_model.params.bmax
-                    
-                    # Get minimum
+                # try:
+                theta_sample[0] = alpha_val
+                theta_sample[1] = beta_val*self.physics_model.params.bmax
+                print(theta_sample)
+                # Get minimum
+                if self.method == 'potential':
                     x_pred = torch_optimize(
-                        x_data.clone().detach().cpu().numpy(),
+                        x_data,
                         function = self.physics_model.sde_potential_and_gradient,
                         method = 'L-BFGS-B',
                         **dict(zip(self.params_to_learn,theta_sample)),
@@ -829,24 +835,42 @@ class RSquared_Analysis(Experiment):
                         dtype = float32,
                         device = self.device
                     )
-                    # Residiual sum squares
-                    res = w_pred - w_data
-                    ss_res = torch.dot(res, res)
+                elif self.method == 'solver':
+                    free_params = {
+                        "alpha":torch.tensor(alpha_val,device=self.device),
+                        "beta":torch.tensor(beta_val,device=self.device)
+                    }
 
-                    # Regression sum squares
-                    r2 = 1. - ss_res/ss_tot
-                    
-                    # Write data
-                    self.write_data(
-                        r2 = r2,
-                        index = (i,j)
-                    )
+                    w_preds = []
+                    for _ in range(1):
+                        w_pred = self.physics_model.run(
+                            init_destination_attraction = (1./self.inputs.data.dims['destination'])*torch.ones(self.inputs.data.dims['destination']),
+                            # init_destination_attraction = w_data,
+                            free_parameters = free_params,
+                            n_iterations = self.config['training']['num_steps'],
+                            generate_time_series = False,
+                            dt = self.physics_model.dt,
+                            requires_grad = False,
+                        ).squeeze()
+                        w_preds.append(w_pred)
+                    w_pred = torch.stack(w_preds, dim=0).mean(dim=0)
 
-                    if r2 > max_r2:
-                        max_w_prediction = deepcopy(w_pred)
-                        max_r2 = r2
-                except:
-                    pass
+                # Residiual sum squares
+                res = w_pred - w_data
+                ss_res = torch.dot(res, res)
+                # Regression sum squares
+                r2 = 1. - ss_res/ss_tot
+                # Write data
+                self.write_data(
+                    r2 = r2,
+                    index = (i,j)
+                )
+
+                if r2 > max_r2:
+                    max_w_prediction = deepcopy(w_pred)
+                    max_r2 = r2
+                # except:
+                #     pass
                 progress.update(1)
 
         # Output results
@@ -854,9 +878,9 @@ class RSquared_Analysis(Experiment):
         idx = np.unravel_index(r2.argmax(), np.shape(r2))
         self.logger.info(f"R^2: {r2[idx]}")
         self.logger.info(f"""
-        alpha = {alpha_values[idx[1]]},
-        beta = {beta_values[idx[0]]}, 
-        beta_scaled = {beta_values[idx[0]]*self.physics_model.params.bmax}
+        alpha = {alpha_values[idx[0]]},
+        beta = {beta_values[idx[1]]}, 
+        beta_scaled = {beta_values[idx[1]]*self.physics_model.params.bmax}
         """)
         self.logger.note('Destination attraction prediction')
         self.logger.note(max_w_prediction)
@@ -868,9 +892,9 @@ class RSquared_Analysis(Experiment):
                               beta = {self.physics_model.intensity_model.beta}")
 
         # Save fitted values to parameters
-        self.config.settings['fitted_alpha'] = to_json_format(alpha_values[idx[1]])
-        self.config.settings['fitted_beta'] = to_json_format(beta_values[idx[0]])
-        self.config.settings['fitted_scaled_beta'] = to_json_format(beta_values[idx[0]]*self.physics_model.params.bmax)
+        self.config.settings['fitted_alpha'] = to_json_format(alpha_values[idx[0]])
+        self.config.settings['fitted_beta'] = to_json_format(beta_values[idx[1]])
+        self.config.settings['fitted_scaled_beta'] = to_json_format(beta_values[idx[1]]*self.physics_model.params.bmax)
         self.config.settings['R^2'] = to_json_format(float(r2[idx]))
         self.config.settings['predicted_w'] = to_json_format(max_w_prediction)
 
@@ -1155,7 +1179,7 @@ class SIM_MCMC(Experiment):
         
         self.logger.note(f"{self.learning_model}")
         self.logger.info(f"Experiment: {self.outputs.experiment_id}")
-        # self.logger.critical(f"{json.dumps(kwargs.get('sweep',{}),indent = 2)}")
+        self.logger.critical(f"{json.dumps(kwargs.get('sweep',{}),indent = 2)}")
 
         
     def run(self,**kwargs) -> None:
@@ -2492,7 +2516,7 @@ class ExperimentSweep():
             self.outputs.config = list(
                 self.outputs.config.trim_sweep_configurations()
             )
-        
+
         # Prepare writing to file
         self.outputs.open_output_file(sweep={})
 
