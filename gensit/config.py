@@ -1,10 +1,10 @@
 import json
 import sys
-import toml
 import math
 import os.path
 import traceback
 
+from toml import load
 from copy import deepcopy
 from itertools import product
 from collections.abc import Iterable
@@ -38,7 +38,7 @@ class Config:
             self.logger.debug(f' Loading config from {path}')
 
             if path.endswith('.toml'):
-                self.settings = toml.load(path, _dict = dict)
+                self.settings = load(path, _dict = dict)
             elif path.endswith('.json'):
                 self.settings = read_json(path)
 
@@ -451,11 +451,10 @@ class Config:
             key_path = variable_key_paths[0],
             settings = self.schema
         )
-        return value.get('sweepable',False)
+        return value.get('sweepable',False) or value.get('file',{}).get('sweepable',False)
 
     def get_sweep_id(self,sweep:dict={}):
         sweep_id = ''
-        
         if len(sweep) > 0 and isinstance(sweep,dict):
             # Create sweep id by grouping coupled sweep vars together
             # and isolated sweep vars separately
@@ -481,7 +480,6 @@ class Config:
     def find_sweep_key_paths(self,settings:dict=None):
         if settings is None:
             settings = self.settings
-        
         for key_val_path in deep_walk(settings):
 
             if "sweep" in key_val_path and "range" in key_val_path:
@@ -517,7 +515,8 @@ class Config:
                             }
                 # Else add to isolated sweep paths
                 else:
-                    self.isolated_sweep_paths[key_val_path[sweep_indx-1]] = deepcopy(key_val_path[:sweep_indx])
+                    target_name = key_val_path[sweep_indx-1] if key_val_path[sweep_indx-1] != 'file' else key_val_path[sweep_indx-2]
+                    self.isolated_sweep_paths[target_name] = deepcopy(key_val_path[:sweep_indx])
         
         # Find common keys between isolated and coupled paths
         common_keys = set(list(self.isolated_sweep_paths.keys())).intersection(set(list(self.coupled_sweep_paths.keys())))
@@ -764,7 +763,8 @@ class Config:
                         # Add to isolated sweep paths
                         # iff this parameter should be treated a sweep parameter
                         if is_sweep:
-                            self.isolated_sweep_paths[key_path[-2]] = deepcopy(key_path[:-1])
+                            target_name = key_path[-2] if key_path[-2] != 'file' else key_path[-3]
+                            self.isolated_sweep_paths[target_name] = deepcopy(key_path[:-1])
 
                 # 6: Check that if parameter sweep is activated
                 if key_path[-1] == 'sweep_mode':
@@ -978,31 +978,30 @@ class Config:
 
     def parse_sweep_params(self):
         sweep_params = {"coupled":{},"isolated":{}}
-
         # Find common keys between isolated and coupled paths
         common_keys = set(list(self.isolated_sweep_paths.keys())).intersection(set(list(self.coupled_sweep_paths.keys())))
         # Remove them from isolated sweeps
         for k in list(common_keys):
             del self.isolated_sweep_paths[k]
         # Keep track of the target name for each sweeped variable
-        for key_path in self.isolated_sweep_paths.values():
+        for key,key_path in self.isolated_sweep_paths.items():
             # Get sweep configuration
             sweep_input,_ = self.path_get(
                 key_path = (key_path+["sweep","range"]),
                 settings = self.settings
             )
             # Parse values
-            # print('isolated',key_path)
+            # print(key,'isolated',key_path)
             sweep_vals = self.parse_data(sweep_input,(key_path+["sweep","range"]))
 
-            sweep_params['isolated'][key_path[-1]] = {
-                "var":key_path[-1] if key_path[-1] != 'file' else key_path[-2],
+            sweep_params['isolated'][key] = {
+                "var":key,
                 "path": key_path,
                 "values": sweep_vals
             }
 
             # Isolated sweeps have themselves as the target name
-            self.target_names_by_sweep_var[key_path[-1]] = key_path[-1]
+            self.target_names_by_sweep_var[key] = key
         coupled_val_lens = {}
         for target_name,coupled_paths in self.coupled_sweep_paths.items():
             # Monitor length of sweep values by target name
@@ -1036,7 +1035,7 @@ class Config:
                 # Add key path length to dict
                 coupled_val_lens[target_name][key_path[-1]] = len(sweep_vals)
                 # Coupled sweeps have a common target name
-                self.target_names_by_sweep_var[key_path[-1]] = target_name
+                self.target_names_by_sweep_var[target_name] = target_name
         # Make sure all coupled parameters have the same length
         for target_name,keypaths in coupled_val_lens.items():
             try:
@@ -1045,7 +1044,6 @@ class Config:
                 raise Exception(f"""Coupled sweep parameters for target name {target_name} 
                                 do not all have the same length
                                 {json.dumps(keypaths)}""")
-
         return sweep_params
 
 
