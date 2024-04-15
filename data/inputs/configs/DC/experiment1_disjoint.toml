@@ -1,0 +1,161 @@
+log_level = 'info'
+sweep_mode = true
+
+[inputs]
+n_workers = +1
+n_threads = +6
+device = 'cpu'
+in_directory = './data/inputs/'
+dataset = 'DC'
+load_experiment = ''
+seed = 1234
+
+[inputs.data]
+    [inputs.data.origin_demand]
+      file = 'origin_demand_sum_normalised.txt'
+    [inputs.data.destination_attraction_ts]
+      file ='destination_attraction_demand_ts_sum_normalised.txt'
+    [inputs.data.cost_matrix]
+      file = "cost_matrix_large_diagonal_max_normalised.txt"
+    [inputs.data.ground_truth_table]
+      file = 'ground_truth_table.txt'
+
+[contingency_table]
+  sparse_margins = false
+  [contingency_table.constraints]
+    cells = 'zero_and_train_cells.txt'
+    axes = [[+0],[+1]]
+
+[spatial_interaction_model]
+  [spatial_interaction_model.name.sweep]
+    default = 'TotallyConstrained'
+    range = ['TotallyConstrained','ProductionConstrained']
+  grand_total = +200029
+  [spatial_interaction_model.parameters]
+    bmax = +1.0
+  
+[harris_wilson_model]
+  dt = +0.001
+  [harris_wilson_model.parameters]
+    noise_percentage = +0.01
+    epsilon = 1.0
+    [harris_wilson_model.parameters.sigma.sweep]
+      default = 0.0141421356
+      range = [0.0141421356, 0.1414213562, nan]
+
+[training]
+  num_steps = +1
+  batch_size = +1
+  N = 100000
+  [training.to_learn.sweep]
+    default = ['alpha', 'beta'] 
+    range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
+    coupled = true
+    target_name = 'sigma'
+  
+
+[mcmc]
+    disable_tqdm = true
+    mcmc_workers = +1
+    
+    [mcmc.contingency_table]
+      table_steps = +1
+      table0 = 'maximum_entropy_solution'
+      margin0 = 'multinomial'
+      proposal = 'degree_higher'
+      
+    [mcmc.parameters]
+      theta_steps = 1
+      step_size = 1.0
+      [mcmc.parameters.covariance.sweep]
+        default = [[0.0149674,0.00182529],[0.00182529,0.0109968]]
+        range = [
+          [[0.0149674,0.00182529],[0.00182529,0.0109968]],
+          [[1.0,0.0],[0.0,1.0]],
+          [[1.0,0.0],[0.0,1.0]]
+        ]
+        coupled = true
+        target_name = 'sigma'
+    [mcmc.destination_attraction]
+      log_destination_attraction_steps = 1
+      leapfrog_steps = 3#10
+      leapfrog_step_size = 0.01 #0.02
+      ais_leapfrog_steps = 3#10
+      ais_leapfrog_step_size = 0.2#0.1
+      ais_samples = 10
+      n_bridging_distributions = 50
+
+[neural_network]
+  disable_tqdm = true
+  [neural_network.loss.loss_name.sweep]
+    default = ['dest_attraction_ts_loss']
+    range = [
+      ['dest_attraction_ts_loss'],
+      ['dest_attraction_ts_likelihood_loss']
+    ]
+  [neural_network.loss.loss_function.sweep]
+    default = ['mseloss']
+    range = [
+      ['mseloss'],
+      ['custom']
+    ]
+    coupled = true
+    target_name = 'loss_name'
+  [neural_network.loss.loss_kwargs.sweep]
+    coupled = true
+    target_name = 'loss_name'
+    [neural_network.loss.loss_kwargs.sweep.default]
+      nokey = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      nokey = nan
+    [[neural_network.loss.loss_kwargs.sweep.range]]
+      noise_percentage = nan
+  [neural_network.hyperparameters]
+    num_layers = +1
+    optimizer = 'Adam'
+    learning_rate = +0.002
+    [neural_network.hyperparameters.biases]
+      default = [+0.0, +4.0]
+      [neural_network.hyperparameters.biases.layer_specific]
+    [neural_network.hyperparameters.nodes_per_layer]
+      default = +20
+      [neural_network.hyperparameters.nodes_per_layer.layer_specific]
+    [neural_network.hyperparameters.activation_funcs]
+      default = 'linear'
+      [neural_network.hyperparameters.activation_funcs.layer_specific]
+        1 = 'abs'
+
+[[experiments]]
+  type = 'SIM_NN'
+  comment = 'Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[[experiments]]
+  type = 'NonJointTableSIM_NN'
+  comment = 'Independent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[[experiments]]
+  type = 'SIM_MCMC'
+  comment = 'Spatial Interaction Model parameter learning using Markov Chain Monte Carlo'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[outputs]
+    chunk_size = +20_000
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/'
+    out_group = 'exp1'
+    title = '_doubly_and_cell_constrained'

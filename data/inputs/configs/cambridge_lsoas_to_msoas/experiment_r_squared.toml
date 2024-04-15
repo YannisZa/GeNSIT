@@ -1,0 +1,73 @@
+log_level = 'info'
+sweep_mode = false
+
+[inputs]
+n_workers = +1
+n_threads = +6
+device = 'cpu'
+in_directory = './data/inputs/'
+dataset = 'cambridge_work_commuter_lsoas_to_msoas'
+load_experiment = ''
+  
+[inputs.data]
+    [inputs.data.origin_demand]
+      file = 'origin_demand_sum_normalised.txt'
+    [inputs.data.destination_attraction_ts]
+      file ='destination_attraction_time_series_sum_normalised.txt'
+    [inputs.data.cost_matrix]
+      file = """cost_matrices/clustered_facilities_sample_20x20_20_01_2023_\
+  sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_\
+      prob_origin_destination_adjusted_normalised_boundary_only_\
+      edge_corrected_cost_matrix_sum_normalised.txt"""
+    [inputs.data.ground_truth_table]
+      file = 'table_lsoas_to_msoas.txt'
+    [inputs.data.total_cost_by_origin]
+      file = 'lsoas_total_distance_to_work.txt'
+
+
+[spatial_interaction_model]
+  name = 'TotallyConstrained'
+  grand_total = +37400
+  [spatial_interaction_model.parameters]
+    bmax = +250.0
+    alpha = +1.0
+    beta = +1.0
+
+[harris_wilson_model]
+  dt = +0.001
+  [harris_wilson_model.parameters]
+    noise_percentage = +0.01
+    epsilon = 1.0
+    sigma = 0.0141421356
+  
+
+[training]
+  num_steps = +1
+  batch_size = +1
+  N = 1000
+  to_learn = ['alpha', 'beta']
+
+[[experiments]]
+  type = 'RSquared_Analysis'
+  comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  [experiments.grid_ranges.alpha]
+    min = 0.001
+    max = 2.0
+    n = 25
+  [experiments.grid_ranges.beta]
+    min = 0.001
+    max = 2.0
+    n = 50
+
+
+[outputs]
+    chunk_size = +20_000
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/'
+    out_group = 'r_squared'
+    title = '_total_constrained'
