@@ -6,7 +6,7 @@ n_workers = +1
 n_threads = +6
 device = 'cpu'
 in_directory = './data/inputs/'
-dataset = 'sioux_falls'
+dataset = 'DC'
 load_experiment = ''
 seed = 1234
   
@@ -14,30 +14,23 @@ seed = 1234
     [inputs.data.origin_demand]
       file = 'origin_demand_sum_normalised.txt'
     [inputs.data.destination_attraction_ts]
-      file ='destination_attraction_time_series_sum_normalised.txt'
+      file ='destination_attraction_demand_ts_sum_normalised.txt'
     [inputs.data.cost_matrix]
-      file = "cost_matrix.txt"
+      file = "cost_matrix_large_diagonal_max_normalised.txt"
     [inputs.data.ground_truth_table]
       file = 'ground_truth_table.txt'
 
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints]
-    cells = 'empty_link_cells.txt'
-    [contingency_table.constraints.axes.sweep]
-      default = []
-      range = [[], [[+0,+1]], [[+1]], [[+1]], [[+0],[+1]]]
-      coupled = true
-      target_name = 'title'
-
+    cells = 'zero_and_train_cells.txt'
+    axes = [[0],[1]]
 
 [spatial_interaction_model]
   [spatial_interaction_model.name.sweep]
     default = 'TotallyConstrained'
-    range = ['TotallyConstrained','TotallyConstrained','TotallyConstrained','ProductionConstrained', 'TotallyConstrained']
-    coupled = true
-    target_name = 'title'
-  grand_total = +360600
+    range = ['TotallyConstrained','ProductionConstrained']
+  grand_total = +200029
   [spatial_interaction_model.parameters]
     bmax = +1.0
   
@@ -68,12 +61,8 @@ seed = 1234
       table_steps = +1
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
-      [mcmc.contingency_table.proposal.sweep]
-        default = 'direct_sampling'
-        range = ['direct_sampling','direct_sampling','direct_sampling','direct_sampling', 'degree_higher']
-        coupled = true
-        target_name = 'title'
-
+      proposal = 'degree_higher'
+      
     [mcmc.parameters]
       theta_steps = 1
       step_size = 1.0
@@ -86,6 +75,7 @@ seed = 1234
         ]
         coupled = true
         target_name = 'sigma'
+        
     [mcmc.destination_attraction]
       log_destination_attraction_steps = 1
       leapfrog_steps = 3#10
@@ -163,6 +153,4 @@ seed = 1234
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'exp1'
-    [outputs.title.sweep]
-      default = '_unconstrained'
-      range = ['_unconstrained','_total_constrained','_total_intensity_row_table_constrained','_row_constrained','_doubly_constrained']
+    title = '_doubly_and_cell_constrained'

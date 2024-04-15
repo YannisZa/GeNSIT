@@ -306,6 +306,7 @@ clear; gensit summarise -dn DC/r_squared \
 ```
 clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et SIM_NN -nt 6 -nw 5
 ```
+
 ```
 clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et NonJointTableSIM_NN -nt 6 -nw 5
 ```

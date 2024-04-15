@@ -76,6 +76,7 @@ seed = 1234
         ]
         coupled = true
         target_name = 'sigma'
+        
     [mcmc.destination_attraction]
       log_destination_attraction_steps = 1
       leapfrog_steps = 3#10
