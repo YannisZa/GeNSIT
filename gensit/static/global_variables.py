@@ -1,11 +1,7 @@
 import os
 import json
-import torch 
 import operator
 from copy import deepcopy
-
-from torch import int32, float32, uint8, int8, float64, int64, int16
-from torch import bool as tbool
 
 def deep_walk(indict, pre = None):
     pre = pre[:] if pre else []
@@ -81,27 +77,6 @@ DISTANCE_FUNCTIONS = [
     "chi_squared_row_distance"
 ]
 
-NUMPY_TO_TORCH_DTYPE = {
-    "float32":float32,
-    "float64":float64,
-    "uint8":uint8,
-    "int8":int8,
-    "int16":int16,
-    "int32":int32,
-    "int64":int64,
-    "bool":tbool,
-    "str":str,
-    "object":object,
-    "list":list
-}
-
-TORCH_TO_NUMPY_DTYPE = {v:k for k,v in NUMPY_TO_TORCH_DTYPE.items()}
-
-
-def sigmoid(beta = torch.tensor(1.0)):
-    """Extends the torch.nn.sigmoid activation function by allowing for a slope parameter."""
-    return lambda x: torch.sigmoid(beta * x)
-
 
 RAW_LOSS_DATA_REQUIREMENTS = {
     "dest_attraction_ts_loss": {
@@ -135,103 +110,11 @@ for k,v in RAW_LOSS_DATA_REQUIREMENTS.items():
 LOSS_KWARG_OPERATIONS = {
     "var":  {
         "function": "var*torch.ones(dim).to(device,dtype)",
-        "kwargs": {
-            "dtype": float32
-        }
+        "dtype": "float32",
+        "kwargs": {}
     }
 }
 
-# Pytorch loss functions
-LOSS_FUNCTIONS = {
-    "l1loss": {
-        "function":torch.nn.L1Loss,
-        "kwargs_keys":[]
-    },
-    "mseloss": {
-        "function":torch.nn.MSELoss,
-        "kwargs_keys":[]
-    },
-    "crossentropyloss": {
-        "function":torch.nn.CrossEntropyLoss,
-        "kwargs_keys":[]
-    },
-    "ctcloss": {
-        "function":torch.nn.CTCLoss,
-        "kwargs_keys":[]
-    },
-    "nllloss": {
-        "function":torch.nn.NLLLoss,
-        "kwargs_keys":[]
-    },
-    "poissonnllloss": {
-        "function":torch.nn.PoissonNLLLoss,
-        "kwargs_keys":[]
-    },
-    "gaussiannllloss": {
-        "function":torch.nn.GaussianNLLLoss,
-        "kwargs_keys":['var']
-    },
-    "kldivloss": {
-        "function":torch.nn.KLDivLoss,
-        "kwargs_keys":[]
-    },
-    "bceloss": {
-        "function":torch.nn.BCELoss,
-        "kwargs_keys":[]
-    },
-    "bcewithlogitsloss": {
-        "function":torch.nn.BCEWithLogitsLoss,
-        "kwargs_keys":[]
-    },
-    "marginrankingloss": {
-        "function":torch.nn.MarginRankingLoss,
-        "kwargs_keys":[]
-    },
-    "hingeembeddingloss": {
-        "function":torch.nn.HingeEmbeddingLoss,
-        "kwargs_keys":[]
-    },
-    "multilabelmarginloss": {
-        "function":torch.nn.MultiLabelMarginLoss,
-        "kwargs_keys":[]
-    },
-    "huberloss": {
-        "function":torch.nn.HuberLoss,
-        "kwargs_keys":[]
-    },
-    "smoothl1loss": {
-        "function":torch.nn.SmoothL1Loss,
-        "kwargs_keys":[]
-    },
-    "softmarginloss": {
-        "function":torch.nn.SoftMarginLoss,
-        "kwargs_keys":[]
-    },
-    "multilabelsoftmarginloss": {
-        "function":torch.nn.MultiLabelSoftMarginLoss,
-        "kwargs_keys":[]
-    },
-    "cosineembeddingloss": {
-        "function":torch.nn.CosineEmbeddingLoss,
-        "kwargs_keys":[]
-    },
-    "multimarginloss": {
-        "function":torch.nn.MultiMarginLoss,
-        "kwargs_keys":[]
-    },
-    "tripletmarginloss": {
-        "function":torch.nn.TripletMarginLoss,
-        "kwargs_keys":[]
-    },
-    "tripletmarginwithdistanceloss": {
-        "function":torch.nn.TripletMarginWithDistanceLoss,
-        "kwargs_keys":[]
-    },
-    "custom":{
-        "function":None,
-        "kwargs_keys":None
-    }
-}
 
 INPUT_SCHEMA = {
     "origin_demand":{
@@ -488,41 +371,42 @@ EXPERIMENT_OUTPUT_NAMES = {
 }
 
 AUXILIARY_COORDINATES_DTYPES = {
-    "N":torch.int32,
-    "dataset":str,
-    "covariance":str,
-    "step_size":torch.float32,
-    "to_learn":object,
-    "alpha":torch.float32,
-    "beta":torch.float32,
-    "noise_percentage":torch.float32,
-    "delta":torch.float32,
-    "kappa":torch.float32,
-    "sigma":object,
-    "title":str,
-    "axes":object,
-    "cells":str,
-    "loss_name":object,
-    "loss_function":object,
-    "loss_kwargs":object,
-    "name":str,
-    "table_steps": torch.int32,
-    "bmax":torch.float32,
-    "cost_matrix":str,
-    "proposal":str
+    "N":"int32",
+    "dataset":"str",
+    "covariance":"str",
+    "step_size":"float32",
+    "to_learn":"object",
+    "alpha":"float32",
+    "beta":"float32",
+    "noise_percentage":"float32",
+    "delta":"float32",
+    "kappa":"float32",
+    "sigma":"object",
+    "title":"str",
+    "axes":"object",
+    "cells":"str",
+    "loss_name":"object",
+    "loss_function":"object",
+    "loss_kwargs":"object",
+    "name":"str",
+    "table_steps": "int32",
+    "bmax":"float32",
+    "cost_matrix":"str",
+    "destination_attraction_ts":"str",
+    "proposal":"str"
 }
 
 CORE_COORDINATES_DTYPES = {
- "iter":torch.int32,
- "time":torch.int32,
- "origin":torch.int16,
- "destination":torch.int16,
- "seed":torch.int32,
- "alpha_range":torch.int32,
- "beta_range":torch.int32
-#  "table_steps":torch.int32,
-#  "theta_steps":torch.int32,
-#  "destination_attraction_steps":torch.int32,
+ "iter":"int32",
+ "time":"int32",
+ "origin":"int16",
+ "destination":"int16",
+ "seed":"int32",
+ "alpha_range":"int32",
+ "beta_range":"int32"
+#  "table_steps":"int32",
+#  "theta_steps":"int32",
+#  "destination_attraction_steps":"int32",
 }
 
 COORDINATES_DTYPES = {**CORE_COORDINATES_DTYPES,**AUXILIARY_COORDINATES_DTYPES}
@@ -626,57 +510,144 @@ INTENSITY_MODELS = ["spatial_interaction_model"]
 
 DATE_FORMATS = ["start,stop,step-%m-%Y","start,stop,step_%m_%Y","start,stop,step_%m", "start,stop,step-%m"]
 
-# Pytorch activation functions.
-# Pairs of activation functions and whether they are part of the torch.nn module, in which case they must be called
-# via func(*args, **kwargs)(x).
-
-ACTIVATION_FUNCS = {
-    "abs": [torch.abs, False],
-    "celu": [torch.nn.CELU, True],
-    "cos": [torch.cos, False],
-    "cosine": [torch.cos, False],
-    "elu": [torch.nn.ELU, True],
-    "gelu": [torch.nn.GELU, True],
-    "hardshrink": [torch.nn.Hardshrink, True],
-    "hardsigmoid": [torch.nn.Hardsigmoid, True],
-    "hardswish": [torch.nn.Hardswish, True],
-    "hardtanh": [torch.nn.Hardtanh, True],
-    "leakyrelu": [torch.nn.LeakyReLU, True],
-    "linear": [None, False],
-    "logsigmoid": [torch.nn.LogSigmoid, True],
-    "mish": [torch.nn.Mish, True],
-    "prelu": [torch.nn.PReLU, True],
-    "relu": [torch.nn.ReLU, True],
-    "rrelu": [torch.nn.RReLU, True],
-    "selu": [torch.nn.SELU, True],
-    "sigmoid": [sigmoid, True],
-    "silu": [torch.nn.SiLU, True],
-    "sin": [torch.sin, False],
-    "sine": [torch.sin, False],
-    "softplus": [torch.nn.Softplus, True],
-    "softshrink": [torch.nn.Softshrink, True],
-    "swish": [torch.nn.SiLU, True],
-    "tanh": [torch.nn.Tanh, True],
-    "tanhshrink": [torch.nn.Tanhshrink, True],
-    "threshold": [torch.nn.Threshold, True],
-}
-
-OPTIMIZERS = {
-    "Adagrad": torch.optim.Adagrad,
-    "Adam": torch.optim.Adam,
-    "AdamW": torch.optim.AdamW,
-    "SparseAdam": torch.optim.SparseAdam,
-    "Adamax": torch.optim.Adamax,
-    "ASGD": torch.optim.ASGD,
-    "LBFGS": torch.optim.LBFGS,
-    "NAdam": torch.optim.NAdam,
-    "RAdam": torch.optim.RAdam,
-    "RMSprop": torch.optim.RMSprop,
-    "Rprop": torch.optim.Rprop,
-    "SGD": torch.optim.SGD,
-}
-
-
 class Dataset(object):
     pass
 
+# Pytorch loss functions
+LOSS_FUNCTIONS = {
+    "l1loss": {
+        "function":"torch.nn.L1Loss",
+        "kwargs_keys":[]
+    },
+    "mseloss": {
+        "function":"torch.nn.MSELoss",
+        "kwargs_keys":[]
+    },
+    "crossentropyloss": {
+        "function":"torch.nn.CrossEntropyLoss",
+        "kwargs_keys":[]
+    },
+    "ctcloss": {
+        "function":"torch.nn.CTCLoss",
+        "kwargs_keys":[]
+    },
+    "nllloss": {
+        "function":"torch.nn.NLLLoss",
+        "kwargs_keys":[]
+    },
+    "poissonnllloss": {
+        "function":"torch.nn.PoissonNLLLoss",
+        "kwargs_keys":[]
+    },
+    "gaussiannllloss": {
+        "function":"torch.nn.GaussianNLLLoss",
+        "kwargs_keys":['var']
+    },
+    "kldivloss": {
+        "function":"torch.nn.KLDivLoss",
+        "kwargs_keys":[]
+    },
+    "bceloss": {
+        "function":"torch.nn.BCELoss",
+        "kwargs_keys":[]
+    },
+    "bcewithlogitsloss": {
+        "function":"torch.nn.BCEWithLogitsLoss",
+        "kwargs_keys":[]
+    },
+    "marginrankingloss": {
+        "function":"torch.nn.MarginRankingLoss",
+        "kwargs_keys":[]
+    },
+    "hingeembeddingloss": {
+        "function":"torch.nn.HingeEmbeddingLoss",
+        "kwargs_keys":[]
+    },
+    "multilabelmarginloss": {
+        "function":"torch.nn.MultiLabelMarginLoss",
+        "kwargs_keys":[]
+    },
+    "huberloss": {
+        "function":"torch.nn.HuberLoss",
+        "kwargs_keys":[]
+    },
+    "smoothl1loss": {
+        "function":"torch.nn.SmoothL1Loss",
+        "kwargs_keys":[]
+    },
+    "softmarginloss": {
+        "function":"torch.nn.SoftMarginLoss",
+        "kwargs_keys":[]
+    },
+    "multilabelsoftmarginloss": {
+        "function":"torch.nn.MultiLabelSoftMarginLoss",
+        "kwargs_keys":[]
+    },
+    "cosineembeddingloss": {
+        "function":"torch.nn.CosineEmbeddingLoss",
+        "kwargs_keys":[]
+    },
+    "multimarginloss": {
+        "function":"torch.nn.MultiMarginLoss",
+        "kwargs_keys":[]
+    },
+    "tripletmarginloss": {
+        "function":"torch.nn.TripletMarginLoss",
+        "kwargs_keys":[]
+    },
+    "tripletmarginwithdistanceloss": {
+        "function":"torch.nn.TripletMarginWithDistanceLoss",
+        "kwargs_keys":[]
+    },
+    "custom":{
+        "function":None,
+        "kwargs_keys":None
+    }
+}
+
+
+ACTIVATION_FUNCS = {
+    "abs": ["torch.abs", False],
+    "celu": ["torch.nn.CELU", True],
+    "cos": ["torch.cos", False],
+    "cosine": ["torch.cos", False],
+    "elu": ["torch.nn.ELU", True],
+    "gelu": ["torch.nn.GELU", True],
+    "hardshrink": ["torch.nn.Hardshrink", True],
+    "hardsigmoid": ["torch.nn.Hardsigmoid", True],
+    "hardswish": ["torch.nn.Hardswish", True],
+    "hardtanh": ["torch.nn.Hardtanh", True],
+    "leakyrelu": ["torch.nn.LeakyReLU", True],
+    "linear": ["None", False],
+    "logsigmoid": ["torch.nn.LogSigmoid", True],
+    "mish": ["torch.nn.Mish", True],
+    "prelu": ["torch.nn.PReLU", True],
+    "relu": ["torch.nn.ReLU", True],
+    "rrelu": ["torch.nn.RReLU", True],
+    "selu": ["torch.nn.SELU", True],
+    "sigmoid": ["lambda x: torch.sigmoid(beta * x)", True],
+    "silu": ["torch.nn.SiLU", True],
+    "sin": ["torch.sin", False],
+    "sine": ["torch.sin", False],
+    "softplus": ["torch.nn.Softplus", True],
+    "softshrink": ["torch.nn.Softshrink", True],
+    "swish": ["torch.nn.SiLU", True],
+    "tanh": ["torch.nn.Tanh", True],
+    "tanhshrink": ["torch.nn.Tanhshrink", True],
+    "threshold": ["torch.nn.Threshold", True],
+}
+
+OPTIMIZERS = {
+    "Adagrad": "torch.optim.Adagrad",
+    "Adam": "torch.optim.Adam",
+    "AdamW": "torch.optim.AdamW",
+    "SparseAdam": "torch.optim.SparseAdam",
+    "Adamax": "torch.optim.Adamax",
+    "ASGD": "torch.optim.ASGD",
+    "LBFGS": "torch.optim.LBFGS",
+    "NAdam": "torch.optim.NAdam",
+    "RAdam": "torch.optim.RAdam",
+    "RMSprop": "torch.optim.RMSprop",
+    "Rprop": "torch.optim.Rprop",
+    "SGD": "torch.optim.SGD",
+}

@@ -45,7 +45,7 @@ class Plot(object):
         # Store settings
         self.settings = settings
 
-        # self.logger.info(f"{','.join([Path(out_dir).stem for out_dir in self.outputs_directories])}")
+        self.logger.info(f"{','.join([Path(out_dir).stem for out_dir in self.outputs_directories])}")
         # Run plotting
         self.data_plot(plot_func = self.compile_plot(plot_view), **kwargs)
 

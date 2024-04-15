@@ -1,8 +1,7 @@
 import click
+
 from copy import deepcopy
 
-from gensit.static.global_variables import *
-from gensit.utils.misc_utils import unstringify
 def btt_callback(ctx, param, value):
     if value is None:
         return {}
@@ -48,7 +47,11 @@ def unstringify_callback(ctx, param, value):
     res = []
     for val in list(value):
         # Unstringify argument
-        res.append(unstringify(val))
+        try:
+            decoded_val = eval(val)
+        except:
+            decoded_val = val
+        res.append(decoded_val)
     return res
     
 def list_of_str(ctx, param, value):
@@ -177,7 +180,7 @@ class PythonLiteralOption(click.Option):
             try:
                 res = []
                 for item in value:
-                    res.append(ast.literal_eval(item))
+                    res.append(eval(item))
                 return res
             except ValueError:
                 raise click.BadParameter(value)

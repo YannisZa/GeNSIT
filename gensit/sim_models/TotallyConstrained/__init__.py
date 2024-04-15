@@ -38,7 +38,6 @@ def sde_pot(**kwargs):
     delta = kwargs['delta']
     kappa = kwargs['kappa']
     sigma = kwargs['sigma']
-    gamma = 2 / (sigma**2)
     epsilon = kwargs['epsilon']
     log_destination_attraction = kwargs['log_destination_attraction']
 
@@ -53,7 +52,7 @@ def sde_pot(**kwargs):
     else:
         potential = -(1./alpha)*log_normalisation
         potential += kappa*(torch.exp(log_destination_attraction)).sum() - delta*torch.sum(log_destination_attraction)
-        potential *= gamma*epsilon
+        potential *= (2* epsilon) / (sigma**2)
     return potential
 
 def sde_pot_jacobian(**kwargs):
@@ -104,10 +103,24 @@ def log_flow_matrix(**kwargs):
     else:
         # Extract dimensions
         N = log_destination_attraction['id'].shape[0]
+        # Create dummy sweep coordinate
+        if 'sweep' not in log_destination_attraction.dims:
+            log_destination_attraction = log_destination_attraction.expand_dims(
+                sweep = xr.DataArray(['dummy_sweep'], dims=['sweep'])
+            )
+        if 'sweep' not in alpha.dims:
+            alpha = alpha.expand_dims(
+                sweep = xr.DataArray(['dummy_sweep'], dims=['sweep'])
+            )
+        if 'sweep' not in beta.dims:
+            beta = beta.expand_dims(
+                sweep = xr.DataArray(['dummy_sweep'], dims=['sweep'])
+            )
+            
         sweep = len(log_destination_attraction.coords['sweep'].values.tolist())
         dims = ['id','origin','destination','sweep']
         # Merge all coordinates
-        coords = kwargs['log_destination_attraction'].coords
+        coords = log_destination_attraction.coords
         coords = coords.assign(origin = arange(1,origin+1,dtype='int32'))
 
         # Use the .sel() method to select the dimensions you want to convert
@@ -154,7 +167,7 @@ def log_flow_matrix(**kwargs):
         return xr.DataArray(
             data = log_flow.detach().cpu().numpy(), 
             dims = dims,
-            coords={k:coords[k] for k in dims}
+            coords = {k:coords[k] for k in dims}
         ) 
 
 def flow_matrix_expanded(log_destination_attraction,cost_matrix,grand_total,alpha,beta):

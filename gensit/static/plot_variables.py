@@ -1,15 +1,3 @@
-import matplotlib.cm as cm
-
-from matplotlib.colors import LinearSegmentedColormap, cnames
-
-def cmap_exists(name):
-    try:
-        cm.get_cmap(name)
-    except:
-        return False
-    return True
-
-
 PLOT_COORDINATES = ["x","y","z"]
 PLOT_AUX_COORDINATES = ["x_group","y_group","z_group"]
 PLOT_ALL_COORDINATES = PLOT_COORDINATES+PLOT_AUX_COORDINATES
@@ -74,6 +62,7 @@ PLOT_MARKERS = {
 }
 
 COLOR_NAMES = {
+    "silver": "#C0C0C0",
     "deepred": "#E20000",
     "skyblue": "#1E88E5",
     "tab20b_purple": "#5856c4",
@@ -93,7 +82,7 @@ PLOT_COLOURS = {
         "JointTableSIM_NN":COLOR_NAMES["tab20c_blue"],
     },
     "title": {
-        "_unconstrained":cnames["silver"],
+        "_unconstrained":COLOR_NAMES["silver"],
         "_total_constrained":COLOR_NAMES["tab20b_purple"],
         "_row_constrained":COLOR_NAMES["tab20b_green"],
         "_doubly_constrained":COLOR_NAMES["tab20b_orange"],

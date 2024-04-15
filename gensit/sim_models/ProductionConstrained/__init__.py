@@ -113,10 +113,24 @@ def log_flow_matrix(**kwargs):
     else:
         # Extract dimensions
         N = log_destination_attraction['id'].shape[0]
+        # Create dummy sweep coordinate
+        if 'sweep' not in log_destination_attraction.dims:
+            log_destination_attraction = log_destination_attraction.expand_dims(
+                sweep = xr.DataArray(['dummy_sweep'], dims=['sweep'])
+            )
+        if 'sweep' not in alpha.dims:
+            alpha = alpha.expand_dims(
+                sweep = xr.DataArray(['dummy_sweep'], dims=['sweep'])
+            )
+        if 'sweep' not in beta.dims:
+            beta = beta.expand_dims(
+                sweep = xr.DataArray(['dummy_sweep'], dims=['sweep'])
+            )
+
         sweep = len(log_destination_attraction.coords['sweep'].values.tolist())
         dims = ['id','origin','destination','sweep']
         # Merge all coordinates
-        coords = kwargs['log_destination_attraction'].coords
+        coords = log_destination_attraction.coords
         coords = coords.assign(origin = arange(1,origin+1,dtype='int32'))
 
         # Use the .sel() method to select the dimensions you want to convert

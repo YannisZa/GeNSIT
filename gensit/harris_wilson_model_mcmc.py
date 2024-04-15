@@ -38,9 +38,7 @@ class HarrisWilson_MCMC(object):
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
 
         # Type of learning model
         self.model_type = 'markov_chain_monte_carlo'
@@ -548,7 +546,7 @@ class HarrisWilson_MCMC(object):
 
         if min(self.mcmc_workers,N+1) > 1:
             # Multiprocessing
-            # self.logger.debug(f"Multiprocessing with workers = {min(self.n_workers,N+1)}")
+            self.logger.debug(f"Multiprocessing with workers = {min(self.n_workers,N+1)}")
             # with joblib_progress(f"Multiprocessing {min(self.n_workers,N+1)}", total=(N+1)):
             # log_weights = torch.asarray(
             #     Parallel(n_jobs = min(self.n_workers,N+1))(
@@ -636,7 +634,7 @@ class HarrisWilson_MCMC(object):
         # Theta-accept/reject
         if theta_new.min() < 0 or theta_new.max() >= 2:
             # print(f'Parameters {theta_new} outside of [0,2]^2 range')
-            # self.logger.debug("Rejected")
+            self.logger.debug("Rejected")
             return theta_prev,0,V,gradV,log_z_inverse,sign
 
         # try:
@@ -676,7 +674,7 @@ class HarrisWilson_MCMC(object):
             return theta_prev,0,V,gradV,log_z_inverse,sign
         # except:
         #     print("Exception raised in theta_gibbs_step")
-        #     # self.logger.debug("Exception raised")
+        #     self.logger.debug("Exception raised")
         #     return theta_prev,0,V,gradV,log_z_inverse,sign
 
 
@@ -723,7 +721,7 @@ class HarrisWilson_MCMC(object):
         # Theta-accept/reject
         if theta_new.min() < 0 or theta_new.max() >= 2:
             # print(f'Parameters {theta_new} outside of [0,2]^2 range')
-            # self.logger.debug("Rejected")
+            self.logger.debug("Rejected")
             return theta_prev, 0, V, gradV, log_z_inverse, negative_log_table_likelihood, sign
 
         # try:
@@ -815,7 +813,7 @@ class HarrisWilson_MCMC(object):
                     sign
         # except:
         #     print("Exception raised in theta_given_table_gibbs_step")
-        #     # self.logger.debug("Exception raised")
+        #     self.logger.debug("Exception raised")
         #     return theta_prev, 0, V, gradV, log_z_inverse, negative_log_table_likelihood, negative_gradient_log_table_likelihood, sign
 
 

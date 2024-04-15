@@ -53,9 +53,7 @@ class Outputs(object):
             console_level = level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update config level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
         # Store output names
         self.data_names = settings.get('sample',[]) \
             if (data_names is None) or (len(data_names) <= 0) \
@@ -227,22 +225,26 @@ class Outputs(object):
         self_copy.data = self_copy.data[index]
         # Update config
         first_dataset = list(self_copy.data_vars().values())[0]
-        # Find sweep dimensions that are not core coordinates
-        sweep = dict(zip(
-            first_dataset.get_index('sweep').names,
-            [unstringify(d) for d in first_dataset.coords['sweep'].values.tolist()[0]]
-        ))
-        # NOTE: We are not using config's native 'prepare_experiment_config' function
-        # because some of the sweep dimensions might have be grouped when loading the outputs
-        # e.g. seed is often grouped and does not appear in the sweep coordinates of the output data array
-        # Reset config-global quantities
-        self_copy.config.reset()
-        # Update config
-        self_copy.config.update(sweep)
-        # Update sweep mode flag
-        self_copy.config.find_sweep_key_paths()
-        # print(sweep)
-        # print(self_copy.config.sweep_param_names)
+        try:
+            # Find sweep dimensions that are not core coordinates
+            sweep = dict(zip(
+                first_dataset.get_index('sweep').names,
+                [unstringify(d) for d in first_dataset.coords['sweep'].values.tolist()[0]]
+            ))
+            # NOTE: We are not using config's native 'prepare_experiment_config' function
+            # because some of the sweep dimensions might have be grouped when loading the outputs
+            # e.g. seed is often grouped and does not appear in the sweep coordinates of the output data array
+            # Reset config-global quantities
+            self_copy.config.reset()
+            # Update config
+            self_copy.config.update(sweep)
+            # Update sweep mode flag
+            self_copy.config.find_sweep_key_paths()
+            # print(sweep)
+            # print(self_copy.config.sweep_param_names)
+        except:
+            pass
+
         try:
             # Either there are no sweep params
             # or if there are then these are must be group_by dims
@@ -594,11 +596,11 @@ class Outputs(object):
         # Convert set to list
         local_coords = {k:np.array(
                             list(v),
-                            dtype = TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
+                            dtype = eval_dtype(COORDINATES_DTYPES[k], numpy_format = True)
                         ) for k,v in local_coords.items()}
         global_coords = {k:np.array(
                             list(v),
-                            dtype = TORCH_TO_NUMPY_DTYPE[COORDINATES_DTYPES[k]]
+                            dtype = eval_dtype(COORDINATES_DTYPES[k], numpy_format = True)
                         ) for k,v in global_coords.items()}
         self.logger.progress('Populating data dictionary')
         # Create an xarray dataset for each sample
@@ -1467,7 +1469,7 @@ class Outputs(object):
                 else torch.tensor(
                     self.inputs.data.grand_total,
                     device = self.config['inputs']['device'],
-                    dtype = torch.int32
+                    dtype = torch.float32
                 )
             # Compute log intensity
             samples = IntensityModel.log_intensity(
@@ -1503,7 +1505,10 @@ class Outputs(object):
             if torch.is_tensor(getattr(self.inputs.data,sample_name)):
                 samples = torch.clone(
                     getattr(self.inputs.data,sample_name).to(
-                        NUMPY_TO_TORCH_DTYPE[INPUT_SCHEMA[sample_name]['dtype']]
+                        eval_dtype(
+                            INPUT_SCHEMA[sample_name]['dtype'],
+                            numpy_format = False
+                        )
                     )
                 )
             elif isinstance(getattr(self.inputs.data,sample_name),(xr.DataArray,xr.Dataset)):
@@ -1511,7 +1516,10 @@ class Outputs(object):
             else:
                 samples = torch.tensor(
                     getattr(self.inputs.data,sample_name),
-                    dtype = NUMPY_TO_TORCH_DTYPE[INPUT_SCHEMA[sample_name]['dtype']],
+                    dtype = eval_dtype(
+                        INPUT_SCHEMA[sample_name]['dtype'],
+                        numpy_format = False
+                    ),
                     device = self.device
                 )
 
@@ -1551,7 +1559,6 @@ class Outputs(object):
             for coord_slice in self.settings.get('coordinate_slice',[]):
                 # Get all data names appearing in slice expression
                 dim_names = [dim for dim in re.findall(r'\bda\.(\w+)\b',coord_slice) if dim not in ['isin']]
-                
                 # If all included data names are sweepable dimensions
                 if all([self.config.is_sweepable(dim) for dim in dim_names]):
                     # Store this coordinate slice expression
@@ -1782,9 +1789,7 @@ class DataCollection(object):
             console_level = level,
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update config level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
         # Store length temporarily
         self.data_length = deepcopy(len(data))
 
@@ -2178,9 +2183,7 @@ class OutputSummary(object):
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         
         # Update logger level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
 
         # Store settings
         self.settings = settings
@@ -2292,7 +2295,7 @@ class OutputSummary(object):
             for metadata in metadata_collection:
                 if len(metadata) > 0:
                     if output_folder in experiment_metadata:
-                        experiment_metadata[output_folder]= np.append(
+                        experiment_metadata[output_folder] = np.append(
                             experiment_metadata[output_folder],
                             metadata,
                             axis = 0
@@ -2490,26 +2493,34 @@ class OutputSummary(object):
         # Get sweep-related data
         config.get_sweep_data()
         
-        # If sweep is over input data
-        input_sweep_param_names = set(config.sweep_param_names).intersection(
-            set(list(INPUT_SCHEMA.keys()))
-        )
-        input_sweep_param_names = set(input_sweep_param_names).difference(set(['to_learn']))
-        input_sweep_param_names = input_sweep_param_names.union(
-            set(config.sweep_param_names).intersection(
-                set(list(PARAMETER_DEFAULTS.keys()))
+        if config.sweep_mode():
+            # If sweep is over input data
+            input_sweep_param_names = set(config.sweep_param_names).intersection(
+                set(list(INPUT_SCHEMA.keys()))
             )
+            input_sweep_param_names = set(input_sweep_param_names).difference(set(['to_learn']))
+            input_sweep_param_names = input_sweep_param_names.union(
+                set(config.sweep_param_names).intersection(
+                    set(list(PARAMETER_DEFAULTS.keys()))
+                )
         )
-        if len(input_sweep_param_names) > 0:
-            # Load inputs for every single output
-            passed_inputs = None
+            if len(input_sweep_param_names) > 0:
+                # Load inputs for every single output
+                passed_inputs = None
+            else:
+                # Import all input data
+                passed_inputs = deepcopy(Inputs(
+                    config = config,
+                    synthetic_data = False,
+                    logger = self.logger,
+                ))
         else:
             # Import all input data
-            passed_inputs = deepcopy(Inputs(
-                config = config,
-                synthetic_data = False,
-                logger = self.logger,
-            ))
+                passed_inputs = deepcopy(Inputs(
+                    config = config,
+                    synthetic_data = False,
+                    logger = self.logger,
+                ))
 
         # Instantiate global outputs
         outputs = Outputs(
@@ -2521,6 +2532,7 @@ class OutputSummary(object):
             logger = self.logger
         )
         
+        print(indx)
         # Load all output data
         outputs.load(indx = indx)
 
@@ -2603,13 +2615,19 @@ class OutputSummary(object):
         sample_data = list(outputs.data_vars().values())[0]
         
         # Update config using sweep configuration
-        sweep_outputs.config.update({
-            "sweep_mode":False,
-            **dict(zip(
-                [x for x in sample_data.get_index('sweep').names if x != 'sweep'],
-                list(map(unstringify,sample_data.get_index('sweep')[0]))
-            ))
-        })
+        try:
+            # This means that outputs were a result of one or more sweeps
+            sweep_outputs.config.update({
+                "sweep_mode":False,
+                **dict(zip(
+                    [x for x in sample_data.get_index('sweep').names if x != 'sweep'],
+                    list(map(unstringify,sample_data.get_index('sweep')[0]))
+                ))
+            })
+            sweeped_outputs = True
+        except:
+            # This means that outputs were not a result of any sweep
+            sweeped_outputs = False
 
         # Gather all arguments for evaluating every expression later on
         keyword_args = {}
@@ -2637,7 +2655,6 @@ class OutputSummary(object):
         
         keyword_expressions = [(k,v) for k,v in self.settings['evaluation_kwargs'] if k not in raw_data_keys]
         self.logger.progress([k for k,_ in keyword_expressions])
-        
         # Second, gather all data derivative arguments
         for key,expression in keyword_expressions:
             self.logger.progress(f"trying {key} {expression}")
@@ -2744,7 +2761,7 @@ class OutputSummary(object):
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
                 if 'sweep' in evaluation.dims:
                     self.logger.note(f"sweep: {evaluation['sweep'].values.tolist()}")
-                    
+            
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
                 if 'sweep' in evaluation.dims:
                     # Rename xr data array
@@ -2789,15 +2806,18 @@ class OutputSummary(object):
                         data = data.tolist()
                     # Rename xr data array
                     evaluation = evaluation.rename(operation_name.lower())
+
                     # Add data to every existing sweep
                     for sweep_id in evaluation_data.keys():
                         if operation_name in evaluation_data[sweep_id]:
                             evaluation_data[sweep_id][operation_name].append(data)
                         else:
                             evaluation_data[sweep_id].update({operation_name:data})
-                        # evaluation_data[sweep_id].update({
-                        #     operation_name:data
-                        # })
+                    
+                    # Initialise the evaluation data only if the outputs
+                    # were not a result of any sweep
+                    if not sweeped_outputs and len(evaluation_data) <= 0:
+                        evaluation_data[outputs.experiment_id] = {operation_name:data}
             else:
                 # print('no xarray found',operation_name,type(evaluation))
                 # Get data list
@@ -2807,12 +2827,18 @@ class OutputSummary(object):
                     data = evaluation
                 else:
                     data = [evaluation]
+
                 # Add data to every existing sweep
                 for sweep_id in evaluation_data.keys():
                     if operation_name in evaluation_data[sweep_id]:
                         evaluation_data[sweep_id][operation_name].append(data)
                     else:
                         evaluation_data[sweep_id].update({operation_name:data})
+
+                # Initialise the evaluation data only if the outputs
+                # were not a result of any sweep
+                if not sweeped_outputs and len(evaluation_data) <= 0:
+                    evaluation_data[outputs.experiment_id] = {operation_name:data}
 
         return list(evaluation_data.values())
         

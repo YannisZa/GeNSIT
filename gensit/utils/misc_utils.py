@@ -16,6 +16,7 @@ import traceback
 import numpy as np
 import pandas as pd
 import xarray as xr
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 
 from tqdm import tqdm
@@ -24,8 +25,6 @@ from difflib import SequenceMatcher
 from itertools import chain, product, count
 from typing import Dict, List, Union, Tuple
 from collections.abc import Iterable,MutableMapping,Mapping,Sequence
-
-
 
 from gensit.utils.exceptions import *
 from gensit.utils.logger_class import *
@@ -660,7 +659,13 @@ def stringify_coordinate(d):
         return d
 
 def stringify(data,**kwargs):
-    if isinstance(data,Iterable) and not isinstance(data,str) and len(data) > 0:
+    if isinstance(data, dict) and len(data) > 0:
+        try:
+            res = json.dumps(data)
+        except:
+            res = str(data)
+        return res
+    elif isinstance(data,Iterable) and not isinstance(data,str) and len(data) > 0:
         return kwargs.get('preffix','')+ \
             ','.join([stringify(v,**kwargs) for v in data])+ \
             kwargs.get('suffix','')
@@ -1030,31 +1035,6 @@ def string_to_numeric(s):
     f = np.float32(s)
     i = np.int32(f)
     return i if i == f else np.round(f,5)
-
-def setup_logger(
-        name,
-        console_level:str = None,
-        file_level:str = None,
-    ):
-    # print('setting up new logger',name)
-    # traceback.print_stack()
-
-    # Silence warnings from other packages
-    numba_logger = logging.getLogger('numba')
-    numba_logger.setLevel(logging.WARNING)
-    
-    # Get logger
-    logger = DualLogger(
-        name = name,
-        level = console_level
-    )
-
-    logger.setLevels(
-        console_level = console_level,
-        file_level = file_level
-    )
-
-    return logger
 
 def sigma_to_noise_regime(sigma = None):
     if sigma:
@@ -1502,7 +1482,6 @@ def xr_apply_and_combine_wrapper(
         multiindex_dim = existing_dim,
         added_dims = sweep_keys
     )
-
     
 def safe_list_get(l, idx, default):
   try:
@@ -1521,3 +1500,40 @@ def unpack_data(data,index):
 
 def flip(items, ncol):
     return chain(*[items[i::ncol] for i in range(ncol)])
+
+
+def eval_dtype(dtype:str='',numpy_format:bool=False):
+    match dtype:
+        case "str":
+            return str
+        case "object":
+            return object
+        case "list":
+            return list
+        case "float16":
+            return np.float16 if numpy_format else torch.float16
+        case "float32":
+            return np.float32 if numpy_format else torch.float32
+        case "float64":
+            return np.float64 if numpy_format else torch.float64
+        case "uint8":
+            return np.uint8 if numpy_format else torch.uint8
+        case "int8":
+            return np.int8 if numpy_format else torch.int8
+        case "int16":
+            return np.int16 if numpy_format else torch.int16
+        case "int32":
+            return np.int32 if numpy_format else torch.int32
+        case "int64":
+            return np.int64 if numpy_format else torch.int64
+        case "bool":
+            return bool if numpy_format else torch.bool
+        case _:
+            raise Exception(f"Cannot find {'numpy' if numpy_format else 'torch'} type {dtype}.")
+
+def cmap_exists(name):
+    try:
+        cm.get_cmap(name)
+    except:
+        return False
+    return True

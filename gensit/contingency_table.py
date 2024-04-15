@@ -62,9 +62,7 @@ class ContingencyTable(object):
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
         
         # Config
         self.config = config

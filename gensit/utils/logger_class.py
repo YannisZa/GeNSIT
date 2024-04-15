@@ -7,6 +7,7 @@ import string
 import random
 import logging
 import coloredlogs
+
 from pathlib import Path
 
 # Define the additional log levels
@@ -33,6 +34,30 @@ logging.addLevelName(SUCCESS, "SUCCESS")
 logging.addLevelName(EMPTY, "EMPTY")
 
 
+def setup_logger(
+        name,
+        console_level:str = None,
+        file_level:str = None,
+    ):
+    # print('setting up new logger',name)
+    # traceback.print_stack()
+
+    # Silence warnings from other packages
+    # numba_logger = logging.getLogger('numba')
+    # numba_logger.setLevel(logging.WARNING)
+    
+    # Get logger
+    logger = DualLogger(
+        name = name,
+        level = console_level
+    )
+
+    logger.setLevels(
+        console_level = console_level,
+        file_level = file_level
+    )
+
+    return logger
 
 def random_string(N:int = 10):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k = N))

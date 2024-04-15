@@ -15,7 +15,7 @@ from typing import Any, List, Union
 from gensit.config import Config
 from gensit.utils.exceptions import *
 from gensit.harris_wilson_model import HarrisWilson
-from gensit.utils.misc_utils import setup_logger, fn_name
+from gensit.utils.misc_utils import setup_logger, fn_name, eval_dtype
 from gensit.static.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
 
 
@@ -58,22 +58,27 @@ def get_activation_funcs(n_layers: int, cfg: dict) -> List[callable]:
 
         # Entry is a single string
         if isinstance(layer_cfg, str):
-            _f = ACTIVATION_FUNCS[layer_cfg.lower()]
-            if _f[1]:
-                return _f[0]()
+            _fun,_call = ACTIVATION_FUNCS[layer_cfg.lower()]
+            _fun = eval(_fun, {"torch":torch})
+            if _call:
+                return _fun()
             else:
-                return _f[0]
+                return _fun
 
         # Entry is a dictionary containing args and kwargs
         elif isinstance(layer_cfg, dict):
-            _f = ACTIVATION_FUNCS[layer_cfg.get("name").lower()]
-            if _f[1]:
-                return _f[0](*layer_cfg.get("args", ()), **layer_cfg.get("kwargs", {}))
+            _fun,_call = ACTIVATION_FUNCS[layer_cfg.lower()]
+            _fun = eval(_fun, {"torch":torch})
+            if _call:
+                return _fun(*layer_cfg.get("args", ()), **layer_cfg.get("kwargs", {}))
             else:
-                return _f[0]
+                return _fun
 
         elif layer_cfg is None:
-            _f = ACTIVATION_FUNCS["linear"][0]
+            _f = eval(
+                ACTIVATION_FUNCS["linear"][0],
+                {"torch":torch}
+            )
 
         else:
             raise ValueError(f"Unrecognized activation function {cfg}!")
@@ -191,7 +196,11 @@ class NeuralNet(nn.Module):
             self.layers.append(layer)
 
         # Get the optimizer
-        self.optimizer = OPTIMIZERS[optimizer](self.parameters(), lr = learning_rate)
+        optimizer_function = eval(
+            OPTIMIZERS[optimizer],
+            {"torch":torch}
+        )
+        self.optimizer = optimizer_function(self.parameters(), lr = learning_rate)
 
     # ... Evaluation functions .........................................................................................
 
@@ -235,9 +244,7 @@ class HarrisWilson_NN:
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
 
         # Type of learning model
         self.model_type = 'neural_network'
@@ -302,7 +309,7 @@ class HarrisWilson_NN:
             # Get loss function from global variables (standard torch loss functions)
             loss_func = LOSS_FUNCTIONS.get(function.lower(),{}).get('function',None)
             # if failed get loss function from loss dictionary provided
-            loss_func = loss.get(name,loss_func) if loss_func is None else loss_func()
+            loss_func = loss.get(name,loss_func) if loss_func is None else eval(loss_func+"()",{"torch":torch})
             # if failed get loss function from physics model defined functions
             loss_func = getattr(self.physics_model,name,loss_func) if loss_func is None else loss_func
 
@@ -399,6 +406,7 @@ class HarrisWilson_NN:
                                     "dim":np.prod(validation_data['total_cost_by_origin'].shape),
                                     "device":self.physics_model.device,
                                     key:value,
+                                    "dtype":eval_dtype(LOSS_KWARG_OPERATIONS[key]['dtype'], numpy_format=False),
                                     **LOSS_KWARG_OPERATIONS[key]['kwargs']
                                 },
                                 globals()
@@ -424,6 +432,7 @@ class HarrisWilson_NN:
                                     "dim":np.prod(validation_data[validation_dataset].shape),
                                     "device":self.physics_model.device,
                                     key:value,
+                                    "dtype":eval_dtype(LOSS_KWARG_OPERATIONS[key]['dtype'], numpy_format=False),
                                     **LOSS_KWARG_OPERATIONS[key]['kwargs']
                                 },
                                 globals()

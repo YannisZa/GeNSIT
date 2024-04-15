@@ -40,9 +40,7 @@ class HarrisWilson:
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
 
         # Store SIM and its config separately
         self.intensity_model = intensity_model
@@ -311,16 +309,6 @@ class HarrisWilson:
         self.logger.trace('Parsing parameters')
 
         # Parameters to learn
-        alpha = (
-            self.params.alpha
-            if 'alpha' not in list(self.params_to_learn.keys())
-            else free_parameters[self.params_to_learn["alpha"]]
-        )
-        beta = (
-            self.params.beta
-            if "beta" not in list(self.params_to_learn.keys())
-            else free_parameters[self.params_to_learn["beta"]]
-        )
         kappa = (
             self.params.kappa
             if "kappa" not in list(self.params_to_learn.keys())
@@ -380,9 +368,9 @@ class HarrisWilson:
         self,
         *,
         init_destination_attraction,
+        free_parameters:dict,
         n_iterations: int,
         dt: float = None,
-        free_parameters = None,
         requires_grad: bool = True,
         generate_time_series: bool = False,
         seed: int = None,
@@ -410,14 +398,15 @@ class HarrisWilson:
         dt = self.dt if dt is None else dt
 
         if not generate_time_series:
-            sizes = init_destination_attraction.clone()
+            sizes = init_destination_attraction.clone().unsqueeze(1)
+
 
             for _ in range(n_iterations):
                 # Compute log intensity
                 log_intensity_sample = self.intensity_model.log_intensity(
-                    log_destination_attraction = torch.log(sizes[-1]),
+                    log_destination_attraction = torch.log(sizes),
                     grand_total = torch.tensor(1.0),
-                    **dict(vars(self.params))
+                    **free_parameters
                 ).squeeze()
 
                 sizes = self.run_single(
@@ -426,16 +415,13 @@ class HarrisWilson:
                     dt = dt,
                     requires_grad = requires_grad,
                 )
-                sizes = torch.stack(sizes)
-
         else:
             sizes = [init_destination_attraction.clone()]
             for _ in range(n_iterations):
                 # Compute log intensity
                 log_intensity_sample = self.intensity_model.log_intensity(
                     log_destination_attraction = torch.log(sizes[-1]),
-                    grand_total = torch.tensor(1.0),
-                    **dict(vars(self.params))
+                    **free_parameters
                 ).squeeze()
 
                 sizes.append(

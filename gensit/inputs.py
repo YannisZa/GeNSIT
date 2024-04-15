@@ -20,8 +20,8 @@ from gensit.utils.math_utils import torch_optimize
 from gensit.harris_wilson_model import HarrisWilson
 from gensit.utils.probability_utils import random_vector
 from gensit.spatial_interaction_model import instantiate_sim
-from gensit.static.global_variables import INPUT_SCHEMA, NUMPY_TO_TORCH_DTYPE, PARAMETER_DEFAULTS,INPUT_SCHEMA,Dataset
-from gensit.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims
+from gensit.static.global_variables import INPUT_SCHEMA, PARAMETER_DEFAULTS,INPUT_SCHEMA, Dataset
+from gensit.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims, eval_dtype
 
 class Inputs:
     def __init__(
@@ -37,9 +37,7 @@ class Inputs:
             console_level = level, 
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
 
         # Store config
         self.config = config
@@ -296,7 +294,12 @@ class Inputs:
                             self.data,
                             input,
                             torch.reshape(
-                                torch.from_numpy(getattr(self.data,input)).to(dtype = NUMPY_TO_TORCH_DTYPE[schema['dtype']]),
+                                torch.from_numpy(
+                                    getattr(self.data,input)).to(dtype = eval_dtype(
+                                        schema['dtype'],
+                                        numpy_format = False
+                                    )
+                                ),
                                 tuple([self.data.dims[name] for name in schema["dims"]])
                             ).to(device)
                         )

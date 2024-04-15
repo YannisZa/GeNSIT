@@ -44,9 +44,7 @@ class SpatialInteraction():
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
         
     def export(self):
         pass
@@ -151,14 +149,14 @@ class SpatialInteraction2D(SpatialInteraction):
 
         return f"""
             {'x'.join([str(d) for d in self.dims.values()])} {self.name} Spatial Interaction Model
-            Origin demand sum: {torch.sum(self.origin_demand) if getattr(self,'origin_demand',None) is not None else None}
-            Destination demand sum: {torch.sum(self.destination_demand) if getattr(self,'destination_demand',None) is not None  else None}
-            Origin attraction sum: {torch.sum(torch.exp(self.log_origin_attraction)) if getattr(self,'log_origin_attraction',None) is not None  else None}
-            Destination attraction sum: {torch.sum(self.destination_attraction_ts) if getattr(self,'destination_attraction_ts',None) is not None  else None}
-            Cost matrix sum: {torch.sum(torch.ravel(self.cost_matrix)) if getattr(self,'cost_matrix',None) is not None else None}
-            Alpha: {self.alpha if getattr(self,'alpha',None) is not None else None}
-            Beta: {self.beta if getattr(self,'beta',None) is not None else None}
-            Beta scaling: {self.bmax if getattr(self,'bmax',None) is not None else None}
+            Origin demand sum: {torch.sum(self.data.origin_demand) if getattr(self.data,'origin_demand',None) is not None else None}
+            Destination demand sum: {torch.sum(self.data.destination_demand) if getattr(self.data,'destination_demand',None) is not None  else None}
+            Origin attraction sum: {torch.sum(torch.exp(self.data.log_origin_attraction)) if getattr(self.data,'log_origin_attraction',None) is not None  else None}
+            Destination attraction sum: {torch.sum(self.data.destination_attraction_ts) if getattr(self.data,'destination_attraction_ts',None) is not None else None}
+            Cost matrix sum: {torch.sum(torch.ravel(self.data.cost_matrix)) if getattr(self.data,'cost_matrix',None) is not None else None}
+            Alpha: {self.params.alpha if getattr(self.params,'alpha',None) is not None else None}
+            Beta: {self.params.beta if getattr(self.params,'beta',None) is not None else None}
+            Beta scaling: {self.params.bmax if getattr(self.params,'bmax',None) is not None else None}
         """
 
     def get_input_kwargs(self,passed_kwargs):
@@ -311,7 +309,7 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
         # Inherit sim-specific functions
         self.inherit_functions(ProductionConstrained)
 
-        # self.logger.info(('Building ' + self.__str__()))
+        self.logger.info(('Building ' + self.__str__()))
 
     def __repr__(self):
         return "ProductionConstrained(SpatialInteraction2D)"
@@ -347,8 +345,7 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
         
         # Inherit sim-specific functions
         self.inherit_functions(TotallyConstrained)
-
-        # self.logger.info(('Building ' + self.__str__()))
+        self.logger.info(('Building ' + self.__str__()))
 
     def __repr__(self):
         return "TotallyConstrained(SpatialInteraction2D)"

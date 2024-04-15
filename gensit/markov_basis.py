@@ -27,9 +27,7 @@ class MarkovBasis(object):
             
         ) if kwargs.get('logger',None) is None else kwargs['logger']
         # Update logger level
-        self.logger.setLevels(
-            console_level = level
-        )
+        self.logger.setLevels( console_level = level )
         
         # Enable/disable tqdm
         self.tqdm_disabled = not kwargs.get('monitor_progress',False)
