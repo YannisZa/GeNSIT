@@ -49,6 +49,7 @@
       "sweepable": false,
       "optional": true,
       "exclude": false,
+      "allow-nan": true,
       "dtype": "int",
       "default-value": 8,
       "valid-range": [1, 32]
@@ -945,15 +946,15 @@
 
       "sweep": {
         "default": {
-          "dtype": "int",
-          "default-value": 1,
-          "valid-range": [1, null]
+          "dtype": "float",
+          "default-value": 1.0,
+          "valid-range": [1.0, null]
         },
         "range": {
           "dtype": "list",
-          "list-length": [1, null],
-          "list-dtype": "int",
-          "default-value": 1
+          "default-value": 1.0,
+          "list-length": [1.0, null],
+          "list-dtype": "int"
         }
       }
     },

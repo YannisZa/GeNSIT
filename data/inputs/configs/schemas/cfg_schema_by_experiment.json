@@ -59,7 +59,10 @@
   "RSquared_Analysis": {
     "neural_network>exclude": true,
     "contingency_table>exclude": true,
-    "mcmc>exclude": true
+    "mcmc>exclude": true,
+    "training>to_learn>sweepable": false,
+    "training>to_learn>sweep>default>default-value": ["alpha", "beta"],
+    "training>to_learn>sweep>default>is-any-of": ["alpha", "beta"]
   },
   "LogTarget_Analysis": {
     "neural_network>exclude": true,
