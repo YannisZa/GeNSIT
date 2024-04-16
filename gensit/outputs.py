@@ -2532,7 +2532,6 @@ class OutputSummary(object):
             logger = self.logger
         )
         
-        print(indx)
         # Load all output data
         outputs.load(indx = indx)
 

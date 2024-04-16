@@ -14,9 +14,9 @@ seed = 1234
     [inputs.data.origin_demand]
       file = 'origin_demand_sum_normalised.txt'
     [inputs.data.destination_attraction_ts]
-      file ='destination_attraction_demand_ts_sum_normalised.txt'
+      file ='destination_attraction_housing_units_ts_sum_normalised.txt'
     [inputs.data.cost_matrix]
-      file = "cost_matrix_large_diagonal_max_normalised.txt"
+      file = "cost_matrix.txt"
     [inputs.data.ground_truth_table]
       file = 'ground_truth_table.txt'
 
@@ -27,9 +27,7 @@ seed = 1234
     axes = [[0],[1]]
 
 [spatial_interaction_model]
-  [spatial_interaction_model.name.sweep]
-    default = 'TotallyConstrained'
-    range = ['TotallyConstrained','ProductionConstrained']
+  name = 'ProductionConstrained'
   grand_total = +200029
   [spatial_interaction_model.parameters]
     bmax = +1.0

@@ -284,7 +284,7 @@ clear; gensit run ./data/inputs/configs/generic/experiment_r_squared.toml \
 
 ```
 clear; gensit summarise -dn DC/r_squared \
--d RSquared_Analysis_LowNoise__total_constrained_12_04_2024_19_34_17 \
+-d RSquared_Analysis_LowNoise_16_04_2024_18_01_20 \
 -e maxr2 "r2[arg_max]" \
 -e alpha "alpha_range[arg_max[0]]" \
 -e beta "beta_range[arg_max[1]]" \
