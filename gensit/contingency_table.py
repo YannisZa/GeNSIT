@@ -9,7 +9,7 @@ from pprint import pprint
 from pandas import DataFrame
 from itertools import product
 from tabulate import tabulate
-from torch import int32, uint8
+from torch import int32, float32
 from num2words import num2words
 from typing import List, Union, Callable
 

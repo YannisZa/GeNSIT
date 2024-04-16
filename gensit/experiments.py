@@ -809,7 +809,7 @@ class RSquared_Analysis(Experiment):
                 # try:
                 theta_sample[0] = alpha_val
                 theta_sample[1] = beta_val*self.physics_model.params.bmax
-                print(theta_sample)
+
                 # Get minimum
                 if self.method == 'potential':
                     x_pred = torch_optimize(
