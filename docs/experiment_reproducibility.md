@@ -279,7 +279,7 @@ clear; gensit plot simple scatter -y table_srmse -x loss_name --x_discrete  \
 
 ```
 clear; gensit run ./data/inputs/configs/generic/experiment_r_squared.toml \
--et RSquared_Analysis -d DC -gt 200029.0 -nt 2 -nt 12
+-et RSquared_Analysis -d DC -gt 200029.0 -nt 3 -nw 12
 ```
 
 ```
@@ -308,5 +308,5 @@ clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et SIM_NN 
 ```
 
 ```
-clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et NonJointTableSIM_NN -nt 6 -nw 5
+clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et NonJointTableSIM_NN -nt 6 -nw 1
 ```
