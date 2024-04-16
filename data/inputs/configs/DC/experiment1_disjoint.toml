@@ -16,7 +16,7 @@ seed = 1234
     [inputs.data.destination_attraction_ts]
       file ='destination_attraction_demand_ts_sum_normalised.txt'
     [inputs.data.cost_matrix]
-      file = "cost_matrix_large_diagonal_max_normalised.txt"
+      file = "cost_matrix_large_diagonal.txt"
     [inputs.data.ground_truth_table]
       file = 'ground_truth_table.txt'
 
@@ -159,4 +159,4 @@ seed = 1234
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'exp1'
-    title = '_doubly_and_cell_constrained'
+    title = '_doubly_and_cell_constrained_unnormalised_cost_matrix_large_diagonal'

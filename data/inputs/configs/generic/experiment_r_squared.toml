@@ -1,5 +1,5 @@
 log_level = 'info'
-sweep_mode = false
+sweep_mode = true
 
 [inputs]
 n_workers = +1
@@ -17,13 +17,13 @@ load_experiment = ''
     [inputs.data.destination_attraction_ts.file.sweep]
       default = 'destination_attraction_demand_ts_sum_normalised.txt'
       range = [
-        'destination_attraction_household_ts_sum_normalised.txt',
         'destination_attraction_demand_ts_sum_normalised.txt',
+        'destination_attraction_households_ts_sum_normalised.txt',
         'destination_attraction_housing_units_ts_sum_normalised.txt',
-        'destination_attraction_earnings_ts_sum_normalised.txt'
+        'destination_attraction_population_ts_sum_normalised.txt'
       ]
     [inputs.data.cost_matrix.file.sweep]
-      default = "cost_matrix_large_diagonal_sum_normalised.txt"
+      default = "cost_matrix_sum_normalised.txt"
       range = [
         "cost_matrix_sum_normalised.txt",
         "cost_matrix_large_diagonal_sum_normalised.txt"
@@ -31,14 +31,18 @@ load_experiment = ''
     
 
 [spatial_interaction_model]
-  name = 'TotallyConstrained'
   grand_total = +360600.0
+  [spatial_interaction_model.name.sweep]
+    default = 'TotallyConstrained'
+    range = ['TotallyConstrained','ProductionConstrained']
+    coupled = true
+    target_name = 'title'
   [spatial_interaction_model.parameters]
     alpha = +1.0
     beta = +1.0
     [spatial_interaction_model.parameters.bmax.sweep]
-      default = +10944.0
-      range = [1.0,10944.0,100000.0,1000000.0,10000000.0]
+      default = +1.0
+      range = [1.0,10944.0,100000.0,1000000.0]
 
 [harris_wilson_model]
   dt = +0.001
@@ -64,11 +68,11 @@ load_experiment = ''
   [experiments.grid_ranges.alpha]
     min = 0.001
     max = 2.0
-    n = 100
+    n = 30
   [experiments.grid_ranges.beta]
     min = 0.001
     max = 2.0
-    n = 100
+    n = 40
 
 [outputs]
     chunk_size = +20_000
@@ -76,4 +80,6 @@ load_experiment = ''
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'r_squared'
-    title = '_total_constrained'
+    [outputs.title.sweep]
+      default = '_total_constrained'
+      range = ['_total_constrained','_row_constrained']
