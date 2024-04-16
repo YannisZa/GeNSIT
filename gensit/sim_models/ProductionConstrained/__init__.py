@@ -40,27 +40,22 @@ def sde_pot(**kwargs):
     delta = kwargs['delta']
     kappa = kwargs['kappa']
     sigma = kwargs['sigma']
-    gamma = 2 / (sigma**2)
     epsilon = kwargs['epsilon']
     log_destination_attraction = kwargs['log_destination_attraction']
     
     # Compute log unnormalised expected flow
     log_utility = alpha*log_destination_attraction - beta*cost_matrix
     # Compute log normalisation factor
-    log_normalisation = torch.logsumexp(log_utility.ravel(),dim = 0)
-    
-    # Extract dimensions and reshape quantities
-    origin = cost_matrix.size(dim = 0)
-    origin_demand = torch.reshape(origin_demand,(origin,1))
+    log_normalisation = torch.logsumexp(log_utility,dim = 0)
 
     # Compute potential
     if alpha == 0:
-        potential = -float('inf')
+        potential = torch.tensor(-float('inf'))
     else:
         potential = -(1./alpha)*torch.dot(origin_demand,log_normalisation)
         potential += kappa*(torch.exp(log_destination_attraction)).sum() - delta*torch.sum(log_destination_attraction)
-        potential *= gamma*epsilon
-    
+        potential *= (2* epsilon) / (sigma**2)
+
     return potential
 
 def sde_pot_jacobian(**kwargs):
