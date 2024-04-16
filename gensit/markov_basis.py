@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from torch import int32
+from joblib import Parallel, delayed
 from tqdm.auto import tqdm
 from typing import Dict,Tuple,List
 
@@ -30,10 +31,13 @@ class MarkovBasis(object):
         self.logger.setLevels( console_level = level )
         
         # Enable/disable tqdm
-        self.tqdm_disabled = not kwargs.get('monitor_progress',False)
+        self.tqdm_disabled = False#not kwargs.get('monitor_progress',False)
 
         # Get contingency table
         self.ct = ct
+
+        # Get number of workers
+        self.n_threads = self.ct.config['inputs'].get('n_threads',1)
         
         # Raise implementation error if more constraints are provided than implemented
         if ndims(self.ct) > 2:
@@ -70,7 +74,8 @@ class MarkovBasis(object):
             self.logger.debug('Checking Markov Basis validity...')
             # Check that all basis are admissible
             try:
-                # assert self.check_markov_basis_validity()
+                # This is too Slowwww...
+                # assert self.check_markov_basis_validity_sequentially()
                 assert True
             except:
                 self.logger.error(f"Invalid Markov bases functions found.")
@@ -115,15 +120,31 @@ class MarkovBasis(object):
                 (torch.any(tab)) and \
                 torch.all(self.ct.table_cell_constraint_summary_statistic(full_tab)==0)
         
-    def check_markov_basis_validity(self) -> bool:
+    def check_markov_basis_validity_sequentially(self) -> bool:
         for i in tqdm(
             range(len(self.basis_dictionaries)),
             disable = self.tqdm_disabled,
+            desc = 'Checking Markov Basis validity sequentially',
             leave = False
         ):
-            if not self.basis_function_admissible(self.basis_dictionaries[i]):
+            if not self.check_markov_basis_validity(i):
                 return False
         return True
+
+    def check_markov_basis_validity_concurrently(self) -> bool:
+        return np.all(list(
+            Parallel(n_jobs = self.n_threads)(
+                delayed(self.check_markov_basis_validity)(i) for i in tqdm(
+                    range(len(self.basis_dictionaries)),
+                    disable = self.tqdm_disabled,
+                    desc = 'Checking Markov Basis validity concurrently',
+                    leave = False
+                )
+            )
+        ))
+
+    def check_markov_basis_validity(self,index) -> bool:
+        return self.basis_function_admissible(self.basis_dictionaries[index])
 
     def random_basis_function(self) -> pd.DataFrame:
         return f_to_df(self.basis_dictionaries[np.random.choice(range(len(self.basis_dictionaries)))])
@@ -152,12 +173,14 @@ class MarkovBasis(object):
 
         # Get all cells in lexicographic order (order first by row and then by col index)
         sorted_cells = sorted(self.ct.cells)
+        sorted_cells_set = set(sorted_cells)
 
         # Loop through each pair combination and keep only ones that don't share a row OR column
         for index,tup1 in tqdm(
             enumerate(sorted_cells),
             total = len(sorted_cells),
             disable = self.tqdm_disabled,
+            desc = 'Generating one margin Markov Basis cells',
             leave = False
         ):
             # Get all active candidate cells
@@ -166,7 +189,10 @@ class MarkovBasis(object):
                 inactive_candidate_cells = self.active_candidates(tup1,sorted_cells[(index+1):])
             # Loop through inactive candidates
             for tup2 in inactive_candidate_cells:
-                basis_cells.append((tup1,tup2))
+                # Every cell in the proposed basis should be entirely contained
+                # in the list of available (free) cells.
+                if set([tup1,tup2]).issubset(sorted_cells_set):
+                    basis_cells.append((tup1,tup2))
 
         # Define set of Markov bases
         # self.basis_functions = []
@@ -176,11 +202,13 @@ class MarkovBasis(object):
         for index in tqdm(
             range(len(basis_cells)),
             disable = self.tqdm_disabled,
+            desc = 'Generating one margin Markov Basis functions',
             leave = False
         ):
-            # Make sure that no cell in the basis is a constrained cell
-            if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
-                continue
+            # This is commented out because it checked in the previous loop
+            # # Make sure that no cell in the basis is a constrained cell
+            # if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
+            #     continue
             
             # Construct Markov basis function
             def make_f_i(findex):
@@ -204,36 +232,49 @@ class MarkovBasis(object):
 
         # Get all cells in lexicographic order (order first by row and then by col index)
         sorted_cells = sorted(self.ct.cells)
+        sorted_cells_set = set(sorted_cells)
+
+        self.logger.info(f"{len(sorted_cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(sorted_cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
 
         # Loop through each pair combination and keep only ones that don't share a row OR column
-        for index,tup1 in tqdm(
-            enumerate(sorted_cells),
+        for index,tup1 in enumerate(tqdm(
+            sorted_cells,
             total = len(sorted_cells),
             disable = self.tqdm_disabled,
+            desc = 'Generating both margin Markov Basis cells',
             leave = False
-        ):
+        )):
             # Get all active candidate cells
-            inactive_candidate_cells = []
+            active_candidate_cells = []
             if index < len(sorted_cells)-1:
-                inactive_candidate_cells = self.active_candidates(tup1,sorted_cells[(index+1):])
-            # Loop through inactive candidates
-            for tup2 in inactive_candidate_cells:
-                basis_cells.append((tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])))
+                active_candidate_cells = self.active_candidates(tup1,sorted_cells[(index+1):])
+            # Loop through active candidates
+            for tup2 in active_candidate_cells:
+                # Every cell in the proposed basis should be entirely contained
+                # in the list of available (free) cells.
+                if set([tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])]).issubset(sorted_cells_set):
+                    basis_cells.append((tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])))
+        
+        self.logger.info(f"{len(basis_cells)} basis functions found")
 
         # Define set of Markov bases
-        # self.basis_functions = []
         self.basis_dictionaries = []
         # Define active cells i.e. cells of a basis function that map to non-zero values
         self.basis_active_cells = []
         for index in tqdm(
             range(len(basis_cells)),
             disable = self.tqdm_disabled,
+            desc = 'Generating both margin Markov Basis functions',
             leave = False
         ):
+            # self.logger.progress('Checking cell admissibility')
+            # This is commented out because it checked in the previous loop
             # Make sure that no cell in the basis is a constrained cell
-            if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
-                continue
-
+            # if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
+            #     print('inadmissible basis function found')
+            #     continue
+            
+            # self.logger.progress('Defining generating function')
             # Construct Markov basis function
             def make_f_i(findex):
                 def f_i(x):
@@ -241,7 +282,9 @@ class MarkovBasis(object):
                         int(x == (basis_cells[findex][0][0],basis_cells[findex][1][1]) or x == (basis_cells[findex][1][0],basis_cells[findex][0][1]))
                 return f_i
             # Make function
+            # self.logger.progress('Generating function')
             my_f_i = make_f_i(index)
+            # self.logger.progress('Converting function to dictionary \n')
             my_f_i_dict = dict(zip(basis_cells[index],list(map(my_f_i, basis_cells[index]))))
 
             # Update cells that map to non-zero values (i.e. active cells)
