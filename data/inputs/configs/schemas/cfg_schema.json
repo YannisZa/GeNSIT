@@ -857,6 +857,13 @@
     "optional": true,
     "exclude": false,
 
+    "disable_tqdm": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+      "dtype": "bool",
+      "default-value": true
+    },
     "sparse_margins": {
       "sweepable": false,
       "optional": true,
@@ -1428,7 +1435,6 @@
       "sweepable": false,
       "optional": true,
       "exclude": false,
-
       "table_steps": {
         "sweepable": true,
         "optional": true,

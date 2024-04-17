@@ -153,6 +153,7 @@
     }
   },
   "contingency_table": {
+    "disable_tqdm": true,
     "sparse_margins": true,
     "constraints": {
       "axes": {
