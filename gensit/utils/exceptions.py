@@ -101,7 +101,7 @@ class DataConflict(DataException):
         """
 
 class IrregularDataCollectionSize(DataCollectionException):
-    def __init__(self,message:str,sizes:dict={},**kwargs):
+    def __init__(self,message:str='',sizes:dict={},**kwargs):
         super().__init__(message)
         self.sizes = sizes
 
