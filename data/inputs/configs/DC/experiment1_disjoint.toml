@@ -15,13 +15,13 @@ seed = 1234
       file = 'origin_demand_sum_normalised.txt'
     [inputs.data.destination_attraction_ts]
       file ='destination_attraction_housing_units_ts_sum_normalised.txt'
-    [inputs.data.cost_matrix.file.sweep]
-      default = "cost_matrix.txt"
-      range = ["cost_matrix.txt","cost_matrix_max_normalised.txt"]
+    [inputs.data.cost_matrix]
+      file = "cost_matrix_max_normalised.txt"
     [inputs.data.ground_truth_table]
       file = 'ground_truth_table.txt'
 
 [contingency_table]
+  disable_tqdm = true
   sparse_margins = false
   [contingency_table.constraints]
     cells = 'zero_and_train_cells.txt'
@@ -51,7 +51,6 @@ seed = 1234
     range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
     coupled = true
     target_name = 'sigma'
-  
 
 [mcmc]
     disable_tqdm = true
@@ -87,28 +86,11 @@ seed = 1234
 
 [neural_network]
   disable_tqdm = true
-  [neural_network.loss.loss_name.sweep]
-    default = ['dest_attraction_ts_loss']
-    range = [
-      ['dest_attraction_ts_loss'],
-      ['dest_attraction_ts_likelihood_loss']
-    ]
-  [neural_network.loss.loss_function.sweep]
-    default = ['mseloss']
-    range = [
-      ['mseloss'],
-      ['custom']
-    ]
-    coupled = true
-    target_name = 'loss_name'
-  [neural_network.loss.loss_kwargs.sweep]
-    coupled = true
-    target_name = 'loss_name'
-    [neural_network.loss.loss_kwargs.sweep.default]
+  [neural_network.loss]
+    loss_name = ['dest_attraction_ts_likelihood_loss']
+    loss_function = ['custom']
+    [neural_network.loss.loss_kwargs]
       nokey = nan
-    [[neural_network.loss.loss_kwargs.sweep.range]]
-      nokey = nan
-    [[neural_network.loss.loss_kwargs.sweep.range]]
       noise_percentage = nan
   [neural_network.hyperparameters]
     num_layers = +1
