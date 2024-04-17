@@ -10,6 +10,7 @@ data/outputs/**
 tests/test_outputs/**
 notebooks/logs/**
 notebooks/data/**
+data/inputs/temp/**
 
 # Files
 *temp*.log
