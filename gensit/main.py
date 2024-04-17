@@ -186,7 +186,7 @@ def create(
     # Remove all nulls
     settings = {k: v for k, v in settings.items() if v is not None}
     # Capitalise all single-letter arguments
-    settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
+    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
 
     # Update settings
     settings = update_settings(settings)
@@ -402,7 +402,7 @@ def run(
     # Remove empty lists
     settings = {k: v for k, v in settings.items() if not hasattr(v,'__len__') or (hasattr(v,'__len__') and len(v) > 0)}
     # Capitalise all single-letter arguments
-    settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
+    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
     
     # Update settings
     settings = update_settings(settings)
@@ -776,7 +776,7 @@ def plot(
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
     
     # Capitalise all single-letter arguments
-    settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
+    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
     
     # Add context arguments
     undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
@@ -863,7 +863,7 @@ def summarise(
     # Gather all options in dictionary
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
     # Capitalise all single-letter arguments
-    settings = {(key if len(key) == 1 else key):value for key, value in settings.items()}
+    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
     # Add context arguments
     undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
 
