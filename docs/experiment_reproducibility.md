@@ -308,5 +308,5 @@ clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et SIM_NN 
 ```
 
 ```
-clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et NonJointTableSIM_NN -nt 6 -nw 1
+clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et NonJointTableSIM_NN -nt 6 -nw 4
 ```
