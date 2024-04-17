@@ -25,16 +25,16 @@ class MarkovBasis(object):
         self.logger = setup_logger(
             __name__,
             console_level = level,
-            
         ) if kwargs.get('logger',None) is None else kwargs['logger']
+        
         # Update logger level
         self.logger.setLevels( console_level = level )
         
-        # Enable/disable tqdm
-        self.tqdm_disabled = False#not kwargs.get('monitor_progress',False)
-
         # Get contingency table
         self.ct = ct
+        
+        # Enable/disable tqdm
+        self.tqdm_disabled = self.ct.config['contingency_table'].get('disable_tqdm',True)
 
         # Get number of workers
         self.n_threads = self.ct.config['inputs'].get('n_threads',1)
@@ -234,7 +234,7 @@ class MarkovBasis(object):
         sorted_cells = sorted(self.ct.cells)
         sorted_cells_set = set(sorted_cells)
 
-        self.logger.info(f"{len(sorted_cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(sorted_cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
+        self.logger.progress(f"{len(sorted_cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(sorted_cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
 
         # Loop through each pair combination and keep only ones that don't share a row OR column
         for index,tup1 in enumerate(tqdm(
@@ -255,7 +255,7 @@ class MarkovBasis(object):
                 if set([tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])]).issubset(sorted_cells_set):
                     basis_cells.append((tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])))
         
-        self.logger.info(f"{len(basis_cells)} basis functions found")
+        self.logger.progress(f"{len(basis_cells)} basis functions found")
 
         # Define set of Markov bases
         self.basis_dictionaries = []
