@@ -1084,18 +1084,14 @@ def h5_deep_get(name,group,prefix=''):
                 if name == key:
                     yield path
 
-def broadcast(arr,shape):
+def broadcast2d(arr,shape,expanded_axis):
     # Squeeze array
     arr = np.squeeze(arr)
-    # Figure out repetitions
-    axes = [i for i in range(len(shape)) if shape[i] not in list(arr.shape)]
     # Expand dims
-    arr_reshaped = np.expand_dims(arr,axis = axes)
-    for ax in axes:
-        # Repeat along axis
-        arr_reshaped = np.repeat(arr_reshaped,shape[ax],axis = ax)
-
-    return arr_reshaped
+    arr_reshaped = np.expand_dims(arr,axis = expanded_axis)
+    # Repeat along axis
+    arr_reshaped = np.repeat(arr_reshaped,shape[expanded_axis],axis = expanded_axis)
+    return arr_reshaped.reshape(shape)
 
 def expand_tuple(t):
     result = []
