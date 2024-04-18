@@ -1,0 +1,90 @@
+log_level = 'info'
+sweep_mode = true
+
+[inputs]
+n_workers = +1
+n_threads = +6
+device = 'cpu'
+in_directory = './data/inputs/'
+dataset = 'DC'
+load_experiment = ''
+seed = 1234
+
+[inputs.data]
+    [inputs.data.origin_demand]
+      file = 'origin_demand_sum_normalised.txt'
+    [inputs.data.destination_attraction_ts]
+      file ='destination_attraction_housing_units_ts_sum_normalised.txt'
+    [inputs.data.cost_matrix]
+      file = "cost_matrix_max_normalised.txt"
+    [inputs.data.ground_truth_table]
+      file = 'ground_truth_table.txt'
+
+[spatial_interaction_model]
+  name = 'ProductionConstrained'
+  grand_total = +200029
+  [spatial_interaction_model.parameters]
+    bmax = +1.0
+  
+[harris_wilson_model]
+  dt = +0.001
+  [harris_wilson_model.parameters]
+    noise_percentage = +3.0
+    epsilon = 1.0
+    sigma = 0.0141421356
+
+[training]
+  num_steps = +1
+  batch_size = +1
+  N = 100000
+  to_learn = ['alpha', 'beta']
+
+[mcmc]
+    disable_tqdm = false
+    mcmc_workers = +1
+
+    [mcmc.contingency_table]
+      table_steps = +1
+      table0 = 'maximum_entropy_solution'
+      margin0 = 'multinomial'
+      proposal = 'degree_higher'
+    
+    [mcmc.parameters]
+      theta_steps = 1
+      step_size = 1.0
+      covariance = [[0.0149674,0.00182529],[0.00182529,0.0109968]]
+        
+    [mcmc.destination_attraction]
+      log_destination_attraction_steps = 1
+      leapfrog_steps = 3#10
+      leapfrog_step_size = 0.01 #0.02
+      ais_leapfrog_steps = 3#10
+      ais_leapfrog_step_size = 0.2#0.1
+      ais_samples = 10
+      n_bridging_distributions = 50
+
+[[experiments]]
+  type = 'SIM_MCMC'
+  comment = 'Spatial Interaction Model parameter learning using Markov Chain Monte Carlo'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[[experiments]]
+  type = 'JointTableSIM_MCMC'
+  comment = 'Joint Table and Spatial Interaction Model parameter learning using Markov Chain Monte Carlo'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[outputs]
+    chunk_size = +20_000
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/'
+    out_group = 'exp1'
+    title = '_doubly_and_cell_constrained'

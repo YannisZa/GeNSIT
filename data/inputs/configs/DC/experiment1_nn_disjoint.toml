@@ -53,36 +53,11 @@ seed = 1234
     target_name = 'sigma'
 
 [mcmc]
-    disable_tqdm = true
-    mcmc_workers = +1
-    
     [mcmc.contingency_table]
       table_steps = +1
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
       proposal = 'degree_higher'
-      
-    [mcmc.parameters]
-      theta_steps = 1
-      step_size = 1.0
-      [mcmc.parameters.covariance.sweep]
-        default = [[0.0149674,0.00182529],[0.00182529,0.0109968]]
-        range = [
-          [[0.0149674,0.00182529],[0.00182529,0.0109968]],
-          [[1.0,0.0],[0.0,1.0]],
-          [[1.0,0.0],[0.0,1.0]]
-        ]
-        coupled = true
-        target_name = 'sigma'
-        
-    [mcmc.destination_attraction]
-      log_destination_attraction_steps = 1
-      leapfrog_steps = 3#10
-      leapfrog_step_size = 0.01 #0.02
-      ais_leapfrog_steps = 3#10
-      ais_leapfrog_step_size = 0.2#0.1
-      ais_samples = 10
-      n_bridging_distributions = 50
 
 [neural_network]
   disable_tqdm = true
@@ -125,14 +100,6 @@ seed = 1234
   overwrite = true
   validate_samples = false
 
-[[experiments]]
-  type = 'SIM_MCMC'
-  comment = 'Spatial Interaction Model parameter learning using Markov Chain Monte Carlo'
-  disable_tqdm = false
-  export_samples = true
-  export_metadata = true
-  overwrite = true
-  validate_samples = false
 
 [outputs]
     chunk_size = +20_000
