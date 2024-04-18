@@ -304,9 +304,31 @@ clear; gensit summarise -dn DC/r_squared \
 ### NN
 
 ```
-clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et SIM_NN -nt 6 -nw 5
+clear; gensit run ./data/inputs/configs/DC/experiment1_nn_disjoint.toml -et SIM_NN -nt 6 -nw 5
 ```
 
 ```
-clear; gensit run ./data/inputs/configs/DC/experiment1_disjoint.toml -et NonJointTableSIM_NN -nt 6 -nw 4
+clear; gensit run ./data/inputs/configs/DC/experiment1_nn_disjoint.toml -et NonJointTableSIM_NN -nt 6 -nw 4
+```
+
+```
+clear; gensit run ./data/inputs/configs/DC/experiment1_nn_joint.toml -et JointTableSIM_NN -nt 6 -nw 4
+```
+
+### MCMC
+
+```
+clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_low_noise.toml -et SIM_MCMC -nt 12 -nw 1 -n 20000
+```
+
+```
+clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_high_noise.toml -et SIM_MCMC -nt 12 -nw 1 -n 50000
+```
+
+```
+clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_low_noise.toml -et JointTableSIM_MCMC -nt 12 -nw 1 -n 20000
+```
+
+```
+clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_high_noise.toml -et JointTableSIM_MCMC -nt 12 -nw 1 -n 20000
 ```
