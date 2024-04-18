@@ -75,7 +75,7 @@ class HarrisWilson:
         # kwargs or parameter defaults
         self.params_to_learn = {}
         for i,param in enumerate(self.config.settings['training']['to_learn']):
-            self.params_to_learn[param] = i#PARAMETER_DEFAULTS[param]
+            self.params_to_learn[param] = PARAMETER_DEFAULTS[param]
 
         # Fixed hyperparameters
         self.params = Dataset()
