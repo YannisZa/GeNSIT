@@ -74,6 +74,15 @@ seed = 1234
   overwrite = true
   validate_samples = false
 
+[[experiments]]
+  type = 'JointTableSIM_MCMC'
+  comment = 'Joint Table and Spatial Interaction Model parameter learning using Markov Chain Monte Carlo'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
 [outputs]
     chunk_size = +20_000
     write_start = +1
