@@ -316,7 +316,11 @@ class Experiment(object):
                         except:
                             self.logger.warning("Theta could not be initialised.")
                 self.params_to_learn = list(theta.keys())
-                initialisations['theta'] = torch.tensor(list(theta.values()),dtype = float32,device = self.device)
+                initialisations['theta'] = torch.tensor(
+                    [PARAMETER_DEFAULTS[t] for t in self.params_to_learn],
+                    dtype = float32,
+                    device = self.device
+                )
                 
             elif param == 'log_destination_attraction':
                 # Arbitrarily initialise destination attraction
