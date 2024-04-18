@@ -85,7 +85,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
                 )
                 self.ct.config['markov_basis_len'] = int(len(self.markov_basis))
 
-        # self.logger.info(self.__str__())
+        self.logger.debug(self.__str__())
 
     def __str__(self):
         return f"""
@@ -634,6 +634,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # Note that this form is a simplified version of the ratio 
         # of odds ratios for the four table cells that have been changed
         omega = torch.exp(log_odds_cross_ratio(log_intensity, *positive_cells))
+        
         # Convert infinities to value
         if (not torch.isfinite(omega)) & (omega > 0):
             omega = 1e6
@@ -641,12 +642,14 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             omega = 1e-6
         else:
             omega = omega.cpu().detach().numpy()
+            # Make sure omega is not too large to cause numerical overflow
+            omega = omega if omega < 1e6 else np.float32(1e6)
 
         # Get row and column sums of 2x2 subtable
         rsum = np.int32(tab_prev[non_zero_cells[0]] + tab_prev[non_zero_cells[1]])
         csum = np.int32(tab_prev[non_zero_cells[0]] + tab_prev[non_zero_cells[2]])
-        total = np.sum([np.int32(tab_prev[non_zero_cells[i]]) for i in range(len(non_zero_cells))])
-
+        total = np.sum([np.int32(tab_prev[non_zero_cells[i]]) for i in range(len(non_zero_cells))],dtype='int32')
+        
         # Sample upper leftmost entry of 2x2 subtable from non-central hypergeometric distribution
         new_val = nchypergeom_fisher.rvs(M = total, n = rsum, N = csum, odds = omega)
 
@@ -656,11 +659,6 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         tab_new[non_zero_cells[2]] = torch.tensor(csum - new_val,dtype = float32)
         tab_new[non_zero_cells[3]] = torch.tensor(total - rsum - csum + new_val,dtype = float32)
         
-        # non_zero_cells = np.array(non_zero_cells)
-        # non_zero_indices = [non_zero_cells[:,i] for i in range(ndims(self.ct))]
-        # print(tab_new[non_zero_indices]-tab_prev[non_zero_indices])
-        # print('\n')
-
         return tab_new.to(device = self.ct.device,dtype = float32), \
             None, \
             self.markov_basis.basis_dictionaries[func_index], \
@@ -730,7 +728,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             # Add range of values between numerator and denominator to numerator (if table_new > table_prev) in the denominator
             # Note: addition in the denominator happens because the target measure has a power of -1 in the factorial
             # or to denominator (if table_new < table_prev)
-            # # Add odds ratio of intensities to numerator
+            # Add odds ratio of intensities to numerator
             if log_intensity is not None:
                 # Note that this form is a simplified version of the ratio 
                 # of odds ratios for the four table cells that have been changed
