@@ -56,6 +56,9 @@ class HarrisWilson_MCMC(object):
         # Device name
         self.device = self.config['inputs']['device']
 
+        # Tqdm flag
+        self.tqdm_disabled = self.config['mcmc'].get('disable_tqdm',True)
+
         # Stopping times
         self.stopping_times = None
         self.stopping_times_directory = None
@@ -431,11 +434,9 @@ class HarrisWilson_MCMC(object):
     ):
         # Run experiments in parallel
         ctx = mp.get_context('spawn')
-        # pbar = tqdm(total = N, desc='Running AIS in parallel',leave = False)
-
         kwargs['semaphore'] = None
-        # kwargs['pbar'] = pbar
         results = []
+        
         # Create partial function by fixing all kwargs
         annealed_importance_sampling_log_z_expanded_partial = partial(
             self.annealed_importance_sampling_log_z_expanded,
@@ -443,13 +444,15 @@ class HarrisWilson_MCMC(object):
         )
 
         with ctx.Pool(min(self.mcmc_workers,N)) as p:
-            for res in p.imap_unordered(
-                annealed_importance_sampling_log_z_expanded_partial,
-                range(N)
+            for res in tqdm(
+                p.imap_unordered(
+                    annealed_importance_sampling_log_z_expanded_partial,
+                    range(N)
+                ),
+                disable = self.tqdm_disabled,
+                desc = 'Unbiased Z inverse (in parallel)'
             ):
                 results.append(res)
-
-        # pbar.close()
 
         return torch.tensor(results)
 
@@ -471,13 +474,20 @@ class HarrisWilson_MCMC(object):
         Ndests = self.physics_model.intensity_model.dims['destination']
         g = np.log(self.physics_model.params.delta.item())*np.ones((Ndests,Ndests)) - np.log(self.physics_model.params.delta.item())*np.eye(Ndests) + np.log(1+self.physics_model.params.delta.item())*np.eye(Ndests)
         g = g.astype('float32')
-
         # Get minimum across different initialisations in parallel
         if self.mcmc_workers > 1:
-            xs = list(Parallel(n_jobs = self.mcmc_workers)(delayed(torch_optimize_partial)(g[i,:]) for i in range(Ndests)))
+            xs = list(Parallel(n_jobs = self.mcmc_workers)(delayed(torch_optimize_partial)(g[i,:]) for i in tqdm(
+                range(Ndests),
+                disable = self.tqdm_disabled,
+                desc = 'Biased Z inverse (in parallel)'
+            )))
         else:
             # Get minimum across different initialisations in parallel
-            xs = [torch_optimize_partial(g[i,:]) for i in range(Ndests)]
+            xs = [torch_optimize_partial(g[i,:]) for i in tqdm(
+                range(Ndests),
+                disable = self.tqdm_disabled,
+                desc = 'Biased Z inverse (in sequence)'
+            )]
 
         # Compute potential
         fs = np.asarray([
@@ -523,7 +533,7 @@ class HarrisWilson_MCMC(object):
         # log_likelihood_values[i, j] = -lap - si.sde_potential_and_gradient(xd,theta)[0]
 
         # Return array
-        ret = torch.empty(2,dtype = float32,device = self.device)
+        ret = torch.empty(2, dtype = float32,device = self.device)
         # Log z(\theta) without the constant (2\pi\gamma^{-1})^{M/2}
         ret[0] = minimum_potential + half_log_det_A
         # self.physics_model.sde_potential_and_gradient(minimum,theta)[0] +  half_log_det_A
@@ -568,7 +578,11 @@ class HarrisWilson_MCMC(object):
         else:
             log_weights = []
             self.logger.debug(f"annealed_importance_sampling_log_z_partial")
-            for i in range(N+1):
+            for i in tqdm(
+                range(N+1),
+                disable = self.tqdm_disabled,
+                desc = 'Unbiased Z inverse (in sequence)'
+            ):
                 log_weights.append(self.annealed_importance_sampling_log_z(
                     i,
                     ais_samples = int(self.destination_attraction_ais_samples),
