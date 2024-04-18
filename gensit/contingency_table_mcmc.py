@@ -14,7 +14,7 @@ from gensit.utils.math_utils import log_factorial_sum
 from gensit.markov_basis import instantiate_markov_basis,MarkovBasis
 from gensit.contingency_table import ContingencyTable, ContingencyTable2D
 from gensit.utils.probability_utils import uniform_binary_choice, log_odds_cross_ratio
-from gensit.utils.misc_utils import  ndims, set_seed, setup_logger, tuplize, flatten, unpack_dims
+from gensit.utils.misc_utils import  ndims, set_seed, setup_logger, tuplize, flatten, unpack_dims, safe_cast
 
 
 class ContingencyTableMarkovChainMonteCarlo(object):
@@ -635,23 +635,32 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # of odds ratios for the four table cells that have been changed
         omega = torch.exp(log_odds_cross_ratio(log_intensity, *positive_cells))
         
-        # Convert infinities to value
-        if (not torch.isfinite(omega)) & (omega > 0):
-            omega = 1e6
-        elif (omega == 0):
-            omega = 1e-6
-        else:
-            omega = omega.cpu().detach().numpy()
-            # Make sure omega is not too large to cause numerical overflow
-            omega = omega if omega < 1e6 else np.float32(1e6)
-
+        # Cast torch to numpy safely within specified range to 
+        # prevent over or underflow 
+        omega = safe_cast(
+            omega,
+            minval = np.float32(1e-6),
+            maxval = np.float32(1e6)
+        )
+        
         # Get row and column sums of 2x2 subtable
         rsum = np.int32(tab_prev[non_zero_cells[0]] + tab_prev[non_zero_cells[1]])
         csum = np.int32(tab_prev[non_zero_cells[0]] + tab_prev[non_zero_cells[2]])
         total = np.sum([np.int32(tab_prev[non_zero_cells[i]]) for i in range(len(non_zero_cells))],dtype='int32')
         
         # Sample upper leftmost entry of 2x2 subtable from non-central hypergeometric distribution
-        new_val = nchypergeom_fisher.rvs(M = total, n = rsum, N = csum, odds = omega)
+        try:
+            new_val = nchypergeom_fisher.rvs(M = total, n = rsum, N = csum, odds = omega)
+        except:
+            new_val = 0
+            print('\n')
+            print('omega',omega)
+            print('total',total)
+            print('rsum',rsum)
+            print('csum',csum)
+            print('non_zero_cells',non_zero_cells)
+            print('markov_basis',self.markov_basis.basis_dictionaries[func_index])
+            print('tab_prev',[tab_new[c] for c in non_zero_cells])
 
         # Update upper leftmost entry and propagate to rest of cells
         tab_new[non_zero_cells[0]] = torch.tensor(new_val).to(device = self.ct.device,dtype = float32)
