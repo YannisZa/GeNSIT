@@ -1179,7 +1179,7 @@ class SIM_MCMC(Experiment):
         
         self.logger.note(f"{self.learning_model}")
         self.logger.info(f"Experiment: {self.outputs.experiment_id}")
-        self.logger.critical(f"{json.dumps(kwargs.get('sweep',{}),indent = 2)}")
+        # self.logger.critical(f"{json.dumps(kwargs.get('sweep',{}),indent = 2)}")
 
         
     def run(self,**kwargs) -> None:
