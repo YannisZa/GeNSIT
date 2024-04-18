@@ -16,7 +16,7 @@ seed = 1234
     [inputs.data.destination_attraction_ts]
       file ='destination_attraction_housing_units_ts_sum_normalised.txt'
     [inputs.data.cost_matrix]
-      file = "cost_matrix.txt"
+      file = "cost_matrix_max_normalised.txt"
     [inputs.data.ground_truth_table]
       file = 'ground_truth_table.txt'
 
@@ -35,7 +35,7 @@ seed = 1234
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
-    noise_percentage = +3.0 #+0.01
+    noise_percentage = +0.01
     epsilon = 1.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356

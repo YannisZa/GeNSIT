@@ -140,4 +140,4 @@ seed = 1234
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'exp1'
-    title = '_doubly_and_cell_constrained_unnormalised_cost_matrix'
+    title = '_doubly_and_cell_constrained'
