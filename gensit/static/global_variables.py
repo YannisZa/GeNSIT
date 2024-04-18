@@ -21,8 +21,8 @@ def deep_walk(indict, pre = None):
 
 
 PARAMETER_DEFAULTS = {
-    "alpha": 1, 
-    "beta": 0, 
+    "alpha": 0.5, 
+    "beta": 0.5, 
     "delta": 0.1,
     "kappa": 2, 
     "epsilon": 1,
