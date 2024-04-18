@@ -1,5 +1,5 @@
 log_level = 'info'
-sweep_mode = true
+sweep_mode = false
 
 [inputs]
 n_workers = +1
@@ -19,6 +19,13 @@ seed = 1234
       file = "cost_matrix_max_normalised.txt"
     [inputs.data.ground_truth_table]
       file = 'ground_truth_table.txt'
+
+[contingency_table]
+  disable_tqdm = true
+  sparse_margins = false
+  [contingency_table.constraints]
+    cells = 'zero_and_train_cells.txt'
+    axes = [[+0],[+1]]
 
 [spatial_interaction_model]
   name = 'ProductionConstrained'

@@ -99,7 +99,7 @@ class ContingencyTable(object):
         # Build contingency table
         if config is not None:
             # Store flag for whether to allow sparse margins or not
-            self.sparse_margins = self.config.settings['contingency_table'].get('sparse_margins',False)
+            self.sparse_margins = self.config['contingency_table'].get('sparse_margins',False)
             # Read tabular data
             self.import_tabular_data()
 

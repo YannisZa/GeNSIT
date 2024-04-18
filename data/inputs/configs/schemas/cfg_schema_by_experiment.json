@@ -35,9 +35,7 @@
     "harris_wilson_model>parameters>sigma>sweep>default>allow-nan": false,
     "harris_wilson_model>parameters>sigma>sweep>range>allow-nan": false,
     "neural_network>exclude": true,
-    "experiments>0>grid_ranges>exclude": true,
-    "mcmc>parameters>exclude": true,
-    "mcmc>destination_attraction>exclude": true
+    "experiments>0>grid_ranges>exclude": true
   },
   "SIM_NN": {
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
