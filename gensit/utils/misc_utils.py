@@ -1533,3 +1533,15 @@ def cmap_exists(name):
     except:
         return False
     return True
+
+def safe_cast(x,minval:float=np.float32(1e-6),maxval:float=np.float32(1e6)):
+    # Convert infinities to value
+    try:
+        x = x.cpu().detach().numpy()
+    except:
+        pass
+    # Make sure omega is not too large to cause numerical overflow
+    x = x if x > minval else minval
+    x = x if x < maxval else maxval
+    
+    return x
