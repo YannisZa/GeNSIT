@@ -115,6 +115,12 @@ LOSS_KWARG_OPERATIONS = {
     }
 }
 
+VALIDATION_SCHEMA = {
+    "test_cells": {
+        "apply_function":"da.astype('int32')"
+    }
+}
+
 
 INPUT_SCHEMA = {
     "origin_demand":{
@@ -345,7 +351,7 @@ for loss in LOSS_DATA_REQUIREMENTS.keys():
         "is_iterable": True
     }
 
-DATA_SCHEMA = {**INPUT_SCHEMA,**OUTPUT_SCHEMA}
+DATA_SCHEMA = {**INPUT_SCHEMA,**OUTPUT_SCHEMA,**VALIDATION_SCHEMA}
 
 SAMPLE_DATA_REQUIREMENTS = {
     **dict(zip(list(OUTPUT_SCHEMA.keys()),list(OUTPUT_SCHEMA.keys())))
