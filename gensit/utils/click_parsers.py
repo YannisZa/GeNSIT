@@ -41,6 +41,12 @@ def evaluate_kwargs_callback(ctx, param, value):
             kwargs.append((keyval.strip(' '),keyval.strip(' ')))
     return kwargs
 
+def to_dict(ctx, param, value):
+    if value is None or len(value) == 0:
+        return {}
+    else:
+        return {val[0]:val[1] for val in value}
+
 def unstringify_callback(ctx, param, value):
     if not value:
         return [{}]
