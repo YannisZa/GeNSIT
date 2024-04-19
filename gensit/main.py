@@ -476,6 +476,8 @@ _output_options = [
     click.option('--metadata_keys','-k', multiple = True, type = click.STRING, required = False),
     click.option('--force_reload/--no-force_reload', default = False,is_flag = True, show_default = True,
               help = f'Flag for whether output collections should be re-compiled and re-written to file.'),
+    click.option('--validation_data','-vd', multiple = True, type=(click.STRING, click.STRING), required = False, default=[], 
+                callback = to_dict, help = f'''Includes name and filename of validation data to be used'''),
 ]
 
 def output_options(func):
@@ -670,6 +672,7 @@ def plot(
         metadata_keys,
         region_mass,
         force_reload,
+        validation_data,
         plot_view,
         plot_type,
         # Plot-specific main arguments and options
@@ -853,6 +856,7 @@ def summarise(
         metadata_keys,
         region_mass,
         force_reload,
+        validation_data,
         algorithm,
         sort_by,
         ascending,
