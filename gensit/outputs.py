@@ -1588,6 +1588,26 @@ class Outputs(object):
                     device = self.device
                 )
 
+        elif sample_name in VALIDATION_SCHEMA:
+            
+            if sample_name in self.settings['validation_data']:
+                # Get filename to validation data
+                validation_data_filename = self.settings['validation_data'][sample_name]
+                # Read validation data
+                samples = read_file(validation_data_filename)
+                # Apply 
+                if VALIDATION_SCHEMA[sample_name].get('apply_function','') != '':
+                    samples = eval(
+                        VALIDATION_SCHEMA[sample_name]['apply_function'],
+                        {"np":np,"torch":torch,"da":samples}     
+                    )
+
+            else:
+                raise MissingData(
+                    missing_data_name = sample_name,
+                    data_names = ', '.join(list(self.settings['validation_data'].keys())),
+                    location = 'ValidationData'
+                )
 
         else:
             if not hasattr(self.data,sample_name):
