@@ -207,20 +207,27 @@ def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     """
     # print('prediction total',prediction.sum(['origin','destination']).values.tolist())
     # print('ground truth total',ground_truth.sum(['origin','destination']).values.tolist())
+
     prediction = prediction.astype('float32')
     ground_truth = ground_truth.astype('float32')
     prediction,ground_truth = xr.broadcast(prediction,ground_truth)
     prediction,ground_truth = xr.align(prediction,ground_truth, join='exact')
-    numerator = ( ((prediction - ground_truth)**2).sum(dim=['origin','destination']) / prediction.size) ** 0.5
-    denominator = ground_truth.sum(dim=['origin','destination']) / ground_truth.size
+    test_cells = kwargs.get('test_cells',None)
+    
+    if test_cells is not None:
+        # Mask all non test cells
+        mask = ground_truth.copy(deep=True)
+        mask[:] = False
+        for cell in test_cells:
+            mask[cell[0],cell[1]] = True
+        # Apply mask
+        prediction = prediction.where(mask)
+        ground_truth = ground_truth.where(mask)
+    
+    numerator = ( ((prediction - ground_truth)**2).sum(dim=['origin','destination'],skipna=True) / (~np.isnan(prediction)).sum()) ** 0.5
+    denominator = ground_truth.sum(dim=['origin','destination'],skipna=True) / (~np.isnan(ground_truth)).sum()
     srmse = numerator / denominator
     
-    # print('prediction',prediction.size)
-    # print(prediction.values.flatten())
-    # print('ground_truth',ground_truth.size)
-    # print(ground_truth.values.flatten())
-    # print('numerator:',numerator.values.tolist(), 'denominator:',denominator.values.tolist())
-    # print('srmse',srmse.values.tolist())
     return srmse
 
 def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
@@ -241,36 +248,27 @@ def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
         Standardised root mean square error of t_hat.
 
     """
+
+    test_cells = kwargs.get('test_cells',None)
     # Compute denominator
     denominator = (ground_truth + prediction)
     denominator = xr.where(denominator <= 0, 1., denominator)
     # Compute numerator
-    numerator = 2*xr.minimum(ground_truth,prediction)
-    # Compute SSI
-    ssi = xr.divide(numerator,denominator).mean(dim=['origin','destination'])
-    return ssi
+    numerator = 2*np.minimum(ground_truth,prediction)
+    ratio = numerator / denominator
 
-def shannon_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
-    """Computes entropy for a table X
-    E = sum_{i}^I sum_{j = 1}^{J} X_{ij}log(X_{ij})
+    if test_cells is not None:
+        # Mask all non test cells
+        mask = ratio.copy(deep=True)
+        mask[:] = False
+        for cell in test_cells:
+            mask[cell[0],cell[1]] = True
+        # Apply mask
+        ratio = ratio.where(mask)
     
-    ground_truth : log intensity
-    """
-    try:
-        log_distribution = globals()[kwargs['distribution_name']]
-    except:
-        raise Exception(f"No distribution function found for distribution name {kwargs['distribution_name']}")
-    _prediction = np.copy(prediction)
-    _ground_truth = np.copy(ground_truth)
-    # Apply distribution
-    res = _shannon_entropy(
-        _prediction,
-        _ground_truth,
-        log_distribution,
-        None
-    )
-    return res
-
+    # Compute SSI
+    ssi = ratio.mean(dim=['origin','destination'],skipna=True)
+    return ssi
 
 def von_neumann_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     # Convert matrix to square
@@ -305,7 +303,13 @@ def sparsity(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     return res
 
 
-def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,region_mass:float=0.95,**kwargs):
+def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
+    # Get region mass
+    region_mass = kwargs.get('region_mass',0.95)
+    
+    # Get test cells
+    test_cells = kwargs.get('test_cells',None)
+    
     # High posterior density mass
     alpha = 1-region_mass
     
@@ -325,6 +329,15 @@ def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,
     )
     # Compute flag for whether ground truth table is covered
     cell_coverage = (ground_truth >= lower_bound_hpdr) & (ground_truth <= upper_bound_hpdr)
+
+    if test_cells is not None:
+        # Mask all non test cells
+        mask = cell_coverage.copy(deep=True)
+        mask[:] = False
+        for cell in test_cells:
+            mask[cell[0],cell[1]] = True
+        # Apply mask
+        return cell_coverage.where(mask)
     
     # Update coordinates to include region mass
     return cell_coverage
