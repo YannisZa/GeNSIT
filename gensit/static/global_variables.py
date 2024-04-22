@@ -118,6 +118,15 @@ LOSS_KWARG_OPERATIONS = {
 VALIDATION_SCHEMA = {
     "test_cells": {
         "apply_function":"da.astype('int32')"
+    },
+    "test_validation_cells": {
+        "apply_function":"da.astype('int32')"
+    },
+    "zero_train_cells": {
+        "apply_function":"da.astype('int32')"
+    },
+    "train_cells": {
+        "apply_function":"da.astype('int32')"
     }
 }
 
