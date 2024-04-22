@@ -309,7 +309,7 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
         # Inherit sim-specific functions
         self.inherit_functions(ProductionConstrained)
 
-        self.logger.info(('Building ' + self.__str__()))
+        self.logger.progress(('Building ' + self.__str__()))
 
     def __repr__(self):
         return "ProductionConstrained(SpatialInteraction2D)"
@@ -345,7 +345,8 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
         
         # Inherit sim-specific functions
         self.inherit_functions(TotallyConstrained)
-        self.logger.info(('Building ' + self.__str__()))
+
+        self.logger.progress(('Building ' + self.__str__()))
 
     def __repr__(self):
         return "TotallyConstrained(SpatialInteraction2D)"
