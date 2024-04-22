@@ -312,7 +312,7 @@ clear; gensit run ./data/inputs/configs/DC/experiment1_nn_disjoint.toml -et NonJ
 ```
 
 ```
-clear; gensit run ./data/inputs/configs/DC/experiment1_nn_joint.toml -et JointTableSIM_NN -nt 6 -nw 4
+clear; gensit run ./data/inputs/configs/DC/experiment1_nn_joint.toml -et JointTableSIM_NN -nt 8 -nw 3
 ```
 
 ### MCMC
