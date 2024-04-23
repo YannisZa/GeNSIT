@@ -254,3 +254,4 @@ inflect==7.0.0
 xarray==2023.1.0
 num2words==0.5.13
 netcdf4==1.6.2
+xgboost==2.0.3
