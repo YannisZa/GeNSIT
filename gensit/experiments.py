@@ -19,7 +19,9 @@ from gensit.contingency_table import instantiate_ct
 from gensit.physics_models.harris_wilson_model import HarrisWilson
 from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
 from gensit.intensity_models.spatial_interaction_models import instantiate_sim
-from gensit.learning_models.XGB_model import *
+from gensit.learning_models.GBRT import GBRT_Model
+from gensit.learning_models.XGB_model import XGB_Model
+from gensit.learning_models.random_forest_model import RandomForest_Model
 from gensit.learning_models.harris_wilson_model_mcmc import HarrisWilson_MCMC
 from gensit.learning_models.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
 from gensit.contingency_table.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
@@ -2450,8 +2452,9 @@ class XGBoost_Comparison(Experiment):
         
         # Initalise superclass
         super().__init__(config,**kwargs)
-    
-        self.output_names = EXPERIMENT_OUTPUT_NAMES['XGBoost_Comparison']
+
+        self.experiment_name = 'XGBoost_Comparison'
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.experiment_name]
 
         # Fix random seed
         set_seed(self.seed)
@@ -2479,7 +2482,7 @@ class XGBoost_Comparison(Experiment):
         self.config = getattr(self.ct,'config',self.config)
         
         # Set up the model
-        self.logger.note("Initializing the neural net ...")
+        self.logger.note(f"Initializing the {self.experiment_name.replace('_Comparison','')} algorithm ...")
         self.learning_model = XGB_Model(
             config = self.config,
             logger = self.logger
@@ -2510,7 +2513,7 @@ class XGBoost_Comparison(Experiment):
 
     def run(self,**kwargs) -> None:
 
-        self.logger.note(f"Running Neural Network training of Harris Wilson model.")
+        self.logger.note(f"Running {self.experiment_name.replace('_',' ')}.")
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -2558,28 +2561,27 @@ class XGBoost_Comparison(Experiment):
             disable = self.tqdm_disabled,
             leave = False,
             position = self.position,
-            desc = f"XGBoost_Comparison instance: {self.position}"
+            desc = f"{self.experiment_name} instance: {self.position}"
         ):
             # Track the epoch training time
             start_time = time.time()
             
             # Get previously trained model
-            if i == 0:
-                existing_model = None
-            else:
-                existing_model = bst
+            if i == 0: trained_model = None
 
             # Train
-            bst = self.learning_model.train(
+            trained_model = self.learning_model.train(
                 train_x = train_x,
                 train_y = train_y,
                 N = 1,
-                trained_model = existing_model
+                trained_model = trained_model
             )
             
             # Test/predict
-            dtest = xgb.DMatrix(test_x)
-            intensity = bst.predict(dtest)
+            intensity = self.learning_model.predict(
+                test_x = test_x, 
+                trained_model = trained_model
+            )
 
             # Update test cells
             for i,tc in enumerate(test_index):
@@ -2592,6 +2594,296 @@ class XGBoost_Comparison(Experiment):
             )
             self._time += 1
         
+        # Update metadata
+        self.show_progress()
+
+        # Write metadata
+        self.write_metadata()
+
+        # Write log and close outputs
+        self.close_outputs()
+        
+        self.logger.note("Experiment finished.")
+
+class RandomForest_Comparison(Experiment):
+    def __init__(self, config:Config, **kwargs):
+        
+        # Initalise superclass
+        super().__init__(config,**kwargs)
+        
+        self.experiment_name = 'RandomForest_Comparison'
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.experiment_name]
+
+        # Fix random seed
+        set_seed(self.seed)
+
+        # Prepare inputs
+        self.inputs = Inputs(
+            config = self.config,
+            synthetic_data = False,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+
+        # Pass inputs to device
+        self.inputs.pass_to_device()
+
+        # Build contingency table
+        self.logger.note("Initializing the contingency table ...")
+        self.ct = instantiate_ct(
+            config = self.config,
+            logger = self.logger,
+            **vars(self.inputs.data)
+        )
+        
+        # Get config
+        self.config = getattr(self.ct,'config',self.config)
+        
+        # Set up the model
+        self.logger.note(f"Initializing the {self.experiment_name.replace('_Comparison','')} algorithm ...")
+        self.learning_model = RandomForest_Model(
+            config = self.config,
+            logger = self.logger
+        )
+
+        # Get config
+        self.config = getattr(self.learning_model,'config',self.config)
+
+        # Create outputs
+        self.outputs = Outputs(
+            self.config,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
+            logger = self.logger
+        )
+
+        # Prepare writing to file
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
+
+        # Write metadata
+        self.write_metadata()
+        
+        self.logger.note(f"{self.learning_model}")
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        
+
+    def run(self,**kwargs) -> None:
+
+        self.logger.note(f"Running {self.experiment_name.replace('_',' ')}.")
+
+        # Initialise data structures
+        self.initialise_data_structures()
+        
+        # Store number of samples
+        self._time = 1
+
+        # Get covariates/features
+        # features_max = self.inputs.data.region_features.max(dim=0).values
+        # features_min = self.inputs.data.region_features.min(dim=0).values
+        # features = (self.inputs.data.region_features - features_min)*2 / (features_max-features_min) - 1
+        features = self.inputs.data.region_features
+
+        # Get training and test cells
+        train_index = np.array([np.array(c,dtype='int32') for c in self.ct.constraints['cells']],dtype='int32')
+        test_index = self.inputs.data.test_cells
+
+        # Get training set
+        train_dis = self.inputs.data.cost_matrix[train_index[:,0],train_index[:,1]].reshape([-1, 1])
+        train_x = torch.concatenate( (features[train_index[:,0]], features[train_index[:,1]], train_dis), dim=1)
+        train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
+
+        # Get test set
+        test_dis = self.inputs.data.cost_matrix[test_index[:,0],test_index[:,1]].reshape([-1, 1])
+        test_x = torch.concatenate( (features[test_index[:,0]], features[test_index[:,1]], test_dis), dim=1)
+
+        # Define output xarray coordinates 
+        coordinates = {
+            "origin": np.arange(1,self.inputs.data.dims['origin']+1,1,dtype='int32'),
+            "destination": np.arange(1,self.inputs.data.dims['destination']+1,1,dtype='int32'),
+        }
+
+        # Create output array
+        intensity_xr = xr.DataArray(
+            torch.zeros(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']),
+            coords = coordinates
+        )
+        # Update train cells
+        for tc in train_index:
+            intensity_xr[tc[0],tc[1]] = self.inputs.data.ground_truth_table[tc[0],tc[1]]
+
+        # Track the epoch training time
+        start_time = time.time()
+
+        # Train
+        trained_model = self.learning_model.train(
+            train_x = train_x,
+            train_y = train_y
+        )
+        
+        # Test/predict
+        intensity = self.learning_model.predict(
+            test_x = test_x, 
+            trained_model = trained_model
+        )
+
+        # Update test cells
+        for i,tc in enumerate(test_index):
+            intensity_xr[tc[0],tc[1]] = intensity[i]
+
+        # Clean and write to file
+        self.write_data(
+            intensity = intensity_xr,
+            compute_time = time.time() - start_time
+        )
+        self._time += 1
+    
+        # Update metadata
+        self.show_progress()
+
+        # Write metadata
+        self.write_metadata()
+
+        # Write log and close outputs
+        self.close_outputs()
+        
+        self.logger.note("Experiment finished.")
+
+class GBRT_Comparison(Experiment):
+    def __init__(self, config:Config, **kwargs):
+        
+        # Initalise superclass
+        super().__init__(config,**kwargs)
+    
+        self.experiment_name = 'GBRT_Comparison'
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.experiment_name]
+
+        # Fix random seed
+        set_seed(self.seed)
+
+        # Prepare inputs
+        self.inputs = Inputs(
+            config = self.config,
+            synthetic_data = False,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+
+        # Pass inputs to device
+        self.inputs.pass_to_device()
+
+        # Build contingency table
+        self.logger.note("Initializing the contingency table ...")
+        self.ct = instantiate_ct(
+            config = self.config,
+            logger = self.logger,
+            **vars(self.inputs.data)
+        )
+        
+        # Get config
+        self.config = getattr(self.ct,'config',self.config)
+        
+        # Set up the model
+        self.logger.note(f"Initializing the {self.experiment_name.replace('_Comparison','')} algorithm ...")
+        self.learning_model = GBRT_Model(
+            config = self.config,
+            logger = self.logger
+        )
+
+        # Get config
+        self.config = getattr(self.learning_model,'config',self.config)
+
+        # Create outputs
+        self.outputs = Outputs(
+            self.config,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
+            logger = self.logger
+        )
+
+        # Prepare writing to file
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
+
+        # Write metadata
+        self.write_metadata()
+        
+        self.logger.note(f"{self.learning_model}")
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        
+
+    def run(self,**kwargs) -> None:
+
+        self.logger.note(f"Running {self.experiment_name.replace('_',' ')}.")
+
+        # Initialise data structures
+        self.initialise_data_structures()
+        
+        # Store number of samples
+        self._time = 1
+
+        # Get covariates/features
+        # features_max = self.inputs.data.region_features.max(dim=0).values
+        # features_min = self.inputs.data.region_features.min(dim=0).values
+        # features = (self.inputs.data.region_features - features_min)*2 / (features_max-features_min) - 1
+        features = self.inputs.data.region_features
+        
+        # Get training and test cells
+        train_index = np.array([np.array(c,dtype='int32') for c in self.ct.constraints['cells']],dtype='int32')
+        test_index = self.inputs.data.test_cells
+
+        # Get training set
+        train_dis = self.inputs.data.cost_matrix[train_index[:,0],train_index[:,1]].reshape([-1, 1])
+        train_x = torch.concatenate( (features[train_index[:,0]], features[train_index[:,1]], train_dis), dim=1)
+        train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
+
+        # Get test set
+        test_dis = self.inputs.data.cost_matrix[test_index[:,0],test_index[:,1]].reshape([-1, 1])
+        test_x = torch.concatenate( (features[test_index[:,0]], features[test_index[:,1]], test_dis), dim=1)
+
+        # Define output xarray coordinates 
+        coordinates = {
+            "origin": np.arange(1,self.inputs.data.dims['origin']+1,1,dtype='int32'),
+            "destination": np.arange(1,self.inputs.data.dims['destination']+1,1,dtype='int32'),
+        }
+
+        # Create output array
+        intensity_xr = xr.DataArray(
+            torch.zeros(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']),
+            coords = coordinates
+        )
+        # Update train cells
+        for tc in train_index:
+            intensity_xr[tc[0],tc[1]] = self.inputs.data.ground_truth_table[tc[0],tc[1]]
+
+        # Track the epoch training time
+        start_time = time.time()
+
+        # Train
+        trained_model = self.learning_model.train(
+            train_x = train_x,
+            train_y = train_y
+        )
+        
+        # Test/predict
+        intensity = self.learning_model.predict(
+            test_x = test_x, 
+            trained_model = trained_model
+        )
+
+        # Update test cells
+        for i,tc in enumerate(test_index):
+            intensity_xr[tc[0],tc[1]] = intensity[i]
+
+        # Clean and write to file
+        self.write_data(
+            intensity = intensity_xr,
+            compute_time = time.time() - start_time
+        )
+        self._time += 1
+    
         # Update metadata
         self.show_progress()
 

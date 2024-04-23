@@ -459,7 +459,10 @@ class ContingencyTable(object):
                     cell_constraints = os.path.join(
                         os.path.relpath(self.config.in_directory,os.path.realpath(os.getcwd())),
                         self.config.settings['inputs']['dataset'],
-                        self.config.settings['inputs']['data']['train_cells']
+                        self.config.settings['inputs']['data']['train_cells'].get(
+                            'file',
+                            self.config.settings['inputs']['data']['train_cells']
+                        )
                     )
 
         ## Reading kwargs if provided

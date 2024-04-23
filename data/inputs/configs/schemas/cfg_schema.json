@@ -304,6 +304,35 @@
           }
         }
       },
+      "validation_cells": {
+        "sweepable": false,
+        "optional": true,
+        "exclude": false,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "validation_cells.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "validation_cells.txt",
+              "unique-vals": true
+            }
+          }
+        }
+      },
       "origin_demand": {
         "sweepable": false,
         "optional": true,
@@ -1679,6 +1708,13 @@
     "optional": true,
     "exclude": false,
 
+    "disable_tqdm": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+      "dtype": "bool",
+      "default-value": true
+    },
     "verbose_eval": {
       "sweepable": false,
       "optional": true,
@@ -1911,6 +1947,226 @@
             "list-dtype": "float",
             "default-value": 0.8,
             "valid-range": [0.0, null],
+            "unique-vals": true
+          }
+        }
+      }
+    }
+  },
+  "random_forest": {
+    "sweepable": false,
+    "optional": true,
+    "exclude": false,
+
+    "disable_tqdm": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+      "dtype": "bool",
+      "default-value": true
+    },
+    "hyperparameters": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+
+      "rf_n_estimators": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 100,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 100,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "rf_oob_score": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "bool",
+            "default-value": true
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "bool",
+            "default-value": true,
+            "unique-vals": true
+          }
+        }
+      },
+      "rf_max_depth": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": null,
+            "allow-nan": true,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": null,
+            "valid-range": [1, null],
+            "allow-nan": true,
+            "unique-vals": true
+          }
+        }
+      },
+      "rf_min_samples_split": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 10,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 10,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "rf_min_samples_leaf": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 3,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 3,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      }
+    }
+  },
+  "gradient_boosted_regression_trees": {
+    "sweepable": false,
+    "optional": true,
+    "exclude": false,
+
+    "disable_tqdm": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+      "dtype": "bool",
+      "default-value": true
+    },
+    "hyperparameters": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+
+      "gbrt_n_estimators": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 3,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 3,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "gbrt_max_depth": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": null,
+            "allow-nan": true,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": null,
+            "valid-range": [1, null],
+            "allow-nan": true,
+            "unique-vals": true
+          }
+        }
+      },
+      "gbrt_min_samples_split": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 10,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 10,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "gbrt_min_samples_leaf": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 1,
+            "valid-range": [1, null],
             "unique-vals": true
           }
         }
@@ -2271,7 +2527,9 @@
           "SIM_NN",
           "NonJointTableSIM_NN",
           "JointTableSIM_NN",
-          "XGBoost_Comparison"
+          "XGBoost_Comparison",
+          "RandomForest_Comparison",
+          "GBRT_Comparison"
         ]
       },
       "comment": {

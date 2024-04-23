@@ -126,6 +126,11 @@ VALIDATION_SCHEMA = {
         "ndmin":2,
         "cast_to_xarray":False
     },
+    "validation_cells": {
+        "dtype":"int32",
+        "ndmin":2,
+        "cast_to_xarray":False
+    },
     "zero_train_cells": {
         "dtype":"int32",
         "ndmin":2,
@@ -391,7 +396,9 @@ EXPERIMENT_OUTPUT_NAMES = {
     "SIM_NN": ["log_destination_attraction","theta","loss","compute_time"],
     "NonJointTableSIM_NN": ["log_destination_attraction","theta", "loss", "table","compute_time"],
     "JointTableSIM_NN": ["log_destination_attraction","theta","loss", "table","compute_time"],
-    "XGBoost_Comparison": ["intensity","compute_time"]
+    "XGBoost_Comparison": ["intensity","compute_time"],
+    "RandomForest_Comparison": ["intensity","compute_time"],
+    "GBRT_Comparison": ["intensity","compute_time"]
 }
 
 AUXILIARY_COORDINATES_DTYPES = {

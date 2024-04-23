@@ -45,6 +45,14 @@
           }
         }
       },
+      "validation_samples": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        }
+      },
       "origin_demand": {
         "file": {
           "sweep": {
@@ -368,7 +376,72 @@
       "margin0": true
     }
   },
+  "random_forest": {
+    "disable_tqdm": true,
+    "hyperparameters": {
+      "rf_n_estimators": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "rf_oob_score": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "rf_max_depth": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "rf_min_samples_split": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "rf_min_samples_leaf": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      }
+    }
+  },
+  "gradient_boosted_regression_trees": {
+    "disable_tqdm": true,
+    "hyperparameters": {
+      "gbrt_n_estimators": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gbrt_max_depth": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gbrt_min_samples_split": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gbrt_min_samples_leaf": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      }
+    }
+  },
   "xgboost": {
+    "disable_tqdm": true,
     "verbose_eval": true,
     "hyperparameters": {
       "xg_max_depth": {

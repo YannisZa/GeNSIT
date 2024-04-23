@@ -25,6 +25,8 @@ seed = 1234
         file = 'test_cells.txt'
     [inputs.data.train_cells]
         file = 'zero_and_train_cells.txt'
+    [inputs.data.validation_cells]
+        file = 'validation_cells.txt'
 
 [contingency_table]
   sparse_margins = false
@@ -53,9 +55,46 @@ seed = 1234
     # xg_lambda = 5.0
     # xg_gamma = 0.5
     # xg_subsample = 0.8
+  
+[random_forest]
+  disable_tqdm = true
+  [random_forest.hyperparameters]
+    rf_n_estimators = 100
+    rf_oob_score = true
+    rf_max_depth = nan
+    rf_min_samples_split = 10
+    rf_min_samples_leaf = 3
+  
+
+[gradient_boosted_regression_trees]
+  disable_tqdm = true
+  [gradient_boosted_regression_trees.hyperparameters]
+    gbrt_n_estimators = 100
+    gbrt_max_depth = nan
+    gbrt_min_samples_split = 10
+    gbrt_min_samples_leaf = 3
+    
 
 [[experiments]]
   type = 'XGBoost_Comparison'
+  comment = 'Gradient Boosted Trees Vanilla Algorithm Comparison'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[[experiments]]
+  type = 'RandomForest_Comparison'
+  comment = 'Random Forest Vanilla Algorithm Comparison'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[[experiments]]
+  type = 'GBRT_Comparison'
   comment = 'Gradient Boosted Trees Vanilla Algorithm Comparison'
   disable_tqdm = false
   export_samples = true
