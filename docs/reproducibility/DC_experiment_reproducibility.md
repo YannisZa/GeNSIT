@@ -90,7 +90,7 @@ clear; gensit summarise \
 
 ```
 clear; gensit summarise \
--dn DC/exp2 -et XGBoost_Comparison \
+-dn DC/exp2 -et RandomForest_Comparison \
 -el np -el MathUtils -el xr \
 -e intensity_srmse_all "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \
 -e intensity_srmse_train "srmse_func(prediction=mean_intensity,ground_truth=ground_truth,cells=train_cells)" \
