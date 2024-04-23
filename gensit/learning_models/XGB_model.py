@@ -62,18 +62,22 @@ class XGB_Model(object):
                 self.hyperparams[pname] = self.config['xgboost']['hyperparameters'][pname]
 
 
-    def train(self, train_x, train_y, N:int, trained_model=None):
+    def train(self, train_x, train_y, **kwargs):
         # Train
         self.dtrain = xgb.DMatrix(train_x, label = train_y)
 
         return xgb.train(
             self.hyperparams, 
             self.dtrain,
-            N, 
-            xgb_model = trained_model,
+            kwargs.get('N',1), 
+            xgb_model = kwargs.get('trained_model',None),
             evals = [(self.dtrain, 'train')],
             verbose_eval = self.config['xgboost'].get('verbose_eval',0)
         )
+
+    def predict(self, test_x, trained_model):
+        dtest = xgb.DMatrix(test_x)
+        return trained_model.predict(dtest)
 
     def __repr__(self):
         return "XGBoost()"
