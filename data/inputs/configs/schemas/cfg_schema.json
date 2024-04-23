@@ -1034,11 +1034,22 @@
         }
       },
       "cells": {
-        "sweepable": false,
+        "sweepable": true,
         "optional": true,
         "exclude": false,
-        "dtype": "bool",
-        "default-value": false
+
+        "sweep": {
+          "default": {
+            "dtype": "bool",
+            "default-value": true
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "bool",
+            "default-value": true,
+            "unique-vals": true
+          }
+        }
       }
     }
   },
