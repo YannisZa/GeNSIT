@@ -16,6 +16,7 @@ from typing import List, Union, Callable
 from gensit.config import Config
 from gensit.static.global_variables import *
 from gensit.utils.math_utils import powerset
+from gensit.utils.exceptions import MissingData
 from gensit.utils.misc_utils import ndims, setup_logger, unpack_dims, write_txt, makedir, tuplize, flatten, tuple_contained, depth, broadcast2d, print_json
 
 # -> Union[ContingencyTable,None]:
@@ -446,28 +447,40 @@ class ContingencyTable(object):
             if 'constraints' in list(self.config.settings['contingency_table'].keys()):
                 if 'axes' in list(self.config.settings['contingency_table']['constraints'].keys()):
                     constrained_axes = [tuplize(ax) for ax in self.config.settings['contingency_table']['constraints']['axes'] if len(ax) > 0]
-                if 'cells' in list(self.config.settings['contingency_table']['constraints'].keys()):
-                    if isinstance(self.config.settings['contingency_table']['constraints']['cells'],str):
-                        cell_constraints = os.path.join(
-                            os.path.relpath(self.config.in_directory,os.path.realpath(os.getcwd())),
-                            self.config.settings['inputs']['dataset'],
-                            self.config.settings['contingency_table']['constraints']['cells']
+                if self.config.settings['contingency_table']['constraints'].get('cells',False):
+                    # Train cells must be provided if the contingency table has cell constraints
+                    if self.config.settings['inputs']['data'].get('train_cells','') == '':
+                        raise MissingData(
+                            missing_data_name = 'train_cells',
+                            data_names = ', '.join(list(self.config.settings['inputs']['data'].keys())),
+                            location = 'Input Data'
                         )
-                    elif isinstance(self.config.settings['contingency_table']['constraints']['cells'],(list,np.ndarray)):
-                        cell_constraints = self.config.settings['contingency_table']['constraints']['cells']
+                    # Get cell constraints path
+                    cell_constraints = os.path.join(
+                        os.path.relpath(self.config.in_directory,os.path.realpath(os.getcwd())),
+                        self.config.settings['inputs']['dataset'],
+                        self.config.settings['inputs']['data']['train_cells']
+                    )
+
         ## Reading kwargs if provided
         elif 'constraints' in list(kwargs.keys()):
             if 'axes' in list(kwargs['constraints'].keys().keys()):
                 constrained_axes = [tuplize(ax) for ax in kwargs['constraints']['axes'] if len(ax) > 0]
-            if 'cells' in list(kwargs['constraints'].keys()):
-                if isinstance(kwargs['constraints']['cells'],str):
+            if kwargs['constraints'].get('cells',False):
+                # Train cells must be provided if the contingency table has cell constraints
+                if kwargs['inputs']['data'].get('train_cells','') == '':
+                    raise MissingData(
+                        missing_data_name = 'train_cells',
+                        data_names = ', '.join(list(kwargs['inputs']['data'].keys())),
+                        location = 'Input (Kwargs) Data'
+                    )
+                    
+                if kwargs['inputs'].get('data',{}).get('train_cells','') != '':
                     cell_constraints = os.path.join(
                         kwargs['inputs']['in_directory'],
                         kwargs['inputs']['dataset'],
-                        kwargs['constraints']['cells']
+                        kwargs['inputs']['data']['train_cells']
                     )
-                elif isinstance(kwargs['constraints']['cells'],(list,np.ndarray)):
-                    cell_constraints = kwargs['constraints']['cells']
         ## Storing constraints
         if constrained_axes is not None:
             # Get the set of constrained axes
@@ -632,7 +645,7 @@ class ContingencyTable(object):
                     # print('\n')
 
     def propagate_cell_constraints(self):
-        if 'cells' in list(self.constraints.keys()) and len(self.constraints['cells']) > 0:
+        if len(self.constraints.get('cells',[])) > 0:
             # Update cell constraints if there are any deterministic solutions
             # based on the cell and margin constraints provided
             self.update_cell_constraints_deterministically()
