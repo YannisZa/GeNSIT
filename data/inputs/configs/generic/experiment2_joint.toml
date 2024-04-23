@@ -21,11 +21,13 @@ load_experiment = ''
       file = "cost_matrix.txt"
     [inputs.data.ground_truth_table]
       file = 'ground_truth_table.txt'
+    [inputs.data.train_cells]
+      file = 'empty_link_cells.txt'
 
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints]
-    cells = 'empty_link_cells.txt'
+    cells = true
     [contingency_table.constraints.axes.sweep]
       default = []
       range = [[], [[+0,+1]], [[+1]], [[+1]], [[+0],[+1]]]

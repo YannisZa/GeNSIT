@@ -246,6 +246,35 @@
           }
         }
       },
+      "train_cells": {
+        "sweepable": false,
+        "optional": true,
+        "exclude": false,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "train_cells.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "train_cells.txt",
+              "unique-vals": true
+            }
+          }
+        }
+      },
       "test_cells": {
         "sweepable": false,
         "optional": true,
@@ -976,25 +1005,11 @@
         }
       },
       "cells": {
-        "sweepable": true,
+        "sweepable": false,
         "optional": true,
         "exclude": false,
-
-        "sweep": {
-          "default": {
-            "dtype": "file",
-            "file-exists": false,
-            "file-extension": "txt",
-            "default-value": ""
-          },
-          "range": {
-            "dtype": "list",
-            "file-exists": false,
-            "list-dtype": "file",
-            "file-extension": "txt",
-            "default-value": ""
-          }
-        }
+        "dtype": "bool",
+        "default-value": false
       }
     }
   },

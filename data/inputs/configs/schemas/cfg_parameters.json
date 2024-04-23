@@ -29,6 +29,14 @@
           }
         }
       },
+      "train_cells": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        }
+      },
       "test_cells": {
         "file": {
           "sweep": {
@@ -178,12 +186,7 @@
           "range": true
         }
       },
-      "cells": {
-        "sweep": {
-          "default": true,
-          "range": true
-        }
-      }
+      "cells": true
     }
   },
   "spatial_interaction_model": {

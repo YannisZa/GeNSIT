@@ -28,7 +28,7 @@ load_experiment = ''
   sparse_margins = false
   [contingency_table.constraints]
     axes = [[+0,+1]]
-    cells = ''
+    cells = false
   
 [spatial_interaction_model]
   name = 'TotallyConstrained'  

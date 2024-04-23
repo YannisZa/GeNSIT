@@ -19,12 +19,14 @@ seed = 1234
       file = "cost_matrix_max_normalised.txt"
     [inputs.data.ground_truth_table]
       file = 'ground_truth_table.txt'
+    [inputs.data.train_cells]
+      file = 'zero_and_train_cells.txt'
 
 [contingency_table]
   disable_tqdm = true
   sparse_margins = false
   [contingency_table.constraints]
-    cells = 'zero_and_train_cells.txt'
+    cells = true
     axes = [[+0],[+1]]
 
 [spatial_interaction_model]

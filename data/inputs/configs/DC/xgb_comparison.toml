@@ -23,17 +23,19 @@ seed = 1234
       file = 'ground_truth_table.txt'
     [inputs.data.test_cells]
         file = 'test_cells.txt'
+    [inputs.data.train_cells]
+        file = 'zero_and_train_cells.txt'
 
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints]
-    cells = 'zero_and_train_cells.txt'
+    cells = true
     axes = [[0],[1]]
 
 [training]
   num_steps = +1
   batch_size = +1
-  N = 400
+  N = 40
 
 [xgboost]
   disable_tqdm = true
