@@ -16,12 +16,13 @@ from gensit.utils.misc_utils import *
 from gensit.static.global_variables import *
 from gensit.utils.math_utils import torch_optimize
 from gensit.contingency_table import instantiate_ct
-from gensit.harris_wilson_model import HarrisWilson
-from gensit.spatial_interaction_model import instantiate_sim
+from gensit.physics_models.harris_wilson_model import HarrisWilson
 from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
-from gensit.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
-from gensit.harris_wilson_model_mcmc import HarrisWilson_MCMC
-from gensit.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from gensit.intensity_models.spatial_interaction_models import instantiate_sim
+from gensit.learning_models.XGB_model import *
+from gensit.learning_models.harris_wilson_model_mcmc import HarrisWilson_MCMC
+from gensit.learning_models.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
+from gensit.contingency_table.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 
 # Suppress scientific notation
 np.set_printoptions(suppress = True)
@@ -359,7 +360,7 @@ class Experiment(object):
             dims = self.config['inputs']['dims']
             
             # Setup neural net loss
-            if 'loss' in self.output_names:
+            if 'loss' in self.output_names and self.learning_model.model_type == 'neural_network':
                 for loss_name in list(self.learning_model.loss_functions.keys())+['total_loss']:
                     # Setup chunked dataset to store the state data in
                     if loss_name in self.outputs.h5group and not load_experiment:
@@ -446,7 +447,8 @@ class Experiment(object):
 
             for sample in [
                 'log_destination_attraction','table','log_target','compute_time',
-                'sign','theta_acc','log_destination_attraction_acc','table_acc'
+                'sign','theta_acc','log_destination_attraction_acc','table_acc',
+                'intensity'
             ]:
                 if sample in self.output_names:
                     # Setup chunked dataset to store the state data in
@@ -562,7 +564,8 @@ class Experiment(object):
 
             for sample in [
                 'log_destination_attraction','sign','table',
-                'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time'
+                'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time',
+                'intensity'
             ]:
                 if sample in self.output_names:
                     # Get sample value
@@ -2443,6 +2446,164 @@ class JointTableSIM_NN(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+
+class XGBoost_Comparison(Experiment):
+    def __init__(self, config:Config, **kwargs):
+        
+        # Initalise superclass
+        super().__init__(config,**kwargs)
+    
+        self.output_names = EXPERIMENT_OUTPUT_NAMES['XGBoost_Comparison']
+
+        # Fix random seed
+        set_seed(self.seed)
+
+        # Prepare inputs
+        self.inputs = Inputs(
+            config = self.config,
+            synthetic_data = False,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+
+        # Pass inputs to device
+        self.inputs.pass_to_device()
+
+        # Build contingency table
+        self.logger.note("Initializing the contingency table ...")
+        self.ct = instantiate_ct(
+            config = self.config,
+            logger = self.logger,
+            **vars(self.inputs.data)
+        )
+        
+        # Get config
+        self.config = getattr(self.ct,'config',self.config)
+        
+        # Set up the model
+        self.logger.note("Initializing the neural net ...")
+        self.learning_model = XGB_Model(
+            config = self.config,
+            logger = self.logger
+        )
+
+        # Get config
+        self.config = getattr(self.learning_model,'config',self.config)
+
+        # Create outputs
+        self.outputs = Outputs(
+            self.config,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
+            logger = self.logger
+        )
+
+        # Prepare writing to file
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
+
+        # Write metadata
+        self.write_metadata()
+        
+        self.logger.note(f"{self.learning_model}")
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        
+
+    def run(self,**kwargs) -> None:
+
+        self.logger.note(f"Running Neural Network training of Harris Wilson model.")
+
+        # Initialise data structures
+        self.initialise_data_structures()
+        
+        # Store number of samples
+        N = self.config['training']['N']
+
+        # Get covariates/features
+        features_max = self.inputs.data.region_features.max(dim=0).values
+        features_min = self.inputs.data.region_features.min(dim=0).values
+        features = (self.inputs.data.region_features - features_min)*2 / (features_max-features_min) - 1
+
+        # Get training and test cells
+        train_index = np.array([np.array(c,dtype='int32') for c in self.ct.constraints['cells']],dtype='int32')
+        test_index = self.inputs.data.test_cells
+
+        # Get training set
+        train_dis = self.inputs.data.cost_matrix[train_index[:,0],train_index[:,1]].reshape([-1, 1])
+        train_x = torch.concatenate( (features[train_index[:,0]], features[train_index[:,1]], train_dis), dim=1)
+        train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
+
+        # Get test set
+        test_dis = self.inputs.data.cost_matrix[test_index[:,0],test_index[:,1]].reshape([-1, 1])
+        test_x = torch.concatenate( (features[test_index[:,0]], features[test_index[:,1]], test_dis), dim=1)
+
+        # Define output xarray coordinates 
+        coordinates = {
+            "origin": np.arange(1,self.inputs.data.dims['origin']+1,1,dtype='int32'),
+            "destination": np.arange(1,self.inputs.data.dims['destination']+1,1,dtype='int32'),
+        }
+
+        # Create output array
+        intensity_xr = xr.DataArray(
+            torch.zeros(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']),
+            coords = coordinates
+        )
+        # Update train cells
+        for tc in train_index:
+            intensity_xr[tc[0],tc[1]] = self.inputs.data.ground_truth_table[tc[0],tc[1]]
+
+        self.tqdm_disabled = False
+        for i in tqdm(
+            range(N),
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
+            desc = f"XGBoost_Comparison instance: {self.position}"
+        ):
+            # Track the epoch training time
+            start_time = time.time()
+            
+            # Get previously trained model
+            if i == 0:
+                existing_model = None
+            else:
+                existing_model = bst
+
+            # Train
+            bst = self.learning_model.train(
+                train_x = train_x,
+                train_y = train_y,
+                N = 1,
+                trained_model = existing_model
+            )
+            
+            # Test/predict
+            dtest = xgb.DMatrix(test_x)
+            intensity = bst.predict(dtest)
+
+            # Update test cells
+            for i,tc in enumerate(test_index):
+                intensity_xr[tc[0],tc[1]] = intensity[i]
+
+            # Clean and write to file
+            self.write_data(
+                intensity = intensity_xr,
+                compute_time = time.time() - start_time
+            )
+
+        
+        # Update metadata
+        self.show_progress()
+
+        # Write metadata
+        self.write_metadata()
+
+        # Write log and close outputs
+        self.close_outputs()
+        
+        self.logger.note("Experiment finished.")
+
 
 class ExperimentSweep():
 
