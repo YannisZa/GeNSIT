@@ -26,15 +26,15 @@ from gensit.inputs import Inputs
 from gensit.utils.misc_utils import *
 from gensit.utils.exceptions import *
 from gensit.static.global_variables import *
-from gensit.spatial_interaction_model import *
+from gensit.intensity_models.spatial_interaction_models import *
 from gensit.utils import misc_utils as MiscUtils
 from gensit.utils import math_utils as MathUtils
 from gensit.contingency_table import instantiate_ct
-from gensit.harris_wilson_model import HarrisWilson
 from gensit.utils import probability_utils as ProbabilityUtils
+from gensit.physics_models.harris_wilson_model import HarrisWilson
 from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
-from gensit.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
-from gensit.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from gensit.learning_models.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
+from gensit.contingency_table.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
 
 OUTPUTS_MODULE = sys.modules[__name__]
 
@@ -94,7 +94,15 @@ class Outputs(object):
             self.config = config
             
             # Get intensity model class
-            self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
+            intensity_model_class = [
+                k for k in self.config.keys() 
+                if k in INTENSITY_MODELS and isinstance(self.config[k],dict)
+            ]
+            if len(intensity_model_class) > 0: 
+                self.intensity_model_class = intensity_model_class[0]
+            else:
+                self.intensity_model_class = ""
+                self.intensity_model_name = ""
 
             # Update experiment id
             self.experiment_id = self.update_experiment_directory_id(kwargs.get('experiment_id',None))
@@ -148,20 +156,29 @@ class Outputs(object):
             self.config.get_sweep_data()
 
             # Get intensity model class
-            self.intensity_model_class = [k for k in self.config.keys() if k in INTENSITY_MODELS and isinstance(self.config[k],dict)][0]
-            
+            intensity_model_class = [
+                k for k in self.config.keys() 
+                if k in INTENSITY_MODELS and isinstance(self.config[k],dict)
+            ]
+            if len(intensity_model_class) > 0: 
+                self.intensity_model_class = intensity_model_class[0]
+            else:
+                self.intensity_model_class = ""
+                self.intensity_model_name = ""
+
             # Define config experiment path to directory
             self.outputs_path = config.split('samples/')[0] if kwargs.get('base_dir') is None else kwargs['base_dir']
         
         else:
             raise InvalidConfigType(f'Config {config} of type {type(config)} not recognised.')
         
-        # Get name of intensity model
-        self.intensity_model_name = self.config.settings[self.intensity_model_class]['name']
-        # If these are sweeped store their range otherwse
-        self.intensity_model_name = self.intensity_model_name['sweep']['range'] \
-            if isinstance(self.intensity_model_name,dict) \
-            else [self.intensity_model_name]
+        if self.intensity_model_class:
+            # Get name of intensity model
+            self.intensity_model_name = self.config.settings[self.intensity_model_class]['name']
+            # If these are sweeped store their range otherwse
+            self.intensity_model_name = self.intensity_model_name['sweep']['range'] \
+                if isinstance(self.intensity_model_name,dict) \
+                else [self.intensity_model_name]
         
         # Store sample data requirements
         self.output_names = []
@@ -616,7 +633,7 @@ class Outputs(object):
                 # Success - samples were sliced
                 for d in dim_names: 
                     sliced_dims.add(d)
-                sliced_settings.add(slice_setts)
+                sliced_settings.add(str(slice_setts))
                 sliced_new_shape = ({k:v for k,v in dict(samples.sizes).items() if v > 1})
                     # if d not in sliced_dims:
                     #     sliced_dims[d] = {"slice_settings":slice_setts,"new_shape":({k:v for k,v in dict(samples.sizes).items() if v > 1})}
@@ -950,7 +967,7 @@ class Outputs(object):
 
         noise_level = list(deep_get(key='noise_regime',value = self.config.settings))
         if len(noise_level) <= 0:
-            if 'sigma' in self.config.settings['training']['to_learn']:
+            if 'sigma' in self.config.settings['training'].get('to_learn',[]):
                 noise_level = 'learned'
             else:
                 sigma = list(deep_get(key='sigma',value = self.config.settings))
@@ -959,6 +976,8 @@ class Outputs(object):
                         noise_level = 'sweeped'
                     else:
                         noise_level = sigma_to_noise_regime(sigma = sigma[0])
+                else:
+                    noise_level = "unset"
         else:
             noise_level = noise_level[0]
         noise_level = noise_level.capitalize()
@@ -966,9 +985,10 @@ class Outputs(object):
         title = self.config['outputs']['title']
         title = title if isinstance(title,str) else None
         
-        proposal = self.config['mcmc']['contingency_table']['proposal'] \
-            if 'mcmc' in self.config.settings and 'contingency_table' in self.config.settings['mcmc'] \
-            else None
+        proposal = self.config\
+            .get('mcmc',{})\
+            .get('contingency_table',{})\
+            .get('proposal','')
         proposal = proposal if isinstance(proposal,str) else None
 
         if sweep_experiment_id is None:
@@ -1553,19 +1573,6 @@ class Outputs(object):
             # Cast to xr DataArray
             self.inputs.cast_to_xarray()
 
-            # Read from config
-            intensity_name = self.config.settings[self.intensity_model_class]['name']
-            # Otherwise read from coords of first dataarray
-            first_da = self.get_sample(self.output_names[0])
-            intensity_name = intensity_name if isinstance(intensity_name,str) else first_da.coords['name'].item()
-
-            # Get intensity model
-            IntensityModelClass = globals()[intensity_name+'SIM']
-
-            self.check_data_availability(
-                sample_name = sample_name,
-                input_names = IntensityModelClass.REQUIRED_INPUTS
-            )
             # Get samples and cast them to appropriate type
             if torch.is_tensor(getattr(self.inputs.data,sample_name)):
                 samples = torch.clone(
@@ -2735,7 +2742,11 @@ class OutputSummary(object):
                 self.logger.debug(traceback.format_exc())
                 self.logger.error(exc)
                 sys.exit()
-            self.logger.progress(f"{key} {dict(samples.sizes)}, {samples.dtype}")
+            # Log progress
+            if isinstance(samples,(xr.DataArray,xr.Dataset)):
+                self.logger.progress(f"{key} {dict(samples.sizes)}, {samples.dtype}")
+            else:
+                self.logger.progress(f"{key} {samples.shape}, {samples.dtype}")
         
         keyword_expressions = [(k,v) for k,v in self.settings['evaluation_kwargs'] if k not in raw_data_keys]
         self.logger.progress([k for k,_ in keyword_expressions])

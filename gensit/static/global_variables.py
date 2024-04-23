@@ -117,16 +117,24 @@ LOSS_KWARG_OPERATIONS = {
 
 VALIDATION_SCHEMA = {
     "test_cells": {
-        "apply_function":"da.astype('int32')"
+        "dtype":"int32",
+        "ndmin":2,
+        "cast_to_xarray":False
     },
     "test_validation_cells": {
-        "apply_function":"da.astype('int32')"
+        "dtype":"int32",
+        "ndmin":2,
+        "cast_to_xarray":False
     },
     "zero_train_cells": {
-        "apply_function":"da.astype('int32')"
+        "dtype":"int32",
+        "ndmin":2,
+        "cast_to_xarray":False
     },
     "train_cells": {
-        "apply_function":"da.astype('int32')"
+        "dtype":"int32",
+        "ndmin":2,
+        "cast_to_xarray":False
     }
 }
 
@@ -196,12 +204,13 @@ INPUT_SCHEMA = {
         "cast_to_xarray":True
     },
     "grand_total":{
-        "axes":[],
         "dtype":"float32",
         "ndmin":0,
-        "funcs":[],
-        "args_dtype":[],
-        "dims":[],
+        "cast_to_xarray":False
+    },
+    "region_features":{
+        "dtype":"float32",
+        "ndmin":2,
         "cast_to_xarray":False
     },
     "margins":{},
@@ -370,6 +379,8 @@ SAMPLE_DATA_REQUIREMENTS["intensity"] = INTENSITY_OUTPUTS
 TABLE_INFERENCE_EXPERIMENTS = ["nonjointtablesim_nn","jointtablesim_nn","jointtablesim_mcmc","table_mcmc","table_mcmc","tablesummaries_mcmcconvergence"]
 
 EXPERIMENT_OUTPUT_NAMES = {
+    "RSquared_Analysis": ["r2"],
+    "LogTarget_Analysis": ["log_posterior_approximation"],
     "SIM_MCMC": ["log_destination_attraction","theta","sign",
                  "log_target","compute_time",
                  "theta_acc","log_destination_attraction_acc"],
@@ -377,12 +388,10 @@ EXPERIMENT_OUTPUT_NAMES = {
                            "log_target","compute_time",
                            "theta_acc","log_destination_attraction_acc","table_acc"],
     "Table_MCMC": ["table","compute_time"],
-    "TableSummaries_MCMCConvergence": ["table","compute_time"],
     "SIM_NN": ["log_destination_attraction","theta","loss","compute_time"],
-    "RSquared_Analysis": ["r2"],
-    "LogTarget_Analysis": ["log_posterior_approximation"],
     "NonJointTableSIM_NN": ["log_destination_attraction","theta", "loss", "table","compute_time"],
-    "JointTableSIM_NN": ["log_destination_attraction","theta","loss", "table","compute_time"]
+    "JointTableSIM_NN": ["log_destination_attraction","theta","loss", "table","compute_time"],
+    "XGBoost_Comparison": ["intensity","compute_time"]
 }
 
 AUXILIARY_COORDINATES_DTYPES = {

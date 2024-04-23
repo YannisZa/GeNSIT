@@ -4,7 +4,7 @@ from copy import deepcopy
 from gensit.config import Config
 from gensit.utils.misc_utils import ,f_to_array,deep_updates
 from gensit.contingency_table import ContingencyTable2D
-from gensit.markov_basis import instantiate_markov_basis
+from gensit.contingency_table.markov_basis import instantiate_markov_basis
 
 @pytest.fixture
 def default_config():

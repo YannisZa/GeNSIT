@@ -9,7 +9,7 @@ from copy import deepcopy
 from argparse import Namespace
 from gensit.config import Config
 from gensit.contingency_table import ContingencyTable2D
-from gensit.spatial_interaction_model import ProductionConstrainedSIM,TotallyConstrainedSIM
+from gensit.intensity_models.spatial_interaction_models import ProductionConstrainedSIM,TotallyConstrainedSIM
 from gensit.utils.probability_utils import *
 from tests.test_4_spatial_interaction_model import Test4Helpers
 

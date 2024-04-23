@@ -6,7 +6,7 @@ import pandas as pd
 # from pprint import pprint
 
 from gensit.config import Config
-from gensit.spatial_interaction_model import instantiate_sim
+from gensit.intensity_models.spatial_interaction_models import instantiate_sim
 
 class Test4Helpers:
 

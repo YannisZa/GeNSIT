@@ -3,18 +3,18 @@
     Code extended from https://github.com/ThGaskin/NeuralABM
 '''
 
-from copy import deepcopy
 import sys
 import torch
 import inspect
 import numpy as np
 
+from copy import deepcopy
 from torch import nn, float32
 from typing import Any, List, Union
 
 from gensit.config import Config
 from gensit.utils.exceptions import *
-from gensit.harris_wilson_model import HarrisWilson
+from gensit.physics_models.harris_wilson_model import HarrisWilson
 from gensit.utils.misc_utils import setup_logger, fn_name, eval_dtype
 from gensit.static.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
 
@@ -171,7 +171,7 @@ class NeuralNet(nn.Module):
             activation_funcs
         )
         self.bias = get_bias(
-            num_layers, 
+            num_layers,
             biases
         )
 

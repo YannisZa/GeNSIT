@@ -8,9 +8,9 @@ import xarray as xr
 from torch import float32
 
 from gensit.config import Config
-from gensit.spatial_interaction_model import SpatialInteraction2D
 from gensit.utils.misc_utils import set_seed, setup_logger, to_json_format
 from gensit.static.global_variables import PARAMETER_DEFAULTS,DATA_SCHEMA,Dataset
+from gensit.intensity_models.spatial_interaction_models import SpatialInteraction2D
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
 

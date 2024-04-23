@@ -17,11 +17,11 @@ from copy import deepcopy
 from gensit.config import Config
 from gensit.utils.exceptions import *
 from gensit.utils.math_utils import torch_optimize
-from gensit.harris_wilson_model import HarrisWilson
+from gensit.physics_models.harris_wilson_model import HarrisWilson
 from gensit.utils.probability_utils import random_vector
-from gensit.spatial_interaction_model import instantiate_sim
-from gensit.static.global_variables import INPUT_SCHEMA, PARAMETER_DEFAULTS,INPUT_SCHEMA, Dataset
-from gensit.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims, eval_dtype
+from gensit.intensity_models.spatial_interaction_models import instantiate_sim
+from gensit.static.global_variables import INPUT_SCHEMA, PARAMETER_DEFAULTS, INPUT_SCHEMA, VALIDATION_SCHEMA, Dataset
+from gensit.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims, eval_dtype, read_file
 
 class Inputs:
     def __init__(
@@ -45,9 +45,6 @@ class Inputs:
         # Create data
         self.data = Dataset()
 
-        # Store attributes and their associated dims
-        self.schema = INPUT_SCHEMA
-
         # Flag for whether data are stored in device
         self.data_in_device = False
 
@@ -69,9 +66,9 @@ class Inputs:
         return {k:v for k,v in vars(self.data).items() if k in INPUT_SCHEMA}
     
     def validate_dims(self):
-        for attr,schema in self.schema.items():
+        for attr,schema in INPUT_SCHEMA.items():
             if len(schema) > 0:
-                for ax,dim in zip(schema["axes"],schema["dims"]):
+                for ax,dim in zip(schema.get("axes",[]),schema.get("dims",[])):
                     if hasattr(self.data,attr) and getattr(self.data,attr) is not None:
                         try:
                             assert list(getattr(self.data,attr).shape)[ax] == self.data.dims[dim]
@@ -86,14 +83,18 @@ class Inputs:
             raise Exception('Input dataset NOT provided. Harris Wilson model cannot be created.')
 
         # Initialise all
-        # for attr in self.schema.keys():
+        # for attr in INPUT_SCHEMA.keys():
             # setattr(self.data,attr,None)
 
         # Import dims
-        setattr(self.data,"dims",self.config.settings['inputs'].get("dims",{"origin":None,"destination":None,"time":None}))
+        setattr(
+            self.data,
+            "dims",
+            self.config.settings['inputs'].get("dims",{"origin":None,"destination":None,"time":None})
+        )
 
         # Import all data
-        for attr,schema in self.schema.items():
+        for attr,schema in INPUT_SCHEMA.items():
             if len(schema) > 0 and attr in list(self.config.settings['inputs']['data'].keys()):
                 filename = self.config.settings['inputs']['data'][attr]
                 filename = filename.get('file','') if isinstance(filename,dict) else filename
@@ -110,9 +111,35 @@ class Inputs:
                     if schema.get('positive',True) and (getattr(self.data,attr) < 0).any():
                         raise Exception(f"{attr.replace('_',' ').capitalize()} {getattr(self.data,attr)} are NOT positive")
                     # Update dims
-                    for ax,dim in zip(schema["axes"],schema["dims"]):
+                    for ax,dim in zip(schema.get("axes",[]),schema.get("dims",[])):
                         if getattr(self.data,attr) is not None:
                             self.data.dims[dim] = int(np.shape(getattr(self.data,attr))[ax])
+                else:
+                    raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
+        
+        
+        for attr,schema in VALIDATION_SCHEMA.items():
+            if len(schema) > 0 and attr in list(self.config.settings['inputs']['data'].keys()):
+                filename = self.config.settings['inputs']['data'][attr]
+                filename = filename.get('file','') if isinstance(filename,dict) else filename
+                filepath = os.path.join(
+                    self.config.in_directory,
+                    self.config.settings['inputs']['dataset'],
+                    filename
+                )
+                if os.path.isfile(filepath):
+                    # Import data
+                    data = read_file(filepath, dtype = schema['dtype'], ndmin = schema['ndmin'])
+                    # # Apply function
+                    # if schema.get('apply_function','') != '':
+                    #     data = eval(
+                    #         schema['apply_function'],
+                    #         {"np":np,"torch":torch,"da":data}
+                    #     )
+                    setattr(self.data,attr,data)
+                    # Check to see see that they are all positive
+                    if schema.get('positive',True) and (getattr(self.data,attr) < 0).any():
+                        raise Exception(f"{attr.replace('_',' ').capitalize()} {getattr(self.data,attr)} are NOT positive")
                 else:
                     raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
         
@@ -127,7 +154,8 @@ class Inputs:
         if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:
             # Compute grand total
             self.data.grand_total = np.sum(self.data.ground_truth_table,dtype='float32')
-            self.config.settings['spatial_interaction_model']['grand_total'] = float(self.data.grand_total)
+            if 'spatial_interaction_model' in self.config.settings:
+                self.config.settings['spatial_interaction_model']['grand_total'] = float(self.data.grand_total)
         if hasattr(self.data,"dims") and self.data.dims is not None and len(self.data.dims) > 0:
             self.config.settings['inputs']["dims"] = self.data.dims
 
@@ -138,8 +166,8 @@ class Inputs:
             params_to_learn = ['alpha','beta']
         # Extract the underlying parameters from the config
         parameter_settings = {
-            **self.config.settings['spatial_interaction_model']['parameters'],
-            **self.config.settings['harris_wilson_model']['parameters']
+            **self.config.settings.get('spatial_interaction_model',{}).get('parameters',{}),
+            **self.config.settings.get('harris_wilson_model',{}).get('parameters',{})
         }
         self.true_parameters = {
             k: parameter_settings.get(k,v) \
@@ -150,9 +178,9 @@ class Inputs:
         self.update_delta_and_kappa()
 
     def update_delta_and_kappa(self):
-        self.true_parameters['delta'] = self.config.settings['harris_wilson_model']['parameters'].get('delta',-1.0)
+        self.true_parameters['delta'] = self.config.settings.get('harris_wilson_model',{}).get('parameters',{}).get('delta',-1.0)
         self.true_parameters['delta'] = self.true_parameters['delta'] if self.true_parameters['delta'] >= 0 else None
-        self.true_parameters['kappa'] = self.config.settings['harris_wilson_model']['parameters'].get('kappa',-1.0)
+        self.true_parameters['kappa'] = self.config.settings.get('harris_wilson_model',{}).get('parameters',{}).get('kappa',-1.0)
         self.true_parameters['kappa'] = self.true_parameters['kappa'] if self.true_parameters['kappa'] >= 0 else None
         
         if hasattr(self.data,'destination_attraction_ts'):
@@ -290,10 +318,8 @@ class Inputs:
             for input,schema in INPUT_SCHEMA.items():
                 if input not in ["dims",'grand_total','margins','true_parameters'] and \
                     getattr(self.data,input,None) is not None:
-                        setattr(
-                            self.data,
-                            input,
-                            torch.reshape(
+                        if "dims" in schema:
+                            data = torch.reshape(
                                 torch.from_numpy(
                                     getattr(self.data,input)).to(dtype = eval_dtype(
                                         schema['dtype'],
@@ -302,6 +328,18 @@ class Inputs:
                                 ),
                                 tuple([self.data.dims[name] for name in schema["dims"]])
                             ).to(device)
+                        else:
+                            data = torch.from_numpy(
+                                getattr(self.data,input)).to(dtype = eval_dtype(
+                                    schema['dtype'],
+                                    numpy_format = False
+                                )
+                            )
+                        # Store to data
+                        setattr(
+                            self.data,
+                            input,
+                            data
                         )
             if hasattr(self.data,'log_destination_attraction') and getattr(self.data,'log_destination_attraction') is not None:
                 self.data.log_destination_attraction = torch.squeeze(self.data.log_destination_attraction)
@@ -353,8 +391,8 @@ class Inputs:
             if os.path.isfile(cell_filename):
                 # Initialise ground truth table
                 self.data.ground_truth_table = -np.ones(
-                    tuple([d for d in self.schema['ground_truth_table']['dims']]),
-                    dtype = self.schema['ground_truth_table']['dtype']
+                    tuple([d for d in INPUT_SCHEMA['ground_truth_table']['dims']]),
+                    dtype = INPUT_SCHEMA['ground_truth_table']['dtype']
                 )
                 # Import all cells
                 cells = read_json(cell_filename)

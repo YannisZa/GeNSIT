@@ -17,7 +17,7 @@ import gensit.utils.probability_utils as ProbabilityUtils
 
 from gensit.config import Config
 from gensit.utils.math_utils import torch_optimize
-from gensit.harris_wilson_model import HarrisWilson
+from gensit.physics_models.harris_wilson_model import HarrisWilson
 from gensit.utils.misc_utils import setup_logger, makedir, set_seed, unpack_dims
 
 AIS_SAMPLE_ARGS = ['alpha','beta','sigma','n_temperatures','ais_samples','leapfrog_steps','epsilon_step','semaphore','pbar']
