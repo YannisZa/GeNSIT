@@ -198,6 +198,83 @@
           }
         }
       },
+      "region_features": {
+        "sweepable": false,
+        "optional": true,
+        "exclude": false,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "npy",
+              "default-value": "region_features.npy"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "npy",
+              "default-value": "region_features.npy",
+              "unique-vals": true
+            }
+          }
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "list",
+              "list-list-dtype": "int",
+              "default-value": []
+            }
+          }
+        }
+      },
+      "test_cells": {
+        "sweepable": false,
+        "optional": true,
+        "exclude": false,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "test_cells.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "test_cells.txt",
+              "unique-vals": true
+            }
+          }
+        }
+      },
       "origin_demand": {
         "sweepable": false,
         "optional": true,
@@ -928,7 +1005,7 @@
 
     "name": {
       "sweepable": true,
-      "optional": false,
+      "optional": true,
       "exclude": false,
 
       "sweep": {
@@ -967,7 +1044,7 @@
     },
     "parameters": {
       "sweepable": false,
-      "optional": false,
+      "optional": true,
       "exclude": false,
 
       "alpha": {
@@ -1012,7 +1089,7 @@
       },
       "bmax": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
         "exclude": false,
 
         "sweep": {
@@ -1036,12 +1113,12 @@
   },
   "harris_wilson_model": {
     "sweepable": false,
-    "optional": false,
+    "optional": true,
     "exclude": false,
 
     "dt": {
       "sweepable": true,
-      "optional": false,
+      "optional": true,
       "exclude": false,
 
       "sweep": {
@@ -1061,7 +1138,7 @@
     },
     "parameters": {
       "sweepable": false,
-      "optional": false,
+      "optional": true,
       "exclude": false,
 
       "delta": {
@@ -1130,7 +1207,7 @@
       },
       "epsilon": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
         "exclude": false,
 
         "sweep": {
@@ -1152,7 +1229,7 @@
       },
       "noise_percentage": {
         "sweepable": true,
-        "optional": false,
+        "optional": true,
         "exclude": false,
 
         "sweep": {
@@ -1548,7 +1625,7 @@
     },
     "to_learn": {
       "sweepable": true,
-      "optional": false,
+      "optional": true,
       "exclude": false,
 
       "sweep": {
@@ -1578,6 +1655,249 @@
             "sigma",
             "noise_percentage"
           ]
+        }
+      }
+    }
+  },
+  "xgboost": {
+    "sweepable": false,
+    "optional": true,
+    "exclude": false,
+
+    "verbose_eval": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+
+      "dtype": "int",
+      "default-value": 0,
+      "valid-range": [0, null]
+    },
+    "hyperparameters": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+
+      "xg_max_depth": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 1,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_eta": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 0.5,
+            "valid-range": [0.0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "float",
+            "default-value": 0.5,
+            "valid-range": [0.0, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_objective": {
+        "sweep": {
+          "default": {
+            "dtype": "str",
+            "default-value": "reg:squarederror"
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "str",
+            "default-value": "reg:squarederror",
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_eval_metric": {
+        "sweep": {
+          "default": {
+            "dtype": "str",
+            "default-value": "rmse"
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "str",
+            "default-value": "rmse",
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_gpu_id": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 0,
+            "valid-range": [0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 0,
+            "valid-range": [0, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_tree_method": {
+        "sweep": {
+          "default": {
+            "dtype": "str",
+            "default-value": "gpu_hist"
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "str",
+            "default-value": "gpu_hist",
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_max_delta_step": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 2,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 2,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_min_child_weight": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 4,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 1,
+            "valid-range": [4, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_alpha": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 0.5,
+            "valid-range": [0.0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "float",
+            "default-value": 0.5,
+            "valid-range": [0.0, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_lambda": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 5.0,
+            "valid-range": [0.0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "float",
+            "default-value": 5.0,
+            "valid-range": [0.0, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_gamma": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 0.5,
+            "valid-range": [0.0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "float",
+            "default-value": 0.5,
+            "valid-range": [0.0, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "xg_subsample": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 0.8,
+            "valid-range": [0.0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "float",
+            "default-value": 0.8,
+            "valid-range": [0.0, null],
+            "unique-vals": true
+          }
         }
       }
     }
@@ -1930,12 +2250,13 @@
           "RSquared_Analysis",
           "LogTarget_Analysis",
           "DataGeneration",
-          "SIM_NN",
           "SIM_MCMC",
+          "JointTableSIM_MCMC",
           "Table_MCMC",
+          "SIM_NN",
           "NonJointTableSIM_NN",
           "JointTableSIM_NN",
-          "JointTableSIM_MCMC"
+          "XGBoost_Comparison"
         ]
       },
       "comment": {

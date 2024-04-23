@@ -21,6 +21,22 @@
     "load_experiment": true,
     "data": {
       "data_generation_seed": true,
+      "region_features": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        }
+      },
+      "test_cells": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        }
+      },
       "origin_demand": {
         "file": {
           "sweep": {
@@ -347,6 +363,83 @@
       },
       "table0": true,
       "margin0": true
+    }
+  },
+  "xgboost": {
+    "verbose_eval": true,
+    "hyperparameters": {
+      "xg_max_depth": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_eta": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_objective": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_eval_metric": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_gpu_id": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_tree_method": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_max_delta_step": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_min_child_weight": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_alpha": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_lambda": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_gamma": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "xg_subsample": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      }
     }
   },
   "neural_network": {
