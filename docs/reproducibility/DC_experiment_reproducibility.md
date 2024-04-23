@@ -88,6 +88,23 @@ clear; gensit summarise \
 -k sigma -k type -k name -k title -fe SRMSEs -nw 20
 ```
 
+```
+clear; gensit summarise \
+-dn DC/exp2 -et XGBoost_Comparison \
+-el np -el MathUtils -el xr \
+-e intensity_srmse_all "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \
+-e intensity_srmse_train "srmse_func(prediction=mean_intensity,ground_truth=ground_truth,cells=train_cells)" \
+-e intensity_srmse_test "srmse_func(prediction=mean_intensity,ground_truth=ground_truth,cells=test_cells)" \
+-ea intensity \
+-ea "test_cells=outputs.get_sample('test_cells')" \
+-ea "train_cells=outputs.get_sample('train_cells')" \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "srmse_func=MathUtils.srmse" \
+-ea "mean_intensity=intensity.mean(['id'],dtype='float64')" \
+-vd test_cells "./data/inputs/DC/test_cells.txt" -vd train_cells "./data/inputs/DC/train_cells.txt" \
+-k type -k title -fe SRMSEs -nw 20
+```
+
 Get coverage probabilities for all samples and all experiments:
 
 ```
