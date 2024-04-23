@@ -187,7 +187,7 @@ class Outputs(object):
             if self.data_names is not None \
             else set(list(OUTPUT_SCHEMA.keys()))
         for sam in avail_output_names:
-            if sam == 'intensity':
+            if sam == 'intensity' and self.intensity_model_name != '':
                 # Add all intensity-related data names
                 for model_name in self.intensity_model_name:
                     self.output_names.extend(SAMPLE_DATA_REQUIREMENTS[sam][model_name])
@@ -1525,7 +1525,7 @@ class Outputs(object):
                 logger = self.logger
             )
 
-        if sample_name == 'intensity':
+        if sample_name == 'intensity' and self.intensity_model_class != '':
             # Get sim model 
             self.logger.debug('getting sim model')
             
@@ -1596,19 +1596,22 @@ class Outputs(object):
                 )
 
         elif sample_name in VALIDATION_SCHEMA:
-            
-            if sample_name in self.settings['validation_data']:
+            # First try to read from inputs
+            # this is only the case when inputs and validation data intersect
+            if getattr(self.inputs.data,sample_name,None) is not None:
+                samples = getattr(self.inputs.data,sample_name)
+            # Then try to read from settings directly
+            elif sample_name in self.settings['validation_data']:
                 # Get filename to validation data
                 validation_data_filename = self.settings['validation_data'][sample_name]
                 # Read validation data
-                samples = read_file(validation_data_filename)
+                samples = read_file(validation_data_filename, dtype = VALIDATION_SCHEMA[sample_name]['dtype'])
                 # Apply 
                 if VALIDATION_SCHEMA[sample_name].get('apply_function','') != '':
                     samples = eval(
                         VALIDATION_SCHEMA[sample_name]['apply_function'],
                         {"np":np,"torch":torch,"da":samples}     
                     )
-
             else:
                 raise MissingData(
                     missing_data_name = sample_name,

@@ -446,9 +446,8 @@ class Experiment(object):
                         )
 
             for sample in [
-                'log_destination_attraction','table','log_target','compute_time',
-                'sign','theta_acc','log_destination_attraction_acc','table_acc',
-                'intensity'
+                'log_destination_attraction','table','log_target','intensity',
+                'sign','theta_acc','log_destination_attraction_acc','table_acc','compute_time'
             ]:
                 if sample in self.output_names:
                     # Setup chunked dataset to store the state data in
@@ -563,9 +562,8 @@ class Experiment(object):
                     getattr(self,sample)[kwargs['index']] = sample_value
 
             for sample in [
-                'log_destination_attraction','sign','table',
-                'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time',
-                'intensity'
+                'log_destination_attraction','sign','table', 'intensity',
+                'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time'
             ]:
                 if sample in self.output_names:
                     # Get sample value
@@ -2519,6 +2517,7 @@ class XGBoost_Comparison(Experiment):
         
         # Store number of samples
         N = self.config['training']['N']
+        self._time = 1
 
         # Get covariates/features
         features_max = self.inputs.data.region_features.max(dim=0).values
@@ -2591,7 +2590,7 @@ class XGBoost_Comparison(Experiment):
                 intensity = intensity_xr,
                 compute_time = time.time() - start_time
             )
-
+            self._time += 1
         
         # Update metadata
         self.show_progress()
