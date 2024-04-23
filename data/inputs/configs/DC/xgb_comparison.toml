@@ -1,0 +1,70 @@
+log_level = 'info'
+sweep_mode = false
+
+[inputs]
+n_workers = +1
+n_threads = +6
+device = 'cpu'
+in_directory = './data/inputs/'
+dataset = 'DC'
+load_experiment = ''
+seed = 1234
+  
+[inputs.data]
+    [inputs.data.region_features]
+      file = 'region_features.npy'
+    [inputs.data.origin_demand]
+      file = 'origin_demand_sum_normalised.txt'
+    [inputs.data.destination_attraction_ts]
+      file ='destination_attraction_housing_units_ts_sum_normalised.txt'
+    [inputs.data.cost_matrix]
+      file = "cost_matrix_max_normalised.txt"
+    [inputs.data.ground_truth_table]
+      file = 'ground_truth_table.txt'
+    [inputs.data.test_cells]
+        file = 'test_cells.txt'
+
+[contingency_table]
+  sparse_margins = false
+  [contingency_table.constraints]
+    cells = 'zero_and_train_cells.txt'
+    axes = [[0],[1]]
+
+[training]
+  num_steps = +1
+  batch_size = +1
+  N = 400
+
+[xgboost]
+  disable_tqdm = true
+  verbose_eval = 0
+  [xgboost.hyperparameters]
+    xg_max_depth = 8
+    xg_eta = 0.5
+    xg_objective = 'reg:squarederror'
+    xg_eval_metric = 'rmse'
+    xg_gpu_id = 0
+    xg_tree_method = 'gpu_hist'
+    xg_max_delta_step = 2
+    xg_min_child_weight = 4 
+    # xg_alpha = 0.5
+    # xg_lambda = 5.0
+    # xg_gamma = 0.5
+    # xg_subsample = 0.8
+
+[[experiments]]
+  type = 'XGBoost_Comparison'
+  comment = 'Gradient Boosted Trees Vanilla Algorithm Comparison'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[outputs]
+    chunk_size = +20_000
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/'
+    out_group = 'exp2'
+    title = '_doubly_and_cell_constrained'
