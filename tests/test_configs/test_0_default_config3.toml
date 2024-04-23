@@ -9,7 +9,7 @@ directory = ''
   sparse_margins = false
   [inputs.contingency_table.constraints]
     axes = [[0,1]]
-    cells = ''
+    cells = false
   [inputs.contingency_table.import]
       table = 'table.txt'
       margins = ['colsums.txt','rowsums.txt']
