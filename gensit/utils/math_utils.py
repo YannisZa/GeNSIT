@@ -438,3 +438,31 @@ def signed_var(data,signs,**kwargs):
     denominator = signs.sum(kwargs['dim'])
     numerator,denominator = xr.align(numerator,denominator, join='exact')
     return (numerator/denominator - samples_mean**2)
+
+def skew_sigmoid_torch(v):
+    v = 1 / ( 1 + torch.exp(-50*v) )
+    return v
+
+def skew_sigmoid_numpy(v):
+    v = 1 / ( 1 + np.exp(-50*v) )
+    return v
+
+# Calculates the gradient penalty loss for WGAN GP
+def compute_gradient_penalty(D, real_samples, fake_samples, device):
+    # Random weight term for interpolation between real and fake samples
+    alpha = torch.FloatTensor(np.random.random((real_samples.size(0), 1, 1))).to(device)
+    # Get random interpolation between real and fake samples
+    interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
+    d_interpolates = D(interpolates)
+    fake = torch.FloatTensor(real_samples.shape[0]).fill_(1.0).to(device)
+    # Get gradient w.r.t. interpolates
+    gradients = torch.autograd.grad(
+        outputs=d_interpolates,
+        inputs=interpolates,
+        grad_outputs=fake,
+        create_graph=True,
+        retain_graph=True,
+    )[0]
+    gradients = gradients.view(gradients.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    return gradient_penalty
