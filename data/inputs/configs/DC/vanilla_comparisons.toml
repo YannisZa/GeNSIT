@@ -13,6 +13,8 @@ seed = 1234
 [inputs.data]
     [inputs.data.region_features]
       file = 'region_features.npy'
+    [inputs.data.adjacency_matrix]
+      file = 'adjacency_matrix.txt'
     [inputs.data.origin_demand]
       file = 'origin_demand_sum_normalised.txt'
     [inputs.data.destination_attraction_ts]
@@ -25,8 +27,6 @@ seed = 1234
         file = 'test_cells.txt'
     [inputs.data.train_cells]
         file = 'zero_and_train_cells.txt'
-    [inputs.data.validation_cells]
-        file = 'validation_cells.txt'
 
 [contingency_table]
   sparse_margins = false
@@ -36,7 +36,7 @@ seed = 1234
 
 [training]
   num_steps = +1
-  batch_size = +1
+  batch_size = +1000
   N = 40
 
 [xgboost]
@@ -73,6 +73,20 @@ seed = 1234
     gbrt_max_depth = nan
     gbrt_min_samples_split = 10
     gbrt_min_samples_leaf = 3
+
+
+[graph_attention_network]
+  disable_tqdm = true
+  [graph_attention_network.hyperparameters]
+    gat_nodes_per_layer = 128
+    gat_num_hidden_layers = 1
+    gat_dropout = 0
+    gat_reg_param = 0
+    gat_negative_sampling_rate = 0
+    gat_grad_norm = 1.0
+    gat_optimizer = 'Adam'
+    gat_learning_rate = +1e-5
+    gat_multitask_weights = [0.5, 0.25, 0.25]
     
 
 [[experiments]]
@@ -101,6 +115,16 @@ seed = 1234
   export_metadata = true
   overwrite = true
   validate_samples = false
+
+[[experiments]]
+  type = 'GraphAttentionNetwork_Comparison'
+  comment = 'Graph Attention Network Algorithm Comparison'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
 
 [outputs]
     chunk_size = +20_000
