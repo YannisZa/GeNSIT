@@ -19,9 +19,10 @@ from gensit.contingency_table import instantiate_ct
 from gensit.physics_models.harris_wilson_model import HarrisWilson
 from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
 from gensit.intensity_models.spatial_interaction_models import instantiate_sim
+from gensit.learning_models.XGB import XGB_Model
 from gensit.learning_models.GBRT import GBRT_Model
-from gensit.learning_models.XGB_model import XGB_Model
-from gensit.learning_models.random_forest_model import RandomForest_Model
+from gensit.learning_models.RandomForest import RandomForest_Model
+from gensit.learning_models.graph_attention_network import GAT_Model
 from gensit.learning_models.harris_wilson_model_mcmc import HarrisWilson_MCMC
 from gensit.learning_models.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
 from gensit.contingency_table.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
@@ -676,7 +677,7 @@ class RSquared_Analysis(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
     
-        self.output_names = EXPERIMENT_OUTPUT_NAMES['RSquared_Analysis']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -806,7 +807,7 @@ class RSquared_Analysis(Experiment):
             total = len(alpha_values)*len(beta_values),
             disable = self.tqdm_disabled,
             position = self.position,
-            desc = f"RSquared_Analysis instance: {self.position}",
+            desc = f"{self.__class__.__name__} instance: {self.position}",
             leave = False
         )
 
@@ -922,7 +923,7 @@ class LogTarget_Analysis(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
     
-        self.output_names = EXPERIMENT_OUTPUT_NAMES['LogTarget_Analysis']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -1046,7 +1047,7 @@ class LogTarget_Analysis(Experiment):
             total = len(alpha_values)*len(beta_values),
             disable = self.tqdm_disabled,
             position = self.position,
-            desc = f"LogTarget Analysis instance: {self.position}",
+            desc = f"{self.__class__.__name__} instance: {self.position}",
             leave = False
         )
 
@@ -1112,7 +1113,7 @@ class SIM_MCMC(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        self.output_names = EXPERIMENT_OUTPUT_NAMES['SIM_MCMC']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -1231,7 +1232,7 @@ class SIM_MCMC(Experiment):
             disable = self.tqdm_disabled,
             leave = False,
             position = self.position,
-            desc = f"SIM_MCMC instance: {self.position}"
+            desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -1322,7 +1323,7 @@ class JointTableSIM_MCMC(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        self.output_names = EXPERIMENT_OUTPUT_NAMES['JointTableSIM_MCMC']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -1467,7 +1468,7 @@ class JointTableSIM_MCMC(Experiment):
             disable = self.tqdm_disabled,
             leave = False,
             position = self.position,
-            desc = f"JointTableSIM_MCMC instance: {self.position}"
+            desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -1596,7 +1597,7 @@ class Table_MCMC(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        self.output_names = EXPERIMENT_OUTPUT_NAMES['table']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -1708,7 +1709,7 @@ class Table_MCMC(Experiment):
             disable = self.tqdm_disabled,
             leave = False,
             position = self.position,
-            desc = f"Table MCMC instance: {self.position}"
+            desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -1754,7 +1755,7 @@ class SIM_NN(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
     
-        self.output_names = EXPERIMENT_OUTPUT_NAMES['SIM_NN']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -1874,7 +1875,7 @@ class SIM_NN(Experiment):
             disable = self.tqdm_disabled,
             leave = False,
             position = self.position,
-            desc = f"SIM_NN instance: {self.position}"
+            desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -1961,7 +1962,7 @@ class NonJointTableSIM_NN(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        self.output_names = EXPERIMENT_OUTPUT_NAMES['NonJointTableSIM_NN']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -2101,7 +2102,7 @@ class NonJointTableSIM_NN(Experiment):
             disable = self.tqdm_disabled,
             leave = False,
             position = self.position,
-            desc = f"NonJointTableSIM_NN instance: {self.position}"
+            desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -2196,13 +2197,12 @@ class NonJointTableSIM_NN(Experiment):
         self.logger.note("Experiment finished.")
 
 class JointTableSIM_NN(Experiment):
-    
     def __init__(self, config:Config, **kwargs):
 
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        self.output_names = EXPERIMENT_OUTPUT_NAMES['JointTableSIM_NN']
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -2343,7 +2343,7 @@ class JointTableSIM_NN(Experiment):
             disable = self.tqdm_disabled,
             leave = False,
             position = self.position,
-            desc = f"JointTableSIM_NN instance: {self.position}"
+            desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
 
             # Track the epoch training time
@@ -2453,8 +2453,7 @@ class XGBoost_Comparison(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
-        self.experiment_name = 'XGBoost_Comparison'
-        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.experiment_name]
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -2482,7 +2481,7 @@ class XGBoost_Comparison(Experiment):
         self.config = getattr(self.ct,'config',self.config)
         
         # Set up the model
-        self.logger.note(f"Initializing the {self.experiment_name.replace('_Comparison','')} algorithm ...")
+        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
         self.learning_model = XGB_Model(
             config = self.config,
             logger = self.logger
@@ -2513,7 +2512,7 @@ class XGBoost_Comparison(Experiment):
 
     def run(self,**kwargs) -> None:
 
-        self.logger.note(f"Running {self.experiment_name.replace('_',' ')}.")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -2561,7 +2560,7 @@ class XGBoost_Comparison(Experiment):
             disable = self.tqdm_disabled,
             leave = False,
             position = self.position,
-            desc = f"{self.experiment_name} instance: {self.position}"
+            desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
             # Track the epoch training time
             start_time = time.time()
@@ -2611,8 +2610,7 @@ class RandomForest_Comparison(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
         
-        self.experiment_name = 'RandomForest_Comparison'
-        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.experiment_name]
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -2640,7 +2638,7 @@ class RandomForest_Comparison(Experiment):
         self.config = getattr(self.ct,'config',self.config)
         
         # Set up the model
-        self.logger.note(f"Initializing the {self.experiment_name.replace('_Comparison','')} algorithm ...")
+        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
         self.learning_model = RandomForest_Model(
             config = self.config,
             logger = self.logger
@@ -2671,7 +2669,7 @@ class RandomForest_Comparison(Experiment):
 
     def run(self,**kwargs) -> None:
 
-        self.logger.note(f"Running {self.experiment_name.replace('_',' ')}.")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -2756,8 +2754,7 @@ class GBRT_Comparison(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
     
-        self.experiment_name = 'GBRT_Comparison'
-        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.experiment_name]
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
         set_seed(self.seed)
@@ -2785,7 +2782,7 @@ class GBRT_Comparison(Experiment):
         self.config = getattr(self.ct,'config',self.config)
         
         # Set up the model
-        self.logger.note(f"Initializing the {self.experiment_name.replace('_Comparison','')} algorithm ...")
+        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
         self.learning_model = GBRT_Model(
             config = self.config,
             logger = self.logger
@@ -2816,7 +2813,7 @@ class GBRT_Comparison(Experiment):
 
     def run(self,**kwargs) -> None:
 
-        self.logger.note(f"Running {self.experiment_name.replace('_',' ')}.")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -2895,6 +2892,198 @@ class GBRT_Comparison(Experiment):
         
         self.logger.note("Experiment finished.")
 
+
+class GraphAttentionNetwork_Comparison(Experiment):
+    def __init__(self, config:Config, **kwargs):
+        
+        # Initalise superclass
+        super().__init__(config,**kwargs)
+    
+        self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
+
+        # Fix random seed
+        set_seed(self.seed)
+
+        # Prepare inputs
+        self.inputs = Inputs(
+            config = self.config,
+            synthetic_data = False,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+
+        # Pass inputs to device
+        self.inputs.pass_to_device()
+
+        # Build contingency table
+        self.logger.note("Initializing the contingency table ...")
+        self.ct = instantiate_ct(
+            config = self.config,
+            logger = self.logger,
+            **vars(self.inputs.data)
+        )
+        
+        # Get config
+        self.config = getattr(self.ct,'config',self.config)
+
+        # Get covariates/features
+        features_mean = self.inputs.data.region_features.mean(dim=0)
+        features_std = self.inputs.data.region_features.std(dim=0)
+        features = (self.inputs.data.region_features - features_mean) / features_std
+
+        # Compute graph adjacency matrix 
+        weigthed_adjacency_matrix = torch.where(
+            self.inputs.data.adjacency_matrix,
+            self.inputs.data.cost_matrix,
+            0
+        )
+        nonzerocells = weigthed_adjacency_matrix.nonzero()
+        wam = weigthed_adjacency_matrix[nonzerocells[:,0],nonzerocells[:,1]]
+    
+        # Construct graph using adjacency matrix
+        graph = build_graph_from_matrix(
+            weigthed_adjacency_matrix = weigthed_adjacency_matrix, 
+            region_features = features,
+            device = self.device
+        ).to(self.device)
+        
+        # Set up the model
+        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
+
+        # Get number of regions
+        if self.inputs.data.dims['origin'] == self.inputs.data.dims['destination']:
+            num_regions = self.inputs.data.dims['origin']
+        else:
+            num_regions = self.inputs.data.dims['origin'] + self.inputs.data.dims['destination']
+
+        # TODO: Modify this to elicit number of nodes in non square adjacency matrices / graphs
+        self.learning_model = GAT_Model(
+            config = self.config,
+            graph = graph,
+            num_regions = num_regions,
+            input_size = features.shape[1],
+            **{k.replace("gat_",""):v for k,v in self.config['graph_attention_network']['hyperparameters'].items()},
+            device = self.device, 
+            logger = self.logger
+        ).to(self.device)
+
+        # Get config
+        self.config = getattr(self.learning_model,'config',self.config)
+
+        # Create outputs
+        self.outputs = Outputs(
+            self.config,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
+            logger = self.logger
+        )
+
+        # Prepare writing to file
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
+
+        # Write metadata
+        self.write_metadata()
+        
+        self.logger.note(f"{self.learning_model}")
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        
+
+    def run(self,**kwargs) -> None:
+
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
+
+        # Initialise data structures
+        self.initialise_data_structures()
+        
+        # Store time
+        self._time = 1
+        # Store number of samples
+        N = self.config.settings['training']['N']
+        
+        # Get training and test cells
+        train_index = np.array([np.array(c,dtype='int32') for c in self.ct.constraints['cells']],dtype='int32')
+        test_index = self.inputs.data.test_cells
+
+        # Get training set
+        train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
+        train_y = torch.concatenate((
+            torch.tensor(train_index,dtype=uint8),
+            train_y.unsqueeze(1)
+        ), dim = 1)
+        train_inflow = torch.concatenate((
+            torch.tensor(np.arange(0,self.inputs.data.dims['destination'],1), dtype=torch.int32, device=self.device).unsqueeze(1),
+            self.inputs.data.ground_truth_table.sum(axis=INPUT_SCHEMA['ground_truth_table']['dims'].index('destination')).unsqueeze(1),
+        ), dim = 1)
+        train_outflow = torch.concatenate((
+            torch.tensor(np.arange(0,self.inputs.data.dims['origin'],1), dtype=torch.int32, device=self.device).unsqueeze(1),
+            self.inputs.data.ground_truth_table.sum(axis=INPUT_SCHEMA['ground_truth_table']['dims'].index('origin')).unsqueeze(1),
+        ), dim = 1)
+
+        # Define output xarray coordinates 
+        coordinates = {
+            "origin": np.arange(1,self.inputs.data.dims['origin']+1,1,dtype='int32'),
+            "destination": np.arange(1,self.inputs.data.dims['destination']+1,1,dtype='int32'),
+        }
+
+        # Create output array
+        intensity_xr = xr.DataArray(
+            torch.zeros(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']),
+            coords = coordinates
+        )
+        # Update train cells
+        for tc in train_index:
+            intensity_xr[tc[0],tc[1]] = self.inputs.data.ground_truth_table[tc[0],tc[1]]
+
+        # For each epoch
+        for i in tqdm(
+            range(N),
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
+            desc = f"{self.__class__.__name__} instance: {self.position}"
+        ):  
+            # Track the epoch training time
+            start_time = time.time()
+
+            # Run model a single time
+            self.learning_model.run_single(
+                train_y,
+                train_inflow,
+                train_outflow
+            )
+
+            # Predict y, inflows, outflows
+            intensity = self.learning_model.predict(test_index)
+
+            # Update test cells
+            for i,tc in enumerate(test_index):
+                intensity_xr[tc[0],tc[1]] = intensity[i]
+
+            # Clean and write to file
+            self.write_data(
+                intensity = intensity_xr,
+                compute_time = time.time() - start_time
+            )
+            self._time += 1
+
+            # print statements
+            self.show_progress()
+            self.logger.iteration(f"Completed iteration {i+1} / {N}.")
+            if self.logger.console.isEnabledFor(PROGRESS):
+                print('\n')
+    
+        # Update metadata
+        self.show_progress()
+
+        # Write metadata
+        self.write_metadata()
+
+        # Write log and close outputs
+        self.close_outputs()
+        
+        self.logger.note("Experiment finished.")
 
 class ExperimentSweep():
 
