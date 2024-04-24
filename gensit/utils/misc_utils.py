@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import dgl
 import zlib
 import gzip
 import json
@@ -1545,3 +1546,46 @@ def safe_cast(x,minval:float=np.float32(1e-6),maxval:float=np.float32(1e6)):
     x = x if x < maxval else maxval
     
     return x
+
+def build_graph_from_matrix(weigthed_adjacency_matrix, region_features, device='cpu'):
+    '''
+    Build graph using DGL library from adjacency matrix.
+
+    Inputs:
+    -----------------------------------
+    weigthed_adjacency_matrix: graph adjacency matrix of which entries are either 0 or 1.
+    node_feats: node features
+
+    Returns:
+    -----------------------------------
+    g: DGL graph object
+    '''
+    # get edge nodes' tuples [(src, dst)]
+    nonzerocells = weigthed_adjacency_matrix.nonzero()
+    dst, src = nonzerocells.T
+    # get edge weights
+    d = weigthed_adjacency_matrix[nonzerocells[:,0],nonzerocells[:,1]]
+    # create a graph
+    g = dgl.DGLGraph()
+    # add nodes
+    g.add_nodes(weigthed_adjacency_matrix.shape[0])
+    # add edges and edge weights
+    g.add_edges(src, dst, {'d': torch.tensor(d).float().view(-1, 1)})
+    # add node attribute, i.e. the geographical features of census tract
+    g.ndata['attr'] = region_features.to(device)
+    # compute the degree norm
+    norm = comp_deg_norm(g)
+    # add nodes norm
+    g.ndata['norm'] = torch.from_numpy(norm).view(-1,1).to(device) # column vector
+    # return
+    return g
+
+
+def comp_deg_norm(g):
+    '''
+    compute the degree normalization factor which is 1/in_degree
+    '''
+    in_deg = g.in_degrees(range(g.number_of_nodes())).float().numpy()
+    norm = 1.0 / in_deg
+    norm[np.isinf(norm)] = 0
+    return norm
