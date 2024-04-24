@@ -198,6 +198,35 @@
           }
         }
       },
+      "adjacency_matrix": {
+        "sweepable": false,
+        "optional": false,
+        "exclude": false,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "adjacency_matrix.txt"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "txt",
+              "default-value": "adjacency_matrix.txt",
+              "unique-vals": true
+            }
+          }
+        }
+      },
       "region_features": {
         "sweepable": false,
         "optional": true,
@@ -2184,6 +2213,233 @@
       }
     }
   },
+  "graph_attention_network": {
+    "sweepable": false,
+    "optional": true,
+    "exclude": false,
+
+    "disable_tqdm": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+      "dtype": "bool",
+      "default-value": true
+    },
+    "hyperparameters": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+
+      "gat_nodes_per_layer": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 128,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 128,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "gat_num_hidden_layers": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 1,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "gat_dropout": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 0,
+            "valid-range": [0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 0,
+            "valid-range": [0, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "gat_reg_param": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 0,
+            "valid-range": [0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 0,
+            "valid-range": [0, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "gat_negative_sampling_rate": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 0,
+            "valid-range": [0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 0,
+            "valid-range": [0, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "gat_grad_norm": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [1.0, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "float",
+            "default-value": 1.0,
+            "valid-range": [1.0, null],
+            "unique-vals": true
+          }
+        }
+      },
+      "gat_optimizer": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "str",
+            "default-value": "Adam",
+            "is-any-of": [
+              "Adagrad",
+              "Adam",
+              "AdamW",
+              "SparseAdam",
+              "Adamax",
+              "ASGD",
+              "LBFGS",
+              "NAdam",
+              "RAdam",
+              "RMSprop",
+              "Rprop",
+              "SGD"
+            ]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "str",
+            "default-value": "Adam",
+            "is-any-of": [
+              "Adagrad",
+              "Adam",
+              "AdamW",
+              "SparseAdam",
+              "Adamax",
+              "ASGD",
+              "LBFGS",
+              "NAdam",
+              "RAdam",
+              "RMSprop",
+              "Rprop",
+              "SGD"
+            ],
+            "unique-vals": true
+          }
+        }
+      },
+      "gat_learning_rate": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "float",
+            "default-value": 0.002,
+            "valid-range": [0, 1]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "float",
+            "default-value": 0.002,
+            "valid-range": [0, 1],
+            "unique-vals": true
+          }
+        }
+      },
+      "gat_multitask_weights": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "list",
+            "list-dtype": "float",
+            "default-value": 0.0,
+            "valid-range": [0.0, 1.0]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "list",
+            "list-list-dtype": "float",
+            "default-value": 0.0,
+            "valid-range": [0.0, 1.0],
+            "unique-vals": true
+          }
+        }
+      }
+    }
+  },
   "neural_network": {
     "sweepable": false,
     "optional": true,
@@ -2540,7 +2796,8 @@
           "JointTableSIM_NN",
           "XGBoost_Comparison",
           "RandomForest_Comparison",
-          "GBRT_Comparison"
+          "GBRT_Comparison",
+          "GraphAttentionNetwork_Comparison"
         ]
       },
       "comment": {

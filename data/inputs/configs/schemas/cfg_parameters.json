@@ -21,6 +21,14 @@
     "load_experiment": true,
     "data": {
       "data_generation_seed": true,
+      "adjacency_matrix": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        }
+      },
       "region_features": {
         "file": {
           "sweep": {
@@ -45,7 +53,7 @@
           }
         }
       },
-      "validation_samples": {
+      "validation_cells": {
         "file": {
           "sweep": {
             "default": false,
@@ -194,7 +202,12 @@
           "range": true
         }
       },
-      "cells": true
+      "cells": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      }
     }
   },
   "spatial_interaction_model": {
@@ -511,6 +524,65 @@
         }
       },
       "xg_subsample": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      }
+    }
+  },
+  "graph_attention_network": {
+    "disable_tqdm": true,
+    "hyperparameters": {
+      "gat_nodes_per_layer": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gat_num_hidden_layers": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gat_dropout": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gat_reg_param": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gat_negative_sampling_rate": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gat_grad_norm": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gat_optimizer": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gat_learning_rate": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
+      "gat_multitask_weights": {
         "sweep": {
           "default": true,
           "range": true

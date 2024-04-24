@@ -4,7 +4,8 @@
     "training>N>exclude": true,
     "xgboost>exclude": true,
     "random_forest>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "RSquared_Analysis": {
     "neural_network>exclude": true,
@@ -15,7 +16,8 @@
     "training>to_learn>sweep>default>is-any-of": ["alpha", "beta"],
     "xgboost>exclude": true,
     "random_forest>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "LogTarget_Analysis": {
     "neural_network>exclude": true,
@@ -23,7 +25,8 @@
     "mcmc>exclude": true,
     "xgboost>exclude": true,
     "random_forest>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "SIM_MCMC": {
     "training>to_learn>sweep>default>default-value": ["alpha", "beta"],
@@ -37,7 +40,8 @@
     "experiments>0>grid_ranges>exclude": true,
     "xgboost>exclude": true,
     "random_forest>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "JointTableSIM_MCMC": {
     "training>to_learn>sweep>default>default-value": ["alpha", "beta"],
@@ -50,7 +54,8 @@
     "experiments>0>grid_ranges>exclude": true,
     "xgboost>exclude": true,
     "random_forest>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "SIM_NN": {
     "neural_network>loss>loss_name>sweep>default>is-any-of": [
@@ -68,7 +73,8 @@
     "mcmc>exclude": true,
     "xgboost>exclude": true,
     "random_forest>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "NonJointTableSIM_NN": {
     "neural_network>loss>loss_name>sweep>default>default-value": "dest_attraction_ts_loss",
@@ -86,14 +92,16 @@
     "mcmc>destination_attraction>exclude": true,
     "xgboost>exclude": true,
     "random_forest>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "JointTableSIM_NN": {
     "mcmc>parameters>exclude": true,
     "mcmc>destination_attraction>exclude": true,
     "xgboost>exclude": true,
     "random_forest>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "XGBoost_Comparison": {
     "spatial_interaction_model>exclude": true,
@@ -103,7 +111,8 @@
     "training>to_learn>exclude": true,
     "neural_network>exclude": true,
     "random_forest>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "RandomForest_Comparison": {
     "spatial_interaction_model>exclude": true,
@@ -113,7 +122,8 @@
     "training>to_learn>exclude": true,
     "neural_network>exclude": true,
     "xgboost>exclude": true,
-    "gradient_boosted_regression_trees>exclude": true
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   },
   "GBRT_Comparison": {
     "spatial_interaction_model>exclude": true,
@@ -123,6 +133,18 @@
     "training>to_learn>exclude": true,
     "neural_network>exclude": true,
     "xgboost>exclude": true,
-    "random_forest>exclude": true
+    "random_forest>exclude": true,
+    "graph_attention_network>exclude": true
+  },
+  "GraphAttentionNetwork_Comparison": {
+    "spatial_interaction_model>exclude": true,
+    "training>to_learn>optional": true,
+    "harris_wilson_model>exclude": true,
+    "mcmc>exclude": true,
+    "training>to_learn>exclude": true,
+    "neural_network>exclude": true,
+    "xgboost>exclude": true,
+    "random_forest>exclude": true,
+    "gradient_boosted_regression_trees>exclude": true
   }
 }
