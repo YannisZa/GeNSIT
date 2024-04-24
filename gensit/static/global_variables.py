@@ -218,6 +218,15 @@ INPUT_SCHEMA = {
         "ndmin":2,
         "cast_to_xarray":False
     },
+    "adjacency_matrix":{
+        "axes":[0,1],
+        "dtype":"bool", 
+        "ndmin":2,
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["origin","destination"],
+        "cast_to_xarray":False
+    },
     "margins":{},
     "cells_subset":{},
     "dims":{},
@@ -398,7 +407,8 @@ EXPERIMENT_OUTPUT_NAMES = {
     "JointTableSIM_NN": ["log_destination_attraction","theta","loss", "table","compute_time"],
     "XGBoost_Comparison": ["intensity","compute_time"],
     "RandomForest_Comparison": ["intensity","compute_time"],
-    "GBRT_Comparison": ["intensity","compute_time"]
+    "GBRT_Comparison": ["intensity","compute_time"],
+    "GraphAttentionNetwork_Comparison": ["intensity","compute_time"]
 }
 
 AUXILIARY_COORDINATES_DTYPES = {
@@ -423,6 +433,8 @@ AUXILIARY_COORDINATES_DTYPES = {
     "table_steps": "int32",
     "bmax":"float32",
     "cost_matrix":"str",
+    "adjacency_matrix":"str",
+    "region_features":"str",
     "destination_attraction_ts":"str",
     "proposal":"str"
 }
