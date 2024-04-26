@@ -1796,15 +1796,6 @@
       "dtype": "bool",
       "default-value": true
     },
-    "verbose_eval": {
-      "sweepable": false,
-      "optional": true,
-      "exclude": false,
-
-      "dtype": "int",
-      "default-value": 0,
-      "valid-range": [0, null]
-    },
     "hyperparameters": {
       "sweepable": false,
       "optional": true,

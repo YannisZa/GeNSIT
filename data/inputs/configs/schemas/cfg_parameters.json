@@ -461,7 +461,6 @@
   },
   "xgboost": {
     "disable_tqdm": true,
-    "verbose_eval": true,
     "hyperparameters": {
       "xg_n_estimators": {
         "sweep": {
