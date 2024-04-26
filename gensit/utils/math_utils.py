@@ -212,14 +212,9 @@ def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     ground_truth = ground_truth.astype('float32')
     prediction,ground_truth = xr.broadcast(prediction,ground_truth)
     prediction,ground_truth = xr.align(prediction,ground_truth, join='exact')
-    cells = kwargs.get('cells',None)
+    mask = kwargs.get('mask',None)
     
-    if cells is not None:
-        # Mask all non test cells
-        mask = ground_truth.copy(deep=True)
-        mask[:] = False
-        for cell in cells:
-            mask[cell[0],cell[1]] = True
+    if mask is not None:
         # Apply mask
         prediction = prediction.where(mask)
         ground_truth = ground_truth.where(mask)
@@ -249,7 +244,7 @@ def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
 
     """
 
-    cells = kwargs.get('cells',None)
+    mask = kwargs.get('mask',None)
     # Compute denominator
     denominator = (ground_truth + prediction)
     denominator = xr.where(denominator <= 0, 1., denominator)
@@ -257,27 +252,18 @@ def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     numerator = 2*np.minimum(ground_truth,prediction)
     ratio = numerator / denominator
 
-    if cells is not None:
-        # Mask all non test cells
-        mask = ratio.copy(deep=True)
-        mask[:] = False
-        for cell in cells:
-            mask[cell[0],cell[1]] = True
+    if mask is not None:
         # Apply mask
         ratio = ratio.where(mask)
-    
+        
     # Compute SSI
     ssi = ratio.mean(dim=['origin','destination'],skipna=True)
     return ssi
 
 def markov_basis_distance(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
-    cells = kwargs.get('cells',None)
-    if cells is not None:
-        # Mask all non test cells
-        mask = ground_truth.copy(deep=True)
-        mask[:] = False
-        for cell in cells:
-            mask[cell[0],cell[1]] = True
+    mask = kwargs.get('mask',None)
+        
+    if mask is not None:
         # Apply mask
         prediction = prediction.where(mask)
         ground_truth = ground_truth.where(mask)
@@ -292,8 +278,8 @@ def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,
     # Get region mass
     region_mass = kwargs.get('region_mass',0.95)
     
-    # Get test cells
-    cells = kwargs.get('cells',None)
+    # Get test mask
+    mask = kwargs.get('mask',None)
     
     # High posterior density mass
     alpha = 1-region_mass
@@ -315,14 +301,9 @@ def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,
     # Compute flag for whether ground truth table is covered
     cell_coverage = (ground_truth >= lower_bound_hpdr) & (ground_truth <= upper_bound_hpdr)
 
-    if cells is not None:
-        # Mask all non test cells
-        mask = cell_coverage.copy(deep=True)
-        mask[:] = False
-        for cell in cells:
-            mask[cell[0],cell[1]] = True
+    if mask is not None:
         # Apply mask
-        return cell_coverage.where(mask)
+        cell_coverage = cell_coverage.where(mask)
     
     # Update coordinates to include region mass
     return cell_coverage
