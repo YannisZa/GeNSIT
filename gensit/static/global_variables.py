@@ -411,6 +411,8 @@ EXPERIMENT_OUTPUT_NAMES = {
     "GraphAttentionNetwork_Comparison": ["intensity","compute_time"]
 }
 
+OPTIMISABLE_EXPERIMENTS = ["XGBoost_Comparison","RandomForest_Comparison","GBRT_Comparison","GraphAttentionNetwork_Comparison"]
+
 AUXILIARY_COORDINATES_DTYPES = {
     "N":"int32",
     "dataset":"str",
