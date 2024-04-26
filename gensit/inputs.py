@@ -1,4 +1,5 @@
 import os
+import gc
 import sys
 import torch
 import h5py as h5
@@ -16,9 +17,10 @@ from copy import deepcopy
 
 from gensit.config import Config
 from gensit.utils.exceptions import *
+from gensit.utils.misc_utils import create_mask
 from gensit.utils.math_utils import torch_optimize
-from gensit.physics_models.harris_wilson_model import HarrisWilson
 from gensit.utils.probability_utils import random_vector
+from gensit.physics_models.HarrisWilsonModel import HarrisWilson
 from gensit.intensity_models.spatial_interaction_models import instantiate_sim
 from gensit.static.global_variables import INPUT_SCHEMA, PARAMETER_DEFAULTS, INPUT_SCHEMA, VALIDATION_SCHEMA, Dataset
 from gensit.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims, eval_dtype, read_file
@@ -75,7 +77,26 @@ class Inputs:
                         except:
                             raise Exception(f"{attr.replace('_',' ').capitalize()} has dim {list(getattr(self.data,attr).shape)[ax]} instead of {getattr(self.data,'dims')[dim]}.")
                         
-    
+    def copy(self,datasets:list=None):
+        # Try to cast all data to tensor from xarray
+        keys_of_interest = [
+            sam_name for sam_name in dict({**INPUT_SCHEMA,**VALIDATION_SCHEMA}).keys() \
+            if getattr(self.data,sam_name,None) is not None
+        ]
+        datasets = list(set(datasets).intersection(set(keys_of_interest))) \
+            if datasets \
+            else list(keys_of_interest)
+        
+        # Copy everything
+        new_copy = deepcopy(self)
+        for dataset_name in self.data_vars().keys():
+            if dataset_name not in datasets:
+                delattr(new_copy.data,dataset_name)
+        # Garbage collect
+        gc.collect()
+
+        return new_copy
+
     def read_data(self):
         
         self.logger.note("Loading Harris Wilson data ...")
@@ -143,6 +164,8 @@ class Inputs:
                 else:
                     raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
         
+        # Create masks based on train/test/validation cells
+        self.create_cell_masks()
         # Import table margin data
         self.import_margins()
         # Import partial table cell data
@@ -206,15 +229,39 @@ class Inputs:
         elif self.true_parameters['kappa'] is not None and self.true_parameters['delta'] is None:
             self.true_parameters['delta'] = self.true_parameters['kappa'] * smallest_zone_size
 
+    def create_cell_masks(self,datasets:list=None):
+        # Try to cast all data to tensor from xarray
+        keys_of_interest = [
+            sam_name for sam_name in VALIDATION_SCHEMA.keys() \
+            if getattr(self.data,sam_name,None) is not None
+        ]
+        datasets = list(set(datasets).intersection(set(keys_of_interest))) \
+            if datasets \
+            else list(keys_of_interest)
+        
+        for sample_name in datasets:
+            if getattr(self.data,sample_name,None) is not None:
+                setattr(
+                    self.data,
+                    (sample_name+'_mask'),
+                    create_mask(
+                        shape = unpack_dims(self.data.dims,time_dims=False),
+                        index = getattr(self.data,sample_name)
+                    )
+                )
 
-    def cast_from_xarray(self):
+    def cast_from_xarray(self,datasets:list=None):
 
         # Try to cast all data to tensor from xarray
         keys_of_interest = [
             sam_name for sam_name,sam_schema in INPUT_SCHEMA.items() \
             if sam_schema.get('cast_to_xarray',False)
         ]
-        for sample_name in keys_of_interest:
+        datasets = list(set(datasets).intersection(set(keys_of_interest))) \
+            if datasets \
+            else list(keys_of_interest)
+        
+        for sample_name in datasets:
             if getattr(self.data,sample_name,None) is not None:
 
                 # if data is already a tensor do not convert
@@ -247,14 +294,18 @@ class Inputs:
                     location = 'Inputs'
                 )  
 
-    def cast_to_xarray(self):
+    def cast_to_xarray(self, datasets:list=None):
 
         # Try to cast all data to xarray from numpy/tensor
         keys_of_interest = [
             sam_name for sam_name,sam_schema in INPUT_SCHEMA.items() \
             if sam_schema.get('cast_to_xarray',False)
         ]
-        for sample_name in keys_of_interest:
+        datasets = list(set(datasets).intersection(set(keys_of_interest))) \
+            if datasets \
+            else list(keys_of_interest)
+
+        for sample_name in datasets:
             if getattr(self.data,sample_name,None) is not None:
 
                 # Get input schema
@@ -267,7 +318,7 @@ class Inputs:
                 # Data must be of torch type and in cpu
                 try:
                     assert (torch.is_tensor(getattr(self.data,sample_name)) and \
-                        getattr(self.data,sample_name).device == 'cpu') or \
+                        not getattr(self.data,sample_name).is_cuda) or \
                         isinstance(getattr(self.data,sample_name),np.ndarray)
                 except:
                     raise CastingException(
