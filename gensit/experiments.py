@@ -795,11 +795,10 @@ class RSquared_Analysis(Experiment):
             **vars(self.inputs.data),
             logger = self.logger
         )
-
         # Get and remove config
         self.config = pop_variable(sim,'config',self.config)
 
-        # Build Harris Wilson model
+        # Build the Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         self.physics_model = HarrisWilson(
             intensity_model = sim,
@@ -1040,11 +1039,10 @@ class LogTarget_Analysis(Experiment):
             **vars(self.inputs.data),
             logger = self.logger
         )
-
         # Get and remove config
         self.config = pop_variable(sim,'config',self.config)
 
-        # Build Harris Wilson model
+        # Build the Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
@@ -1872,7 +1870,7 @@ class SIM_NN(Experiment):
         # Get and remove config
         self.config = pop_variable(sim,'config',self.config)
 
-        # Build Harris Wilson model
+        # Build the Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
@@ -2079,7 +2077,7 @@ class NonJointTableSIM_NN(Experiment):
         # Get and remove config
         self.config = pop_variable(sim,'config',self.config)
 
-        # Build Harris Wilson model
+        # Build the Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
@@ -2317,9 +2315,9 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(sim,'config',self.config)
+        self.config = pop_variable(sim,'config',self.config)
 
-        # Build Harris Wilson model
+        # Build the Harris Wilson model
         self.logger.note("Initializing the Harris Wilson physics model ...")
         physics_model = HarrisWilson(
             intensity_model = sim,
@@ -2330,7 +2328,7 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get and remove config
-        config = pop_variable(physics_model,'config',self.config)
+        self.config = pop_variable(physics_model,'config',self.config)
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
