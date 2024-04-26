@@ -1589,3 +1589,25 @@ def comp_deg_norm(g):
     norm = 1.0 / in_deg
     norm[np.isinf(norm)] = 0
     return norm
+
+def create_mask(shape,index):
+    # Mask all such cells
+    mask = np.zeros(shape,dtype=bool)
+    for cell in index:
+        mask[tuple(cell)] = True
+    return mask
+
+def populate_array(shape,index,res):
+    # Create an empty output array
+    arr = np.zeros(shape)
+
+    # Flatten the indices and values arrays
+    flat_indices = np.ravel_multi_index(index.T, shape)
+
+    # Use np.unravel_index to convert flattened indices back to multi-dimensional indices
+    multi_indices = np.unravel_index(flat_indices, shape)
+    
+    # Assign values to the output array using tuple indexing
+    arr[multi_indices] = res.flatten()
+
+    return arr
