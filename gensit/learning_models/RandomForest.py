@@ -1,19 +1,34 @@
 import sys
 import json
+import optuna
 
 from copy import deepcopy
+from sklearn.exceptions import NotFittedError
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.utils.validation import check_is_fitted
 
 from gensit.config import Config
 from gensit.utils.exceptions import *
 from gensit.utils.misc_utils import setup_logger
 
 
+DEFAULT_HYPERPARAMS = {
+    'n_estimators': 100,
+    'max_depth': None,
+    'min_samples_split': 10,
+    'min_samples_leaf': 3,
+    'oob_score': True
+}
+
+MODEL_TYPE = 'random_forest'
+MODEL_PREFIX = 'rf_'
+
 class RandomForest_Model(object):
     def __init__(
         self,
         *,
         config: Config,
+        trial: optuna.trial,
         **kwargs
     ):
         # Setup logger
@@ -28,44 +43,72 @@ class RandomForest_Model(object):
         
         # Config file
         self.config = config
-
+        # Hyperparameter optimisation trial
+        self.trial = trial
         # Type of learning model
-        self.model_type = 'random_forest'
+        self.model_type = MODEL_TYPE
+        
+        # Update hyperparameters
+        self.update_hyperparameters()
 
-        DEFAULT_HYPERPARAMS = {
-            'rf_n_estimators': 100,
-            'rf_oob_score': True, 
-            'rf_max_depth': None,
-            'rf_min_samples_split': 10,
-            'rf_min_samples_leaf': 3
-        }
-        
-        # Set hyperparams
-        self.hyperparams = {}
-        for pname in DEFAULT_HYPERPARAMS.keys():
-            if getattr(self.config['random_forest']['hyperparameters'],pname,None) is None:
-                self.hyperparams[pname] = DEFAULT_HYPERPARAMS[pname]
-                # Update config
-                self.config['random_forest']['hyperparameters'][pname] = DEFAULT_HYPERPARAMS[pname]
-            else:
-                self.hyperparams[pname] = self.config['random_forest']['hyperparameters'][pname]
-        
         # Initialise Random Forest Regressor
         self.random_forest = RandomForestRegressor(
             **{k.replace('rf_',''):v for k,v in self.hyperparams.items()},
             n_jobs = self.config['inputs'].get('n_threads',1)
         )
 
+    def update_hyperparameters(self):
+        # Set hyperparams
+        self.hyperparams = {}
+        if self.trial is not None:
+            OPTUNA_HYPERPARAMS = {
+                'n_estimators': self.trial.suggest_int('n_estimators', 10, 100, step = 50),
+                'max_depth': self.trial.suggest_int('max_depth', 1, 12, step = 1),
+                'min_samples_split': self.trial.suggest_int('min_samples_split', 2, 100, step = 10),
+                'min_samples_leaf': self.trial.suggest_int('min_samples_leaf', 1, 50, step = 5),
+                'oob_score':self.trial.suggest_categorical('oob_score',[True,False])
+            } 
+        
+        for pname in DEFAULT_HYPERPARAMS.keys():
+            if self.trial is not None and pname in OPTUNA_HYPERPARAMS:
+                self.hyperparams[pname] = OPTUNA_HYPERPARAMS[pname]
+            elif self.config is None or getattr(self.config[MODEL_TYPE]['hyperparameters'],pname,None) is None:
+                self.hyperparams[pname] = DEFAULT_HYPERPARAMS[pname]
+            else:
+                self.hyperparams[pname] =  self.config[MODEL_TYPE]['hyperparameters'][(MODEL_PREFIX+pname)]
+
+            if self.config is not None and getattr(self.config[MODEL_TYPE]['hyperparameters'],pname,None) is None:
+                # Update object and config hyperparameters
+                self.config[MODEL_TYPE]['hyperparameters'][(MODEL_PREFIX+pname)] = self.hyperparams[pname]
+        
+
 
     def train(self, train_x, train_y, **kwargs):
         # Train
-        return self.random_forest.fit(X = train_x, y = train_y)
+        return self.random_forest.fit(
+            X = train_x, 
+            y = train_y
+        )
     
-    def predict(self, test_x, trained_model):
-        return trained_model.predict(test_x)
+    def predict(self, test_x):
+        return self.random_forest.predict(test_x)
     
+    def run_single(self,train_x,train_y,test_x):
+        # Train
+        self.train(
+            train_x = train_x,
+            train_y = train_y
+        )
+        
+        # Test (predict)
+        intensity = self.predict(
+            test_x = test_x
+        )
+        return intensity
+        
     def __repr__(self):
-        return "RandomForest()"
+        return self.random_forest.__repr__()
 
     def __str__(self):
         return json.dumps(self.hyperparams,indent=2)
+        
