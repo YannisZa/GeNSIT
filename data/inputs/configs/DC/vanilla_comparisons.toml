@@ -27,6 +27,8 @@ seed = 1234
         file = 'test_cells.txt'
     [inputs.data.train_cells]
         file = 'zero_and_train_cells.txt'
+    [inputs.data.validation_cells]
+        file = 'validation_cells.txt'
 
 [contingency_table]
   sparse_margins = false
@@ -37,20 +39,25 @@ seed = 1234
 [training]
   num_steps = +1
   batch_size = +1000
-  N = 40
+  N = 100000
+
+[hyperparameter_optimisation]
+  n_trials = 100
+  timeout = nan
+  metric_minimise = true
+  metric_evaluation = "MathUtils.srmse(prediction=prediction,ground_truth=ground_truth_table,mask=mask)"
 
 [xgboost]
   disable_tqdm = true
-  verbose_eval = 0
   [xgboost.hyperparameters]
-    xg_max_depth = 8
-    xg_eta = 0.5
+    xg_n_estimators = 60
+    xg_max_depth = 4
+    xg_learning_rate = 0.5473698638379005
     xg_objective = 'reg:squarederror'
     xg_eval_metric = 'rmse'
-    xg_gpu_id = 0
-    xg_tree_method = 'gpu_hist'
-    xg_max_delta_step = 2
-    xg_min_child_weight = 4 
+    xg_tree_method = 'hist'
+    xg_max_delta_step = 0.1290289329907377
+    xg_min_child_weight = 4.908563679496025
     # xg_alpha = 0.5
     # xg_lambda = 5.0
     # xg_gamma = 0.5
@@ -59,20 +66,20 @@ seed = 1234
 [random_forest]
   disable_tqdm = true
   [random_forest.hyperparameters]
-    rf_n_estimators = 100
+    rf_n_estimators = 60
+    rf_max_depth = 2
+    rf_min_samples_split = 22
+    rf_min_samples_leaf = 21
     rf_oob_score = true
-    rf_max_depth = nan
-    rf_min_samples_split = 10
-    rf_min_samples_leaf = 3
   
 
 [gradient_boosted_regression_trees]
   disable_tqdm = true
   [gradient_boosted_regression_trees.hyperparameters]
-    gbrt_n_estimators = 100
-    gbrt_max_depth = nan
-    gbrt_min_samples_split = 10
-    gbrt_min_samples_leaf = 3
+    gbrt_n_estimators = 10
+    gbrt_max_depth = 8
+    gbrt_min_samples_split = 92
+    gbrt_min_samples_leaf = 16
 
 
 [graph_attention_network]
@@ -92,7 +99,7 @@ seed = 1234
 [[experiments]]
   type = 'XGBoost_Comparison'
   comment = 'Gradient Boosted Trees Vanilla Algorithm Comparison'
-  disable_tqdm = false
+  disable_tqdm = true
   export_samples = true
   export_metadata = true
   overwrite = true
@@ -131,5 +138,5 @@ seed = 1234
     write_start = +1
     write_every = +1
     out_directory = './data/outputs/'
-    out_group = 'exp2'
+    out_group = 'comparisons'
     title = '_doubly_and_cell_constrained'

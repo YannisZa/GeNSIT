@@ -1743,6 +1743,47 @@
       }
     }
   },
+  "hyperparameter_optimisation": {
+    "sweepable": false,
+    "optional": true,
+    "exclude": false,
+
+    "n_trials": {
+      "sweepable": false,
+      "optional": false,
+      "exclude": false,
+
+      "dtype": "int",
+      "default-value": 1,
+      "valid-range": [1, null]
+    },
+    "timeout": {
+      "sweepable": false,
+      "optional": true,
+      "exclude": false,
+
+      "dtype": "int",
+      "default-value": null,
+      "allow-nan": true,
+      "valid-range": [1, null]
+    },
+    "metric_minimise": {
+      "sweepable": false,
+      "optional": false,
+      "exclude": false,
+
+      "dtype": "bool",
+      "default-value": true
+    },
+    "metric_evaluation": {
+      "sweepable": false,
+      "optional": false,
+      "exclude": false,
+
+      "dtype": "str",
+      "default-value": ""
+    }
+  },
   "xgboost": {
     "sweepable": false,
     "optional": true,
@@ -1769,6 +1810,26 @@
       "optional": true,
       "exclude": false,
 
+      "xg_n_estimators": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
+        "sweep": {
+          "default": {
+            "dtype": "int",
+            "default-value": 1,
+            "valid-range": [1, null]
+          },
+          "range": {
+            "dtype": "list",
+            "list-dtype": "int",
+            "default-value": 1,
+            "valid-range": [1, null],
+            "unique-vals": true
+          }
+        }
+      },
       "xg_max_depth": {
         "sweepable": true,
         "optional": true,
@@ -1789,7 +1850,7 @@
           }
         }
       },
-      "xg_eta": {
+      "xg_learning_rate": {
         "sweepable": true,
         "optional": true,
         "exclude": false,
@@ -1809,21 +1870,11 @@
           }
         }
       },
-      "xg_objective": {
-        "sweep": {
-          "default": {
-            "dtype": "str",
-            "default-value": "reg:squarederror"
-          },
-          "range": {
-            "dtype": "list",
-            "list-dtype": "str",
-            "default-value": "reg:squarederror",
-            "unique-vals": true
-          }
-        }
-      },
       "xg_eval_metric": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
         "sweep": {
           "default": {
             "dtype": "str",
@@ -1858,6 +1909,10 @@
         }
       },
       "xg_tree_method": {
+        "sweepable": true,
+        "optional": true,
+        "exclude": false,
+
         "sweep": {
           "default": {
             "dtype": "str",
@@ -2433,8 +2488,7 @@
             "list-dtype": "list",
             "list-list-dtype": "float",
             "default-value": 0.0,
-            "valid-range": [0.0, 1.0],
-            "unique-vals": true
+            "valid-range": [0.0, 1.0]
           }
         }
       }
@@ -2797,7 +2851,8 @@
           "XGBoost_Comparison",
           "RandomForest_Comparison",
           "GBRT_Comparison",
-          "GraphAttentionNetwork_Comparison"
+          "GraphAttentionNetwork_Comparison",
+          "ExperimentHyperparameterOptimisation"
         ]
       },
       "comment": {

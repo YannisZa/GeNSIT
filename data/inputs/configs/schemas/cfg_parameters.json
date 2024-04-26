@@ -284,6 +284,12 @@
       }
     }
   },
+  "hyperparameter_optimisation": {
+    "n_trials": true,
+    "timeout": true,
+    "metric_minimise": true,
+    "metric_evaluation": true
+  },
   "training": {
     "N": {
       "sweep": {
@@ -457,19 +463,19 @@
     "disable_tqdm": true,
     "verbose_eval": true,
     "hyperparameters": {
+      "xg_n_estimators": {
+        "sweep": {
+          "default": true,
+          "range": true
+        }
+      },
       "xg_max_depth": {
         "sweep": {
           "default": true,
           "range": true
         }
       },
-      "xg_eta": {
-        "sweep": {
-          "default": true,
-          "range": true
-        }
-      },
-      "xg_objective": {
+      "xg_learning_rate": {
         "sweep": {
           "default": true,
           "range": true
