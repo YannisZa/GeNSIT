@@ -1,5 +1,6 @@
 import sys
 import time
+import optuna
 import warnings
 import traceback
 
@@ -7,6 +8,7 @@ from tqdm import tqdm
 from copy import deepcopy
 from datetime import datetime
 from torch import float32, uint8
+from optuna.trial import TrialState
 from multiprocessing import Manager
 
 from gensit.config import Config
@@ -14,18 +16,18 @@ from gensit.inputs import Inputs
 from gensit.outputs import Outputs
 from gensit.utils.misc_utils import *
 from gensit.static.global_variables import *
-from gensit.utils.math_utils import torch_optimize
+from gensit.utils import math_utils as MathUtils
 from gensit.contingency_table import instantiate_ct
-from gensit.physics_models.harris_wilson_model import HarrisWilson
+from gensit.physics_models.HarrisWilsonModel import HarrisWilson
 from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
 from gensit.intensity_models.spatial_interaction_models import instantiate_sim
 from gensit.learning_models.XGB import XGB_Model
 from gensit.learning_models.GBRT import GBRT_Model
 from gensit.learning_models.RandomForest import RandomForest_Model
-from gensit.learning_models.graph_attention_network import GAT_Model
-from gensit.learning_models.harris_wilson_model_mcmc import HarrisWilson_MCMC
-from gensit.learning_models.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
-from gensit.contingency_table.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from gensit.learning_models.GraphAttentionNetwork import GAT_Model
+from gensit.learning_models.HarrisWilsonModel_MCMC import HarrisWilson_MCMC
+from gensit.learning_models.HarrisWilsonModell_NeuralNet import NeuralNet, HarrisWilson_NN
+from gensit.contingency_table.ContingencyTable_MCMC import ContingencyTableMarkovChainMonteCarlo
 
 # Suppress scientific notation
 np.set_printoptions(suppress = True)
@@ -115,14 +117,73 @@ class ExperimentHandler(object):
         # Run all experiments sequential
         for _,experiment in self.experiments.items():
             # Run experiment
-            experiment.run()
+            _ = experiment.run()
 
             # Reset
             try:
                 experiment.reset()
             except:
                 pass
-        
+
+    def optimise_experiments_sequentially(self):
+        # Run all experiments sequential
+        for _,experiment in self.experiments.items():
+
+            # Create output path
+            makedir(experiment.outputs.outputs_path)
+            # Store config
+            experiment.outputs.write_metadata(
+                dir_path = '',
+                filename = 'config.json'
+            )
+
+            # Create database filename for caching optuna study
+            study_name = experiment.__class__.__name__ + '_Hyperparameter_Optimisation'
+            storage_name = '_' + study_name + datetime.now().strftime("%d_%m_%Y___%H:%M:%S")
+            storage_name = f"sqlite:///{os.path.join(experiment.outputs.outputs_path,storage_name)}.db"
+
+            # Create optuna study
+            study = optuna.create_study(
+                study_name = study_name,
+                storage = storage_name,
+                direction = "minimize" if experiment.config['hyperparameter_optimisation']['metric_minimise'] else "maximize"
+            )
+            
+            # Setting the logging level WARNING, the INFO logs are suppressed.
+            optuna.logging.set_verbosity(optuna.logging.INFO)
+
+            study.optimize(
+                experiment.run, 
+                n_trials = experiment.config['hyperparameter_optimisation']['n_trials'], 
+                timeout = experiment.config['hyperparameter_optimisation']['timeout'],
+                n_jobs = experiment.config['inputs']['n_workers'],
+                show_progress_bar = True
+            )
+
+            pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
+            complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
+
+            experiment.logger.info("Study statistics: ")
+            experiment.logger.info(f"  Number of finished trials: {len(study.trials)}")
+            experiment.logger.info(f"  Number of pruned trials: {len(pruned_trials)}")
+            experiment.logger.info(f"  Number of complete trials: {len(complete_trials)}")
+
+            trial = study.best_trial
+            experiment.logger.info(f"|Best trial| Value: {trial.value}")
+            experiment.logger.info("Parameters")
+            for key, value in trial.params.items():
+                experiment.logger.info("    {}: {}".format(key, value))
+            experiment.logger.info("Attributes")
+            for key, value in trial.user_attrs.items():
+                experiment.logger.info("    {}: {}".format(key, value))
+            
+            # Reset
+            try:
+                experiment.reset()
+            except:
+                pass
+
+
 class Experiment(object):
     def __init__(self, config:Config, **kwargs):
         # Create logger
@@ -266,7 +327,7 @@ class Experiment(object):
         return sample_sizes
     
     def write_metadata(self):
-        if self.config.settings.get('export_metadata',True):
+        if self.config.settings['experiments'][0].get('export_metadata',True):
             self.logger.debug("Writing metadata ...")
             dir_path = ""
             if self.config.settings["sweep_mode"] or len(self.outputs.sweep_id) == 0:
@@ -279,18 +340,17 @@ class Experiment(object):
             
             # Remove load experiment setting
             self.config.settings['inputs']['load_experiment'] = ''
-            
             self.outputs.write_metadata(
                 dir_path = dir_path,
                 filename = filename
             )
     
     def close_outputs(self):
-        if self.config.settings.get('export_samples',True):
+        if self.config.settings['experiments'][0].get('export_samples',True):
             # Write log file
             self.outputs.write_log()
-        # Close h5 data file
-        self.outputs.h5file.close()
+            # Close h5 data file
+            self.outputs.h5file.close()
 
     def initialise_parameters(self,param_names:list=[]):
         
@@ -355,7 +415,7 @@ class Experiment(object):
         
     def initialise_data_structures(self):
 
-        if self.config.settings.get('export_samples',True):
+        if self.config.settings['experiments'][0].get('export_samples',True):
             # Flag for loading experiment data
             load_experiment = self.config.settings['load_data']
 
@@ -541,43 +601,44 @@ class Experiment(object):
         extend the dataset size prior to writing; this way, the newly written
         data is always in the last row of the dataset.
         '''
-        self.logger.debug('Writing data')
-        if self._time >= self._write_start and self._time % self._write_every == 0:
-            if 'loss' in self.output_names:
-                for loss_name in list(self.learning_model.loss_functions.keys())+['total_loss']:
-                    # Store samples
-                    _loss_sample = kwargs.get(loss_name,None)
-                    _loss_sample = _loss_sample.clone().detach().cpu().numpy().item() if _loss_sample is not None else None
-                    getattr(self,loss_name).resize(getattr(self,loss_name).shape[0] + 1, axis = 0)
-                    getattr(self,loss_name)[-1] = _loss_sample
+        if self.config.settings['experiments'][0].get('export_samples',True):
+            self.logger.debug('Writing data')
+            if self._time >= self._write_start and self._time % self._write_every == 0:
+                if 'loss' in self.output_names:
+                    for loss_name in list(self.learning_model.loss_functions.keys())+['total_loss']:
+                        # Store samples
+                        _loss_sample = kwargs.get(loss_name,None)
+                        _loss_sample = _loss_sample.clone().detach().cpu().numpy().item() if _loss_sample is not None else None
+                        getattr(self,loss_name).resize(getattr(self,loss_name).shape[0] + 1, axis = 0)
+                        getattr(self,loss_name)[-1] = _loss_sample
 
-            if 'theta' in self.output_names:
-                _theta_sample = kwargs.get('theta',[None]*len(self.thetas))
-                _theta_sample = _theta_sample.clone().detach().cpu() if _theta_sample is not None else None
-                for idx, dset in enumerate(self.thetas):
-                    dset.resize(dset.shape[0] + 1, axis = 0)
-                    dset[-1] = _theta_sample[idx]
+                if 'theta' in self.output_names:
+                    _theta_sample = kwargs.get('theta',[None]*len(self.thetas))
+                    _theta_sample = _theta_sample.clone().detach().cpu() if _theta_sample is not None else None
+                    for idx, dset in enumerate(self.thetas):
+                        dset.resize(dset.shape[0] + 1, axis = 0)
+                        dset[-1] = _theta_sample[idx]
 
-            for sample in ['r2','log_posterior_approximation']:
-                if sample in self.output_names:
-                    sample_value = kwargs.get(sample,None)
-                    sample_value = sample_value.clone().detach().cpu() if sample_value is not None else None
-                    getattr(self,sample)[kwargs['index']] = sample_value
+                for sample in ['r2','log_posterior_approximation']:
+                    if sample in self.output_names:
+                        sample_value = kwargs.get(sample,None)
+                        sample_value = sample_value.clone().detach().cpu() if sample_value is not None else None
+                        getattr(self,sample)[kwargs['index']] = sample_value
 
-            for sample in [
-                'log_destination_attraction','sign','table', 'intensity',
-                'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time'
-            ]:
-                if sample in self.output_names:
-                    # Get sample value
-                    sample_value = kwargs.get(sample,None)
-                    sample_value = sample_value.clone().detach().cpu() \
-                        if torch.is_tensor(sample_value) \
-                        else sample_value
-                    # Resize h5 data
-                    getattr(self,sample).resize(getattr(self,sample).shape[0] + 1, axis = 0)
-                    # Store latest sample
-                    getattr(self,sample)[-1] = sample_value
+                for sample in [
+                    'log_destination_attraction','sign','table', 'intensity',
+                    'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time'
+                ]:
+                    if sample in self.output_names:
+                        # Get sample value
+                        sample_value = kwargs.get(sample,None)
+                        sample_value = sample_value.clone().detach().cpu() \
+                            if torch.is_tensor(sample_value) \
+                            else sample_value
+                        # Resize h5 data
+                        getattr(self,sample).resize(getattr(self,sample).shape[0] + 1, axis = 0)
+                        # Store latest sample
+                        getattr(self,sample)[-1] = sample_value
 
 
     def print_initialisations(self,parameter_inits,print_lengths:bool = True,print_values:bool = False):
@@ -612,6 +673,32 @@ class Experiment(object):
             for loss_name in loss_names:
                 self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:][-1]}')
 
+    def update_optimisation_progress(self,index,prediction,mask):
+        # If hyperparameter optimisation mode is activated:
+        if getattr(self.learning_model,"trial",None) is not None:
+            # Evaluate metric
+            metric_eval = eval(
+                self.config['hyperparameter_optimisation']['metric_evaluation'],
+                {
+                    "MathUtils":MathUtils,
+                    "np":np,
+                    "torch":torch
+                },
+                {
+                    **self.xr_inputs.data_vars(),
+                    **self.inputs.data.dims,
+                    "mask":mask,
+                    "prediction": prediction
+                }
+            )
+            # Report validation metrics
+            self.learning_model.trial.report(metric_eval.values.item(), index)
+            # Handle pruning based on the intermediate value.
+            if self.learning_model.trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+            return metric_eval.values.item()
+        return 0
+    
     def validate_samples(self,**kwargs):
         if 'r2' in self.output_names:
             try:
@@ -2468,6 +2555,9 @@ class XGBoost_Comparison(Experiment):
 
         # Pass inputs to device
         self.inputs.pass_to_device()
+        # Keep a separate copy of inputs that is cast to xarray
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2479,16 +2569,6 @@ class XGBoost_Comparison(Experiment):
         
         # Get config
         self.config = getattr(self.ct,'config',self.config)
-        
-        # Set up the model
-        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
-        self.learning_model = XGB_Model(
-            config = self.config,
-            logger = self.logger
-        )
-
-        # Get config
-        self.config = getattr(self.learning_model,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
@@ -2506,17 +2586,32 @@ class XGBoost_Comparison(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.learning_model}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
         
 
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
+        
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
+        self.learning_model = XGB_Model(
+            trial = trial,
+            config = self.config,
+            logger = self.logger
+        )
+        self.logger.note(f"{self.learning_model}")
 
         self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
         # Initialise data structures
         self.initialise_data_structures()
-        
+    
         # Store number of samples
         N = self.config['training']['N']
         self._time = 1
@@ -2526,18 +2621,21 @@ class XGBoost_Comparison(Experiment):
         features_min = self.inputs.data.region_features.min(dim=0).values
         features = (self.inputs.data.region_features - features_min)*2 / (features_max-features_min) - 1
 
-        # Get training and test cells
-        train_index = np.array([np.array(c,dtype='int32') for c in self.ct.constraints['cells']],dtype='int32')
-        test_index = self.inputs.data.test_cells
+        # Get training and evaluation cells
+        train_index = self.inputs.data.train_cells
+        # Evaluate model at validation cells if optuna trial is ongoing
+        # else evaluate model at test cells
+        evaluation_index = self.inputs.data.test_cells if trial is None else self.inputs.data.validation_cells
+        evaluation_mask = self.inputs.data.test_cells_mask if trial is None else self.inputs.data.validation_cells_mask
 
         # Get training set
         train_dis = self.inputs.data.cost_matrix[train_index[:,0],train_index[:,1]].reshape([-1, 1])
         train_x = torch.concatenate( (features[train_index[:,0]], features[train_index[:,1]], train_dis), dim=1)
         train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
 
-        # Get test set
-        test_dis = self.inputs.data.cost_matrix[test_index[:,0],test_index[:,1]].reshape([-1, 1])
-        test_x = torch.concatenate( (features[test_index[:,0]], features[test_index[:,1]], test_dis), dim=1)
+        # Get evaluation set
+        evaluation_dis = self.inputs.data.cost_matrix[evaluation_index[:,0],evaluation_index[:,1]].reshape([-1, 1])
+        evaluation_x = torch.concatenate( (features[evaluation_index[:,0]], features[evaluation_index[:,1]], evaluation_dis), dim=1)
 
         # Define output xarray coordinates 
         coordinates = {
@@ -2547,13 +2645,19 @@ class XGBoost_Comparison(Experiment):
 
         # Create output array
         intensity_xr = xr.DataArray(
-            torch.zeros(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']),
+            torch.empty(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']).fill_(float('nan')),
             coords = coordinates
         )
-        # Update train cells
-        for tc in train_index:
-            intensity_xr[tc[0],tc[1]] = self.inputs.data.ground_truth_table[tc[0],tc[1]]
 
+        # Update train cells
+        intensity_xr = xr.where(
+            self.inputs.data.train_cells_mask,
+            self.inputs.data.ground_truth_table,
+            intensity_xr
+        )
+        
+        # Initialise validation metrics
+        validation_metrics = []
         self.tqdm_disabled = False
         for i in tqdm(
             range(N),
@@ -2565,33 +2669,42 @@ class XGBoost_Comparison(Experiment):
             # Track the epoch training time
             start_time = time.time()
             
-            # Get previously trained model
-            if i == 0: trained_model = None
-
-            # Train
-            trained_model = self.learning_model.train(
+            # Train/test
+            intensity = self.learning_model.run_single(
                 train_x = train_x,
                 train_y = train_y,
-                N = 1,
-                trained_model = trained_model
+                test_x = evaluation_x
             )
-            
-            # Test/predict
-            intensity = self.learning_model.predict(
-                test_x = test_x, 
-                trained_model = trained_model
+
+            # Populate output array at evaluation index
+            intensity = populate_array(
+                shape = unpack_dims(self.inputs.data.dims,time_dims=False),
+                index = evaluation_index,
+                res = intensity
             )
 
             # Update test cells
-            for i,tc in enumerate(test_index):
-                intensity_xr[tc[0],tc[1]] = intensity[i]
-
+            intensity_xr = xr.where(
+                evaluation_mask,
+                intensity,
+                intensity_xr
+            )
+            
             # Clean and write to file
             self.write_data(
                 intensity = intensity_xr,
                 compute_time = time.time() - start_time
             )
             self._time += 1
+
+            # Update optuna progress
+            validation_metrics.append(
+                self.update_optimisation_progress(
+                    index = i,
+                    prediction = intensity_xr, 
+                    mask = evaluation_mask
+                )
+            )
         
         # Update metadata
         self.show_progress()
@@ -2603,6 +2716,8 @@ class XGBoost_Comparison(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+        
+        return np.mean(validation_metrics)
 
 class RandomForest_Comparison(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -2625,6 +2740,9 @@ class RandomForest_Comparison(Experiment):
 
         # Pass inputs to device
         self.inputs.pass_to_device()
+        # Keep a separate copy of inputs that is cast to xarray
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2636,16 +2754,6 @@ class RandomForest_Comparison(Experiment):
         
         # Get config
         self.config = getattr(self.ct,'config',self.config)
-        
-        # Set up the model
-        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
-        self.learning_model = RandomForest_Model(
-            config = self.config,
-            logger = self.logger
-        )
-
-        # Get config
-        self.config = getattr(self.learning_model,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
@@ -2663,11 +2771,26 @@ class RandomForest_Comparison(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.learning_model}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
         
 
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
+
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
+        self.learning_model = RandomForest_Model(
+            trial = trial,
+            config = self.config,
+            logger = self.logger
+        )
+        self.logger.note(f"{self.learning_model}")
 
         self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
@@ -2683,18 +2806,21 @@ class RandomForest_Comparison(Experiment):
         # features = (self.inputs.data.region_features - features_min)*2 / (features_max-features_min) - 1
         features = self.inputs.data.region_features
 
-        # Get training and test cells
-        train_index = np.array([np.array(c,dtype='int32') for c in self.ct.constraints['cells']],dtype='int32')
-        test_index = self.inputs.data.test_cells
+        # Get training and evaluation cells
+        train_index = self.inputs.data.train_cells
+        # Evaluate model at validation cells if optuna trial is ongoing
+        # else evaluate model at test cells
+        evaluation_index = self.inputs.data.test_cells if trial is None else self.inputs.data.validation_cells
+        evaluation_mask = self.inputs.data.test_cells_mask if trial is None else self.inputs.data.validation_cells_mask
 
         # Get training set
         train_dis = self.inputs.data.cost_matrix[train_index[:,0],train_index[:,1]].reshape([-1, 1])
         train_x = torch.concatenate( (features[train_index[:,0]], features[train_index[:,1]], train_dis), dim=1)
         train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
 
-        # Get test set
-        test_dis = self.inputs.data.cost_matrix[test_index[:,0],test_index[:,1]].reshape([-1, 1])
-        test_x = torch.concatenate( (features[test_index[:,0]], features[test_index[:,1]], test_dis), dim=1)
+        # Get evaluation set
+        evaluation_dis = self.inputs.data.cost_matrix[evaluation_index[:,0],evaluation_index[:,1]].reshape([-1, 1])
+        evaluation_x = torch.concatenate( (features[evaluation_index[:,0]], features[evaluation_index[:,1]], evaluation_dis), dim=1)
 
         # Define output xarray coordinates 
         coordinates = {
@@ -2708,27 +2834,38 @@ class RandomForest_Comparison(Experiment):
             coords = coordinates
         )
         # Update train cells
-        for tc in train_index:
-            intensity_xr[tc[0],tc[1]] = self.inputs.data.ground_truth_table[tc[0],tc[1]]
+        intensity_xr = xr.where(
+            self.inputs.data.train_cells_mask,
+            self.inputs.data.ground_truth_table,
+            intensity_xr
+        )
+
+        # Initialise validation metrics
+        validation_metrics = []
 
         # Track the epoch training time
         start_time = time.time()
 
         # Train
-        trained_model = self.learning_model.train(
+        intensity = self.learning_model.run_single(
             train_x = train_x,
-            train_y = train_y
+            train_y = train_y,
+            test_x = evaluation_x
         )
-        
-        # Test/predict
-        intensity = self.learning_model.predict(
-            test_x = test_x, 
-            trained_model = trained_model
+
+        # Populate output array at evaluation index
+        intensity = populate_array(
+            shape = unpack_dims(self.inputs.data.dims,time_dims=False),
+            index = evaluation_index,
+            res = intensity
         )
 
         # Update test cells
-        for i,tc in enumerate(test_index):
-            intensity_xr[tc[0],tc[1]] = intensity[i]
+        intensity_xr = xr.where(
+            evaluation_mask,
+            intensity,
+            intensity_xr
+        )
 
         # Clean and write to file
         self.write_data(
@@ -2736,6 +2873,15 @@ class RandomForest_Comparison(Experiment):
             compute_time = time.time() - start_time
         )
         self._time += 1
+
+        # Update optuna progress
+        validation_metrics.append(
+            self.update_optimisation_progress(
+                index = 0,
+                prediction = intensity_xr, 
+                mask = evaluation_mask
+            )
+        )
     
         # Update metadata
         self.show_progress()
@@ -2747,6 +2893,7 @@ class RandomForest_Comparison(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+        return np.mean(validation_metrics)
 
 class GBRT_Comparison(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -2769,6 +2916,9 @@ class GBRT_Comparison(Experiment):
 
         # Pass inputs to device
         self.inputs.pass_to_device()
+        # Keep a separate copy of inputs that is cast to xarray
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2780,16 +2930,6 @@ class GBRT_Comparison(Experiment):
         
         # Get config
         self.config = getattr(self.ct,'config',self.config)
-        
-        # Set up the model
-        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
-        self.learning_model = GBRT_Model(
-            config = self.config,
-            logger = self.logger
-        )
-
-        # Get config
-        self.config = getattr(self.learning_model,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
@@ -2807,11 +2947,26 @@ class GBRT_Comparison(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.learning_model}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
         
 
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
+
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
+        self.learning_model = GBRT_Model(
+            trial = trial,
+            config = self.config,
+            logger = self.logger
+        )
+        self.logger.note(f"{self.learning_model}")
 
         self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
@@ -2827,18 +2982,21 @@ class GBRT_Comparison(Experiment):
         # features = (self.inputs.data.region_features - features_min)*2 / (features_max-features_min) - 1
         features = self.inputs.data.region_features
         
-        # Get training and test cells
-        train_index = np.array([np.array(c,dtype='int32') for c in self.ct.constraints['cells']],dtype='int32')
-        test_index = self.inputs.data.test_cells
+        # Get training and evaluation cells
+        train_index = self.inputs.data.train_cells
+        # Evaluate model at validation cells if optuna trial is ongoing
+        # else evaluate model at test cells
+        evaluation_index = self.inputs.data.test_cells if trial is None else self.inputs.data.validation_cells
+        evaluation_mask = self.inputs.data.test_cells_mask if trial is None else self.inputs.data.validation_cells_mask
 
         # Get training set
         train_dis = self.inputs.data.cost_matrix[train_index[:,0],train_index[:,1]].reshape([-1, 1])
         train_x = torch.concatenate( (features[train_index[:,0]], features[train_index[:,1]], train_dis), dim=1)
         train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
 
-        # Get test set
-        test_dis = self.inputs.data.cost_matrix[test_index[:,0],test_index[:,1]].reshape([-1, 1])
-        test_x = torch.concatenate( (features[test_index[:,0]], features[test_index[:,1]], test_dis), dim=1)
+        # Get evaluation set
+        evaluation_dis = self.inputs.data.cost_matrix[evaluation_index[:,0],evaluation_index[:,1]].reshape([-1, 1])
+        evaluation_x = torch.concatenate( (features[evaluation_index[:,0]], features[evaluation_index[:,1]], evaluation_dis), dim=1)
 
         # Define output xarray coordinates 
         coordinates = {
@@ -2852,27 +3010,38 @@ class GBRT_Comparison(Experiment):
             coords = coordinates
         )
         # Update train cells
-        for tc in train_index:
-            intensity_xr[tc[0],tc[1]] = self.inputs.data.ground_truth_table[tc[0],tc[1]]
+        intensity_xr = xr.where(
+            self.inputs.data.train_cells_mask,
+            self.inputs.data.ground_truth_table,
+            intensity_xr
+        )
+
+        # Initialise validation metrics
+        validation_metrics = []
 
         # Track the epoch training time
         start_time = time.time()
 
         # Train
-        trained_model = self.learning_model.train(
+        intensity = self.learning_model.run_single(
             train_x = train_x,
-            train_y = train_y
+            train_y = train_y,
+            test_x = evaluation_x
         )
-        
-        # Test/predict
-        intensity = self.learning_model.predict(
-            test_x = test_x, 
-            trained_model = trained_model
+
+        # Populate output array at evaluation index
+        intensity = populate_array(
+            shape = unpack_dims(self.inputs.data.dims,time_dims=False),
+            index = evaluation_index,
+            res = intensity
         )
 
         # Update test cells
-        for i,tc in enumerate(test_index):
-            intensity_xr[tc[0],tc[1]] = intensity[i]
+        intensity_xr = xr.where(
+            evaluation_mask,
+            intensity,
+            intensity_xr
+        )
 
         # Clean and write to file
         self.write_data(
@@ -2880,6 +3049,15 @@ class GBRT_Comparison(Experiment):
             compute_time = time.time() - start_time
         )
         self._time += 1
+
+        # Update optuna progress
+        validation_metrics.append(
+            self.update_optimisation_progress(
+                index = 0,
+                prediction = intensity_xr, 
+                mask = evaluation_mask
+            )
+        )
     
         # Update metadata
         self.show_progress()
@@ -2891,6 +3069,7 @@ class GBRT_Comparison(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+        return np.mean(validation_metrics)
 
 
 class GraphAttentionNetwork_Comparison(Experiment):
@@ -2914,6 +3093,9 @@ class GraphAttentionNetwork_Comparison(Experiment):
 
         # Pass inputs to device
         self.inputs.pass_to_device()
+        # Keep a separate copy of inputs that is cast to xarray
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2925,6 +3107,37 @@ class GraphAttentionNetwork_Comparison(Experiment):
         
         # Get config
         self.config = getattr(self.ct,'config',self.config)
+
+        # Create outputs
+        self.outputs = Outputs(
+            self.config,
+            module = __name__+kwargs.get('instance',''),
+            sweep = kwargs.get('sweep',{}),
+            base_dir = self.outputs_base_dir,
+            experiment_id = self.sweep_experiment_id,
+            logger = self.logger
+        )
+
+        # Prepare writing to file
+        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
+
+        # Write metadata
+        self.write_metadata()
+        
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        
+
+    def run(self,*trial,**kwargs) -> None:
+
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
 
         # Get covariates/features
         features_mean = self.inputs.data.region_features.mean(dim=0)
@@ -2946,9 +3159,6 @@ class GraphAttentionNetwork_Comparison(Experiment):
             region_features = features,
             device = self.device
         ).to(self.device)
-        
-        # Set up the model
-        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
 
         # Get number of regions
         if self.inputs.data.dims['origin'] == self.inputs.data.dims['destination']:
@@ -2958,39 +3168,16 @@ class GraphAttentionNetwork_Comparison(Experiment):
 
         # TODO: Modify this to elicit number of nodes in non square adjacency matrices / graphs
         self.learning_model = GAT_Model(
+            trial = trial,
             config = self.config,
             graph = graph,
             num_regions = num_regions,
             input_size = features.shape[1],
-            **{k.replace("gat_",""):v for k,v in self.config['graph_attention_network']['hyperparameters'].items()},
             device = self.device, 
             logger = self.logger
         ).to(self.device)
 
-        # Get config
-        self.config = getattr(self.learning_model,'config',self.config)
-
-        # Create outputs
-        self.outputs = Outputs(
-            self.config,
-            module = __name__+kwargs.get('instance',''),
-            sweep = kwargs.get('sweep',{}),
-            base_dir = self.outputs_base_dir,
-            experiment_id = self.sweep_experiment_id,
-            logger = self.logger
-        )
-
-        # Prepare writing to file
-        self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
-
-        # Write metadata
-        self.write_metadata()
-        
         self.logger.note(f"{self.learning_model}")
-        self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        
-
-    def run(self,**kwargs) -> None:
 
         self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
@@ -3002,9 +3189,12 @@ class GraphAttentionNetwork_Comparison(Experiment):
         # Store number of samples
         N = self.config.settings['training']['N']
         
-        # Get training and test cells
-        train_index = np.array([np.array(c,dtype='int32') for c in self.ct.constraints['cells']],dtype='int32')
-        test_index = self.inputs.data.test_cells
+        # Get training and evaluation cells
+        train_index = self.inputs.data.train_cells
+        # Evaluate model at validation cells if optuna trial is ongoing
+        # else evaluate model at test cells
+        evaluation_index = self.inputs.data.test_cells if trial is None else self.inputs.data.validation_cells
+        evaluation_mask = self.inputs.data.test_cells_mask if trial is None else self.inputs.data.validation_cells_mask
 
         # Get training set
         train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
@@ -3033,8 +3223,14 @@ class GraphAttentionNetwork_Comparison(Experiment):
             coords = coordinates
         )
         # Update train cells
-        for tc in train_index:
-            intensity_xr[tc[0],tc[1]] = self.inputs.data.ground_truth_table[tc[0],tc[1]]
+        intensity_xr = xr.where(
+            self.inputs.data.train_cells_mask,
+            self.inputs.data.ground_truth_table,
+            intensity_xr
+        )
+        
+        # Initialise validation metrics
+        validation_metrics = []
 
         # For each epoch
         for i in tqdm(
@@ -3047,20 +3243,28 @@ class GraphAttentionNetwork_Comparison(Experiment):
             # Track the epoch training time
             start_time = time.time()
 
-            # Run model a single time
-            self.learning_model.run_single(
-                train_y,
-                train_inflow,
-                train_outflow
+            # Train/test
+            intensity = self.learning_model.run_single(
+                train_y = train_y,
+                train_inflow = train_inflow,
+                train_outflow = train_outflow,
+                test_index = evaluation_index
             )
 
-            # Predict y, inflows, outflows
-            intensity = self.learning_model.predict(test_index)
+            # Populate output array at evaluation index
+            intensity = populate_array(
+                shape = unpack_dims(self.inputs.data.dims,time_dims=False),
+                index = evaluation_index,
+                res = intensity
+            )
 
             # Update test cells
-            for i,tc in enumerate(test_index):
-                intensity_xr[tc[0],tc[1]] = intensity[i]
-
+            intensity_xr = xr.where(
+                evaluation_mask,
+                intensity,
+                intensity_xr
+            )
+            
             # Clean and write to file
             self.write_data(
                 intensity = intensity_xr,
@@ -3068,12 +3272,15 @@ class GraphAttentionNetwork_Comparison(Experiment):
             )
             self._time += 1
 
-            # print statements
-            self.show_progress()
-            self.logger.iteration(f"Completed iteration {i+1} / {N}.")
-            if self.logger.console.isEnabledFor(PROGRESS):
-                print('\n')
-    
+            # Update optuna progress
+            validation_metrics.append(
+                self.update_optimisation_progress(
+                    index = i,
+                    prediction = intensity_xr, 
+                    mask = evaluation_mask
+                )
+            )
+        
         # Update metadata
         self.show_progress()
 
@@ -3084,6 +3291,8 @@ class GraphAttentionNetwork_Comparison(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+        
+        return np.mean(validation_metrics)
 
 class ExperimentSweep():
 
@@ -3271,7 +3480,7 @@ class ExperimentSweep():
                 pass
 
             # Running experiment
-            new_experiment.run()
+            _ = new_experiment.run()
 
             self.logger.info(f'Instance = {str(instance_num)} DONE')
 

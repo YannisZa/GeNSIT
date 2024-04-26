@@ -3,6 +3,8 @@ import sys
 import click
 import psutil
 
+
+from gensit.config import Config
 from gensit.utils.logger_class import *
 from gensit.utils.click_parsers import *
 from gensit.static.global_variables import *
@@ -59,7 +61,9 @@ _common_options = [
     click.option('--n', '-n', type = click.IntRange(min = 1), help = 'Overwrites number of iterations of the selected the algorithm'),
     click.option('--table','-tab', type = click.STRING,default = None, help = 'Overwrites input table filename in config'),
     click.option('--device','-dev', type = click.Choice(['cpu', 'cuda', 'mps']), default='cpu',
-            help = f'Type of device used for torch operations.')
+            help = f'Type of device used for torch operations.'),
+    click.option('--out_directory', '-o', required = True, type = click.Path(exists = True), default='./data/outputs/'),
+    click.option('--out_group', '-og', required = False, type = click.Path(exists = False), default=None),
 ]
 
 _create_and_run_options = [
@@ -86,6 +90,87 @@ _create_and_run_options = [
             help = 'Overwrites noise_percentage parameter in Harris Wilson Model.')
 ]
 
+_run_and_optimise_options = [
+        click.option('--title','-ttl', type = click.STRING, default = None, help = 'Title appended to output filename of experiment'),
+        click.option('--validate_samples/--no-validate_samples', default = None, is_flag = True, show_default = True,
+                help = f'Flag for whether every sample generated should by appropriately validated.'),
+        click.option('--overwrite/--no-overwrite', default = None,is_flag = True, show_default = True,
+                help = f'Flag for whether parameter sweep mode is activated or not.'),
+        click.option('--dataset','-d', type = click.Path(exists = False),
+        default = None, help = 'Overwrites dataset name in config'),
+        click.option('--in_directory','-id', type = click.Path(exists = True),
+        default = None, help = 'Overwrites inputs directory in config'),
+        click.option('--to_learn','-tl', type = click.Choice(['alpha','beta','kappa','sigma']), default = None,
+        help = 'Overwrites parameters to learn.'),
+        click.option('--mcmc_workers','-mcmcnw', type = click.IntRange(min = 1,max = AVAILABLE_CORES), 
+        help = 'Overwrites number of MCMC workers'),
+        click.option('--name','-nm', type = click.Choice(['TotallyConstrained','ProductionConstrained']),
+        default = None, help = 'Overwrites spatial interaction model of choice (intensity function)'),
+        click.option('--grand_total','-gt', type = click.FloatRange(min=1.0),
+        default = 1.0, help = 'Overwrites input grand total in config'),
+        click.option('--origin_demand','-od', type = click.STRING,
+        default = None, help = 'Overwrites input origin demand filename in config'),
+        click.option('--cost_matrix','-cm', type = click.STRING,
+        default = None, help = 'Overwrites input cost matrix filename in config'),
+        click.option('--destination_attraction_ts','-dats', type = click.STRING,
+        default = None, help = 'Overwrites input destination attraction time series filename in config'),
+        click.option('--margins','-ma', type = click.STRING, cls = OptionEatAll,
+        default = None, help = 'Overwrites input margin filenames in config'),
+        click.option('--sparse_margins','-sm', is_flag = True, default = False,
+        help = 'Flag for allowing sparsity in margins of contingency table'),
+        click.option('--store_progress','-sp', default = 1.0, show_default = True, 
+        type = click.FloatRange(min = 0.01,max = 1.0),
+        help = 'Sets percentage of total samples that will be exported as a batch'),
+        click.option('--axes','-ax', cls = PythonLiteralOption, multiple = True, default = None,
+        help = '''Overwrites constrained margin axes (axes over which table is summed) in config.\
+        Use the following syntax: -ax '[ENTER AXES SEPARATED BY COMMA HERE]' e.g -ax '[0]' -ax '[0, 1]'
+        The unconstrained case is just -ax '[]' '''),
+        click.option('--cells','-c', type = click.STRING, default = None,
+        help = 'Overwrites constrained cells filename in config. '),
+        click.option('--seed','-seed', type = click.IntRange(min = 0), show_default = True,
+        default = None, help = 'Overwrites random number generation seed for model runs.'),
+        click.option('--proposal','-p', type = click.Choice(['direct_sampling','degree_higher','degree_one']),
+        default = None, help = 'Overwrites contingency table MCMC proposal'),
+        click.option('--loss_name','-ln', type = click.Choice(list(LOSS_DATA_REQUIREMENTS.keys())), callback = to_list,
+        default = None, multiple = True, help = 'Overwrites neural net loss name(s)'),
+        click.option('--loss_function','-lf', type = click.Choice(list(LOSS_FUNCTIONS.keys())), callback = to_list,
+        default = None, multiple = True, help = 'Overwrites neural net loss function(s)'),
+        click.option('--loss_kwarg_keys','-lkk', type = click.STRING, callback = split_to_list,
+        default = None, multiple = True, help = 'Overwrites neural net loss function(s) kwarg parameter keys'),
+        click.option('--theta_steps','-pn', type = click.IntRange(min = 1),
+        default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.'),
+        click.option('--destination_attraction_steps','-dan', type = click.IntRange(min = 1),
+        default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.'),
+        click.option('--table_steps','-tn', type = click.IntRange(min = 1),
+        default = None, help = 'Overwrites number of Spatial Interaction Model MCMC steps in joint scheme.'),
+        click.option('--table0','-tab0', type = click.Choice(TABLE_SOLVERS), default = None,
+        help = 'Overwrites table initialisation method name in MCMC.'),
+        click.option('--margin0','-m0', type = click.Choice(MARGINAL_SOLVERS), default = None,
+        help = 'Overwrites margin initialisation method name in MCMC.'),
+        click.option('--alpha0','-alpha0', type = click.FloatRange(min = 0), default = None,
+        help = 'Overwrites initialisation of alpha parameter in MCMC.'),
+        click.option('--beta0','-beta0', type = click.FloatRange(min = 0), default = None,
+        help = 'Overwrites initialisation of beta parameter in MCMC.'),
+        click.option('--beta_max','-bm', type = click.FloatRange(min = 0), default = None,
+        help = 'Overwrites maximum beta in SIM parameters.'),
+        click.option('--covariance','-cov', type = click.STRING, default = None,
+        help = 'Overwrites covariance matrix of parameter Gaussian Randow walk proposal'),
+        click.option('--step_size','-ss', type = click.FloatRange(min = 0), default = None,
+        help = 'Overwrites step size in parameter Gaussian Randow walk proposal'),
+        click.option('--leapfrog_steps','-ls', type = click.IntRange(min = 1), default = None,
+        help = 'Overwrites number of steps in Leapfrog Integrator in HMC'),
+        click.option('--leapfrog_step_size','-lss', type = click.FloatRange(min = 0), default = None,
+        help = 'Overwrites number of step size in Leapfrog Integrator in HMC'),
+        click.option('--ais_leapfrog_steps','-als', type = click.IntRange(min = 1), default = None,
+        help = 'Overwrites number of leapfrog steps in AIS HMC proposal (normalising constant sampling)'),
+        click.option('--ais_leapfrog_step_size','-alss', type = click.FloatRange(min = 0), default = None,
+        help = 'Overwrites size of leapfrog steps in AIS HMC proposal (normalising constant sampling)'),
+        click.option('--ais_samples','-as', type = click.IntRange(min = 1), default = None,
+        help = 'Overwrites number of samples in AIS (normalising constant sampling)'),
+        click.option('--n_bridging_distributions','-nb', type = click.IntRange(min = 1), default = None,
+                help = 'Overwrites number of temperatures in tempered distribution in AIS (normalising constant sampling)')
+]
+
 def common_options(func):
     for option in reversed(_common_options):
         func = option(func)
@@ -96,7 +181,13 @@ def create_and_run_options(func):
         func = option(func)
     return func
 
-def exec(logger,settings,config_path,**kwargs):
+def run_and_optimise_options(func):
+    for option in reversed(_run_and_optimise_options):
+        func = option(func)
+    return func
+
+def setup_experiments(logger,settings,config_path,**kwargs):
+    
     # Import all modules
     from gensit.config import Config
     from gensit.experiments import ExperimentHandler
@@ -128,6 +219,16 @@ def exec(logger,settings,config_path,**kwargs):
         experiment_types = list(kwargs.get('experiment_type',[])),
         logger = logger
     )
+    return eh
+
+def exec(logger,settings,config_path,**kwargs):
+    
+    eh = setup_experiments(
+        logger,
+        settings = settings,
+        config_path = config_path,
+        experiment_type = list(kwargs.get('experiment_type',[]))
+    )
 
     # Run experiments
     eh.run_experiments_sequentially()
@@ -152,6 +253,8 @@ def create(
     n,
     table,
     device,
+    out_directory,
+    out_group,
     config_path,
     data_generation_seed,
     alpha,
@@ -246,98 +349,19 @@ def create(
 @cli.command('run')
 @click.option('--load_experiment','-le', multiple = False, type = click.Path(exists = True), default = None, 
         help='Defines path to existing experiment output in order to load it and resume experimentation.')
-@click.option('--experiment_type','-et', type = click.Choice(list(EXPERIMENT_OUTPUT_NAMES.keys())), multiple = True,   
-        callback = to_list, default = None, help = 'Decides which experiment types to run')
-@click.option('--title','-ttl', type = click.STRING,
-        default = None, help = 'Title appended to output filename of experiment')
 @click.option('--sweep_mode/--no-sweep_mode', default = None,is_flag = True, show_default = True,
         help = f'Flag for whether parameter sweep mode is activated or not.')
-@click.option('--validate_samples/--no-validate_samples', default = None, is_flag = True, show_default = True,
-        help = f'Flag for whether every sample generated should by appropriately validated.')
-@click.option('--overwrite/--no-overwrite', default = None,is_flag = True, show_default = True,
-        help = f'Flag for whether parameter sweep mode is activated or not.')
-@click.option('--dataset','-d', type = click.Path(exists = False),
-        default = None, help = 'Overwrites dataset name in config')
-@click.option('--in_directory','-id', type = click.Path(exists = True),
-        default = None, help = 'Overwrites inputs directory in config')
-@click.option('--to_learn','-tl', type = click.Choice(['alpha','beta','kappa','sigma']), default = None,
-        help = 'Overwrites parameters to learn.')
-@click.option('--mcmc_workers','-mcmcnw', type = click.IntRange(min = 1,max = AVAILABLE_CORES), 
-        help = 'Overwrites number of MCMC workers')
-@click.option('--name','-nm', type = click.Choice(['TotallyConstrained','ProductionConstrained']),
-        default = None, help = 'Overwrites spatial interaction model of choice (intensity function)')
-@click.option('--grand_total','-gt', type = click.FloatRange(min=1.0),
-        default = 1.0, help = 'Overwrites input grand total in config')
-@click.option('--origin_demand','-od', type = click.STRING,
-        default = None, help = 'Overwrites input origin demand filename in config')
-@click.option('--cost_matrix','-cm', type = click.STRING,
-        default = None, help = 'Overwrites input cost matrix filename in config')
-@click.option('--destination_attraction_ts','-dats', type = click.STRING,
-        default = None, help = 'Overwrites input destination attraction time series filename in config')
-@click.option('--margins','-ma', type = click.STRING, cls = OptionEatAll,
-        default = None, help = 'Overwrites input margin filenames in config')
-@click.option('--sparse_margins','-sm', is_flag = True, default = False,
-        help = 'Flag for allowing sparsity in margins of contingency table')
-@click.option('--store_progress','-sp', default = 1.0, show_default = True, 
-        type = click.FloatRange(min = 0.01,max = 1.0),
-        help = 'Sets percentage of total samples that will be exported as a batch')
-@click.option('--axes','-ax', cls = PythonLiteralOption, multiple = True, default = None,
-        help = '''Overwrites constrained margin axes (axes over which table is summed) in config.\
-               Use the following syntax: -ax '[ENTER AXES SEPARATED BY COMMA HERE]' e.g -ax '[0]' -ax '[0, 1]'
-               The unconstrained case is just -ax '[]' ''')
-@click.option('--cells','-c', type = click.STRING, default = None,
-        help = 'Overwrites constrained cells filename in config. ')
-@click.option('--seed','-seed', type = click.IntRange(min = 0), show_default = True,
-        default = None, help = 'Overwrites random number generation seed for model runs.')
-@click.option('--proposal','-p', type = click.Choice(['direct_sampling','degree_higher','degree_one']),
-        default = None, help = 'Overwrites contingency table MCMC proposal')
-@click.option('--loss_name','-ln', type = click.Choice(list(LOSS_DATA_REQUIREMENTS.keys())), callback = to_list,
-        default = None, multiple = True, help = 'Overwrites neural net loss name(s)')
-@click.option('--loss_function','-lf', type = click.Choice(list(LOSS_FUNCTIONS.keys())), callback = to_list,
-        default = None, multiple = True, help = 'Overwrites neural net loss function(s)')
-@click.option('--loss_kwarg_keys','-lkk', type = click.STRING, callback = split_to_list,
-        default = None, multiple = True, help = 'Overwrites neural net loss function(s) kwarg parameter keys')
-@click.option('--theta_steps','-pn', type = click.IntRange(min = 1),
-        default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.')
-@click.option('--destination_attraction_steps','-dan', type = click.IntRange(min = 1),
-        default = None, help = 'Overwrites number of Spatial Interaction Model MCMC theta steps in joint scheme.')
-@click.option('--table_steps','-tn', type = click.IntRange(min = 1),
-        default = None, help = 'Overwrites number of Spatial Interaction Model MCMC steps in joint scheme.')
-@click.option('--table0','-tab0', type = click.Choice(TABLE_SOLVERS), default = None,
-        help = 'Overwrites table initialisation method name in MCMC.')
-@click.option('--margin0','-m0', type = click.Choice(MARGINAL_SOLVERS), default = None,
-        help = 'Overwrites margin initialisation method name in MCMC.')
-@click.option('--alpha0','-alpha0', type = click.FloatRange(min = 0), default = None,
-        help = 'Overwrites initialisation of alpha parameter in MCMC.')
-@click.option('--beta0','-beta0', type = click.FloatRange(min = 0), default = None,
-        help = 'Overwrites initialisation of beta parameter in MCMC.')
-@click.option('--beta_max','-bm', type = click.FloatRange(min = 0), default = None,
-        help = 'Overwrites maximum beta in SIM parameters.')
-@click.option('--covariance','-cov', type = click.STRING, default = None,
-        help = 'Overwrites covariance matrix of parameter Gaussian Randow walk proposal')
-@click.option('--step_size','-ss', type = click.FloatRange(min = 0), default = None,
-        help = 'Overwrites step size in parameter Gaussian Randow walk proposal')
-@click.option('--leapfrog_steps','-ls', type = click.IntRange(min = 1), default = None,
-        help = 'Overwrites number of steps in Leapfrog Integrator in HMC')
-@click.option('--leapfrog_step_size','-lss', type = click.FloatRange(min = 0), default = None,
-        help = 'Overwrites number of step size in Leapfrog Integrator in HMC')
-@click.option('--ais_leapfrog_steps','-als', type = click.IntRange(min = 1), default = None,
-        help = 'Overwrites number of leapfrog steps in AIS HMC proposal (normalising constant sampling)')
-@click.option('--ais_leapfrog_step_size','-alss', type = click.FloatRange(min = 0), default = None,
-        help = 'Overwrites size of leapfrog steps in AIS HMC proposal (normalising constant sampling)')
-@click.option('--ais_samples','-as', type = click.IntRange(min = 1), default = None,
-        help = 'Overwrites number of samples in AIS (normalising constant sampling)')
-@click.option('--n_bridging_distributions','-nb', type = click.IntRange(min = 1), default = None,
-        help = 'Overwrites number of temperatures in tempered distribution in AIS (normalising constant sampling)')
+@click.option('--experiment_type','-et', type = click.Choice(list(EXPERIMENT_OUTPUT_NAMES.keys())), multiple = True, callback = to_list, default = None, help = 'Decides which experiment types to run')
 @common_options
+@run_and_optimise_options
 @create_and_run_options
 def run(
+        load_experiment,
+        sweep_mode,
         experiment_type,
         title,
-        sweep_mode,
         validate_samples,
         overwrite,
-        load_experiment,
         dataset,
         in_directory,
         to_learn,
@@ -391,6 +415,8 @@ def run(
         n,
         table,
         device,
+        out_directory,
+        out_group
     ):
     """
     Sample discrete spatial interaction tables (origin-destination matrices) and/or their mean-field approximation (intensity / choice probabilities).
@@ -423,7 +449,7 @@ def run(
         console_level = settings.get('logging_mode','info'),
     )
 
-    exec(
+    eh = exec(
         logger,
         settings = settings,
         config_path = config_path,
@@ -431,9 +457,133 @@ def run(
     )
 
 
+
+@cli.command('optimise')
+@click.option(f'--n_trials', f'-ntr', default = None, show_default = True,
+              type = click.INT, help = f'Updates config parameter. n_trials is used in optuna package for hyperparameter optimisation.')
+@click.option(f'--timeout', f'-tout', default = None, show_default = True,
+              type = click.INT, help = f'Updates config parameter. timeout is used in optuna package for hyperparameter optimisation.')
+@click.option('--metric_evaluation','-me', type = click.STRING, default = None, required = False,
+              help = f'Updates config parameter. metric_evaluation is used in hyperparameter optimisation to evaluate the objective function based on which hyperparameters will be chosen.')
+@click.option('--experiment_type','-et', type = click.Choice(OPTIMISABLE_EXPERIMENTS), multiple = True, 
+              callback = to_list, default = None, help = 'Decides which experiment types to perform hyperparameter optimisation on')
+@common_options
+@run_and_optimise_options
+@create_and_run_options
+def optimise(
+        n_trials,
+        timeout,
+        metric_evaluation,
+        experiment_type,
+        title,
+        validate_samples,
+        overwrite,
+        dataset,
+        in_directory,
+        to_learn,
+        mcmc_workers,
+        name,
+        grand_total,
+        origin_demand,
+        cost_matrix,
+        destination_attraction_ts,
+        margins,
+        axes,
+        store_progress,
+        cells,
+        sparse_margins,
+        seed,
+        config_path,
+        data_generation_seed,
+        alpha,
+        beta,
+        bmax,
+        delta,
+        kappa,
+        epsilon,
+        sigma,
+        dt,
+        noise_percentage,
+        proposal,
+        loss_name,
+        loss_function,
+        loss_kwarg_keys,
+        theta_steps,
+        destination_attraction_steps,
+        table_steps,
+        table0,
+        margin0,
+        alpha0,
+        beta0,
+        beta_max,
+        covariance,
+        step_size,
+        leapfrog_steps,
+        leapfrog_step_size,
+        ais_leapfrog_steps,
+        ais_leapfrog_step_size,
+        ais_samples,
+        n_bridging_distributions,
+        norm,
+        n_workers,
+        n_threads,
+        logging_mode,
+        n,
+        table,
+        device,
+        out_directory,
+        out_group
+    ):
+    """
+    Perform hyperparameter optimisation using optuna package to tune hyperparameters of various algorithms.
+    """
+    # Gather all arguments in dictionary
+    settings = {k:v for k,v in locals().items() if k != 'ctx'}
+    # Remove all nulls
+    settings = {k: v for k, v in settings.items() if v is not None}
+    # Remove empty lists
+    settings = {k: v for k, v in settings.items() if not hasattr(v,'__len__') or (hasattr(v,'__len__') and len(v) > 0)}
+    # Capitalise all single-letter arguments
+    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
+    
+    # Update settings
+    settings = update_settings(settings)
+    
+    # Update number of workers
+    set_threads(settings['n_threads'])
+
+    # Import all modules
+    from numpy import asarray
+    
+    # Convert covariance to 2x2 array
+    if 'covariance' in list(settings.keys()):
+        settings['covariance'] = asarray([float(x) for x in settings['covariance'].split(",")]).reshape((2,2)).tolist()
+
+    # Setup logger
+    logger = setup_logger(
+        __name__,
+        console_level = settings.get('logging_mode','info'),
+    )
+
+    # Disable data export
+    settings['export_samples'] = False
+    settings['export_metadata'] = False
+    
+    eh = setup_experiments(
+        logger,
+        settings = settings,
+        config_path = config_path,
+        experiment_type = experiment_type
+    )
+
+    # Optimise experiments
+    eh.optimise_experiments_sequentially()
+
+    logger.success('Done')
+
+
 _output_options = [
     # Output experiment data search options 
-    click.option('--out_directory', '-o', required = True, type = click.Path(exists = True), default='./data/outputs/'),
     click.option('--dataset_name', '-dn', required = False, multiple = True, type = click.STRING),
     click.option('--directories','-d', multiple = True, required = False, type = click.Path(exists = False)),
     click.option('--experiment_type','-et', multiple = True, type = click.STRING, default = [''], cls = NotRequiredIf, not_required_if='directories'),
@@ -642,7 +792,6 @@ def plot_coordinate_options(func):
 def plot(
         ctx,
         # Output-specific options
-        out_directory,
         dataset_name,
         directories,
         experiment_type,
@@ -669,6 +818,8 @@ def plot(
         n,
         table,
         device,
+        out_directory,
+        out_group,
         metadata_keys,
         region_mass,
         force_reload,
@@ -826,7 +977,6 @@ def plot(
 @click.pass_context
 def summarise(
         ctx,
-        out_directory,
         dataset_name,
         directories,
         experiment_type,
@@ -853,6 +1003,8 @@ def summarise(
         n,
         table,
         device,
+        out_directory,
+        out_group,
         metadata_keys,
         region_mass,
         force_reload,
