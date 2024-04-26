@@ -14,7 +14,7 @@ from typing import Any, List, Union
 
 from gensit.config import Config
 from gensit.utils.exceptions import *
-from gensit.physics_models.harris_wilson_model import HarrisWilson
+from gensit.physics_models.HarrisWilsonModel import HarrisWilson
 from gensit.utils.misc_utils import setup_logger, fn_name, eval_dtype
 from gensit.static.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
 

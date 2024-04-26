@@ -26,7 +26,7 @@ from gensit.learning_models.GBRT import GBRT_Model
 from gensit.learning_models.RandomForest import RandomForest_Model
 from gensit.learning_models.GraphAttentionNetwork import GAT_Model
 from gensit.learning_models.HarrisWilsonModel_MCMC import HarrisWilson_MCMC
-from gensit.learning_models.HarrisWilsonModell_NeuralNet import NeuralNet, HarrisWilson_NN
+from gensit.learning_models.HarrisWilsonModel_NeuralNet import NeuralNet, HarrisWilson_NN
 from gensit.contingency_table.ContingencyTable_MCMC import ContingencyTableMarkovChainMonteCarlo
 
 # Suppress scientific notation

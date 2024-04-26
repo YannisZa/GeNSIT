@@ -31,10 +31,10 @@ from gensit.utils import misc_utils as MiscUtils
 from gensit.utils import math_utils as MathUtils
 from gensit.contingency_table import instantiate_ct
 from gensit.utils import probability_utils as ProbabilityUtils
-from gensit.physics_models.harris_wilson_model import HarrisWilson
+from gensit.physics_models.HarrisWilsonModel import HarrisWilson
 from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
-from gensit.learning_models.harris_wilson_model_neural_net import NeuralNet, HarrisWilson_NN
-from gensit.contingency_table.contingency_table_mcmc import ContingencyTableMarkovChainMonteCarlo
+from gensit.learning_models.HarrisWilsonModel_NeuralNet import NeuralNet, HarrisWilson_NN
+from gensit.contingency_table.ContingencyTable_MCMC import ContingencyTableMarkovChainMonteCarlo
 
 OUTPUTS_MODULE = sys.modules[__name__]
 
