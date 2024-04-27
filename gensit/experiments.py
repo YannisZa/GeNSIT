@@ -1220,7 +1220,6 @@ class SIM_MCMC(Experiment):
         sim = instantiate_sim(
             name = self.config['spatial_interaction_model']['name'],
             config = self.config,
-            true_parameters = self.config['spatial_interaction_model']['parameters'],
             instance = kwargs.get('instance',''),
             **vars(self.inputs.data),
             logger = self.logger

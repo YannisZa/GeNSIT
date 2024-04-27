@@ -13,7 +13,6 @@ from gensit.intensity_models.spatial_interaction_models import ProductionConstra
 def instantiate_sim(
         config:Config,
         name:str = None,
-        true_parameters = {},
         **kwargs
     ):
     if name is None:
@@ -25,7 +24,6 @@ def instantiate_sim(
     
     return getattr(sys.modules[__name__], name)(
         config = config,
-        true_parameters = true_parameters,
         **kwargs
     )
     
@@ -55,7 +53,6 @@ class SpatialInteraction2D(SpatialInteraction):
     def __init__(
             self,
             config: Config = None,
-            true_parameters: dict = {},
             **kwargs
     ):
         '''  Constructor '''
@@ -63,14 +60,19 @@ class SpatialInteraction2D(SpatialInteraction):
         # SIM name
         self.dims_names = ['origin','destination']
         
+        # Config
+        self.config = config
         # Configuration settings
-        if config is not None:
-            self.config = config
-
+        if self.config is not None:
+            # True parameters
+            true_parameters = self.config['spatial_interaction_model']['parameters']
             # Device name
             self.device = self.config['inputs']['device']
         else:
-             self.device = kwargs.get('device','cpu')
+            # True parameters
+            true_parameters = kwargs.get('true_parameters',{})
+            # Device name
+            self.device = kwargs.get('device','cpu')
 
         # Instantiate data and parameter dataset 
         self.data = Dataset()
@@ -82,14 +84,15 @@ class SpatialInteraction2D(SpatialInteraction):
         # Attribute names
         self.attribute_names = ['dims']
 
-        # True and auxiliary parameters
-        for param in self.param_names:
+        # Auxiliary parameters
+        for param in self.param_names:    
             setattr(
                 self.params,
                 param,
                 true_parameters.get(param,PARAMETER_DEFAULTS[param])
             )
-            self.config.settings['spatial_interaction_model']['parameters'][param] = to_json_format(true_parameters.get(param,PARAMETER_DEFAULTS[param]))
+            if self.config is not None and param not in self.config.settings['spatial_interaction_model']['parameters']:
+                self.config.settings['spatial_interaction_model']['parameters'][param] = to_json_format(true_parameters.get(param,PARAMETER_DEFAULTS[param]))
 
         # Read data passed
         for attr in self.REQUIRED_INPUTS:
