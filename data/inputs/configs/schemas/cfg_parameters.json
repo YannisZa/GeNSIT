@@ -618,7 +618,7 @@
       }
     },
     "hyperparameters": {
-      "num_layers": {
+      "num_hidden_layers": {
         "sweep": {
           "default": true,
           "range": true

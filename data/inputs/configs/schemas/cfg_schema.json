@@ -1703,9 +1703,29 @@
       "sweepable": false,
       "optional": false,
       "exclude": false,
+
       "dtype": "int",
       "default-value": 1,
       "valid-range": [1, null]
+    },
+    "intensity_model": {
+      "sweepable": true,
+      "optional": false,
+      "exclude": false,
+
+      "sweep": {
+        "default": {
+          "dtype": "str",
+          "default-value": "spatial_interaction_model",
+          "is-any-of": ["spatial_interaction_model", "no_model"]
+        },
+        "range": {
+          "dtype": "list",
+          "list-dtype": "str",
+          "default-value": ["spatial_interaction_model"],
+          "is-any-of": ["spatial_interaction_model", "no_model"]
+        }
+      }
     },
     "to_learn": {
       "sweepable": true,
@@ -1924,16 +1944,15 @@
 
         "sweep": {
           "default": {
-            "dtype": "int",
-            "default-value": 2,
-            "valid-range": [1, null]
+            "dtype": "float",
+            "default-value": 2.0,
+            "valid-range": [0.0, null]
           },
           "range": {
             "dtype": "list",
-            "list-dtype": "int",
-            "default-value": 2,
-            "valid-range": [1, null],
-            "unique-vals": true
+            "list-dtype": "float",
+            "default-value": 2.0,
+            "valid-range": [0.0, null]
           }
         }
       },
@@ -1944,16 +1963,15 @@
 
         "sweep": {
           "default": {
-            "dtype": "int",
-            "default-value": 4,
-            "valid-range": [1, null]
+            "dtype": "float",
+            "default-value": 4.0,
+            "valid-range": [0.0, null]
           },
           "range": {
             "dtype": "list",
-            "list-dtype": "int",
-            "default-value": 1,
-            "valid-range": [4, null],
-            "unique-vals": true
+            "list-dtype": "float",
+            "default-value": 4.0,
+            "valid-range": [0.0, null]
           }
         }
       },
@@ -2593,7 +2611,7 @@
       "optional": true,
       "exclude": false,
 
-      "num_layers": {
+      "num_hidden_layers": {
         "sweepable": true,
         "optional": true,
         "exclude": false,
