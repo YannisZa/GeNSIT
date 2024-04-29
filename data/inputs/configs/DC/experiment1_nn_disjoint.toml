@@ -21,6 +21,10 @@ seed = 1234
       file = 'ground_truth_table.txt'
     [inputs.data.train_cells]
       file = 'zero_and_train_cells.txt'
+    [inputs.data.test_cells]
+      file = 'test_cells.txt'
+    [inputs.data.validation_cells]
+      file = 'validation_cells.txt'
 
 [contingency_table]
   disable_tqdm = true
@@ -48,12 +52,20 @@ seed = 1234
   num_steps = +1
   batch_size = +1
   N = 100000
+  intensity_model = 'spatial_interaction_model'
+  physics_model = 'harris_wilson_model'
   [training.to_learn.sweep]
     default = ['alpha', 'beta'] 
     range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
     coupled = true
     target_name = 'sigma'
 
+[hyperparameter_optimisation]
+  n_trials = 100
+  timeout = nan
+  metric_minimise = true
+  metric_evaluation = "MathUtils.srmse(prediction=prediction,ground_truth=ground_truth_table,mask=mask)"
+  
 [mcmc]
   [mcmc.contingency_table]
     table_steps = +1
@@ -70,7 +82,7 @@ seed = 1234
       nokey = nan
       noise_percentage = nan
   [neural_network.hyperparameters]
-    num_layers = +1
+    num_hidden_layers = +1
     optimizer = 'Adam'
     learning_rate = +0.002
     [neural_network.hyperparameters.biases]

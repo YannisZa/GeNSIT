@@ -69,12 +69,19 @@ load_experiment = ''
   batch_size = +1
   table_inference = false
   to_learn = []
+  intensity_model = 'spatial_interaction_model'
+  physics_model = 'harris_wilson_model'
   [training.num_steps.sweep]
     default = +1_000
     range = [1_000,1_000,1_000,3_000,3_000,3_000,3_000]
     coupled = true
     target_name = 'dataset'
 
+[hyperparameter_optimisation]
+  n_trials = 100
+  timeout = nan
+  metric_minimise = true
+  metric_evaluation = "MathUtils.srmse(prediction=prediction,ground_truth=ground_truth_table,mask=mask)"
 
 [[experiments]]
   type = 'DataGeneration'

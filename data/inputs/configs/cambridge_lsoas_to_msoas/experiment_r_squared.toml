@@ -46,7 +46,15 @@ load_experiment = ''
   batch_size = +1
   N = 1000
   to_learn = ['alpha', 'beta']
+  intensity_model = 'spatial_interaction_model'
+  physics_model = 'harris_wilson_model'
 
+[hyperparameter_optimisation]
+  n_trials = 100
+  timeout = nan
+  metric_minimise = true
+  metric_evaluation = "MathUtils.srmse(prediction=prediction,ground_truth=ground_truth_table,mask=mask)"
+  
 [[experiments]]
   type = 'RSquared_Analysis'
   comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
