@@ -91,6 +91,9 @@ _create_and_run_options = [
 ]
 
 _run_and_optimise_options = [
+        click.option('--sweep_mode/--no-sweep_mode', default = None,is_flag = True, show_default = True,
+        help = f'Flag for whether parameter sweep mode is activated or not.'),
+        click.option('--experiment_type','-et', type = click.Choice(list(EXPERIMENT_OUTPUT_NAMES.keys())), multiple = True, callback = to_list, default = None, help = 'Decides which experiment types to run'),
         click.option('--title','-ttl', type = click.STRING, default = None, help = 'Title appended to output filename of experiment'),
         click.option('--validate_samples/--no-validate_samples', default = None, is_flag = True, show_default = True,
                 help = f'Flag for whether every sample generated should by appropriately validated.'),
@@ -349,9 +352,6 @@ def create(
 @cli.command('run')
 @click.option('--load_experiment','-le', multiple = False, type = click.Path(exists = True), default = None, 
         help='Defines path to existing experiment output in order to load it and resume experimentation.')
-@click.option('--sweep_mode/--no-sweep_mode', default = None,is_flag = True, show_default = True,
-        help = f'Flag for whether parameter sweep mode is activated or not.')
-@click.option('--experiment_type','-et', type = click.Choice(list(EXPERIMENT_OUTPUT_NAMES.keys())), multiple = True, callback = to_list, default = None, help = 'Decides which experiment types to run')
 @common_options
 @run_and_optimise_options
 @create_and_run_options
@@ -465,8 +465,6 @@ def run(
               type = click.INT, help = f'Updates config parameter. timeout is used in optuna package for hyperparameter optimisation.')
 @click.option('--metric_evaluation','-me', type = click.STRING, default = None, required = False,
               help = f'Updates config parameter. metric_evaluation is used in hyperparameter optimisation to evaluate the objective function based on which hyperparameters will be chosen.')
-@click.option('--experiment_type','-et', type = click.Choice(OPTIMISABLE_EXPERIMENTS), multiple = True, 
-              callback = to_list, default = None, help = 'Decides which experiment types to perform hyperparameter optimisation on')
 @common_options
 @run_and_optimise_options
 @create_and_run_options
@@ -474,6 +472,7 @@ def optimise(
         n_trials,
         timeout,
         metric_evaluation,
+        sweep_mode,
         experiment_type,
         title,
         validate_samples,
