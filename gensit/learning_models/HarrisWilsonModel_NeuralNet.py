@@ -6,6 +6,7 @@
 import sys
 import torch
 import inspect
+import optuna
 import numpy as np
 
 from copy import deepcopy
@@ -15,9 +16,29 @@ from typing import Any, List, Union
 from gensit.config import Config
 from gensit.utils.exceptions import *
 from gensit.physics_models.HarrisWilsonModel import HarrisWilson
-from gensit.utils.misc_utils import setup_logger, fn_name, eval_dtype
+from gensit.utils.misc_utils import setup_logger, fn_name, eval_dtype, pop_variable
 from gensit.static.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
 
+# Store hyperparameters
+DEFAULT_HYPERPARAMS = {
+    "nodes_per_layer": {
+        "default": 20,
+        "layer_specific": {}
+    },
+    "num_hidden_layers": 1,
+    "optimizer": 'Adam',
+    "learning_rate": 0.002,
+    "biases": {
+        "default":[+0.0, +4.0],
+        "layer_specific": {}
+    },
+    "activation_funcs": {
+        "default": "linear",
+        "layer_specific": {
+            1: "abs"
+        }
+    }
+}
 
 def get_architecture(
     input_size: int, output_size: int, n_layers: int, cfg: dict
@@ -130,21 +151,17 @@ class NeuralNet(nn.Module):
     def __init__(
         self,
         *,
+        config:Config,
+        trial:optuna.trial,
         input_size: int,
         output_size: int,
-        num_layers: int,
-        nodes_per_layer: dict,
-        activation_funcs: dict,
-        biases: dict,
-        optimizer: str = 'Adam',
-        learning_rate: float = 0.001,
-        **__,
+        **kwargs,
     ):
         '''
 
         :param input_size: the number of input values
         :param output_size: the number of output values
-        :param num_layers: the number of hidden layers
+        :param num_hidden_layers: the number of hidden layers
         :param nodes_per_layer: a dictionary specifying the number of nodes per layer
         :param activation_funcs: a dictionary specifying the activation functions to use
         :param biases: a dictionary containing the initialisation parameters for the bias
@@ -155,24 +172,37 @@ class NeuralNet(nn.Module):
         super().__init__()
         self.flatten = nn.Flatten()
 
+        # Input/output dimensions
         self.input_dim = input_size
         self.output_dim = output_size
-        self.hidden_dim = num_layers
+
+        # Configuration file
+        self.config = config
+        
+        # Optuna hyperparameter optimisation trial
+        self.trial = trial
+
+        # Type of learning model
+        self.model_type = 'neural_network'
+        self.model_prefix = ''
+        
+        # Update hyperparameters
+        self.update_hyperparameters()
 
         # Get architecture, activation functions, and layer bias
         self.architecture = get_architecture(
             input_size, 
             output_size, 
-            num_layers, 
-            nodes_per_layer
+            self.hyperparams['num_hidden_layers'],
+            self.hyperparams['nodes_per_layer']
         )
         self.activation_funcs = get_activation_funcs(
-            num_layers, 
-            activation_funcs
+            self.hyperparams['num_hidden_layers'], 
+            self.hyperparams['activation_funcs']
         )
         self.bias = get_bias(
-            num_layers,
-            biases
+            self.hyperparams['num_hidden_layers'],
+            self.hyperparams['biases']
         )
 
         # Add the neural net layers
@@ -197,11 +227,59 @@ class NeuralNet(nn.Module):
 
         # Get the optimizer
         optimizer_function = eval(
-            OPTIMIZERS[optimizer],
+            OPTIMIZERS[self.hyperparams['optimizer']],
             {"torch":torch}
         )
-        self.optimizer = optimizer_function(self.parameters(), lr = learning_rate)
+        self.optimizer = optimizer_function(self.parameters(), lr = self.hyperparams['learning_rate'])
 
+    def update_hyperparameters(self):
+        # Set hyperparams
+        self.hyperparams = {}
+        if self.trial is not None:
+            OPTUNA_HYPERPARAMS = {
+                "num_hidden_layers": self.trial.suggest_int('num_hidden_layers', 1, 12, step = 1),
+                "optimizer":  self.trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
+                "learning_rate": self.trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True),
+            } 
+            # Layer-specific number of nodes
+            layer_specific_nodes = []
+            for i in range(OPTUNA_HYPERPARAMS['num_hidden_layers']):
+                layer_specific_nodes.append(self.trial.suggest_int(f"nodes_per_layer_{i}", 1, 128, step = 128))
+            OPTUNA_HYPERPARAMS['nodes_per_layer'] = {
+                "default": layer_specific_nodes[0],
+                "layer_specific": {i:layer_specific_nodes[i] for i in range(len(layer_specific_nodes))}
+            }
+            # Layer-specific biases
+            layer_specific_biases = []
+            for i in range(OPTUNA_HYPERPARAMS['num_hidden_layers']):
+                layer_specific_biases.append([0,self.trial.suggest_float(f"biases_{i}", 0, 4)])
+            OPTUNA_HYPERPARAMS['biases'] = {
+                "default": layer_specific_biases[0],
+                "layer_specific": {i:layer_specific_biases[i] for i in range(len(layer_specific_biases))}
+            }
+            # Layer-specific activation functions
+            layer_specific_activation_funcs = []
+            for i in range(OPTUNA_HYPERPARAMS['num_hidden_layers']+1):
+                layer_specific_activation_funcs.append(
+                    self.trial.suggest_categorical(f"activation_funcs_{i}", ["abs","relu","linear","tanh","hardsigmoid"])
+                )
+            OPTUNA_HYPERPARAMS['activation_funcs'] = {
+                "default": layer_specific_activation_funcs[0],
+                "layer_specific": {i:layer_specific_activation_funcs[i] for i in range(len(layer_specific_activation_funcs))}
+            }
+        
+        for pname in DEFAULT_HYPERPARAMS.keys():
+            if self.trial is not None and pname in OPTUNA_HYPERPARAMS:
+                self.hyperparams[pname] = OPTUNA_HYPERPARAMS[pname]
+            elif self.config is None or getattr(self.config[self.model_type]['hyperparameters'],pname,None) is None:
+                self.hyperparams[pname] = DEFAULT_HYPERPARAMS[pname]
+            else:
+                self.hyperparams[pname] =  self.config[self.model_type]['hyperparameters'][(self.model_prefix+pname)]
+
+            if self.config is not None and getattr(self.config[self.model_type]['hyperparameters'],pname,None) is None:
+                # Update object and config hyperparameters
+                self.config[self.model_type]['hyperparameters'][(self.model_prefix+pname)] = self.hyperparams[pname]
+    
     # ... Evaluation functions .........................................................................................
 
     # The model forward pass
@@ -217,13 +295,13 @@ class NeuralNet(nn.Module):
 # -- Model implementation ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 class HarrisWilson_NN:
+
     def __init__(
         self,
         *,
+        config: Config,
         neural_net: NeuralNet,
-        loss: dict,
         physics_model: HarrisWilson,
-        config: Config = None,
         **kwargs,
     ):
         '''Initialize the model instance with a previously constructed RNG and
@@ -247,17 +325,24 @@ class HarrisWilson_NN:
         self.logger.setLevels( console_level = level )
 
         # Type of learning model
-        self.model_type = 'neural_network'
+        self.model_type = 'harris_wilson_neural_network'
+        self.model_prefix = ''
 
         # The numeric solver
         self.physics_model = physics_model
 
         # Config file
         self.config = config
+        
+        # Loss arguments
+        loss = kwargs.get('loss',{})
 
         # Initialise neural net, loss tracker and prediction tracker
         self._neural_net = neural_net
         self._neural_net.optimizer.zero_grad()
+
+        # Copy optuna trial
+        self.trial = pop_variable(self._neural_net,'trial',None)
 
         # Store loss function parameters
         self.loss_functions = {}

@@ -3,32 +3,34 @@
 """
 import sys
 import torch
+import optuna
 import xarray as xr
 
 from torch import float32
 
 from gensit.config import Config
 from gensit.utils.misc_utils import set_seed, setup_logger, to_json_format
-from gensit.static.global_variables import PARAMETER_DEFAULTS,DATA_SCHEMA,Dataset
+from gensit.static.global_variables import PARAMETER_DEFAULTS,DATA_SCHEMA
 from gensit.intensity_models.spatial_interaction_models import SpatialInteraction2D
 
 """ Load a dataset or generate synthetic data on which to train the neural net """
+
+MODEL_TYPE = 'HarrisWilson'
+MODEL_PREFIX = ''
 
 
 class HarrisWilson:
     def __init__(
         self,
         *,
-        config: Config = None,
+        config: Config,
+        trial:optuna.trial,
         intensity_model: SpatialInteraction2D = None,
-        dt: float = 0.001,
-        true_parameters: dict = None,
         **kwargs
     ):
         """The Harris and Wilson model of economic activity.
 
         :param sim: the Spatial interaction model with all necessary data
-        :param dt: (optional) the time differential to use for the solver
         :param true_parameters: (optional) a dictionary of the true parameters
         """
 
@@ -42,33 +44,29 @@ class HarrisWilson:
         # Update logger level
         self.logger.setLevels( console_level = level )
 
-        # Store SIM and its config separately
+        # Store important quantities separately
         self.intensity_model = intensity_model
         self.config = config
-        self.name = 'HarrisWilson'
-
-        # Device name
+        self.trial = trial
+        self.model_type = MODEL_TYPE
+        self.model_prefix = MODEL_PREFIX
         self.device = self.config['inputs']['device']
 
         # Model parameters
-        self.param_names = ['alpha','beta','kappa','sigma','delta','epsilon','bmax']
-        true_params = {k:v for k,v in true_parameters.items() if v is not None}
+        learnable_param_names = ['alpha','beta','kappa','sigma','delta','epsilon','bmax']
+        default_true_parameters = dict(zip(learnable_param_names,[None]*len(learnable_param_names)))
+        true_params = {k:v for k,v in kwargs.get('true_parameters',default_true_parameters).items() if v is not None}
         # Add parameters to learn if None is provided as true parameter
         for key,value in true_params.items():
             if value is None and key not in self.config.settings['training']['to_learn']:
                 self.config.settings['training']['to_learn'].append(key)
         
-        # Store noise variance
-        self.noise_var = self.obs_noise_percentage_to_var(
-            self.config['harris_wilson_model']['parameters']['noise_percentage']
-        )
-
         # Check that learnable parameters are in valid set
         try:
-            assert set(self.config.settings['training']['to_learn']).issubset(set(self.param_names))
+            assert set(self.config.settings['training']['to_learn']).issubset(set(learnable_param_names))
         except:
             self.logger.error(f"Some parameters in {','.join(self.config.settings['training']['to_learn'])} cannot be learned.")
-            self.logger.error(f"Acceptable parameters are {','.join(self.param_names)}.")
+            self.logger.error(f"Acceptable parameters are {','.join(learnable_param_names)}.")
             raise Exception('Cannot instantiate Harris Wilson Model.') 
         
         # Set parameters to learn based on
@@ -77,26 +75,14 @@ class HarrisWilson:
         for i,param in enumerate(self.config.settings['training']['to_learn']):
             self.params_to_learn[param] = i
 
-        # Fixed hyperparameters
-        self.params = Dataset()
-        for param,default in PARAMETER_DEFAULTS.items():
-            if not param in list(self.params_to_learn.keys()):
-                true_param = true_params.get(param,default)
-                setattr(
-                    self.params,
-                    param,
-                    torch.tensor(true_param).to(device = self.device,dtype = float32)
-                )
-                if self.config is not None:
-                    self.config.settings['harris_wilson_model']['parameters'][param] = to_json_format(
-                        true_params.get(param,default)
-                    )
-        
-        # Time discretisation step size
-        self.dt = torch.tensor(dt).float().to(self.device)
+        # Update hyperparameters
+        self.update_hyperparameters(**true_params)
+
+        # Store noise variance
+        self.hyperparams['noise_var'] = self.obs_noise_percentage_to_var(self.hyperparams['noise_percentage'])
 
         # Update noise regime
-        self.noise_regime = self.config['harris_wilson_model']['parameters'].get('sigma',None)
+        self.noise_regime = self.hyperparams['sigma']
         if 'sigma' in list(self.params_to_learn.keys()) or self.noise_regime is None:
             self.noise_regime = 'variable'
         elif isinstance(self.noise_regime,list):
@@ -106,6 +92,62 @@ class HarrisWilson:
         else:
             self.noise_regime = 'low'
         self.config.settings['noise_regime'] = self.noise_regime
+
+
+    def update_hyperparameters(self,**kwargs):
+        # Set hyperparams
+        self.hyperparams = {}
+        if self.trial is not None:
+            OPTUNA_HYPERPARAMS = {
+                'alpha': self.trial.suggest_float('alpha', 0.01, 10.0), 
+                'beta': self.trial.suggest_float('beta', 0.0, 10.0), 
+                'kappa': self.trial.suggest_float('kappa', 0.01, 10.0), 
+                'epsilon': self.trial.suggest_float('epsilon', 0.01, 10.0), 
+                'bmax': self.trial.suggest_float('bmax', 0.01, 1000.0,log=True), 
+                'noise_percentage': self.trial.suggest_float('noise_percentage', 0.0001, 3.0),
+                'dt': self.trial.suggest_float('dt', 1e-5, 1e-1, log=True),
+            }
+        
+        for pname in PARAMETER_DEFAULTS.keys():
+            if pname in list(self.params_to_learn.keys()):
+                continue
+            
+            # Try to read from optuna trial
+            if self.trial is not None and pname in OPTUNA_HYPERPARAMS:
+                self.hyperparams[pname] = OPTUNA_HYPERPARAMS[pname]
+            else:
+                # Try to read from config
+                paths_found = list(self.config.path_find(
+                    key = pname,
+                    settings = self.config.settings,
+                    current_key_path = [],
+                    all_key_paths = []
+                ))
+                # First try to read from kwargs
+                if kwargs.get(pname,None) is not None:
+                    self.hyperparams[pname] = kwargs[pname]
+                # Second try to read from config
+                elif len(paths_found) > 0 and len(paths_found[0]) > 0:
+                    # Return sweepable flag for first instance of variable
+                    value,_ = self.path_get(
+                        key_path = paths_found[0],
+                        settings = self.config.settings
+                    )
+                    self.hyperparams[pname] = torch.tensor(value)
+                # Third read from defaults
+                else:
+                    self.hyperparams[pname] = PARAMETER_DEFAULTS[pname]
+
+                if self.config is not None and len(paths_found) > 0 and len(paths_found[0]) > 0:
+                    self.config.path_set(
+                        self.config.settings,
+                        to_json_format(self.hyperparams[pname]),
+                        paths_found[0]
+                    )
+
+                # Pass to device
+                self.hyperparams[pname] = self.hyperparams[pname].to(self.device)
+
 
     def obs_noise_percentage_to_var(self,noise_percentage:float):
         return torch.pow(
@@ -125,7 +167,7 @@ class HarrisWilson:
         # Update input kwargs if required
         kwargs['log_destination_attraction'] = log_destination_attraction
         updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
-        updated_kwargs.update(**vars(self.params))
+        updated_kwargs.update(**self.hyperparams)
         
         required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['sigma'])
 
@@ -140,7 +182,7 @@ class HarrisWilson:
         # Update input kwargs if required
         kwargs['log_destination_attraction'] = log_destination_attraction
         updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
-        updated_kwargs.update(**vars(self.params))
+        updated_kwargs.update(**self.hyperparams)
 
         required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['sigma'])
 
@@ -157,7 +199,7 @@ class HarrisWilson:
         # Update input kwargs if required
         kwargs['log_destination_attraction'] = log_destination_attraction
         updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
-        updated_kwargs.update(**vars(self.params))
+        updated_kwargs.update(**self.hyperparams)
 
         required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['sigma'])
 
@@ -173,7 +215,7 @@ class HarrisWilson:
         # Update input kwargs if required
         kwargs['log_destination_attraction'] = log_destination_attraction
         updated_kwargs = self.intensity_model.get_input_kwargs(kwargs)
-        updated_kwargs.update(**vars(self.params))
+        updated_kwargs.update(**self.hyperparams)
 
         required = (self.intensity_model.REQUIRED_OUTPUTS+self.intensity_model.REQUIRED_INPUTS+['sigma'])
 
@@ -198,7 +240,7 @@ class HarrisWilson:
         # Compute difference
         diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
         # Compute log likelihood (without constant factor) and its gradient
-        temp = 0.5*(1./self.noise_var)*(diff.dot(diff)), (1./self.noise_var)*diff
+        temp = 0.5*(1./self.hyperparams['noise_var'])*(diff.dot(diff)), (1./self.hyperparams['noise_var'])*diff
         return temp
     
     
@@ -214,7 +256,7 @@ class HarrisWilson:
         log_destination_attraction_pred = kwargs['log_destination_attraction_pred']
         noise_var = self.obs_noise_percentage_to_var(kwargs['noise_percentage']) \
                     if kwargs.get('noise_percentage',None) is not None \
-                    else self.noise_var
+                    else self.hyperparams['noise_var']
 
         if torch.is_tensor(log_destination_attraction_pred) and \
             torch.is_tensor(log_destination_attraction_ts):
@@ -252,7 +294,7 @@ class HarrisWilson:
         # Compute difference
         diff = (log_destination_attraction_pred.flatten() - log_destination_attraction_ts.flatten())
         # Compute gradient of log likelihood
-        return (1./self.noise_var) * diff
+        return (1./self.hyperparams['noise_var']) * diff
     
     def dest_attraction_ts_likelihood_loss(
             self,
@@ -270,10 +312,10 @@ class HarrisWilson:
     def sde_ais_potential_and_jacobian(self,**kwargs):
         
         Ndestinations = self.intensity_model.dims['destination']
-        delta = self.params.delta
-        kappa = self.params.kappa
+        delta = self.hyperparams['delta']
+        kappa = self.hyperparams['kappa']
         xx = kwargs['log_destination_attraction']
-        sigma = kwargs['sigma'] if kwargs['sigma'] is not None else self.params.sigma
+        sigma = kwargs['sigma'] if kwargs['sigma'] is not None else self.hyperparams['sigma']
         gamma = 2/(sigma**2)
         # Note that lim_{beta->0, alpha->0} gamma*V_{theta}(x) = gamma*kappa*\sum_{j = 1}^J \exp(x_j) - gamma*(delta+1/J) * \sum_{j = 1}^J x_j
         gamma_kk_exp_xx = gamma*kappa*torch.exp(xx)
@@ -310,28 +352,28 @@ class HarrisWilson:
 
         # Parameters to learn
         kappa = (
-            self.params.kappa
+            self.hyperparams['kappa']
             if "kappa" not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["kappa"]]
         )
         delta = (
-            self.params.delta
+            self.hyperparams['delta']
             if "delta" not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["delta"]]
         )
         epsilon = (
-            self.params.epsilon
+            self.hyperparams['epsilon']
             if "epsilon" not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["epsilon"]]
         )
         sigma = (
-            self.params.sigma
+            self.hyperparams['sigma']
             if "sigma" not in list(self.params_to_learn.keys())
             else free_parameters[self.params_to_learn["sigma"]]
         )
 
         # Training parameters
-        dt = self.dt if dt is None else dt
+        dt = self.hyperparams['dt'] if dt is None else dt
         self.logger.trace('Cloning dest attractions')
         new_sizes = curr_destination_attractions.clone()
         new_sizes.requires_grad = requires_grad
@@ -395,7 +437,7 @@ class HarrisWilson:
             set_seed(seed)
         
         # Training parameters
-        dt = self.dt if dt is None else dt
+        dt = self.hyperparams['dt'] if dt is None else dt
 
         if not generate_time_series:
             sizes = init_destination_attraction.clone().unsqueeze(1)
@@ -451,7 +493,7 @@ class HarrisWilson:
         return f"""
             {'x'.join([str(d) for d in self.intensity_model.dims.values()])} Harris Wilson model using {self.intensity_model}
             Learned parameters: {', '.join(self.params_to_learn.keys())}
-            Epsilon: {self.params.epsilon}
-            Kappa: {self.params.kappa}
-            Delta: {self.params.delta}
+            Epsilon: {self.hyperparams['epsilon']}
+            Kappa: {self.hyperparams['kappa']}
+            Delta: {self.hyperparams['delta']}
         """

@@ -42,6 +42,7 @@ class HarrisWilson_MCMC(object):
 
         # Type of learning model
         self.model_type = 'markov_chain_monte_carlo'
+        self.model_prefix = ''
         
         # Store sim model but not its config
         self.physics_model = physics_model
@@ -258,7 +259,7 @@ class HarrisWilson_MCMC(object):
         self.logger.debug('negative_table_log_likelihood_gradient \n')
 
         # Make sure to include fixed parameters if there are any
-        kwargs.update(**vars(self.physics_model.params))
+        kwargs.update(**self.physics_model.hyperparameters)
 
         # Get log table likelihood derivative with respect to inputs
         return -torch.autograd.functional.jacobian(
@@ -272,7 +273,7 @@ class HarrisWilson_MCMC(object):
             **kwargs
     ):
         # Make sure to include fixed parameters if there are any
-        kwargs.update(**vars(self.physics_model.params))
+        kwargs.update(**self.physics_model.hyperparameters)
         negative_table_log_likelihood = self.negative_table_log_likelihood_expanded(
             log_destination_attraction = kwargs['log_destination_attraction'],
             table = kwargs['table'],
@@ -329,12 +330,12 @@ class HarrisWilson_MCMC(object):
         # Get dimensions
         Ndestinations = self.physics_model.intensity_model.dims['destination']
         # Get parameters
-        kwargs['alpha'] = kwargs['alpha'] if kwargs['alpha'] is not None else self.physics_model.params.alpha
-        kwargs['beta'] = kwargs['beta'] if kwargs['beta'] is not None else self.physics_model.params.beta
-        kwargs['sigma'] = kwargs['sigma'] if kwargs['sigma'] is not None else self.physics_model.params.sigma
+        kwargs['alpha'] = kwargs['alpha'] if kwargs['alpha'] is not None else self.physics_model.hyperparameters['alpha']
+        kwargs['beta'] = kwargs['beta'] if kwargs['beta'] is not None else self.physics_model.hyperparameters['beta']
+        kwargs['sigma'] = kwargs['sigma'] if kwargs['sigma'] is not None else self.physics_model.hyperparameters['sigma']
         sigma = kwargs['sigma']
-        kappa = self.physics_model.params.kappa
-        delta = self.physics_model.params.delta
+        kappa = self.physics_model.hyperparameters['kappa']
+        delta = self.physics_model.hyperparameters['delta']
         n_temperatures = kwargs['n_temperatures']
         ais_samples = kwargs['ais_samples']
         epsilon_step = kwargs['epsilon_step']
@@ -472,7 +473,7 @@ class HarrisWilson_MCMC(object):
         )
         # Create initialisations
         Ndests = self.physics_model.intensity_model.dims['destination']
-        g = np.log(self.physics_model.params.delta.item())*np.ones((Ndests,Ndests)) - np.log(self.physics_model.params.delta.item())*np.eye(Ndests) + np.log(1+self.physics_model.params.delta.item())*np.eye(Ndests)
+        g = np.log(self.physics_model.hyperparameters['delta'].item())*np.ones((Ndests,Ndests)) - np.log(self.physics_model.hyperparameters['delta'].item())*np.eye(Ndests) + np.log(1+self.physics_model.hyperparameters['delta'].item())*np.eye(Ndests)
         g = g.astype('float32')
         # Get minimum across different initialisations in parallel
         if self.mcmc_workers > 1:
@@ -497,7 +498,7 @@ class HarrisWilson_MCMC(object):
                     device = self.device
                 ),
                 **theta,
-                **vars(self.physics_model.params),
+                **self.physics_model.hyperparameters,
             ).detach().cpu().numpy() for i in range(Ndests)
         ])
         # Get arg min
@@ -514,7 +515,7 @@ class HarrisWilson_MCMC(object):
         A = self.physics_model.sde_potential_hessian(
             minimum,
             **theta,
-            **vars(self.physics_model.params)
+            **self.physics_model.hyperparameters
         )
         # Find its cholesky decomposition Hessian = L*L^T for efficient computation
         L = torch.linalg.cholesky(A)
@@ -572,7 +573,7 @@ class HarrisWilson_MCMC(object):
                 n_temperatures = int(self.destination_attraction_n_bridging_distributions),
                 leapfrog_steps = int(self.destination_attraction_leapfrog_steps_ais),
                 epsilon_step = float(self.destination_attraction_leapfrog_step_size_ais),
-                **{p:theta[p] if theta.get(p,None) is not None else getattr(self.physics_model.params,p) for p in ['alpha','beta','sigma']}
+                **{p:theta[p] if theta.get(p,None) is not None else self.physics_model.hyperparameters.get(p) for p in ['alpha','beta','sigma']}
             )
             log_weights = log_weights.to(dtype = float32,device = self.device)
         else:
@@ -589,7 +590,7 @@ class HarrisWilson_MCMC(object):
                     n_temperatures = int(self.destination_attraction_n_bridging_distributions),
                     leapfrog_steps = int(self.destination_attraction_leapfrog_steps_ais),
                     epsilon_step = float(self.destination_attraction_leapfrog_step_size_ais),
-                    **{p:theta[p] if theta.get(p,None) is not None else getattr(self.physics_model.params,p) for p in ['alpha','beta','sigma']}
+                    **{p:theta[p] if theta.get(p,None) is not None else self.physics_model.hyperparameters.get(p) for p in ['alpha','beta','sigma']}
                 ))
             log_weights = torch.tensor(log_weights,dtype = float32,device = self.device)
         
@@ -654,7 +655,7 @@ class HarrisWilson_MCMC(object):
         # try:
         # Multiply beta by total cost
         theta_new_scaled = deepcopy(theta_new)
-        theta_new_scaled[1] *= self.physics_model.params.bmax
+        theta_new_scaled[1] *= self.physics_model.hyperparameters['bmax']
         theta_new_dict = dict(zip(list(self.physics_model.params_to_learn.keys()),theta_new_scaled))
 
         # Compute inverse of z(theta)
@@ -741,7 +742,7 @@ class HarrisWilson_MCMC(object):
         # try:
         # Multiply beta by total cost
         theta_new_scaled = deepcopy(theta_new) 
-        theta_new_scaled[1] *= self.physics_model.params.bmax
+        theta_new_scaled[1] *= self.physics_model.hyperparameters['bmax']
         theta_new_dict = dict(zip(list(self.physics_model.params_to_learn.keys()),theta_new_scaled))
 
         # Compute inverse of z(theta)
@@ -754,7 +755,7 @@ class HarrisWilson_MCMC(object):
         V_new, gradV_new = self.physics_model.sde_potential_and_gradient(
             log_destination_attraction,
             **theta_new_dict,
-            **vars(self.physics_model.params)
+            **self.physics_model.hyperparameters
         )
 
         # Compute table likelihood and its gradient
@@ -778,14 +779,14 @@ class HarrisWilson_MCMC(object):
         # UNCOMMENT
         # Multiply beta by total cost
         # theta_scaled_and_expanded_prev = torch.concatenate([theta_prev,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.sigma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
-        # theta_scaled_and_expanded_prev[1] *= self.physics_model.params.bmax
+        # theta_scaled_and_expanded_prev[1] *= self.physics_model.hyperparameters['bmax']
         # log_intensities_prev = self.physics_model.intensity_model.log_intensity(
         #                     log_destination_attraction,
         #                     theta_scaled_and_expanded_prev,
         #                     total_flow = torch.sum(table.ravel())
         #                 )
         # theta_scaled_and_expanded_new = torch.concatenate([theta_new,torch.array([self.physics_model.intensity_model.data.delta,self.physics_model.intensity_model.sigma,self.physics_model.intensity_model.data.kappa,self.physics_model.intensity_model.data.epsilon])])
-        # theta_scaled_and_expanded_new[1] *= self.physics_model.params.bmax
+        # theta_scaled_and_expanded_new[1] *= self.physics_model.hyperparameters['bmax']
         # log_intensities_new = self.physics_model.intensity_model.log_intensity(
         #                     log_destination_attraction,
         #                     theta_scaled_and_expanded_new,
@@ -847,7 +848,7 @@ class HarrisWilson_MCMC(object):
 
         # Multiply beta by total cost
         theta_scaled = deepcopy(theta)
-        theta_scaled[1] *= self.physics_model.params.bmax
+        theta_scaled[1] *= self.physics_model.hyperparameters['bmax']
 
         ''' Log destination demand update '''
 
@@ -858,7 +859,7 @@ class HarrisWilson_MCMC(object):
         negative_gradient_log_data_likelihood = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
             log_destination_attraction_ts = log_destination_attraction_data,
             log_destination_attraction_pred = log_destination_attraction_prev,
-            noise_percentage = 1./self.physics_model.params.noise_percentage
+            noise_percentage = 1./self.physics_model.hyperparameters['noise_percentage']
         )
         # Compute log initial potential energy and its derivarive weighted by the likelihood function \pi(y|x)
         # \log(\exp(-\gamma)V_{\theta}(xx)) + \log(\pi(y|x)) + \log(p(T|x,\theta))
@@ -909,7 +910,7 @@ class HarrisWilson_MCMC(object):
             negative_gradient_log_data_likelihood_new = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
                 log_destination_attraction_ts = log_destination_attraction_data,
                 log_destination_attraction_pred = log_destination_attraction_prev,
-                noise_percentage = 1./self.physics_model.params.noise_percentage
+                noise_percentage = 1./self.physics_model.hyperparameters['noise_percentage']
             )
             # Compute updated log potential function
             V_new, gradV_new = self.physics_model.sde_potential_and_gradient(
@@ -983,7 +984,7 @@ class HarrisWilson_MCMC(object):
 
         # Multiply beta by total cost
         theta_scaled = deepcopy(theta)
-        theta_scaled[1] *= self.physics_model.params.bmax
+        theta_scaled[1] *= self.physics_model.hyperparameters['bmax']
         theta_scaled_dict = dict(zip(list(self.physics_model.params_to_learn.keys()),theta_scaled))
 
         ''' Log destination demand update '''
@@ -1000,7 +1001,7 @@ class HarrisWilson_MCMC(object):
         negative_gradient_log_data_likelihood = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
             log_destination_attraction_ts = log_destination_attraction_data,
             log_destination_attraction_pred = log_destination_attraction_prev,
-            noise_percentage = 1./self.physics_model.params.noise_percentage
+            noise_percentage = 1./self.physics_model.hyperparameters['noise_percentage']
         )
         # # Compute gradient of lambda
         # intensity_gradient = self.physics_model.intensity_model.intensity_gradient(
@@ -1079,7 +1080,7 @@ class HarrisWilson_MCMC(object):
             negative_gradient_log_data_likelihood_new = self.physics_model.negative_destination_attraction_log_likelihood_and_gradient(
                 log_destination_attraction_ts = log_destination_attraction_data,
                 log_destination_attraction_pred = log_destination_attraction_prev,
-                noise_percentage = 1./self.physics_model.params.noise_percentage
+                noise_percentage = 1./self.physics_model.hyperparameters['noise_percentage']
             )
             # Compute updated log potential function
             V_new, gradV_new = self.physics_model.sde_potential_and_gradient(
@@ -1182,3 +1183,4 @@ class HarrisWilson_MCMC(object):
                     V,\
                     gradV,\
                     negative_log_table_likelihood
+                    
