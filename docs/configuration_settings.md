@@ -119,7 +119,7 @@ This section is only relevant if any of the following experiments are run: `SIM_
 
 ## Hyperparameters
 
-Hyperparameters are relevant to the architecture of the Neural Network. The number of hidden layers (excluding input and output) is given by `num_layers`. The loss optimisation algorithm is given by `optimizer` and its `learning_rate`. NN layer biases correspond to `biases`. The `layer_specific` number of nodes per layer and activation functions are equal to `nodes_per_layer` and `activation_funcs`, respectively.
+Hyperparameters are relevant to the architecture of the Neural Network. The number of hidden layers (excluding input and output) is given by `num_hidden_layers`. The loss optimisation algorithm is given by `optimizer` and its `learning_rate`. NN layer biases correspond to `biases`. The `layer_specific` number of nodes per layer and activation functions are equal to `nodes_per_layer` and `activation_funcs`, respectively.
 
 ### Loss
 
