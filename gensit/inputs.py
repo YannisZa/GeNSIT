@@ -21,7 +21,7 @@ from gensit.utils.misc_utils import create_mask
 from gensit.utils.math_utils import torch_optimize
 from gensit.utils.probability_utils import random_vector
 from gensit.physics_models.HarrisWilsonModel import HarrisWilson
-from gensit.intensity_models.spatial_interaction_models import instantiate_sim
+from gensit.intensity_models import instantiate_intensity_model
 from gensit.static.global_variables import INPUT_SCHEMA, PARAMETER_DEFAULTS, INPUT_SCHEMA, VALIDATION_SCHEMA, Dataset
 from gensit.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims, eval_dtype, read_file
 
@@ -693,10 +693,8 @@ class Inputs:
         self.pass_to_device()
 
         # Initialise spatial interaction model
-        sim = instantiate_sim(
-            name = self.config['spatial_interaction_model']['name'],
+        intensity_model = instantiate_intensity_model(
             config = self.config,
-            true_parameters = self.true_parameters,
             instance = kwargs.get('instance',''),
             **vars(self.data),
             logger = self.logger
@@ -704,7 +702,7 @@ class Inputs:
 
         # Initialise the Harris Wilson model
         HWM = HarrisWilson(
-            intensity_model = sim,
+            intensity_model = intensity_model,
             config = self.config,
             dt = self.config['harris_wilson_model'].get('dt',0.001),
             true_parameters = self.true_parameters,
@@ -796,9 +794,9 @@ class Inputs:
         )
         # Create initialisations
         Ndests = self.data.dims['destination']
-        g = np.log(physics_model.params.delta.item())*np.ones((Ndests,Ndests)) - \
-            np.log(physics_model.params.delta.item())*np.eye(Ndests) + \
-            np.log(1+physics_model.params.delta.item())*np.eye(Ndests)
+        g = np.log(physics_model.hyperparameters['delta'].item())*np.ones((Ndests,Ndests)) - \
+            np.log(physics_model.hyperparameters['delta'].item())*np.eye(Ndests) + \
+            np.log(1+physics_model.hyperparameters['delta'].item())*np.eye(Ndests)
         g = g.astype('float32')
         
         # Get minimum across different initialisations in parallel
