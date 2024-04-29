@@ -26,6 +26,7 @@ from gensit.inputs import Inputs
 from gensit.utils.misc_utils import *
 from gensit.utils.exceptions import *
 from gensit.static.global_variables import *
+from gensit.intensity_models import instantiate_intensity_model
 from gensit.intensity_models.spatial_interaction_models import *
 from gensit.utils import misc_utils as MiscUtils
 from gensit.utils import math_utils as MathUtils
@@ -1804,7 +1805,7 @@ class Outputs(object):
                 )
                 safe_delete(__self__.ct)
             
-            elif obj_call == 'sim':
+            elif obj_call == 'intensity_model':
                 __self__.check_object_availability(
                     __self__,
                     ['config','inputs'],
@@ -1813,14 +1814,12 @@ class Outputs(object):
                 )
                 inputs_copy = deepcopy(__self__.inputs)
                 inputs_copy.cast_from_xarray()
-                __self__.intensity_model = instantiate_sim(
-                    name = __self__.config['spatial_interaction_model']['name'],
+                __self__.intensity_model = instantiate_intensity_model(
                     config = __self__.config,
-                    true_parameters = __self__.config['spatial_interaction_model']['parameters'],
                     **inputs_copy.data_vars(),
                     **kwargs
                 )
-            
+
             elif obj_call == 'physics_model':
                 __self__.check_object_availability(
                     __self__,
