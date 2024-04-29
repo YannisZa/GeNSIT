@@ -14,16 +14,16 @@ from multiprocessing import Manager
 from gensit.config import Config
 from gensit.inputs import Inputs
 from gensit.outputs import Outputs
-from gensit.utils.misc_utils import *
 from gensit.static.global_variables import *
+from gensit.utils.misc_utils import *
 from gensit.utils import math_utils as MathUtils
-from gensit.contingency_table import instantiate_ct
-from gensit.physics_models.HarrisWilsonModel import HarrisWilson
 from gensit.utils.multiprocessor import BoundedQueueProcessPoolExecutor
-from gensit.intensity_models.spatial_interaction_models import instantiate_sim
+from gensit.contingency_table import instantiate_ct
+from gensit.physics_models import instantiate_physics_model
+from gensit.intensity_models import instantiate_intensity_model
 from gensit.learning_models.XGB import XGB_Model
 from gensit.learning_models.GBRT import GBRT_Model
-from gensit.learning_models.RandomForest import RandomForest_Model
+from gensit.learning_models.RandomForest import RF_Model
 from gensit.learning_models.GraphAttentionNetwork import GAT_Model
 from gensit.learning_models.HarrisWilsonModel_MCMC import HarrisWilson_MCMC
 from gensit.learning_models.HarrisWilsonModel_NeuralNet import NeuralNet, HarrisWilson_NN
@@ -316,6 +316,105 @@ class Experiment(object):
             self.tables = np.zeros((0,*table_shape),dtype='int32')
         except:
             pass
+    
+    def instantiate_intensity_and_physics_models(self,config:Config,trial:optuna.trial=None,**kwargs):
+        # Instantiate intensity model
+        self.logger.note("Initializing the intensity model ...")
+        intensity_model = instantiate_intensity_model(
+            config = config,
+            trial = trial,
+            instance = kwargs.get('instance',''),
+            **vars(self.inputs.data),
+            logger = self.logger
+        )
+        # Get and remove config
+        config = pop_variable(intensity_model,'config',config)
+
+        # Build the physics model
+        self.logger.note("Initializing the physics model ...")
+        physics_model = instantiate_physics_model(
+            config = config,
+            trial = trial,
+            intensity_model = intensity_model,
+            true_parameters = self.inputs.true_parameters,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+        return physics_model
+    
+    def instantiate_learning_model(self,learning_model:str,config:Config,trial:optuna.trial,**kwargs):
+        if learning_model in ['HarrisWilson_NN','HarrisWilson_MCMC']:
+            # Build the intensity and physics models
+            self.logger.note("Initializing the intensity and physics models ...")
+            physics_model = self.instantiate_intensity_and_physics_models(
+                config = config,
+                trial = trial,
+                true_parameters = self.inputs.true_parameters,
+                instance = kwargs.get('instance',''),
+                logger = self.logger
+            )
+            # Get and remove config
+            config = pop_variable(physics_model,'config',config)
+            
+        if learning_model == 'HarrisWilson_NN':
+            # Set up the neural net
+            self.logger.note("Initializing the neural net ...")
+            neural_network = NeuralNet(
+                config = config,
+                trial = trial,
+                input_size = self.inputs.data.dims['destination'],
+                output_size = len(config['training']['to_learn']),
+                logger = self.logger
+            ).to(self.device)
+            # Get and remove config
+            config = pop_variable(neural_network,'config',config)
+
+            # Instantiate harris and wilson neural network model
+            self.logger.note("Initializing the Harris Wilson Neural Network model ...")
+            learning_model = HarrisWilson_NN(
+                config = config,
+                neural_net = neural_network,
+                physics_model = physics_model,
+                loss = kwargs.get('loss',{}),
+                write_every = self._write_every,
+                write_start = self._write_start,
+                instance = kwargs.get('instance',''),
+                logger = self.logger
+            )
+        elif learning_model == 'HarrisWilson_MCMC':
+            # Set up intensity model MCMC
+            self.logger.note("Initializing the physics model MCMC")
+            learning_model = HarrisWilson_MCMC(
+                config = config,
+                physics_model = physics_model,
+                logger = self.logger
+            )
+            learning_model.build(**kwargs)
+
+        elif learning_model in ['XGB_Model','GBRT_Model','RF_Model']:
+            # Set up the model
+            self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
+            learning_model = globals()[learning_model](
+                trial = trial,
+                config = config,
+                logger = self.logger
+            )
+        elif learning_model == 'GAT_Model':
+            learning_model = GAT_Model(
+                trial = trial,
+                config = self.config,
+                graph = kwargs.get('graph',None),
+                num_regions = kwargs.get('num_regions',None),
+                input_size = kwargs.get('input_size',None),
+                device = self.device, 
+                logger = self.logger
+            ).to(self.device)
+        else:
+            raise Exception(f"Could not find learning model {learning_model}")
+            
+        self.logger.note(f"{learning_model}")
+        return learning_model
+            
 
     def define_sample_batch_sizes(self):
         N = self.learning_model.config['training']['N']
@@ -782,34 +881,7 @@ class RSquared_Analysis(Experiment):
         )
 
         # Pass inputs to device
-        self.inputs.pass_to_device()
-
-        # Instantiate Spatial Interaction Model
-        self.logger.note("Initializing the spatial interaction model ...")
-
-        sim = instantiate_sim(
-            name = self.config['spatial_interaction_model']['name'],
-            config = self.config,
-            true_parameters = self.config['spatial_interaction_model']['parameters'],
-            instance = kwargs.get('instance',''),
-            **vars(self.inputs.data),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(sim,'config',self.config)
-
-        # Build the Harris Wilson model
-        self.logger.note("Initializing the Harris Wilson physics model ...")
-        self.physics_model = HarrisWilson(
-            intensity_model = sim,
-            config = self.config,
-            dt = self.config['harris_wilson_model'].get('dt',0.001),
-            true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(self.physics_model,'config',self.config)
+        self.inputs.pass_to_device()        
 
         # Create outputs
         self.outputs = Outputs(
@@ -830,9 +902,28 @@ class RSquared_Analysis(Experiment):
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
     
 
-    def run(self,**kwargs) -> None:
-        
-        self.logger.info(f"Running RSquared Analysis of {self.physics_model.noise_regime} noise SpatialInteraction.")
+    def run(self,*trial,**kwargs) -> None:
+
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Build the intensity and physics models
+        self.logger.note("Initializing the intensity and physics models ...")
+        self.physics_model = self.instantiate_intensity_and_physics_models(
+            config = self.config,
+            trial = trial,
+            true_parameters = self.inputs.true_parameters,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+        # Get and remove config
+        self.config = pop_variable(self.physics_model,'config',self.config)
+
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} of {self.physics_model.noise_regime} noise {self.physics_model.intensity_model.__class__.__name__}.")
         
         # Initialise data structures
         self.initialise_data_structures()
@@ -902,11 +993,11 @@ class RSquared_Analysis(Experiment):
             for j,beta_val in enumerate(beta_values):
                 # try:
                 theta_sample[0] = alpha_val
-                theta_sample[1] = beta_val*self.physics_model.params.bmax
+                theta_sample[1] = beta_val*self.physics_model.hyperparameters['bmax']
 
                 # Get minimum
                 if self.method == 'potential':
-                    x_pred = torch_optimize(
+                    x_pred = MathUtils.torch_optimize(
                         x_data,
                         function = self.physics_model.sde_potential_and_gradient,
                         method = 'L-BFGS-B',
@@ -943,7 +1034,7 @@ class RSquared_Analysis(Experiment):
                             free_parameters = free_params,
                             n_iterations = self.config['training']['num_steps'],
                             generate_time_series = False,
-                            dt = self.physics_model.dt,
+                            dt = self.physics_model.hyperparameters['dt'],
                             requires_grad = False,
                         ).squeeze()
                         w_preds.append(w_pred)
@@ -974,7 +1065,7 @@ class RSquared_Analysis(Experiment):
         self.logger.info(f"""
         alpha = {alpha_values[idx[0]]},
         beta = {beta_values[idx[1]]}, 
-        beta_scaled = {beta_values[idx[1]]*self.physics_model.params.bmax}
+        beta_scaled = {beta_values[idx[1]]*self.physics_model.hyperparameters['bmax']}
         """)
         self.logger.note('Destination attraction prediction')
         self.logger.note(max_w_prediction)
@@ -988,7 +1079,7 @@ class RSquared_Analysis(Experiment):
         # Save fitted values to parameters
         self.config.settings['fitted_alpha'] = to_json_format(alpha_values[idx[0]])
         self.config.settings['fitted_beta'] = to_json_format(beta_values[idx[1]])
-        self.config.settings['fitted_scaled_beta'] = to_json_format(beta_values[idx[1]]*self.physics_model.params.bmax)
+        self.config.settings['fitted_scaled_beta'] = to_json_format(beta_values[idx[1]]*self.physics_model.hyperparameters['bmax'])
         self.config.settings['R^2'] = to_json_format(float(r2[idx]))
         self.config.settings['predicted_w'] = to_json_format(max_w_prediction)
 
@@ -1028,41 +1119,6 @@ class LogTarget_Analysis(Experiment):
         # Pass inputs to device
         self.inputs.pass_to_device()
 
-        # Instantiate Spatial Interaction Model
-        self.logger.note("Initializing the spatial interaction model ...")
-
-        sim = instantiate_sim(
-            name = self.config['spatial_interaction_model']['name'],
-            config = self.config,
-            true_parameters = self.config['spatial_interaction_model']['parameters'],
-            instance = kwargs.get('instance',''),
-            **vars(self.inputs.data),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(sim,'config',self.config)
-
-        # Build the Harris Wilson model
-        self.logger.note("Initializing the Harris Wilson physics model ...")
-        physics_model = HarrisWilson(
-            intensity_model = sim,
-            config = self.config,
-            dt = self.config['harris_wilson_model'].get('dt',0.001),
-            true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(physics_model,'config',self.config)
-        # Spatial interaction model MCMC
-        self.logger.note("Initializing the Harris Wilson model MCMC")
-        self.learning_model = HarrisWilson_MCMC(
-            config = self.config,
-            physics_model = physics_model,
-            logger = self.logger
-        )
-        self.learning_model.build(**kwargs)
-
         # Create outputs
         self.outputs = Outputs(
             self.config,
@@ -1081,9 +1137,28 @@ class LogTarget_Analysis(Experiment):
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
 
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
+
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.learning_model = self.instantiate_learning_model(
+            'HarrisWilson_MCMC',
+            config = self.config,
+            trial = trial,
+            true_parameters = self.inputs.true_parameters,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+        # Get and remove config
+        self.config = pop_variable(self.learning_model,'config',self.config)
         
-        self.logger.info(f"Running LogTarget Analysis of {self.learning_model.physics_model.noise_regime} noise SpatialInteraction.")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} of {self.learning_model.physics_model.noise_regime} noise {self.physics_model.intensity_model.__class__.__name__}.")
         
         # Initialise data structures
         self.initialise_data_structures()
@@ -1141,7 +1216,7 @@ class LogTarget_Analysis(Experiment):
             for beta_val in beta_values:
                 try:
                     theta_sample[0] = alpha_val
-                    theta_sample[1] = beta_val*self.learning_model.physics_model.params.bmax
+                    theta_sample[1] = beta_val*self.learning_model.physics_model.hyperparameters['bmax']
 
                     # Minimise potential function
                     log_z_inverse,_ = self.learning_model.biased_z_inverse(
@@ -1153,7 +1228,7 @@ class LogTarget_Analysis(Experiment):
                     potential_func = self.learning_model.physics_model.sde_potential(
                         x_data,
                         **dict(zip(self.params_to_learn,theta_sample)),
-                        **vars(self.learning_model.physics_model.params)
+                        **self.learning_model.physics_model.hyperparameters
                     )
                     # Store log_target
                     log_target = log_z_inverse - potential_func - lap_c1
@@ -1171,13 +1246,13 @@ class LogTarget_Analysis(Experiment):
         self.logger.info(f"Log target: {max_target}")
         self.logger.info(f"""
         alpha = {argmax_theta['alpha']},
-        beta = {argmax_theta['beta']/self.physics_model.params.bmax}, 
+        beta = {argmax_theta['beta']/self.learning_model.physics_model.hyperparameters['bmax']}, 
         beta_scaled = {argmax_theta['beta']}
         """)
         
         # Save fitted values to parameters
         self.config['fitted_alpha'] = to_json_format(argmax_theta['alpha'])
-        self.config['fitted_scaled_beta'] = to_json_format(argmax_theta['beta']/self.learning_model.physics_model.params.bmax)
+        self.config['fitted_scaled_beta'] = to_json_format(argmax_theta['beta']/self.learning_model.physics_model.hyperparameters['bmax'])
         self.config['fitted_beta'] = to_json_format(argmax_theta['beta'])
         self.config['log_target'] = to_json_format(max_target)
 
@@ -1213,45 +1288,9 @@ class SIM_MCMC(Experiment):
 
         # Pass inputs to device
         self.inputs.pass_to_device()
-
-        # Instantiate Spatial Interaction Model
-        self.logger.note("Initializing the spatial interaction model ...")
-
-        sim = instantiate_sim(
-            name = self.config['spatial_interaction_model']['name'],
-            config = self.config,
-            instance = kwargs.get('instance',''),
-            **vars(self.inputs.data),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(sim,'config',self.config)
-
-        # Build the Harris Wilson model
-        self.logger.note("Initializing the Harris Wilson physics model ...")
-        physics_model = HarrisWilson(
-            intensity_model = sim,
-            config = self.config,
-            dt = self.config['harris_wilson_model'].get('dt',0.001),
-            true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-
-        # Get and remove config
-        self.config = pop_variable(sim,'config',self.config)
-
-        # Spatial interaction model MCMC
-        self.logger.note("Initializing the Harris Wilson model MCMC")
-        self.learning_model = HarrisWilson_MCMC(
-            config = self.config,
-            physics_model = physics_model,
-            logger = self.logger
-        )
-        self.learning_model.build(**kwargs)
-        
-        # Get config
-        self.config = getattr(self.learning_model,'config',self.config)
+        # Keep a separate copy of inputs that is cast to xarray
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
 
         # Create outputs
         self.outputs = Outputs(
@@ -1269,14 +1308,33 @@ class SIM_MCMC(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.learning_model}")
         self.logger.info(f"Experiment: {self.outputs.experiment_id}")
         # self.logger.critical(f"{json.dumps(kwargs.get('sweep',{}),indent = 2)}")
 
         
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
 
-        self.logger.info(f"Running MCMC inference of {self.learning_model.physics_model.noise_regime} noise SpatialInteraction.")
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.learning_model = self.instantiate_learning_model(
+            'HarrisWilson_MCMC',
+            config = self.config,
+            trial = trial,
+            true_parameters = self.inputs.true_parameters,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+        # Get and remove config
+        self.config = pop_variable(self.learning_model,'config',self.config)
+
+        self.logger.debug(f"{self.learning_model}")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} of {self.learning_model.physics_model.noise_regime} noise {self.physics_model.intensity_model.__class__.__name__}.")
 
         # Fix random seed
         set_seed(self.seed)
@@ -1291,7 +1349,7 @@ class SIM_MCMC(Experiment):
         
         # Expand theta
         theta_sample_scaled = deepcopy(theta_sample)
-        theta_sample_scaled[1] *= self.learning_model.physics_model.params.bmax
+        theta_sample_scaled[1] *= self.learning_model.physics_model.hyperparameters['bmax']
 
         # Compute initial log inverse z(\theta)
         log_z_inverse, sign_sample = self.learning_model.z_inverse(
@@ -1302,7 +1360,7 @@ class SIM_MCMC(Experiment):
         V, gradV = self.learning_model.physics_model.sde_potential_and_gradient(
                 log_destination_attraction_sample,
                 **dict(zip(self.params_to_learn,theta_sample_scaled)),
-                **vars(self.learning_model.physics_model.params)
+                **self.learning_model.physics_model.hyperparameters
         )
 
         # Store number of samples
@@ -1422,45 +1480,9 @@ class JointTableSIM_MCMC(Experiment):
 
         # Pass inputs to device
         self.inputs.pass_to_device()
-
-        # Instantiate Spatial Interaction Model
-        self.logger.note("Initializing the spatial interaction model ...")
-
-        sim = instantiate_sim(
-            name = self.config['spatial_interaction_model']['name'],
-            config = self.config,
-            true_parameters = self.config['spatial_interaction_model']['parameters'],
-            instance = kwargs.get('instance',''),
-            **vars(self.inputs.data),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(sim,'config',self.config)
-
-        # Build the Harris Wilson model
-        self.logger.note("Initializing the Harris Wilson physics model ...")
-        physics_model = HarrisWilson(
-            intensity_model = sim,
-            config = self.config,
-            dt = self.config['harris_wilson_model'].get('dt',0.001),
-            true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(physics_model,'config',self.config)
-        
-        # Spatial interaction model MCMC
-        self.logger.note("Initializing the Harris Wilson model MCMC")
-        self.learning_model = HarrisWilson_MCMC(
-            config = self.config,
-            physics_model = physics_model,
-            logger = self.logger
-        )
-        self.learning_model.build(**kwargs)
-        
-        # Get config
-        self.config = getattr(self.learning_model,'config',self.config)
+        # Keep a separate copy of inputs that is cast to xarray
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -1497,12 +1519,31 @@ class JointTableSIM_MCMC(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.learning_model}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
         
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
 
-        self.logger.info(f"Running MCMC inference of {self.learning_model.physics_model.noise_regime} noise {self.learning_model.physics_model.name}.")
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.learning_model = self.instantiate_learning_model(
+            'HarrisWilson_MCMC',
+            config = self.config,
+            trial = trial,
+            true_parameters = self.inputs.true_parameters,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+        # Get and remove config
+        self.config = pop_variable(self.learning_model,'config',self.config)
+
+        self.logger.debug(f"{self.learning_model}")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} of {self.learning_model.physics_model.noise_regime} noise {self.learning_model.physics_model.name}.")
 
         # Fix random seed
         set_seed(self.seed)
@@ -1518,7 +1559,7 @@ class JointTableSIM_MCMC(Experiment):
         
         # Expand theta
         theta_sample_scaled = deepcopy(theta_sample)
-        theta_sample_scaled[1] *= self.learning_model.physics_model.params.bmax
+        theta_sample_scaled[1] *= self.learning_model.physics_model.hyperparameters['bmax']
 
         # Compute table likelihood and its gradient
         negative_log_table_likelihood = self.learning_model.negative_table_log_likelihood_expanded(
@@ -1538,7 +1579,7 @@ class JointTableSIM_MCMC(Experiment):
         V, gradV = self.learning_model.physics_model.sde_potential_and_gradient(
             log_destination_attraction_sample,
             **dict(zip(self.params_to_learn,theta_sample_scaled)),
-            **vars(self.learning_model.physics_model.params)
+            **self.learning_model.physics_model.hyperparameters
         )
 
         # Store number of samples
@@ -1731,24 +1772,23 @@ class Table_MCMC(Experiment):
             
         else:
             try:
-                # Instantiate Spatial Interaction Model
-                sim = instantiate_sim(
-                    name = self.config['spatial_interaction_model']['name'],
+                # Instantiate intensity model
+                intensity_model = instantiate_intensity_model(
                     config = self.config,
-                    true_parameters = self.config['spatial_interaction_model']['parameters'],
+                    trial = None,
                     instance = kwargs.get('instance',''),
                     **vars(self.inputs.data),
                     logger = self.logger
                 )
                 # Get and remove config
-                self.config = pop_variable(sim,'config',self.config)
-                self.logger.note("Using SIM model as ground truth intensity")
+                self.config = pop_variable(intensity_model,'config',self.config)
+                self.logger.note("Using intensity model as ground truth intensity")
                 
-                # Spatial interaction model for intensity
-                self.log_intensity = sim.log_intensity(
-                    log_true_destination_attraction = sim.log_destination_attraction,
-                    alpha = sim.alpha,
-                    beta = sim.beta*sim.bmax,
+                # intensity model for intensity
+                self.log_intensity = intensity_model.log_intensity(
+                    log_true_destination_attraction = intensity_model.log_destination_attraction,
+                    alpha = intensity_model.alpha,
+                    beta = intensity_model.beta*intensity_model.bmax,
                     grand_total = ct.margins[tuplize(range(ndims(ct)))].item()
                 )
             except:
@@ -1775,7 +1815,7 @@ class Table_MCMC(Experiment):
 
     def run(self,**kwargs) -> None:
 
-        self.logger.note(f"Running Table MCMC.")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -1854,57 +1894,9 @@ class SIM_NN(Experiment):
 
         # Pass inputs to device
         self.inputs.pass_to_device()
-
-        # Instantiate Spatial Interaction Model
-        self.logger.note("Initializing the spatial interaction model ...")
-
-        sim = instantiate_sim(
-            name = self.config['spatial_interaction_model']['name'],
-            config = self.config,
-            true_parameters = self.config['spatial_interaction_model']['parameters'],
-            instance = kwargs.get('instance',''),
-            **vars(self.inputs.data),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(sim,'config',self.config)
-
-        # Build the Harris Wilson model
-        self.logger.note("Initializing the Harris Wilson physics model ...")
-        physics_model = HarrisWilson(
-            intensity_model = sim,
-            config = self.config,
-            dt = self.config['harris_wilson_model'].get('dt',0.001),
-            true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(physics_model,'config',self.config)
-        
-        # Set up the neural net
-        self.logger.note("Initializing the neural net ...")
-        neural_network = NeuralNet(
-            input_size = self.inputs.data.dims['destination'],
-            output_size = len(self.config['training']['to_learn']),
-            **self.config['neural_network']['hyperparameters'],
-            logger = self.logger
-        ).to(self.device)
-
-        # Instantiate harris and wilson neural network model
-        self.logger.note("Initializing the Harris Wilson Neural Network model ...")
-        self.learning_model = HarrisWilson_NN(
-            config = self.config,
-            neural_net = neural_network,
-            loss = self.config['neural_network']['loss'],
-            physics_model = physics_model,
-            write_every = self._write_every,
-            write_start = self._write_start,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-        # Get config
-        self.config = getattr(self.learning_model,'config',self.config)
+        # Keep a separate copy of inputs that is cast to xarray
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
 
         # Create outputs
         self.outputs = Outputs(
@@ -1922,23 +1914,56 @@ class SIM_NN(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.learning_model}")
+        
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
         
 
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
 
-        self.logger.note(f"Running Neural Network training of Harris Wilson model.")
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.learning_model = self.instantiate_learning_model(
+            'HarrisWilson_NN',
+            config = self.config,
+            trial = trial,
+            loss = self.config['neural_network']['loss'],
+            true_parameters = self.inputs.true_parameters,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+        # Get config
+        self.config = getattr(self.learning_model,'config',self.config)
+
+        self.logger.debug(f"{self.learning_model}")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} training of physics model.")
 
         # Initialise data structures
         self.initialise_data_structures()
         
         # Store number of samples
         N = self.config['training']['N']
+        # Evaluation mask for computing validation metrics
+        evaluation_mask = self.inputs.data.test_cells_mask if trial is None else self.inputs.data.validation_cells_mask
+        # Define output xarray coordinates 
+        coordinates = {
+            "origin": np.arange(1,self.inputs.data.dims['origin']+1,1,dtype='int32'),
+            "destination": np.arange(1,self.inputs.data.dims['destination']+1,1,dtype='int32'),
+        }
+        # Create output array
+        intensity_xr = xr.DataArray(
+            torch.zeros(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']),
+            coords = coordinates
+        )
 
         # Initialise samples
         log_intensity_sample = None
-        grand_total = torch.tensor(1.0,dtype = float32,device = self.device)
+        grand_total = torch.tensor(self.inputs.data.grand_total, dtype = float32, device = self.device)
 
         # Track the training loss
         loss_sample = {
@@ -1952,6 +1977,7 @@ class SIM_NN(Experiment):
 
         # Track number of elements in each loss function
         n_processed_steps = {nm : 0 for nm in self.learning_model.loss_functions.keys()}
+        validation_metrics = []
 
         # For each epoch
         for i in tqdm(
@@ -2022,6 +2048,18 @@ class SIM_NN(Experiment):
                     data_size = len(training_data),
                     **self.config['training']
                 )
+                
+            # Update intensity
+            intensity_xr[:] = torch.exp(log_intensity_sample).cpu().detach().numpy()
+            # intensity_xr[:] = table_sample.cpu().detach().numpy()
+            # Update optuna progress
+            validation_metrics.append(
+                self.update_optimisation_progress(
+                    index = i,
+                    prediction = intensity_xr, 
+                    mask = evaluation_mask
+                )
+            )
             
             # print statements
             self.show_progress()
@@ -2039,6 +2077,8 @@ class SIM_NN(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+        
+        return np.mean(validation_metrics)
 
 class NonJointTableSIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -2061,33 +2101,9 @@ class NonJointTableSIM_NN(Experiment):
 
         # Pass inputs to device
         self.inputs.pass_to_device()
-
-        # Instantiate Spatial Interaction Model
-        self.logger.note("Initializing the spatial interaction model ...")
-
-        sim = instantiate_sim(
-            name = self.config['spatial_interaction_model']['name'],
-            config = self.config,
-            true_parameters = self.config['spatial_interaction_model']['parameters'],
-            instance = kwargs.get('instance',''),
-            **vars(self.inputs.data),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(sim,'config',self.config)
-
-        # Build the Harris Wilson model
-        self.logger.note("Initializing the Harris Wilson physics model ...")
-        physics_model = HarrisWilson(
-            intensity_model = sim,
-            config = self.config,
-            dt = self.config['harris_wilson_model'].get('dt',0.001),
-            true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(physics_model,'config',self.config)
+        # Keep a separate copy of inputs that is cast to xarray
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
         
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2107,30 +2123,6 @@ class NonJointTableSIM_NN(Experiment):
         # Get config
         self.config = getattr(self.ct_mcmc.ct,'config',self.config)
 
-        # Set up the neural net
-        self.logger.note("Initializing the neural net ...")
-        neural_network = NeuralNet(
-            input_size = self.inputs.data.dims['destination'],
-            output_size = len(self.config['training']['to_learn']),
-            **self.config['neural_network']['hyperparameters'],
-            logger = self.logger
-        ).to(self.device)
-
-        # Instantiate harris and wilson neural network model
-        self.logger.note("Initializing the Harris Wilson Neural Network model ...")
-        self.learning_model = HarrisWilson_NN(
-            config = self.config,
-            neural_net = neural_network,
-            loss = self.config['neural_network']['loss'],
-            physics_model = physics_model,
-            write_every = self._write_every,
-            write_start = self._write_start,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-        # Get config
-        self.config = getattr(self.learning_model,'config',self.config)
-
         # Create outputs
         self.outputs = Outputs(
             self.config,
@@ -2147,14 +2139,34 @@ class NonJointTableSIM_NN(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.learning_model}")
         self.logger.note(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
 
         
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
 
-        self.logger.note(f"Running Disjoint Table Inference and Neural Network training of Harris Wilson model.")
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.learning_model = self.instantiate_learning_model(
+            'HarrisWilson_NN',
+            config = self.config,
+            trial = trial,
+            loss = self.config['neural_network']['loss'],
+            true_parameters = self.inputs.true_parameters,
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+        # Get config
+        self.config = getattr(self.learning_model,'config',self.config)
+        
+        self.logger.debug(f"{self.learning_model}")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} training of physics model.")
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -2163,9 +2175,25 @@ class NonJointTableSIM_NN(Experiment):
         initial_params = self.initialise_parameters(self.output_names)
         table_sample = initial_params['table']
         grand_total = self.ct_mcmc.ct.data.margins[tuplize(range(ndims(self.ct_mcmc.ct)))].to(float32)
+
+        # Evaluation mask for computing validation metrics
+        evaluation_mask = self.inputs.data.test_cells_mask if trial is None else self.inputs.data.validation_cells_mask
+        # Define output xarray coordinates 
+        coordinates = {
+            "origin": np.arange(1,self.inputs.data.dims['origin']+1,1,dtype='int32'),
+            "destination": np.arange(1,self.inputs.data.dims['destination']+1,1,dtype='int32'),
+        }
+
+        # Create output array
+        intensity_xr = xr.DataArray(
+            torch.empty(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']).fill_(float('nan')),
+            coords = coordinates
+        )
         
         # Store number of samples
         N = self.config['training']['N']
+        # Initialise validation metrics
+        validation_metrics = []
 
         # Track the training loss
         loss_sample = {
@@ -2179,6 +2207,7 @@ class NonJointTableSIM_NN(Experiment):
 
         # Track number of elements in each loss function
         n_processed_steps = {nm : 0 for nm in self.learning_model.loss_functions.keys()}
+        
 
         # For each epoch
         for i in tqdm(
@@ -2263,6 +2292,18 @@ class NonJointTableSIM_NN(Experiment):
                 if self.samples_validated:
                     self.validate_samples()
             
+            # Update intensity
+            intensity_xr[:] = torch.exp(log_intensity_sample).cpu().detach().numpy()
+            # intensity_xr[:] = table_sample.cpu().detach().numpy()
+            # Update optuna progress
+            validation_metrics.append(
+                self.update_optimisation_progress(
+                    index = i,
+                    prediction = intensity_xr, 
+                    mask = evaluation_mask
+                )
+            )
+            
             # print statements
             self.show_progress()
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
@@ -2279,6 +2320,8 @@ class NonJointTableSIM_NN(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+
+        return np.mean(validation_metrics)
 
 class JointTableSIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -2301,33 +2344,9 @@ class JointTableSIM_NN(Experiment):
 
         # Pass inputs to device
         self.inputs.pass_to_device()
-
-        # Instantiate Spatial Interaction Model
-        self.logger.note("Initializing the spatial interaction model ...")
-
-        sim = instantiate_sim(
-            name = self.config['spatial_interaction_model']['name'],
-            config = self.config,
-            true_parameters = self.config['spatial_interaction_model']['parameters'],
-            instance = kwargs.get('instance',''),
-            **vars(self.inputs.data),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(sim,'config',self.config)
-
-        # Build the Harris Wilson model
-        self.logger.note("Initializing the Harris Wilson physics model ...")
-        physics_model = HarrisWilson(
-            intensity_model = sim,
-            config = self.config,
-            dt = self.config['harris_wilson_model'].get('dt',0.001),
-            true_parameters = self.inputs.true_parameters,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-        # Get and remove config
-        self.config = pop_variable(physics_model,'config',self.config)
+        # Keep a separate copy of inputs that is cast to xarray
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2344,34 +2363,7 @@ class JointTableSIM_NN(Experiment):
             logger = self.logger
         )
         # Get config
-        config = getattr(self.ct_mcmc.ct,'config',self.config)
-        
-        # Set up the neural net
-        self.logger.note("Initializing the neural net ...")
-        neural_network = NeuralNet(
-            input_size = self.inputs.data.dims['destination'],
-            output_size = len(self.config['training']['to_learn']),
-            **self.config['neural_network']['hyperparameters'],
-            logger = self.logger
-        ).to(self.device)
-
-        # Instantiate harris and wilson neural network model
-        self.logger.note("Initializing the Harris Wilson Neural Network model ...")
-        self.learning_model = HarrisWilson_NN(
-            config = self.config,
-            neural_net = neural_network,
-            loss = dict(
-                **self.config['neural_network']['loss'],
-                table_likelihood_loss = self.ct_mcmc.table_likelihood_loss
-            ),
-            physics_model = physics_model,
-            write_every = self._write_every,
-            write_start = self._write_start,
-            instance = kwargs.get('instance',''),
-            logger = self.logger
-        )
-        # Get config
-        self.config = getattr(self.learning_model,'config',self.config)
+        self.config = getattr(self.ct_mcmc.ct,'config',self.config)
 
         # Create outputs
         self.outputs = Outputs(
@@ -2389,13 +2381,36 @@ class JointTableSIM_NN(Experiment):
         # Write metadata
         self.write_metadata()
         
-        self.logger.note(f"{self.learning_model}")
         self.logger.info(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}. Sweep id: {self.outputs.sweep_id}")
 
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
 
-        self.logger.note(f"Running Joint Table Inference and Neural Network training of Harris Wilson model.")
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
+
+        # Set up the model
+        self.learning_model = self.instantiate_learning_model(
+            'HarrisWilson_NN',
+            config = self.config,
+            trial = trial,
+            true_parameters = self.inputs.true_parameters,
+            loss = dict(
+                **self.config['neural_network']['loss'],
+                table_likelihood_loss = self.ct_mcmc.table_likelihood_loss
+            ),
+            instance = kwargs.get('instance',''),
+            logger = self.logger
+        )
+        # Get and remove config
+        self.config = pop_variable(self.learning_model,'config',self.config)
+
+        self.logger.debug(f"{self.learning_model}")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} of physics model.")
         
         # Initialise data structures
         self.initialise_data_structures()
@@ -2407,6 +2422,22 @@ class JointTableSIM_NN(Experiment):
 
         # Store number of samples
         N = self.config['training']['N']
+        # Initialise validation metrics
+        validation_metrics = []
+
+        # Evaluation mask for computing validation metrics
+        evaluation_mask = self.inputs.data.test_cells_mask if trial is None else self.inputs.data.validation_cells_mask
+        # Define output xarray coordinates 
+        coordinates = {
+            "origin": np.arange(1,self.inputs.data.dims['origin']+1,1,dtype='int32'),
+            "destination": np.arange(1,self.inputs.data.dims['destination']+1,1,dtype='int32'),
+        }
+
+        # Create output array
+        intensity_xr = xr.DataArray(
+            torch.empty(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']).fill_(float('nan')),
+            coords = coordinates
+        )
 
         # Track the training loss
         loss_sample = {
@@ -2513,6 +2544,18 @@ class JointTableSIM_NN(Experiment):
                 if self.samples_validated:
                     self.validate_samples()
             
+            # Update intensity
+            intensity_xr[:] = torch.exp(log_intensity_sample).cpu().detach().numpy()
+            # intensity_xr[:] = table_sample.cpu().detach().numpy()
+            # Update optuna progress
+            validation_metrics.append(
+                self.update_optimisation_progress(
+                    index = i,
+                    prediction = intensity_xr, 
+                    mask = evaluation_mask
+                )
+            )
+
             # print statements
             self.show_progress()
             self.logger.iteration(f"Completed iteration {i+1} / {N}.")
@@ -2530,6 +2573,8 @@ class JointTableSIM_NN(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+
+        return np.mean(validation_metrics)
 
 class XGBoost_Comparison(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -2596,14 +2641,16 @@ class XGBoost_Comparison(Experiment):
             self.position = (trial.number % self.config['inputs']['n_workers']) + 1
 
         # Set up the model
-        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
-        self.learning_model = XGB_Model(
-            trial = trial,
+        self.learning_model = self.instantiate_learning_model(
+            'XGB_Model',
             config = self.config,
-            logger = self.logger
+            trial = trial,
+            **kwargs
         )
-        self.logger.note(f"{self.learning_model}")
+        # Get and remove config
+        self.config = pop_variable(self.learning_model,'config',self.config)
 
+        self.logger.debug(f"{self.learning_model}")
         self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
         # Initialise data structures
@@ -2781,14 +2828,16 @@ class RandomForest_Comparison(Experiment):
             self.position = (trial.number % self.config['inputs']['n_workers']) + 1
 
         # Set up the model
-        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
-        self.learning_model = RandomForest_Model(
-            trial = trial,
+        self.learning_model = self.instantiate_learning_model(
+            'RF_Model',
             config = self.config,
-            logger = self.logger
+            trial = trial,
+            **kwargs
         )
-        self.logger.note(f"{self.learning_model}")
+        # Get and remove config
+        self.config = pop_variable(self.learning_model,'config',self.config)
 
+        self.logger.debug(f"{self.learning_model}")
         self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
         # Initialise data structures
@@ -2890,6 +2939,7 @@ class RandomForest_Comparison(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+
         return np.mean(validation_metrics)
 
 class GBRT_Comparison(Experiment):
@@ -2957,14 +3007,16 @@ class GBRT_Comparison(Experiment):
             self.position = (trial.number % self.config['inputs']['n_workers']) + 1
 
         # Set up the model
-        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
-        self.learning_model = GBRT_Model(
-            trial = trial,
+        self.learning_model = self.instantiate_learning_model(
+            'GBRT_Model',
             config = self.config,
-            logger = self.logger
+            trial = trial,
+            **kwargs
         )
-        self.logger.note(f"{self.learning_model}")
+        # Get and remove config
+        self.config = pop_variable(self.learning_model,'config',self.config)
 
+        self.logger.debug(f"{self.learning_model}")
         self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
         # Initialise data structures
@@ -3066,6 +3118,7 @@ class GBRT_Comparison(Experiment):
         self.close_outputs()
         
         self.logger.note("Experiment finished.")
+        
         return np.mean(validation_metrics)
 
 
@@ -3133,9 +3186,6 @@ class GraphAttentionNetwork_Comparison(Experiment):
         if trial is not None:
             self.position = (trial.number % self.config['inputs']['n_workers']) + 1
 
-        # Set up the model
-        self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
-
         # Get covariates/features
         features_mean = self.inputs.data.region_features.mean(dim=0)
         features_std = self.inputs.data.region_features.std(dim=0)
@@ -3164,18 +3214,20 @@ class GraphAttentionNetwork_Comparison(Experiment):
             num_regions = self.inputs.data.dims['origin'] + self.inputs.data.dims['destination']
 
         # TODO: Modify this to elicit number of nodes in non square adjacency matrices / graphs
-        self.learning_model = GAT_Model(
-            trial = trial,
+        # Set up the model
+        self.learning_model = self.instantiate_learning_model(
+            'GAT_Model',
             config = self.config,
+            trial = trial,
             graph = graph,
             num_regions = num_regions,
             input_size = features.shape[1],
-            device = self.device, 
-            logger = self.logger
-        ).to(self.device)
-
-        self.logger.note(f"{self.learning_model}")
-
+            **kwargs
+        )
+        # Get and remove config
+        self.config = pop_variable(self.learning_model,'config',self.config)
+        
+        self.logger.debug(f"{self.learning_model}")
         self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
 
         # Initialise data structures
