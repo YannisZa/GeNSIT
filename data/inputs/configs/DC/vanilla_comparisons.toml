@@ -87,15 +87,15 @@ seed = 1234
 [graph_attention_network]
   disable_tqdm = true
   [graph_attention_network.hyperparameters]
-    gat_nodes_per_layer = 128
+    gat_nodes_per_layer = 32
     gat_num_hidden_layers = 1
     gat_dropout = 0
     gat_reg_param = 0
     gat_negative_sampling_rate = 0
     gat_grad_norm = 1.0
     gat_optimizer = 'Adam'
-    gat_learning_rate = +1e-5
-    gat_multitask_weights = [0.5, 0.25, 0.25]
+    gat_learning_rate = 0.09848334228302577
+    gat_multitask_weights = [0.7037524669618522, 0.036865784928021526, 0.25938174811012615]
     
 
 [[experiments]]
