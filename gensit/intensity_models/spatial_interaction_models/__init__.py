@@ -5,6 +5,7 @@ import torch
 from numpy import array,ndarray
 
 from gensit.config import Config
+from gensit.utils.exceptions import MissingData
 from gensit.utils.misc_utils import setup_logger, to_json_format
 from gensit.static.global_variables import PARAMETER_DEFAULTS, Dataset, INTENSITY_INPUTS, INTENSITY_OUTPUTS
 from gensit.utils.probability_utils import log_odds_ratio_wrt_intensity
@@ -12,11 +13,22 @@ from gensit.intensity_models.spatial_interaction_models import ProductionConstra
 
 def instantiate_sim(
         config:Config,
-        name:str = None,
         **kwargs
     ):
-    if name is None:
-        name = config.settings['spatial_interaction_model']['name']
+    if config is not None:
+        name = config.settings.get('spatial_interaction_model',{}).get('name',None)
+    else:
+        name = kwargs.get('name',None)
+    try:
+        assert name is not None
+    except:
+        raise MissingData(
+            missing_data_name = 'name',
+            data_names = ','.join(list(config.settings.keys())) \
+                if config is not None \
+                else ','.join(list(kwargs.keys()))
+        )
+
     if hasattr(sys.modules[__name__], name):
         name += 'SIM'
     else:
@@ -52,7 +64,7 @@ class SpatialInteraction2D(SpatialInteraction):
     REQUIRED_OUTPUTS = []
     def __init__(
             self,
-            config: Config = None,
+            config: Config,
             **kwargs
     ):
         '''  Constructor '''
@@ -288,17 +300,13 @@ class ProductionConstrainedSIM(SpatialInteraction2D):
     REQUIRED_OUTPUTS = INTENSITY_OUTPUTS['ProductionConstrained']
     def __init__(
         self,
-        config:Config = None,
-        true_parameters:dict = {},
-        device:str = None,
+        config:Config,
         **kwargs
     ):
         '''  Constructor '''
         # Initialise constructor
         super().__init__(
             config = config,
-            true_parameters = true_parameters,
-            device = device,
             **kwargs
         )
         # Define type of spatial interaction model
@@ -324,17 +332,13 @@ class TotallyConstrainedSIM(SpatialInteraction2D):
     REQUIRED_OUTPUTS = INTENSITY_OUTPUTS['TotallyConstrained']
     def __init__(
         self,
-        config:Config = None,
-        true_parameters = {},
-        device:str = None,
+        config:Config,
         **kwargs
     ):
         '''  Constructor '''
         # Initialise constructor
         super().__init__(
             config = config,
-            true_parameters = true_parameters,
-            device = device,
             **kwargs
         )
         # Define type of spatial interaction model
