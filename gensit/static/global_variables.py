@@ -24,11 +24,12 @@ PARAMETER_DEFAULTS = {
     "alpha": 0.5, 
     "beta": 0.5, 
     "delta": 0.1,
-    "kappa": 2, 
-    "epsilon": 1,
+    "kappa": 1.0, 
+    "epsilon": 1.0,
     "bmax": 1,
     "noise_percentage": 3,
-    "sigma": 3,
+    "sigma": 0.0,#0.0141414,
+    "dt":0.001
 }
 
 SWEEPABLE_PARAMS = {"iter"}
@@ -411,8 +412,6 @@ EXPERIMENT_OUTPUT_NAMES = {
     "GraphAttentionNetwork_Comparison": ["intensity","compute_time"]
 }
 
-OPTIMISABLE_EXPERIMENTS = ["XGBoost_Comparison","RandomForest_Comparison","GBRT_Comparison","GraphAttentionNetwork_Comparison"]
-
 AUXILIARY_COORDINATES_DTYPES = {
     "N":"int32",
     "dataset":"str",
@@ -649,7 +648,6 @@ LOSS_FUNCTIONS = {
         "kwargs_keys":None
     }
 }
-
 
 ACTIVATION_FUNCS = {
     "abs": ["torch.abs", False],
