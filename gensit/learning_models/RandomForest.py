@@ -23,7 +23,7 @@ DEFAULT_HYPERPARAMS = {
 MODEL_TYPE = 'random_forest'
 MODEL_PREFIX = 'rf_'
 
-class RandomForest_Model(object):
+class RF_Model(object):
     def __init__(
         self,
         *,
@@ -47,6 +47,7 @@ class RandomForest_Model(object):
         self.trial = trial
         # Type of learning model
         self.model_type = MODEL_TYPE
+        self.model_prefix = MODEL_PREFIX
         
         # Update hyperparameters
         self.update_hyperparameters()
@@ -72,14 +73,14 @@ class RandomForest_Model(object):
         for pname in DEFAULT_HYPERPARAMS.keys():
             if self.trial is not None and pname in OPTUNA_HYPERPARAMS:
                 self.hyperparams[pname] = OPTUNA_HYPERPARAMS[pname]
-            elif self.config is None or getattr(self.config[MODEL_TYPE]['hyperparameters'],pname,None) is None:
+            elif self.config is None or getattr(self.config[self.model_type]['hyperparameters'],pname,None) is None:
                 self.hyperparams[pname] = DEFAULT_HYPERPARAMS[pname]
             else:
-                self.hyperparams[pname] =  self.config[MODEL_TYPE]['hyperparameters'][(MODEL_PREFIX+pname)]
+                self.hyperparams[pname] =  self.config[self.model_type]['hyperparameters'][(self.model_prefix+pname)]
 
-            if self.config is not None and getattr(self.config[MODEL_TYPE]['hyperparameters'],pname,None) is None:
+            if self.config is not None and getattr(self.config[self.model_type]['hyperparameters'],pname,None) is None:
                 # Update object and config hyperparameters
-                self.config[MODEL_TYPE]['hyperparameters'][(MODEL_PREFIX+pname)] = self.hyperparams[pname]
+                self.config[self.model_type]['hyperparameters'][(self.model_prefix+pname)] = self.hyperparams[pname]
         
 
 

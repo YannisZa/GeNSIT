@@ -77,6 +77,7 @@ class GAT_Model(nn.Module):
         self.trial = trial
         # Type of learning model
         self.model_type = MODEL_TYPE
+        self.model_prefix = MODEL_PREFIX
         # Graph
         self.graph = graph
         # tqdm flag
@@ -162,14 +163,14 @@ class GAT_Model(nn.Module):
                 else:
                     self.hyperparams[pname] = OPTUNA_HYPERPARAMS[pname]
             
-            elif self.config is None or getattr(self.config[MODEL_TYPE]['hyperparameters'],pname,None) is None:
+            elif self.config is None or getattr(self.config[self.model_type]['hyperparameters'],pname,None) is None:
                 self.hyperparams[pname] = DEFAULT_HYPERPARAMS[pname]
             else:
-                self.hyperparams[pname] =  self.config[MODEL_TYPE]['hyperparameters'][(MODEL_PREFIX+pname)]
+                self.hyperparams[pname] =  self.config[self.model_type]['hyperparameters'][(self.model_prefix+pname)]
 
-            if self.config is not None and getattr(self.config[MODEL_TYPE]['hyperparameters'],pname,None) is None:
+            if self.config is not None and getattr(self.config[self.model_type]['hyperparameters'],pname,None) is None:
                 # Update object and config hyperparameters
-                self.config[MODEL_TYPE]['hyperparameters'][(MODEL_PREFIX+pname)] = self.hyperparams[pname]
+                self.config[self.model_type]['hyperparameters'][(self.model_prefix+pname)] = self.hyperparams[pname]
 
     def origin_forward(self, g):
         '''
