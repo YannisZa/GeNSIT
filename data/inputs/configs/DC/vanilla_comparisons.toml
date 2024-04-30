@@ -10,7 +10,7 @@ dataset = 'DC'
 load_experiment = ''
 # seed = 1234
 [inputs.seed.sweep]
-  default = "1"
+  default = 1
   range = "1:10:1"
   
 [inputs.data]
