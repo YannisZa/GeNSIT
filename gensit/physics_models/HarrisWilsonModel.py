@@ -99,13 +99,13 @@ class HarrisWilson:
         self.hyperparams = {}
         if self.trial is not None:
             OPTUNA_HYPERPARAMS = {
-                'alpha': self.trial.suggest_float('alpha', 0.01, 10.0), 
-                'beta': self.trial.suggest_float('beta', 0.0, 10.0), 
-                'kappa': self.trial.suggest_float('kappa', 0.01, 10.0), 
-                'epsilon': self.trial.suggest_float('epsilon', 0.01, 10.0), 
-                'bmax': self.trial.suggest_float('bmax', 0.01, 1000.0,log=True), 
+                'epsilon': self.trial.suggest_float('epsilon', 0.01, 4.0), 
                 'noise_percentage': self.trial.suggest_float('noise_percentage', 0.0001, 3.0),
-                'dt': self.trial.suggest_float('dt', 1e-5, 1e-1, log=True),
+                'dt': self.trial.suggest_float('dt', 1e-4, 1e-1)
+                # 'alpha': self.trial.suggest_float('alpha', 0.01, 10.0), 
+                # 'beta': self.trial.suggest_float('beta', 0.0, 10.0), 
+                # 'kappa': self.trial.suggest_float('kappa', 0.01, 10.0), 
+                # 'bmax': self.trial.suggest_float('bmax', 0.01, 1000.0, log=True)
             }
         
         for pname in PARAMETER_DEFAULTS.keys():

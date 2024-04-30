@@ -238,13 +238,13 @@ class NeuralNet(nn.Module):
         if self.trial is not None:
             OPTUNA_HYPERPARAMS = {
                 "num_hidden_layers": self.trial.suggest_int('num_hidden_layers', 1, 12, step = 1),
-                "optimizer":  self.trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
-                "learning_rate": self.trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True),
+                "learning_rate": self.trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True)
+                # "optimizer":  self.trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
             } 
             # Layer-specific number of nodes
             layer_specific_nodes = []
             for i in range(OPTUNA_HYPERPARAMS['num_hidden_layers']):
-                layer_specific_nodes.append(self.trial.suggest_int(f"nodes_per_layer_{i}", 1, 128, step = 128))
+                layer_specific_nodes.append(self.trial.suggest_int(f"nodes_per_layer_{i}", 1, 30, step = 4))
             OPTUNA_HYPERPARAMS['nodes_per_layer'] = {
                 "default": layer_specific_nodes[0],
                 "layer_specific": {i:layer_specific_nodes[i] for i in range(len(layer_specific_nodes))}
