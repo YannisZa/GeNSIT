@@ -1,5 +1,5 @@
 log_level = 'info'
-sweep_mode = false
+sweep_mode = true
 
 [inputs]
 n_workers = +1
@@ -8,7 +8,10 @@ device = 'cpu'
 in_directory = './data/inputs/'
 dataset = 'DC'
 load_experiment = ''
-seed = 1234
+# seed = 1234
+[inputs.seed.sweep]
+  default = "1"
+  range = "1:10:1"
   
 [inputs.data]
     [inputs.data.region_features]

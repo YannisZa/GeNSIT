@@ -58,6 +58,12 @@ clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_low_noise.toml -et J
 clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_high_noise.toml -et JointTableSIM_MCMC -nt 12 -nw 1 -n 20000
 ```
 
+## Comparison methods
+
+```
+clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_high_noise.toml -et JointTableSIM_MCMC -nt 12 -nw 1 -n 20000
+```
+
 ## Summaries and Metrics
 
 ### Table 1
