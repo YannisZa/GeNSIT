@@ -350,8 +350,9 @@ class Experiment(object):
                 config = config,
                 trial = trial,
                 true_parameters = self.inputs.true_parameters,
-                instance = kwargs.get('instance',''),
-                logger = self.logger
+                instance = kwargs.pop('instance',''),
+                logger = self.logger,
+                **kwargs
             )
             # Get and remove config
             config = pop_variable(physics_model,'config',config)
@@ -364,7 +365,8 @@ class Experiment(object):
                 trial = trial,
                 input_size = self.inputs.data.dims['destination'],
                 output_size = len(config['training']['to_learn']),
-                logger = self.logger
+                logger = self.logger,
+                **kwargs
             ).to(self.device)
             # Get and remove config
             config = pop_variable(neural_network,'config',config)
@@ -375,11 +377,12 @@ class Experiment(object):
                 config = config,
                 neural_net = neural_network,
                 physics_model = physics_model,
-                loss = kwargs.get('loss',{}),
+                loss = kwargs.pop('loss',{}),
                 write_every = self._write_every,
                 write_start = self._write_start,
-                instance = kwargs.get('instance',''),
-                logger = self.logger
+                instance = kwargs.pop('instance',''),
+                logger = self.logger,
+                **kwargs
             )
         elif learning_model == 'HarrisWilson_MCMC':
             # Set up intensity model MCMC
@@ -402,12 +405,13 @@ class Experiment(object):
         elif learning_model == 'GAT_Model':
             learning_model = GAT_Model(
                 trial = trial,
-                config = self.config,
-                graph = kwargs.get('graph',None),
-                num_regions = kwargs.get('num_regions',None),
-                input_size = kwargs.get('input_size',None),
+                config = config,
+                graph = kwargs.pop('graph',None),
+                num_regions = kwargs.pop('num_regions',None),
+                input_size = kwargs.pop('input_size',None),
                 device = self.device, 
-                logger = self.logger
+                logger = self.logger,
+                **kwargs
             ).to(self.device)
         else:
             raise Exception(f"Could not find learning model {learning_model}")
@@ -1158,7 +1162,8 @@ class LogTarget_Analysis(Experiment):
         # Get and remove config
         self.config = pop_variable(self.learning_model,'config',self.config)
         
-        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} of {self.learning_model.physics_model.noise_regime} noise {self.physics_model.intensity_model.__class__.__name__}.")
+        self.logger.debug(f"{self.learning_model}")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} of {self.learning_model.physics_model.noise_regime} noise {self.learning_model.physics_model.intensity_model.__class__.__name__}.")
         
         # Initialise data structures
         self.initialise_data_structures()
@@ -3192,17 +3197,15 @@ class GraphAttentionNetwork_Comparison(Experiment):
         features = (self.inputs.data.region_features - features_mean) / features_std
 
         # Compute graph adjacency matrix 
-        weigthed_adjacency_matrix = torch.where(
+        weighted_adjacency_matrix = torch.where(
             self.inputs.data.adjacency_matrix,
             self.inputs.data.cost_matrix,
             0
         )
-        nonzerocells = weigthed_adjacency_matrix.nonzero()
-        wam = weigthed_adjacency_matrix[nonzerocells[:,0],nonzerocells[:,1]]
     
         # Construct graph using adjacency matrix
         graph = build_graph_from_matrix(
-            weigthed_adjacency_matrix = weigthed_adjacency_matrix, 
+            weigthed_adjacency_matrix = weighted_adjacency_matrix, 
             region_features = features,
             device = self.device
         ).to(self.device)
