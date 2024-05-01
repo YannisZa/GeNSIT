@@ -171,6 +171,8 @@ class GAT_Model(nn.Module):
             if self.config is not None and getattr(self.config[self.model_type]['hyperparameters'],pname,None) is None:
                 # Update object and config hyperparameters
                 self.config[self.model_type]['hyperparameters'][(self.model_prefix+pname)] = self.hyperparams[pname]
+            # Update batch size
+            self.hyperparams['batch_size'] = self.config['training']['batch_size']
 
     def origin_forward(self, g):
         '''
@@ -280,22 +282,22 @@ class GAT_Model(nn.Module):
         # shuffle
         samples = samples[torch.randperm(samples.shape[0])]
         # cut to mini-batches and wrap them by a generator
-        for i in range(0, samples.shape[0], self.config['training']['batch_size']):
-            yield samples[i:i+self.config['training']['batch_size']]
+        for i in range(0, samples.shape[0], self.hyperparams['batch_size']):
+            yield samples[i:i+self.hyperparams['batch_size']]
 
     def negative_sampling(self, train_y):
         '''
         perform negative sampling by perturbing the positive samples
         '''
         # if do not require negative sampling
-        if self.config[self.model_type].get('negative_sampling_rate',0) == 0:
+        if self.hyperparams['negative_sampling_rate'] == 0:
             return None
         # else, let's do negative sampling
         # number of negative samples
         size_of_batch = len(train_y)
-        num_to_generate = size_of_batch * self.config[self.model_type]['gat_negative_sampling_rate']
+        num_to_generate = size_of_batch * self.hyperparams['negative_sampling_rate']
         # create container for negative samples
-        neg_samples = np.tile(train_y, [self.config[self.model_type]['gat_negative_sampling_rate'], 1])
+        neg_samples = np.tile(train_y, [self.hyperparams['negative_sampling_rate'], 1])
         neg_samples[:, -1] = 0 # set trip volume to be 0
         # perturbing the edge
         sample_nid = np.random.randint(self.num_regions, size = num_to_generate) # randomly sample nodes
@@ -348,7 +350,7 @@ class GAT_Model(nn.Module):
         # SGD from each mini-batch
         for mini_batch in tqdm(
             self.generate_mini_batches(train_y),
-            total = len(range(0, train_y.shape[0], self.config['training']['batch_size'])),
+            total = len(range(0, train_y.shape[0], self.hyperparams['batch_size'])),
             disable = self.tqdm_disabled,
             desc = "SGD for each minibatch",
             leave = False
@@ -497,6 +499,7 @@ class FNN(nn.Module):
 
 
 class GATLayer(nn.Module):
+
     def __init__(
             self, 
             graph, 
