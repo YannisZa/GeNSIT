@@ -1542,7 +1542,7 @@ class JointTableSIM_MCMC(Experiment):
         self.config = pop_variable(self.learning_model,'config',self.config)
 
         self.logger.debug(f"{self.learning_model}")
-        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} of {self.learning_model.physics_model.noise_regime} noise {self.learning_model.physics_model.name}.")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} of {self.learning_model.physics_model.noise_regime} noise {self.learning_model.physics_model.model_type}.")
 
         # Fix random seed
         set_seed(self.seed)
