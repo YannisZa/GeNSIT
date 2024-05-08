@@ -991,7 +991,7 @@ class RSquared_Analysis(Experiment):
             for j,beta_val in enumerate(beta_values):
                 # try:
                 theta_sample[0] = alpha_val
-                theta_sample[1] = beta_val*self.physics_model.hyperparameters['bmax']
+                theta_sample[1] = beta_val*self.physics_model.hyperparams['bmax']
 
                 # Get minimum
                 if self.method == 'potential':
@@ -1032,7 +1032,7 @@ class RSquared_Analysis(Experiment):
                             free_parameters = free_params,
                             n_iterations = self.config['training']['num_steps'],
                             generate_time_series = False,
-                            dt = self.physics_model.hyperparameters['dt'],
+                            dt = self.physics_model.hyperparams['dt'],
                             requires_grad = False,
                         ).squeeze()
                         w_preds.append(w_pred)
@@ -1063,7 +1063,7 @@ class RSquared_Analysis(Experiment):
         self.logger.info(f"""
         alpha = {alpha_values[idx[0]]},
         beta = {beta_values[idx[1]]}, 
-        beta_scaled = {beta_values[idx[1]]*self.physics_model.hyperparameters['bmax']}
+        beta_scaled = {beta_values[idx[1]]*self.physics_model.hyperparams['bmax']}
         """)
         self.logger.note('Destination attraction prediction')
         self.logger.note(max_w_prediction)
@@ -1077,7 +1077,7 @@ class RSquared_Analysis(Experiment):
         # Save fitted values to parameters
         self.config.settings['fitted_alpha'] = to_json_format(alpha_values[idx[0]])
         self.config.settings['fitted_beta'] = to_json_format(beta_values[idx[1]])
-        self.config.settings['fitted_scaled_beta'] = to_json_format(beta_values[idx[1]]*self.physics_model.hyperparameters['bmax'])
+        self.config.settings['fitted_scaled_beta'] = to_json_format(beta_values[idx[1]]*self.physics_model.hyperparams['bmax'])
         self.config.settings['R^2'] = to_json_format(float(r2[idx]))
         self.config.settings['predicted_w'] = to_json_format(max_w_prediction)
 
@@ -1215,7 +1215,7 @@ class LogTarget_Analysis(Experiment):
             for beta_val in beta_values:
                 try:
                     theta_sample[0] = alpha_val
-                    theta_sample[1] = beta_val*self.learning_model.physics_model.hyperparameters['bmax']
+                    theta_sample[1] = beta_val*self.learning_model.physics_model.hyperparams['bmax']
 
                     # Minimise potential function
                     log_z_inverse,_ = self.learning_model.biased_z_inverse(
@@ -1227,7 +1227,7 @@ class LogTarget_Analysis(Experiment):
                     potential_func = self.learning_model.physics_model.sde_potential(
                         x_data,
                         **dict(zip(self.params_to_learn,theta_sample)),
-                        **self.learning_model.physics_model.hyperparameters
+                        **self.learning_model.physics_model.hyperparams
                     )
                     # Store log_target
                     log_target = log_z_inverse - potential_func - lap_c1
@@ -1245,13 +1245,13 @@ class LogTarget_Analysis(Experiment):
         self.logger.info(f"Log target: {max_target}")
         self.logger.info(f"""
         alpha = {argmax_theta['alpha']},
-        beta = {argmax_theta['beta']/self.learning_model.physics_model.hyperparameters['bmax']}, 
+        beta = {argmax_theta['beta']/self.learning_model.physics_model.hyperparams['bmax']}, 
         beta_scaled = {argmax_theta['beta']}
         """)
         
         # Save fitted values to parameters
         self.config['fitted_alpha'] = to_json_format(argmax_theta['alpha'])
-        self.config['fitted_scaled_beta'] = to_json_format(argmax_theta['beta']/self.learning_model.physics_model.hyperparameters['bmax'])
+        self.config['fitted_scaled_beta'] = to_json_format(argmax_theta['beta']/self.learning_model.physics_model.hyperparams['bmax'])
         self.config['fitted_beta'] = to_json_format(argmax_theta['beta'])
         self.config['log_target'] = to_json_format(max_target)
 
@@ -1348,7 +1348,7 @@ class SIM_MCMC(Experiment):
         
         # Expand theta
         theta_sample_scaled = deepcopy(theta_sample)
-        theta_sample_scaled[1] *= self.learning_model.physics_model.hyperparameters['bmax']
+        theta_sample_scaled[1] *= self.learning_model.physics_model.hyperparams['bmax']
 
         # Compute initial log inverse z(\theta)
         log_z_inverse, sign_sample = self.learning_model.z_inverse(
@@ -1359,7 +1359,7 @@ class SIM_MCMC(Experiment):
         V, gradV = self.learning_model.physics_model.sde_potential_and_gradient(
                 log_destination_attraction_sample,
                 **dict(zip(self.params_to_learn,theta_sample_scaled)),
-                **self.learning_model.physics_model.hyperparameters
+                **self.learning_model.physics_model.hyperparams
         )
 
         # Store number of samples
@@ -1558,7 +1558,7 @@ class JointTableSIM_MCMC(Experiment):
         
         # Expand theta
         theta_sample_scaled = deepcopy(theta_sample)
-        theta_sample_scaled[1] *= self.learning_model.physics_model.hyperparameters['bmax']
+        theta_sample_scaled[1] *= self.learning_model.physics_model.hyperparams['bmax']
 
         # Compute table likelihood and its gradient
         negative_log_table_likelihood = self.learning_model.negative_table_log_likelihood_expanded(
@@ -1578,7 +1578,7 @@ class JointTableSIM_MCMC(Experiment):
         V, gradV = self.learning_model.physics_model.sde_potential_and_gradient(
             log_destination_attraction_sample,
             **dict(zip(self.params_to_learn,theta_sample_scaled)),
-            **self.learning_model.physics_model.hyperparameters
+            **self.learning_model.physics_model.hyperparams
         )
 
         # Store number of samples

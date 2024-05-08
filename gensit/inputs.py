@@ -794,9 +794,9 @@ class Inputs:
         )
         # Create initialisations
         Ndests = self.data.dims['destination']
-        g = np.log(physics_model.hyperparameters['delta'].item())*np.ones((Ndests,Ndests)) - \
-            np.log(physics_model.hyperparameters['delta'].item())*np.eye(Ndests) + \
-            np.log(1+physics_model.hyperparameters['delta'].item())*np.eye(Ndests)
+        g = np.log(physics_model.hyperparams['delta'].item())*np.ones((Ndests,Ndests)) - \
+            np.log(physics_model.hyperparams['delta'].item())*np.eye(Ndests) + \
+            np.log(1+physics_model.hyperparams['delta'].item())*np.eye(Ndests)
         g = g.astype('float32')
         
         # Get minimum across different initialisations in parallel
