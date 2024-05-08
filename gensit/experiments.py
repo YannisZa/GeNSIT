@@ -131,11 +131,6 @@ class ExperimentHandler(object):
 
             # Create output path
             makedir(experiment.outputs.outputs_path)
-            # Store config
-            experiment.outputs.write_metadata(
-                dir_path = '',
-                filename = 'config.json'
-            )
 
             # Create database filename for caching optuna study
             study_name = experiment.__class__.__name__ + '_Hyperparameter_Optimisation'
@@ -183,7 +178,10 @@ class ExperimentHandler(object):
             experiment.config['best_attrs'] = {k:to_json_format(v) for k,v in trial.user_attrs.items()}
 
             # Export metadata
-            experiment.write_metadata()
+            experiment.outputs.write_metadata(
+                dir_path = '',
+                filename = 'config.json'
+            )
             
             # Reset
             try:

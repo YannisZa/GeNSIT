@@ -1050,7 +1050,9 @@ class Outputs(object):
     def write_metadata(self,dir_path:str,filename:str) -> None:
         # Define filepath
         filepath = os.path.join(self.outputs_path,dir_path,f"{filename.split('.')[0]}.json")
+        print('filepath',filepath)
         if (os.path.exists(filepath) and self.config['experiments'][0]['overwrite']) or (not os.path.exists(filepath)):
+            print(self.config.settings)
             if isinstance(self.config,Config):
                 write_json(self.config.settings,filepath,indent = 2)
             elif isinstance(self.config,dict):
