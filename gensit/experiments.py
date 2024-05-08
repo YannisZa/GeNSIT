@@ -176,6 +176,14 @@ class ExperimentHandler(object):
             experiment.logger.info("Attributes")
             for key, value in trial.user_attrs.items():
                 experiment.logger.info("    {}: {}".format(key, value))
+
+            # Update metadata
+            experiment.config['best_value'] = to_json_format(trial.value)
+            experiment.config['best_params'] = {k:to_json_format(v) for k,v in trial.params.items()}
+            experiment.config['best_attrs'] = {k:to_json_format(v) for k,v in trial.user_attrs.items()}
+
+            # Export metadata
+            experiment.write_metadata()
             
             # Reset
             try:
