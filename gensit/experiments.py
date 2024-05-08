@@ -349,9 +349,6 @@ class Experiment(object):
             physics_model = self.instantiate_intensity_and_physics_models(
                 config = config,
                 trial = trial,
-                true_parameters = self.inputs.true_parameters,
-                instance = kwargs.pop('instance',''),
-                logger = self.logger,
                 **kwargs
             )
             # Get and remove config
@@ -365,7 +362,6 @@ class Experiment(object):
                 trial = trial,
                 input_size = self.inputs.data.dims['destination'],
                 output_size = len(config['training']['to_learn']),
-                logger = self.logger,
                 **kwargs
             ).to(self.device)
             # Get and remove config
@@ -380,8 +376,6 @@ class Experiment(object):
                 loss = kwargs.pop('loss',{}),
                 write_every = self._write_every,
                 write_start = self._write_start,
-                instance = kwargs.pop('instance',''),
-                logger = self.logger,
                 **kwargs
             )
         elif learning_model == 'HarrisWilson_MCMC':
