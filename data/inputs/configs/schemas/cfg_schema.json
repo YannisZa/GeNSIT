@@ -2707,9 +2707,8 @@
           "optional": true,
           "exclude": false,
 
-          "dtype": "list",
-          "list-dtype": "float",
-          "default-value": [0.0, 4.0],
+          "dtype": "float",
+          "default-value": 4.0,
           "valid-range": [null, null]
         },
         "layer_specific": {
@@ -2746,7 +2745,7 @@
 
           "dtype": "dict",
           "dict-key-dtype": "str",
-          "dict-value-dtype": "float",
+          "dict-value-dtype": "int",
           "default-value": {},
           "key-valid-range": [0, null],
           "value-valid-range": [null, null]
