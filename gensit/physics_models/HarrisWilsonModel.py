@@ -80,9 +80,9 @@ class HarrisWilson:
 
         # Store noise variance
         self.hyperparams['noise_var'] = self.obs_noise_percentage_to_var(self.hyperparams['noise_percentage'])
-
+        
         # Update noise regime
-        self.noise_regime = self.hyperparams['sigma']
+        self.noise_regime = self.hyperparams.get('sigma')
         if 'sigma' in list(self.params_to_learn.keys()) or self.noise_regime is None:
             self.noise_regime = 'variable'
         elif isinstance(self.noise_regime,list):
