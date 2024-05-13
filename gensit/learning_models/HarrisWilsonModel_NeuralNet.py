@@ -155,7 +155,7 @@ class NeuralNet(nn.Module):
         trial:optuna.trial,
         input_size: int,
         output_size: int,
-        **kwargs,
+        **kwargs
     ):
         '''
 
@@ -397,7 +397,7 @@ class HarrisWilson_NN:
             loss_func = loss.get(name,loss_func) if loss_func is None else eval(loss_func+"()",{"torch":torch})
             # if failed get loss function from physics model defined functions
             loss_func = getattr(self.physics_model,name,loss_func) if loss_func is None else loss_func
-
+            
             # Add kwargs
             if loss_func is not None:
                 self.loss_functions[name] = loss_func
