@@ -526,7 +526,7 @@ class Experiment(object):
             dims = self.config['inputs']['dims']
             
             # Setup neural net loss
-            if 'loss' in self.output_names and self.learning_model.model_type == 'neural_network':
+            if 'loss' in self.output_names and self.learning_model.model_type in ['neural_network','harris_wilson_neural_network']:
                 for loss_name in list(self.learning_model.loss_functions.keys())+['total_loss']:
                     # Setup chunked dataset to store the state data in
                     if loss_name in self.outputs.h5group and not load_experiment:
