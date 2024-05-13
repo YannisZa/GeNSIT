@@ -8,7 +8,9 @@ device = 'cpu'
 in_directory = './data/inputs/'
 dataset = 'DC'
 load_experiment = ''
-seed = 1234
+[inputs.seed.sweep]
+  default = 1
+  range = "1:10:1"
   
 [inputs.data]
     [inputs.data.origin_demand]
@@ -39,10 +41,10 @@ seed = 1234
     bmax = +1.0
   
 [harris_wilson_model]
-  dt = +0.001
+  dt = +0.008164777
   [harris_wilson_model.parameters]
-    noise_percentage = +0.01
-    epsilon = 1.0
+    noise_percentage = +2.069878483
+    epsilon = 1.301050484
     delta = 0.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356
@@ -127,20 +129,34 @@ seed = 1234
       noise_percentage = nan
 
   [neural_network.hyperparameters]
-    num_hidden_layers = +1
+    num_hidden_layers = +5
     optimizer = 'Adam'
-    learning_rate = +0.002
+    learning_rate = +0.0000534563395155105
     [neural_network.hyperparameters.biases]
-      default = [+0.0, +4.0]
+      default = 2.026003035
       [neural_network.hyperparameters.biases.layer_specific]
+        0 = 2.026003035
+        1 = 0.957112068
+        2 = 1.487798921
+        3 = 0.845822705
+        4 = 3.910202558
     [neural_network.hyperparameters.nodes_per_layer]
-      default = +20
+      default = 17
       [neural_network.hyperparameters.nodes_per_layer.layer_specific]
+        0 = 17
+        1 = 25
+        2 = 21
+        3 = 13
+        4 = 9
     [neural_network.hyperparameters.activation_funcs]
-      default = 'linear'
+      default = 'hardsigmoid'
       [neural_network.hyperparameters.activation_funcs.layer_specific]
-        1 = 'abs'
-
+        0 = 'hardsigmoid'
+        1 = 'relu'
+        2 = 'hardsigmoid'
+        3 = 'relu'
+        4 = 'linear'
+        5 = 'linear'
 
 [[experiments]]
   type = 'JointTableSIM_NN'
