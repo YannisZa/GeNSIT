@@ -62,6 +62,7 @@ clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_high_noise.toml -et 
 
 ```
 clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_high_noise.toml -et JointTableSIM_MCMC -nt 12 -nw 1 -n 20000
+clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et XGBoost_Comparison -nt 12 -nw 1 -n 20000
 ```
 
 ## Summaries and Metrics
@@ -129,5 +130,21 @@ clear; gensit summarise \
 -ea "table_covered=coverage_func(prediction=table,ground_truth=ground_truth,region_mass=region_masses)" \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
 -k sigma -k type -k name -k title \
+-fe CoverageProbabilities -nw 20
+```
+
+```
+clear; gensit summarise \
+-dn cambridge_work_commuter_lsoas_to_msoas/comparisons \
+-et GBRT_Comparison -et GraphAttentionNetwork_Comparison -et RandomForest_Comparison -et XGBoost_Comparison \
+-el np -el MathUtils -el xr \
+-e intensity_coverage "xr.apply_ufunc(roundint, 100*intensity_covered.mean(['origin','destination']))" \
+-ea intensity \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "coverage_func=MathUtils.coverage_probability" \
+-ea "region_masses=[0.99]" \
+-ea "roundint=MathUtils.roundint" \
+-ea "intensity_covered=coverage_func(prediction=intensity,ground_truth=ground_truth,region_mass=region_masses)" \
+-k type -k name -k title \
 -fe CoverageProbabilities -nw 20
 ```
