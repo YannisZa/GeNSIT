@@ -88,7 +88,7 @@ class ContingencyTable(object):
         # CAUTION: Exclude time from table dimensions
         if hasattr(self.data,'dims'):
             self.data.dims = {k:v for k,v in self.data.dims.items() if k != 'time'}
-        self.dim_names = np.array(INPUT_SCHEMA['ground_truth_table']['dims'])
+        self.dim_names = np.array(TRAIN_SCHEMA['ground_truth_table']['dims'])
         # Markov basis class
         self.markov_basis_class = None
         # Flag for whether to allow sparse margins or not

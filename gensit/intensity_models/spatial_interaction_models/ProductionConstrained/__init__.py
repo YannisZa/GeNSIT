@@ -89,6 +89,10 @@ def log_flow_matrix(**kwargs):
     log_destination_attraction = kwargs['log_destination_attraction']
     alpha = kwargs['alpha']
     beta = kwargs['beta']
+
+    # Get iteration dims
+    iter_dims = [x for x in alpha.dims if x in ['iter','seed','N']]
+    iter_sizes = [dict(alpha.sizes)[x] for x in iter_dims]
     
     # Extract dimensions
     origin,destination = cost_matrix.size(dim = 0), cost_matrix.size(dim = 1)
@@ -96,18 +100,11 @@ def log_flow_matrix(**kwargs):
     # If input is torch use the following code
     if tensor:
         if log_destination_attraction.ndim > 2:
-            N = log_destination_attraction.size(dim = 0)
             sweep = log_destination_attraction.size(dim = 2)
-        elif log_destination_attraction.ndim > 1:
-            N = 1
-            sweep = 1
         else:
-            N = 1
             sweep = 1
     # If input is xarray use the following code
     else:
-        # Extract dimensions
-        N = log_destination_attraction['id'].shape[0]
         # Create dummy sweep coordinate
         if 'sweep' not in log_destination_attraction.dims:
             log_destination_attraction = log_destination_attraction.expand_dims(
@@ -123,7 +120,7 @@ def log_flow_matrix(**kwargs):
             )
 
         sweep = len(log_destination_attraction.coords['sweep'].values.tolist())
-        dims = ['id','origin','destination','sweep']
+        dims = iter_dims + ['sweep','origin','destination']
         # Merge all coordinates
         coords = log_destination_attraction.coords
         coords = coords.assign(origin = arange(1,origin+1,dtype='int32'))
@@ -131,11 +128,11 @@ def log_flow_matrix(**kwargs):
         # Use the .sel() method to select the dimensions you want to convert
         # Get the last time dimension
         log_destination_attraction = log_destination_attraction.isel(time = -1).sel(
-            **{dim: slice(None) for dim in ['id','destination','sweep']}
-        ).transpose('id','sweep','destination')
-        alpha = alpha.sel(id = slice(None),sweep = slice(None))
-        beta = beta.sel(id = slice(None),sweep = slice(None))
-        
+            **{dim: slice(None) for dim in iter_dims+['sweep','destination']}
+        ).transpose(*iter_dims,'sweep','destination')
+        alpha = alpha.sel(**{x: slice(None) for x in iter_dims+['sweep']})
+        beta = beta.sel(**{x: slice(None) for x in iter_dims+['sweep']})
+
         # Convert the selected_data to torch tensor
         log_destination_attraction = torch.tensor(
             log_destination_attraction.values
@@ -147,26 +144,23 @@ def log_flow_matrix(**kwargs):
             beta.values
         ).to(dtype = float32,device = device)
 
-    log_flow = torch.zeros((N,origin,destination,sweep)).to(dtype = float64,device = device)
-    
     # Reshape tensors to ensure operations are possible
-    log_destination_attraction = torch.reshape(log_destination_attraction,(N,1,destination,sweep))
-    origin_demand = torch.reshape(origin_demand,(1,origin,1,sweep))
-    cost_matrix = torch.reshape(cost_matrix.unsqueeze(1).repeat(1, 1, 1, sweep),(1,origin,destination,sweep))
-    alpha = torch.reshape(alpha,(N,1,1,sweep))
-    beta = torch.reshape(beta,(N,1,1,sweep))
+    log_destination_attraction = torch.reshape(log_destination_attraction,(*iter_sizes,sweep,1,destination))
+    origin_demand = origin_demand.repeat((*([1]*len(iter_sizes)),sweep))
+    cost_matrix = cost_matrix.repeat((*([1]*len(iter_sizes)),sweep,1))
+    alpha = torch.reshape(alpha,(*iter_sizes,sweep,1,1))
+    beta = torch.reshape(beta,(*iter_sizes,sweep,1,1))
     log_grand_total = torch.log(grand_total).to(device = device)
 
     # Compute log unnormalised expected flow
     # Compute log utility
     log_utility = log_destination_attraction*alpha - cost_matrix*beta
-    # Compute log normalisation factor
-    normalisation = torch.logsumexp(log_utility,dim=(2))
+    # Compute log normalisation factor over destinations
+    normalisation = torch.logsumexp(log_utility,dim=-1)
     # and reshape it
-    normalisation = torch.reshape(normalisation,(N,origin,1,1))
+    normalisation = torch.reshape(normalisation,(*iter_sizes,sweep,origin,1))
     # Evaluate log flow scaled
     log_flow = torch.log(origin_demand) + log_utility - normalisation + log_grand_total
-    
     # print(torch.exp(log_flow).sum(dim=(1,2)))
 
     if kwargs.get('torch',True):
@@ -178,7 +172,6 @@ def log_flow_matrix(**kwargs):
             data = log_flow.detach().cpu().numpy(), 
             dims = dims,
             coords={k:coords[k] for k in dims}
-            # coords=[coords[k] if len(coords[k].values.tolist()) > 1 else array([coords[k].values]) for k in dims]
         )  
 
 def flow_matrix_expanded(log_destination_attraction,origin_demand,cost_matrix,grand_total,alpha,beta):
