@@ -45,6 +45,7 @@ with open(os.path.join(ROOT,"data/inputs/configs/schemas/cfg_parameters.json"), 
             elif key_value_path[sweep_index-2] == "file":
                 SWEEPABLE_PARAMS.add(key_value_path[sweep_index-2])
 
+ITERATION_PARAMS = ["seed","iter","N"]
 SWEEPABLE_LENGTH_METADATA = ["seed","iter","origin","destination","time"]
 
 SIM_TYPE_CONSTRAINTS = {
@@ -122,30 +123,75 @@ VALIDATION_SCHEMA = {
         "ndmin":2,
         "cast_to_xarray":False
     },
+    "test_cells_mask": {
+        "dtype":"int32",
+        "ndmin":2,
+        "axes":[0,1],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["origin","destination"],
+        "cast_to_xarray":True
+    },
     "test_validation_cells": {
         "dtype":"int32",
         "ndmin":2,
         "cast_to_xarray":False
+    },
+    "test_validation_cells_mask": {
+        "dtype":"int32",
+        "ndmin":2,
+        "axes":[0,1],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["origin","destination"],
+        "cast_to_xarray":True
     },
     "validation_cells": {
         "dtype":"int32",
         "ndmin":2,
         "cast_to_xarray":False
     },
+    "validation_cells_mask": {
+        "dtype":"int32",
+        "ndmin":2,
+        "axes":[0,1],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["origin","destination"],
+        "cast_to_xarray":True
+    },
     "zero_train_cells": {
         "dtype":"int32",
         "ndmin":2,
         "cast_to_xarray":False
     },
+    "zero_train_cells_mask": {
+        "dtype":"int32",
+        "ndmin":2,
+        "axes":[0,1],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["origin","destination"],
+        "cast_to_xarray":True
+    },
     "train_cells": {
         "dtype":"int32",
         "ndmin":2,
         "cast_to_xarray":False
-    }
+    },
+    "train_cells_mask": {
+        "dtype":"int32",
+        "ndmin":2,
+        "axes":[0,1],
+        "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
+        "args_dtype":["int32","int32"],
+        "dims":["origin","destination"],
+        "cast_to_xarray":True
+    },
 }
 
 
-INPUT_SCHEMA = {
+TRAIN_SCHEMA = {
     "origin_demand":{
         "axes":[0],
         "dtype":"float32", 
@@ -242,7 +288,7 @@ TABLE_SCHEMA = {
         "dtype":"float32", 
         "ndmin":2,
         "funcs":[("np",".arange(start,stop,step)"),("np",".arange(start,stop,step)")],
-        "args_dtype":["int32","int32"],
+        "args_dtype":["int16","int16"],
         "dims":["origin","destination"],
         "is_iterable": True
     }
@@ -384,7 +430,8 @@ for loss in LOSS_DATA_REQUIREMENTS.keys():
         "is_iterable": True
     }
 
-DATA_SCHEMA = {**INPUT_SCHEMA,**OUTPUT_SCHEMA,**VALIDATION_SCHEMA}
+INPUT_SCHEMA = {**TRAIN_SCHEMA,**VALIDATION_SCHEMA}
+DATA_SCHEMA = {**INPUT_SCHEMA,**OUTPUT_SCHEMA}
 
 SAMPLE_DATA_REQUIREMENTS = {
     **dict(zip(list(OUTPUT_SCHEMA.keys()),list(OUTPUT_SCHEMA.keys())))

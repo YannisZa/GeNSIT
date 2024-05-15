@@ -3256,11 +3256,11 @@ class GraphAttentionNetwork_Comparison(Experiment):
         ), dim = 1)
         train_inflow = torch.concatenate((
             torch.tensor(np.arange(0,self.inputs.data.dims['destination'],1), dtype=torch.int32, device=self.device).unsqueeze(1),
-            self.inputs.data.ground_truth_table.sum(axis=INPUT_SCHEMA['ground_truth_table']['dims'].index('destination')).unsqueeze(1),
+            self.inputs.data.ground_truth_table.sum(axis=TRAIN_SCHEMA['ground_truth_table']['dims'].index('destination')).unsqueeze(1),
         ), dim = 1)
         train_outflow = torch.concatenate((
             torch.tensor(np.arange(0,self.inputs.data.dims['origin'],1), dtype=torch.int32, device=self.device).unsqueeze(1),
-            self.inputs.data.ground_truth_table.sum(axis=INPUT_SCHEMA['ground_truth_table']['dims'].index('origin')).unsqueeze(1),
+            self.inputs.data.ground_truth_table.sum(axis=TRAIN_SCHEMA['ground_truth_table']['dims'].index('origin')).unsqueeze(1),
         ), dim = 1)
 
         # Define output xarray coordinates 

@@ -63,7 +63,7 @@ _common_options = [
     click.option('--device','-dev', type = click.Choice(['cpu', 'cuda', 'mps']), default='cpu',
             help = f'Type of device used for torch operations.'),
     click.option('--out_directory', '-o', required = True, type = click.Path(exists = True), default='./data/outputs/'),
-    click.option('--out_group', '-og', required = False, type = click.Path(exists = False), default=None),
+    click.option('--out_group', '-og', required = False, type = click.Path(exists = False), default=''),
 ]
 
 _create_and_run_options = [
