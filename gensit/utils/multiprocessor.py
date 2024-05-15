@@ -22,4 +22,4 @@ class BoundedQueueProcessPoolExecutor(BoundedQueuePoolExecutor, concurrent.futur
             max_waiting_tasks = self._max_workers
         elif max_waiting_tasks < 0:
             raise ValueError(f'Invalid negative max_waiting_tasks value: {max_waiting_tasks}')
-        BoundedQueuePoolExecutor.__init__(self, multiprocessing.BoundedSemaphore(self._max_workers + max_waiting_tasks))
+        BoundedQueuePoolExecutor.__init__(self, multiprocessing.BoundedSemaphore(max_waiting_tasks))
