@@ -90,26 +90,83 @@ clear; gensit summarise \
 -ea "mean_table=table.mean(['id'],dtype='float64')" \
 -ea "mean_intensity=intensity.mean(['id'],dtype='float64')" \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
--btt 'iter' 10000 90 1000 \
+-btt 'iter' 10000 90 1000 -gb seed \
 -vd test_cells "./data/inputs/DC/test_cells.txt" -vd train_cells "./data/inputs/DC/train_cells.txt" \
--k sigma -k type -k name -k title -fe SRMSEs -nw 20
+-k sigma -k type -k name -k title -fe NonJointTableSIM_NN_table_SRMSEs -nw 20
 ```
 
 ```
 clear; gensit summarise \
--dn DC/exp2 -et RandomForest_Comparison \
+-dn DC/exp1 \
+-et NonJointTableSIM_NN \
 -el np -el MathUtils -el xr \
--e intensity_srmse_all "srmse_func(prediction=mean_intensity,ground_truth=ground_truth)" \
--e intensity_srmse_train "srmse_func(prediction=mean_intensity,ground_truth=ground_truth,cells=train_cells)" \
--e intensity_srmse_test "srmse_func(prediction=mean_intensity,ground_truth=ground_truth,cells=test_cells)" \
+-e intensity_srmse_all_mean "intensity_srmse_all_by_seed.mean('seed',dtype='float64')" \
+-e intensity_srmse_all_std "intensity_srmse_all_by_seed.mean('seed',dtype='float64')" \
+-e intensity_srmse_train_mean "intensity_srmse_train_by_seed.mean('seed',dtype='float64')" \
+-e intensity_srmse_train_std "intensity_srmse_train_by_seed.std('seed',dtype='float64')" \
+-e intensity_srmse_test_mean "intensity_srmse_test_by_seed.mean('seed',dtype='float64')" \
+-e intensity_srmse_test_std "intensity_srmse_test_by_seed.std('seed',dtype='float64')" \
 -ea intensity \
 -ea "test_cells=outputs.get_sample('test_cells')" \
 -ea "train_cells=outputs.get_sample('train_cells')" \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
 -ea "srmse_func=MathUtils.srmse" \
--ea "mean_intensity=intensity.mean(['id'],dtype='float64')" \
+-ea "intensity_mean=intensity.mean('iter',dtype='float64')" \
+-ea "intensity_srmse_all_by_seed=srmse_func(prediction=intensity_mean,ground_truth=ground_truth)" \
+-ea "intensity_srmse_train_by_seed=srmse_func(prediction=intensity_mean,ground_truth=ground_truth,cells=train_cells)" \
+-ea "intensity_srmse_test_by_seed=srmse_func(prediction=intensity_mean,ground_truth=ground_truth,cells=test_cells)" \
+-cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
+-btt 'iter' 10000 90 1000 \
+-k sigma -k type -k name -k title -fe intensity_SRMSEs -nw 20
+```
+
+```
+clear; gensit summarise \
+-dn DC/exp1 \
+-et NonJointTableSIM_NN \
+-el np -el MathUtils -el xr \
+-e table_srmse_all_mean "table_srmse_all_by_seed.mean('seed',dtype='float64',skipna=True)" \
+-e table_srmse_all_std "table_srmse_all_by_seed.mean('seed',dtype='float64',skipna=True)" \
+-e table_srmse_train_mean "table_srmse_train_by_seed.mean('seed',dtype='float64',skipna=True)" \
+-e table_srmse_train_std "table_srmse_train_by_seed.std('seed',dtype='float64',skipna=True)" \
+-e table_srmse_test_mean "table_srmse_test_by_seed.mean('seed',dtype='float64',skipna=True)" \
+-e table_srmse_test_std "table_srmse_test_by_seed.std('seed',dtype='float64',skipna=True)" \
+-ea table \
+-ea "test_cells=outputs.get_sample('test_cells')" \
+-ea "train_cells=outputs.get_sample('train_cells')" \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "srmse_func=MathUtils.srmse" \
+-ea "table_mean=table.mean('iter',dtype='float64')" \
+-ea "table_srmse_all_by_seed=srmse_func(prediction=table_mean,ground_truth=ground_truth)" \
+-ea "table_srmse_train_by_seed=srmse_func(prediction=table_mean,ground_truth=ground_truth,mask=outputs.inputs.data.train_cells_mask)" \
+-ea "table_srmse_test_by_seed=srmse_func(prediction=table_mean,ground_truth=ground_truth,mask=outputs.inputs.data.test_cells_mask)" \
+-btt 'iter' 10000 90 1000 \
+-k sigma -k type -k name -k title -fe table_SRMSEs -nw 4
+```
+
+ -et GBRT_Comparison
+
+```
+clear; gensit summarise \
+-dn DC/comparisons -et RandomForest_Comparison \
+-el np -el MathUtils -el xr \
+-e intensity_srmse_all_mean "intensity_srmse_all_by_seed.mean('sweep',dtype='float64')" \
+-e intensity_srmse_train_mean "intensity_srmse_train_by_seed.mean('sweep',dtype='float64')" \
+-e intensity_srmse_test_mean "intensity_srmse_test_by_seed.mean('sweep',dtype='float64')" \
+-e intensity_srmse_all_std "intensity_srmse_all_by_seed.std('sweep',dtype='float64')" \
+-e intensity_srmse_train_std "intensity_srmse_train_by_seed.std('sweep',dtype='float64')" \
+-e intensity_srmse_test_std "intensity_srmse_test_by_seed.std('sweep',dtype='float64')" \
+-ea intensity \
+-ea "test_cells=outputs.get_sample('test_cells')" \
+-ea "train_cells=outputs.get_sample('train_cells')" \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "srmse_func=MathUtils.srmse" \
+-ea "intensity_mean=intensity.mean('iter',dtype='float64')" \
+-ea "intensity_srmse_all_by_seed=srmse_func(prediction=intensity_mean,ground_truth=ground_truth)" \
+-ea "intensity_srmse_train_by_seed=srmse_func(prediction=intensity_mean_,ground_truth=ground_truth,cells=train_cells)" \
+-ea "intensity_srmse_test_by_seed=srmse_func(prediction=intensity_mean,ground_truth=ground_truth,cells=test_cells)" \
 -vd test_cells "./data/inputs/DC/test_cells.txt" -vd train_cells "./data/inputs/DC/train_cells.txt" \
--k type -k title -fe SRMSEs -nw 20
+-gb seed -k type -k title -fe RF_GBRT_SRMSEs -nw 20
 ```
 
 Get coverage probabilities for all samples and all experiments:
