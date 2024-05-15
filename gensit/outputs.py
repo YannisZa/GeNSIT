@@ -218,27 +218,16 @@ class Outputs(object):
         self.output_names = list(set(self.output_names))
         # Get input names
         self.input_names = [
-            sam for sam in set(self.data_names).intersection(set(list(INPUT_SCHEMA.keys())))
-        ] if self.data_names is not None else list(INPUT_SCHEMA.keys())
+            sam for sam in set(self.data_names).intersection(set(list(TRAIN_SCHEMA.keys())))
+        ] if self.data_names is not None else list(TRAIN_SCHEMA.keys())
 
         # Name output sample directory according 
         # to sweep params (if they are provided)
         if self.sweep_id == '':
             self.sweep_id = self.config.get_sweep_id(sweep = sweep)
 
-        if kwargs.get('slice',True):
-        
-            # Create coordinate slice conditions
-            self.create_slicing_conditions()
-            if self.coordinate_slice or self.settings.get('burnin_thinning_trimming',[]):
-                self.logger.info("//////////////////////////////////////////////////////////////////////////////////")
-                self.logger.info("Slicing coordinates:")
-                for coord_slice_expression in self.coordinate_slice:
-                    self.logger.info(f"{coord_slice_expression.replace('da.','')}")
-                for coord_slice in self.settings.get('burnin_thinning_trimming',[]):
-                    for dimkey,dimval in coord_slice.items():
-                        self.logger.info(f"{dimkey}: {', '.join([str(key)+' = '+str(val) for key,val in dimval.items()])}")
-                self.logger.info("//////////////////////////////////////////////////////////////////////////////////")
+        # Create coordinate slice conditions
+        self.create_slicing_conditions()
 
     def get(self,index:int):
         self_copy = deepcopy(self)
@@ -269,14 +258,14 @@ class Outputs(object):
             # Either there are no sweep params
             # or if there are then these are must be group_by dims
             assert not self_copy.config.sweep_mode() or \
-                not (set(self_copy.config.sweep_param_names).difference(self.settings.get('group_by',[])))
+                not (set(self_copy.config.sweep_param_names).difference(set(list(self.settings.get('group_by',[]))+['seed'])))
         except:
             print(self_copy.config)
             print(self_copy.config.sweep_param_names)
             raise InvalidMetadataType(
                 message = f"""
                     No sweeps should be contained in Outputs' config. 
-                    {self_copy.config.sweep_param_names} found with {self.settings.get('group_by',[])} group by params specified.
+                    {self_copy.config.sweep_param_names} found with {set(list(self.settings.get('group_by',[]))+['seed'])} group by params specified.
                 """
             )
 
@@ -337,147 +326,45 @@ class Outputs(object):
         gc.collect()
         time.sleep(3)
 
-
-    def slice_coordinates(self):
+    def slice_coordinates(self,sample_name,index,samples):
         # Slice according to coordinate value slice
-        if self.coordinate_slice or self.settings.get('burnin_thinning_trimming',[]):
-            progress = tqdm(
-                total = self.data.size(),
-                leave = False,
-                position = 0,
-                miniters = 1,
-                desc = 'Slicing coordinates sequentially'
-            )
-            # Based on first sample name slice the rest of sample names
-            first_sample_name = list(self.data_vars().keys())[0]
-            samples = self.data_vars()[first_sample_name]
+        if self.coordinate_slice or self.settings.get('burnin_thinning_trimming',[]):            
+            self.logger.progress(f"Slicing {sample_name}")
             
-            self.logger.progress(f"First slicing {first_sample_name}")
+            # Apply coordinate value slice
+            try:
+                samples,successful_val_slices = self.slice_coordinates_by_value(
+                    da = samples,
+                    sample_name = sample_name,
+                    index = index
+                )
+                if successful_val_slices and index == 0:
+                    # Announce successful coordinate value slices
+                    self.logger.success(f"Slicing {','.join(list(set(sample_name)))} using coordinate slice {str(successful_val_slices)} succeded")
+            except Exception as exc:
+                # traceback.print_exc()
+                # If coordinate slice failed remove group from data collection
+                self.logger.debug(exc)
+                self.logger.debug(traceback.format_exc())
+                return None
 
-            # Keep track of removed collection ids
-            removed_collection_ids = {first_sample_name:set()}
-            # Keep track of successful value slices
-            successful_value_slices,successful_index_slices = {},[]
-            
-            for i in range(len(samples)):
-                # Apply coordinate value slice
-                try:
-                    samples[i],successful_val_slices = self.slice_coordinates_by_value(
-                        da = samples[i],
-                        sample_name = first_sample_name,
-                        index = i
-                    )
-                    if successful_val_slices:
-                        successful_value_slices.setdefault(str(successful_val_slices),set()).add(first_sample_name)
-                except Exception as exc:
-                    # traceback.print_exc()
-                    # If coordinate slice failed remove group from data collection
-                    removed_collection_ids[first_sample_name].add(i)
-                    self.logger.debug(exc)
-                    self.logger.debug(traceback.format_exc())
-                    # Update progress
-                    progress.update(1)
-                    continue
-
-                # Apply burning, thinning and trimming
-                try:
-                    samples[i], successful_ind_slices = self.slice_coordinates_by_index(
-                        samples = samples[i],
-                        sample_name = first_sample_name
-                    )
-                    self.logger.progress(f"After index slicing {first_sample_name}[{i}]: {({k:v for k,v in dict(samples[i].sizes).items() if v > 1})}")
-                    successful_index_slices.append(successful_ind_slices)
-                except Exception as exc:
-                    # If index slice failed do NOT remove group from data collection
-                    # Instead just keep the data as it was before index slicing
-                    traceback.print_exc()
-                    raise exc
-                
-                # Make sure you keep the samples for this collection id
-                getattr(self.data,first_sample_name)[i] = samples[i]
-                # Slice the rest of sample data
-                for sample_name, current_samples in self.data_vars().items():
-                    # Do not reslice the data you just sliced!
-                    if sample_name == first_sample_name: continue
-                    # Make sure that the current sample data has the same number of elements/sweeps
-                    # as the first sample's data (see above)
-                    if len(current_samples) == len(samples):
-                        removed_collection_ids[sample_name] = removed_collection_ids[first_sample_name]
-                        # Slice sample_name's data
-                        current_samples[i],successful_val_slices = self.slice_coordinates_by_value(
-                            da = current_samples[i],
-                            sample_name = sample_name,
-                            index = i
-                        )
-                        current_samples[i], successful_ind_slices = self.slice_coordinates_by_index(
-                            samples = current_samples[i],
-                            sample_name = sample_name
-                        )
-                        # Update data with sliced data
-                        getattr(self.data,sample_name)[i] = current_samples[i]
-                        # Updated successful slices
-                        if successful_val_slices:
-                            successful_value_slices.setdefault(str(successful_val_slices),set()).add(sample_name)
-                        successful_index_slices.append(successful_ind_slices)
-                    else:
-                        removed_collection_ids[sample_name] = set()
-                        for j in range(len(current_samples)):
-                            try:
-                                # Slice sample_name's data
-                                current_samples[j],successful_val_slices = self.slice_coordinates_by_value(
-                                    da = current_samples[j],
-                                    sample_name = sample_name,
-                                    index = j
-                                )
-                                # Updated successful slices
-                                if successful_val_slices:
-                                    successful_value_slices.setdefault(str(successful_val_slices),set()).add(sample_name)
-                            except Exception as exc:
-                                # traceback.print_exc()
-                                # If coordinate slice failed remove group from data collection
-                                self.logger.debug(exc)
-                                self.logger.debug(traceback.format_exc())
-                                removed_collection_ids[sample_name].add(j)
-                                continue
-                            try:
-                                current_samples[j], successful_ind_slices = self.slice_coordinates_by_index(
-                                    samples = current_samples[j],
-                                    sample_name = sample_name
-                                )
-                                # Updated successful slices
-                                successful_index_slices.append(successful_ind_slices)
-                            except Exception as exc:
-                                # If index slice failed do NOT remove group from data collection
-                                # Instead just keep the data as it was before index slicing
-                                traceback.print_exc()
-                                raise exc
-                            # Update data with sliced data
-                            getattr(self.data,sample_name)[j] = current_samples[j]
-                
-                # Update progress
-                progress.update(1)
-                
-            # Remove collection ids that are not matching coordinate slice
-            for sam_name,removed_ids in removed_collection_ids.items():
-                kept_collection_ids = set(list(range(self.data.size()))).difference(removed_ids)
-                self.logger.info(f"""{sam_name}: {len(kept_collection_ids)} collection ids kept out of {self.data.size()}.""")
-                # Kept ids: {list(sorted(kept_collection_ids))}
-                for cid in sorted(list(removed_ids), reverse = True):
-                    del getattr(self.data,sam_name)[cid]
-                    gc.collect()
-                
-            # Print successful slices
-            for cslice,sam_names in successful_value_slices.items():
-                if cslice:
-                    self.logger.success(f"Slicing {','.join(list(set(sam_names)))} using coordinate slice {cslice} succeded")
-            for islice_dict in successful_index_slices:
-                if islice_dict['dims']:
+            # Apply burning, thinning and trimming
+            try:
+                samples, successful_ind_slices = self.slice_coordinates_by_index(
+                    samples = samples,
+                    sample_name = sample_name
+                )
+                self.logger.progress(f"After index slicing {sample_name}: {({k:v for k,v in dict(samples.sizes).items() if v > 1})}")
+                if successful_ind_slices and index == 0:
                     # Announce successful coordinate index slices
-                    self.logger.success(f"Slicing {','.join(list(islice_dict['dims']))} {islice_dict['settings']} succeded {islice_dict['new_shape']}")
-            # Sleep for 3 secs so that gc cleans memory
-            time.sleep(3)
-
-            progress.close()
+                    self.logger.success(f"Slicing {','.join(list(successful_ind_slices['dims']))} {successful_ind_slices['settings']} succeded {successful_ind_slices['new_shape']}")
+            except Exception as exc:
+                # If index slice failed do NOT remove group from data collection
+                # Instead just keep the data as it was before index slicing
+                traceback.print_exc()
+                return None
+            
+        return samples
 
     def data_vars(self):
         return {k:v for k,v in self.data._vars_().items() if k in DATA_SCHEMA}            
@@ -530,7 +417,8 @@ class Outputs(object):
                     drop = True
                 )
             except Exception as exc:
-                self.logger.debug(f"slicing using {sample_name}[{index}] {coord_slice} failed with {exc}")
+                self.logger.info(f"slicing using {sample_name}[{index}] {coord_slice} failed with {exc}")
+                self.logger.info(da.coords)
                 continue
             # Make sure dataset is not empty
             if da.size <= 0:
@@ -776,11 +664,13 @@ class Outputs(object):
                                 dtype='int32'
                             )
                     # Append
-                    self.logger.debug(f'Appending {sample_name}')
-                    data_vars[sample_name] = np.array(
-                        sample_data[:],
+                    self.logger.debug(f'Appending {sample_name} {sample_data.shape}')
+                    data_vars[sample_name] = np.zeros(
+                        sample_data.shape,
                         dtype = DATA_SCHEMA[sample_name].get('dtype','float32')
                     )
+                    # Read h5 data
+                    sample_data.read_direct(data_vars[sample_name])
 
         except BlockingIOError:
             self.logger.debug(f"Skipping in-use file: {filename}")
@@ -800,6 +690,16 @@ class Outputs(object):
             )
         else:
             nonshared_coord_dims = []
+        
+        if self.coordinate_slice or self.settings.get('burnin_thinning_trimming',[]):
+            self.logger.info("//////////////////////////////////////////////////////////////////////////////////")
+            self.logger.info("Slicing coordinates:")
+            for coord_slice_expression in self.coordinate_slice:
+                self.logger.info(f"{coord_slice_expression.replace('da.','')}")
+            for coord_slice in self.settings.get('burnin_thinning_trimming',[]):
+                for dimkey,dimval in coord_slice.items():
+                    self.logger.info(f"{dimkey}: {', '.join([str(key)+' = '+str(val) for key,val in dimval.items()])}")
+            self.logger.info("//////////////////////////////////////////////////////////////////////////////////")
 
         if getattr(self.config,'sweep_configurations', None) and len(self.config.sweep_configurations) > 0:
             # Attempt to load all samples
@@ -889,11 +789,18 @@ class Outputs(object):
                 sweep = None,
             )
             for sample_name,sample_data in data_array.items():
-                setattr(
-                    self.data,
-                    sample_name,
-                    [sample_data]
-                )
+                if sample_data is not None:
+                    setattr(
+                        self.data,
+                        sample_name,
+                        [sample_data]
+                    )
+                else:
+                    setattr(
+                        self.data,
+                        sample_name,
+                        []
+                    )
         
         # If output dataset is empty raise Error
         if self.data.size() <= 0:
@@ -902,21 +809,11 @@ class Outputs(object):
                 data_names = ""
             )
         
-        # Slice according to coordinate and index slice
-        self.slice_coordinates()
-
-        # If output dataset is empty raise Error
-        if self.data.size() <= 0:
-            raise EmptyData(
-                message = 'Outputs data is empty after slicing by coordinates and/or indices',
-                data_names = ''
-            )
-        
         # Stack sweep and iter dimensions
-        self.stack_sweep_and_iter_dims(self)
+        self.stack_sweep_dims(self)
 
 
-    def load_single(self,sample_names:list = None, group_by:list = None, sweep:dict = None):
+    def load_single(self,sample_names:list = None, group_by:list = None, sweep:dict = None, index:int = 0):
         # Load inputs
         if self.inputs is None:
             # Import all input data
@@ -951,16 +848,26 @@ class Outputs(object):
                     k:stringify_coordinate(parse(sweep[k])) for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
                     if k in sweep and k != 'seed' and k not in slice_dict
                 }
-            data_arr[sample_name] = xr.DataArray(
-                data = data,
-                coords = slice_dict,
-                attrs = dict(
-                    arr_name = sample_name,
-                    experiment_id = self.experiment_id,
-                    sweep_id = self.sweep_id,
-                    **attrs
-                )
-            ).astype(DATA_SCHEMA[sample_name]["dtype"])
+            # Slice according to coordinate and index slice
+            data_arr[sample_name] = self.slice_coordinates(
+                sample_name = sample_name,
+                index = index,
+                samples = xr.DataArray(
+                    data = data,
+                    coords = slice_dict,
+                    attrs = dict(
+                        arr_name = sample_name,
+                        experiment_id = self.experiment_id,
+                        sweep_id = self.sweep_id,
+                        **attrs
+                    )
+                ).astype(DATA_SCHEMA[sample_name]["dtype"])
+            )
+            try:
+                self.logger.progress(f"{sample_name}: {data_arr[sample_name].shape}")
+            except:
+                self.logger.debug(f"{sample_name} REMOVED")
+            
         return data_arr
 
         
@@ -1404,8 +1311,9 @@ class Outputs(object):
         group_by:list = []
     ):  
         output_datasets = []
-        for sweep_configuration in tqdm(
-            self.config.sweep_configurations,
+        for i,sweep_configuration in tqdm(
+            enumerate(self.config.sweep_configurations),
+            total = len(self.config.sweep_configurations),
             desc='Collecting h5 data sequentially',
             leave = False,
             position = 0
@@ -1415,7 +1323,8 @@ class Outputs(object):
                 base_config = self.config,
                 sweep_configuration = sweep_configuration,
                 sample_names = sample_names,
-                group_by = group_by
+                group_by = group_by,
+                index = i
             )
             if len(res) > 0:
                 output_datasets.append(res)
@@ -1449,16 +1358,17 @@ class Outputs(object):
             except Exception as exc:
                 raise ValueError("Getting sweep outputs failed") from exc
 
-        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = 2*self.settings.get('n_workers',1)) as executor:
+        with BoundedQueueProcessPoolExecutor(max_waiting_tasks = self.settings.get('n_workers',1)) as executor:
             # Start the processes and ignore the results
-            for sweep_configuration in self.config.sweep_configurations:
+            for i,sweep_configuration in enumerate(self.config.sweep_configurations):
                 try:
                     future = executor.submit(
                         self.get_sweep_outputs,
                         base_config = self.config,
                         sweep_configuration = sweep_configuration,
                         sample_names = sample_names,
-                        group_by = group_by
+                        group_by = group_by,
+                        index = i
                     )
                     future.add_done_callback(my_callback)
                 except:
@@ -1480,7 +1390,8 @@ class Outputs(object):
         base_config:Config,
         sweep_configuration:list,
         sample_names:list,
-        group_by:list=[]
+        group_by:list=[],
+        index:int=0
     ):
         # Get specific sweep config 
         new_config,sweep = deepcopy(base_config).prepare_experiment_config(
@@ -1495,24 +1406,14 @@ class Outputs(object):
             base_dir = self.outputs_path,
             sweep = sweep,
             console_handling_level = self.settings['logging_mode'],
-            slice = False,
             logger = self.logger
         )
-        # Load inputs
-        if self.inputs is None:
-            # Import all input data
-            outputs.inputs = Inputs(
-                config = new_config,
-                synthetic_data = False,
-                logger = self.logger
-            )
-        data_array = outputs.load_single(
+        return outputs.load_single(
             sample_names = sample_names, 
             group_by = group_by,
-            sweep = sweep
+            sweep = sweep,
+            index = index
         )
-        return data_array
-            
 
     def get_sample(self,sample_name:str):
         
@@ -1558,18 +1459,22 @@ class Outputs(object):
                     dtype = torch.float32
                 )
             # Compute log intensity
-            samples = IntensityModel.log_intensity(
-                torch = False,
-                grand_total = grand_total,
-                **{output:self.get_sample(output) for output in IntensityModelClass.REQUIRED_OUTPUTS}
-            )
+            try:
+                samples = IntensityModel.log_intensity(
+                    torch = False,
+                    grand_total = grand_total,
+                    **{output:self.get_sample(output) for output in IntensityModelClass.REQUIRED_OUTPUTS}
+                )
+            except:
+                traceback.print_exc()
+                sys.exit()
 
             # Create new dataset
             samples = samples.rename('intensity')
             # Exponentiate
             samples = np.exp(samples)
         
-        elif sample_name in INPUT_SCHEMA:
+        elif sample_name in TRAIN_SCHEMA:
 
             # Cast to xr DataArray
             self.inputs.cast_to_xarray()
@@ -1579,7 +1484,7 @@ class Outputs(object):
                 samples = torch.clone(
                     getattr(self.inputs.data,sample_name).to(
                         eval_dtype(
-                            INPUT_SCHEMA[sample_name]['dtype'],
+                            TRAIN_SCHEMA[sample_name]['dtype'],
                             numpy_format = False
                         )
                     )
@@ -1590,7 +1495,7 @@ class Outputs(object):
                 samples = torch.tensor(
                     getattr(self.inputs.data,sample_name),
                     dtype = eval_dtype(
-                        INPUT_SCHEMA[sample_name]['dtype'],
+                        TRAIN_SCHEMA[sample_name]['dtype'],
                         numpy_format = False
                     ),
                     device = self.device
@@ -1695,7 +1600,7 @@ class Outputs(object):
         return filename
 
     @classmethod
-    def stack_sweep_and_iter_dims(cls,__self__):
+    def stack_sweep_dims(cls,__self__):
 
         for sample_name,samples in __self__.data_vars().items(): 
 
@@ -1717,37 +1622,52 @@ class Outputs(object):
                 # print('stacking',iter_dims,sweep_dims)
 
                 # Stack variables and reorder data
-                if len(sweep_dims) > 0 and len(iter_dims) > 0:
-                    # Stack all non-core coordinates into new coordinate
-                    sample_data = sample_data.stack(
-                        id = tuplize(iter_dims),
-                        sweep = tuplize(sweep_dims)
-                    )
-                    # Reorder coordinate names
-                    samples[i] = sample_data.transpose(
-                        'id',*OUTPUT_SCHEMA[sample_name].get("dims",[]),'sweep'
-                    )
-                elif len(iter_dims) > 0:
-                    sample_data = sample_data.stack(
-                        id = tuplize(iter_dims)
-                    )
-                    # Reorder coordinate names
-                    samples[i] = sample_data.transpose(
-                        'id',*OUTPUT_SCHEMA[sample_name].get("dims",[])
-                    )
-                elif len(sweep_dims) > 0:
+                if len(sweep_dims) > 0:
                     sample_data = sample_data.stack(
                         sweep = tuplize(sweep_dims)
                     )
                     # Reorder coordinate names
                     samples[i] = sample_data.transpose(
-                        *OUTPUT_SCHEMA[sample_name].get("dims",[]),'sweep'
+                        *iter_dims,*OUTPUT_SCHEMA[sample_name].get("dims",[]),'sweep'
                     )
                 else:
                     # Reorder coordinate names
                     samples[i] = sample_data.transpose(
-                        *OUTPUT_SCHEMA[sample_name].get("dims",[])
+                        *iter_dims,*OUTPUT_SCHEMA[sample_name].get("dims",[])
                     )
+
+                # # Stack variables and reorder data
+                # if len(sweep_dims) > 0 and len(iter_dims) > 0:
+                #     # Stack all non-core coordinates into new coordinate
+                #     sample_data = sample_data.stack(
+                #         id = tuplize(iter_dims),
+                #         sweep = tuplize(sweep_dims)
+                #     )
+                #     # Reorder coordinate names
+                #     samples[i] = sample_data.transpose(
+                #         'id',*OUTPUT_SCHEMA[sample_name].get("dims",[]),'sweep'
+                #     )
+                # elif len(iter_dims) > 0:
+                #     sample_data = sample_data.stack(
+                #         id = tuplize(iter_dims)
+                #     )
+                #     # Reorder coordinate names
+                #     samples[i] = sample_data.transpose(
+                #         'id',*OUTPUT_SCHEMA[sample_name].get("dims",[])
+                #     )
+                # elif len(sweep_dims) > 0:
+                #     sample_data = sample_data.stack(
+                #         sweep = tuplize(sweep_dims)
+                #     )
+                #     # Reorder coordinate names
+                #     samples[i] = sample_data.transpose(
+                #         *OUTPUT_SCHEMA[sample_name].get("dims",[]),'sweep'
+                #     )
+                # else:
+                #     # Reorder coordinate names
+                #     samples[i] = sample_data.transpose(
+                #         *OUTPUT_SCHEMA[sample_name].get("dims",[])
+                #     )
                 
                 # Update data
                 getattr(
@@ -1899,23 +1819,10 @@ class DataCollection(object):
                     total = self.data_length,
                     desc = 'Grouping/Initialising Data Collection samples sequentially'
                 ):
-                    # datum = 
-                    # if kwargs.get('group_by',[]):
                     self.group_sample(
                         data.pop(i),
                         group_by = kwargs.get('group_by',[])
                     )
-                    # else:
-                    #     # Get sample name
-                    #     sample_name = datum.attrs['arr_name']
-                    #     dat = Dataset()
-                    #     setattr(
-                    #         dat,
-                    #         sample_name,
-                    #         datum
-                    #     )
-                    #     # print(i,dict(datum.sizes))
-                    #     self[i] = dat
                         
                 # Combine coords for each list element of the Data Collection
                 for sample_name in vars(self).keys():
@@ -1964,7 +1871,7 @@ class DataCollection(object):
         # Grouped by sweep params that will be shared
         sample_shared_dims = set(sample_shared_dims).union(set(group_by))
         # All input-related sweep params that will be shared
-        sample_shared_dims = set(sample_shared_dims).union(set(list(INPUT_SCHEMA.keys())))
+        sample_shared_dims = set(sample_shared_dims).union(set(list(TRAIN_SCHEMA.keys())))
 
         # Flag for whether update has completed
         complete = False
@@ -2590,7 +2497,7 @@ class OutputSummary(object):
         if config.sweep_mode():
             # If sweep is over input data
             input_sweep_param_names = set(config.sweep_param_names).intersection(
-                set(list(INPUT_SCHEMA.keys()))
+                set(list(TRAIN_SCHEMA.keys()))
             )
             input_sweep_param_names = set(input_sweep_param_names).difference(set(['to_learn']))
             input_sweep_param_names = input_sweep_param_names.union(
@@ -2733,6 +2640,10 @@ class OutputSummary(object):
             try:
                 samples = sweep_outputs.get_sample(key)
                 keyword_args[key] = samples
+                # try:
+                    # print(key,dict(samples.sizes))
+                # except:
+                #     pass
             except CoordinateSliceMismatch as exc:
                 self.logger.debug(exc)
                 continue
@@ -2749,7 +2660,7 @@ class OutputSummary(object):
                 self.logger.progress(f"{key} {dict(samples.sizes)}, {samples.dtype}")
             else:
                 self.logger.progress(f"{key} {samples.shape}, {samples.dtype}")
-        
+
         keyword_expressions = [(k,v) for k,v in self.settings['evaluation_kwargs'] if k not in raw_data_keys]
         self.logger.progress([k for k,_ in keyword_expressions])
         # Second, gather all data derivative arguments
@@ -2806,6 +2717,10 @@ class OutputSummary(object):
                 # Store evaluation of keyword argument
                 if keyword_eval is not None:
                     keyword_args[key] = keyword_eval
+                    # try:
+                        # print(key,dict(keyword_eval.unstack('sweep').sizes))
+                    # except:
+                    #     pass
                 
                 self.logger.progress(f"Keyword {key} expression {expression} succeded.")
 
