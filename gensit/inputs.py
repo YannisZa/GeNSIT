@@ -22,7 +22,7 @@ from gensit.utils.math_utils import torch_optimize
 from gensit.utils.probability_utils import random_vector
 from gensit.physics_models.HarrisWilsonModel import HarrisWilson
 from gensit.intensity_models import instantiate_intensity_model
-from gensit.static.global_variables import INPUT_SCHEMA, PARAMETER_DEFAULTS, INPUT_SCHEMA, VALIDATION_SCHEMA, Dataset
+from gensit.static.global_variables import TRAIN_SCHEMA, PARAMETER_DEFAULTS, TRAIN_SCHEMA, VALIDATION_SCHEMA, INPUT_SCHEMA, Dataset
 from gensit.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims, eval_dtype, read_file
 
 class Inputs:
@@ -65,10 +65,10 @@ class Inputs:
             self.read_data()
 
     def data_vars(self):
-        return {k:v for k,v in vars(self.data).items() if k in INPUT_SCHEMA}
+        return {k:v for k,v in vars(self.data).items() if k in TRAIN_SCHEMA}
     
     def validate_dims(self):
-        for attr,schema in INPUT_SCHEMA.items():
+        for attr,schema in TRAIN_SCHEMA.items():
             if len(schema) > 0:
                 for ax,dim in zip(schema.get("axes",[]),schema.get("dims",[])):
                     if hasattr(self.data,attr) and getattr(self.data,attr) is not None:
@@ -80,7 +80,7 @@ class Inputs:
     def copy(self,datasets:list=None):
         # Try to cast all data to tensor from xarray
         keys_of_interest = [
-            sam_name for sam_name in dict({**INPUT_SCHEMA,**VALIDATION_SCHEMA}).keys() \
+            sam_name for sam_name in dict({**TRAIN_SCHEMA,**VALIDATION_SCHEMA}).keys() \
             if getattr(self.data,sam_name,None) is not None
         ]
         datasets = list(set(datasets).intersection(set(keys_of_interest))) \
@@ -104,7 +104,7 @@ class Inputs:
             raise Exception('Input dataset NOT provided. Harris Wilson model cannot be created.')
 
         # Initialise all
-        # for attr in INPUT_SCHEMA.keys():
+        # for attr in TRAIN_SCHEMA.keys():
             # setattr(self.data,attr,None)
 
         # Import dims
@@ -115,7 +115,7 @@ class Inputs:
         )
 
         # Import all data
-        for attr,schema in INPUT_SCHEMA.items():
+        for attr,schema in TRAIN_SCHEMA.items():
             if len(schema) > 0 and attr in list(self.config.settings['inputs']['data'].keys()):
                 filename = self.config.settings['inputs']['data'][attr]
                 filename = filename.get('file','') if isinstance(filename,dict) else filename
@@ -308,7 +308,7 @@ class Inputs:
         for sample_name in datasets:
             if getattr(self.data,sample_name,None) is not None:
 
-                # Get input schema
+                # Get input,validation schema
                 schema = INPUT_SCHEMA[sample_name]
 
                 # if data is already a tensor do not convert
@@ -327,6 +327,7 @@ class Inputs:
                         to_type = str(xr.DataArray)
                     )
 
+                
                 # Get data dims
                 dims = [self.data.dims[dim_name] for dim_name in schema["dims"]]
                 coordinates = {}
@@ -353,20 +354,12 @@ class Inputs:
                         coords = coordinates
                     )
                 )
-
-            # else:
-            #     raise MissingData(
-            #         missing_data_name = sample_name,
-            #         data_names = ', '.join([k for k in self.data_vars().keys()]),
-            #         location = 'Inputs'
-            #     )    
-
     def pass_to_device(self):
         # Define device to set 
         device = self.config.settings['inputs']['device']
 
         if not self.data_in_device:
-            for input,schema in INPUT_SCHEMA.items():
+            for input,schema in TRAIN_SCHEMA.items():
                 if input not in ["dims",'grand_total','margins','true_parameters'] and \
                     getattr(self.data,input,None) is not None:
                         if "dims" in schema:
@@ -442,8 +435,8 @@ class Inputs:
             if os.path.isfile(cell_filename):
                 # Initialise ground truth table
                 self.data.ground_truth_table = -np.ones(
-                    tuple([d for d in INPUT_SCHEMA['ground_truth_table']['dims']]),
-                    dtype = INPUT_SCHEMA['ground_truth_table']['dtype']
+                    tuple([d for d in TRAIN_SCHEMA['ground_truth_table']['dims']]),
+                    dtype = TRAIN_SCHEMA['ground_truth_table']['dtype']
                 )
                 # Import all cells
                 cells = read_json(cell_filename)
@@ -648,11 +641,11 @@ class Inputs:
         
         # Generate the initial origin sizes
         for key,value in self.config.settings['inputs']['data'].items():
-            if key in list(INPUT_SCHEMA.keys()) and not (key in ['cost_matrix','dims']):
+            if key in list(TRAIN_SCHEMA.keys()) and not (key in ['cost_matrix','dims']):
                 # Randomly generate data
                 data = np.abs(
                     random_vector(
-                        **value, size = tuple([self.data.dims[name] for name in INPUT_SCHEMA[key]["dims"]])
+                        **value, size = tuple([self.data.dims[name] for name in TRAIN_SCHEMA[key]["dims"]])
                     )
                 ).astype('float32')
                 # Normalise to sum to one
@@ -732,7 +725,7 @@ class Inputs:
         # Set dataset name
         grand_total = self.config.settings['spatial_interaction_model'].get('grand_total',1)
         dataset_name = f"./data/inputs/synthetic/" + \
-        f"synthetic_{'x'.join([str(self.data.dims[name]) for name in INPUT_SCHEMA[key]['dims']])}_total_{grand_total}_" + \
+        f"synthetic_{'x'.join([str(self.data.dims[name]) for name in TRAIN_SCHEMA[key]['dims']])}_total_{grand_total}_" + \
         f"using_{synthetis_method}_samples_{str(num_samples)}_steps_{str(num_steps)}_sigma_{str(np.round(self.true_parameters['sigma'],2))}"
 
         # Create inputs folder
