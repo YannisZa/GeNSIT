@@ -2707,8 +2707,9 @@
           "optional": true,
           "exclude": false,
 
-          "dtype": "float",
-          "default-value": 4.0,
+          "dtype": "list",
+          "list-dtype": "float",
+          "default-value": [0.0,4.0],
           "valid-range": [null, null]
         },
         "layer_specific": {
