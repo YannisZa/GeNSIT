@@ -1635,39 +1635,6 @@ class Outputs(object):
                     samples[i] = sample_data.transpose(
                         *iter_dims,*OUTPUT_SCHEMA[sample_name].get("dims",[])
                     )
-
-                # # Stack variables and reorder data
-                # if len(sweep_dims) > 0 and len(iter_dims) > 0:
-                #     # Stack all non-core coordinates into new coordinate
-                #     sample_data = sample_data.stack(
-                #         id = tuplize(iter_dims),
-                #         sweep = tuplize(sweep_dims)
-                #     )
-                #     # Reorder coordinate names
-                #     samples[i] = sample_data.transpose(
-                #         'id',*OUTPUT_SCHEMA[sample_name].get("dims",[]),'sweep'
-                #     )
-                # elif len(iter_dims) > 0:
-                #     sample_data = sample_data.stack(
-                #         id = tuplize(iter_dims)
-                #     )
-                #     # Reorder coordinate names
-                #     samples[i] = sample_data.transpose(
-                #         'id',*OUTPUT_SCHEMA[sample_name].get("dims",[])
-                #     )
-                # elif len(sweep_dims) > 0:
-                #     sample_data = sample_data.stack(
-                #         sweep = tuplize(sweep_dims)
-                #     )
-                #     # Reorder coordinate names
-                #     samples[i] = sample_data.transpose(
-                #         *OUTPUT_SCHEMA[sample_name].get("dims",[]),'sweep'
-                #     )
-                # else:
-                #     # Reorder coordinate names
-                #     samples[i] = sample_data.transpose(
-                #         *OUTPUT_SCHEMA[sample_name].get("dims",[])
-                #     )
                 
                 # Update data
                 getattr(
@@ -2640,10 +2607,10 @@ class OutputSummary(object):
             try:
                 samples = sweep_outputs.get_sample(key)
                 keyword_args[key] = samples
-                # try:
-                    # print(key,dict(samples.sizes))
-                # except:
-                #     pass
+                try:
+                    print(key,dict(samples.sizes))
+                except:
+                    pass
             except CoordinateSliceMismatch as exc:
                 self.logger.debug(exc)
                 continue
