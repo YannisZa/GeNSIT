@@ -334,10 +334,12 @@ def calculate_min_interval(x, alpha, **kwargs):
     interval_width = right_boundary - left_boundary
     
     # Make sure that all samples are sorted
+    right_boundary_sorted = is_sorted(right_boundary)
+    left_boundary_sorted = is_sorted(left_boundary)
     try:
-        assert is_sorted(right_boundary) and is_sorted(left_boundary)
+        assert left_boundary_sorted and right_boundary_sorted
     except:
-        raise ValueError('Samples were not correctly sorted')
+        raise ValueError('Samples were not correctly sorted (left: {left_boundary_sorted}, right: {right_boundary_sorted})')
     
     # Make sure that the high posterior density interval is not zero
     if interval_width.sizes[dim] == 0:
