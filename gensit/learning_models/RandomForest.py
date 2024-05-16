@@ -87,7 +87,7 @@ class RF_Model(object):
         
 
     def train(self, train_x, train_y, **kwargs):
-        self.random_forest.fit(train_x, train_y, **kwargs)
+        self.random_forest.fit(train_x, train_y)
     
     def predict_single(self, test_x, estimator_index):
         return self.random_forest.estimators_[estimator_index].predict(test_x)
