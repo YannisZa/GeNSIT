@@ -105,7 +105,7 @@ def log_flow_matrix(**kwargs):
     else:
         # Get iteration dims
         iter_dims = [x for x in alpha.dims if x in ['iter','seed','N']]
-        iter_sizes = [dict(alpha.sizes)[x] for x in alpha.dims]
+        iter_sizes = [dict(alpha.sizes)[x] for x in iter_dims]
 
         # Create dummy sweep coordinate
         if 'sweep' not in log_destination_attraction.dims:
@@ -163,12 +163,14 @@ def log_flow_matrix(**kwargs):
     normalisation = torch.reshape(normalisation,(*iter_sizes,sweep,origin,1))
     # Evaluate log flow scaled
     log_flow = torch.log(origin_demand) + log_utility - normalisation + log_grand_total
-    # print(torch.exp(log_flow).sum(dim=(1,2)))
-
+    
     if kwargs.get('torch',True):
         # Return torch tensor
         return log_flow
     else:
+        print('log_flow',log_flow.shape)
+        print(dims)
+        print({k:coords[k] for k in dims})
         # Create outputs xr data array
         return xr.DataArray(
             data = log_flow.detach().cpu().numpy(), 

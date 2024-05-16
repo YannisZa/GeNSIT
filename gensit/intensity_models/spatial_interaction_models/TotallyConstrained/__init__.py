@@ -100,7 +100,7 @@ def log_flow_matrix(**kwargs):
     else:
         # Get iteration dims
         iter_dims = [x for x in alpha.dims if x in ['iter','seed','N']]
-        iter_sizes = [dict(alpha.sizes)[x] for x in alpha.dims]
+        iter_sizes = [dict(alpha.sizes)[x] for x in iter_dims]
 
         # Create dummy sweep coordinate
         if 'sweep' not in log_destination_attraction.dims:
