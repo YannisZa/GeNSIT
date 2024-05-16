@@ -791,7 +791,7 @@ class Experiment(object):
                     "torch":torch
                 },
                 {
-                    **self.inputs.data_vars(),
+                    **self.xr_inputs.data_vars(),
                     **self.inputs.data.dims,
                     "mask":mask,
                     "prediction": prediction
@@ -2793,10 +2793,9 @@ class RandomForest_Comparison(Experiment):
         # Pass inputs to device
         self.inputs.pass_to_device()
         # Keep a separate copy of inputs that is cast to xarray
-        # self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
-        # self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
         self.inputs.cast_to_xarray(datasets = [
-            'ground_truth_table',
             'train_cells_mask',
             'test_cells_mask',
             'validation_cells_mask'
@@ -2945,7 +2944,6 @@ class RandomForest_Comparison(Experiment):
                 intensity_xr
             )
 
-            print(intensity_xr.where(evaluation_mask, drop=True))
             # Clean and write to file
             self.write_data(
                 intensity = intensity_xr,
