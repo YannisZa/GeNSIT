@@ -400,7 +400,8 @@ class Experiment(object):
             learning_model = globals()[learning_model](
                 trial = trial,
                 config = config,
-                logger = self.logger
+                logger = self.logger,
+                **kwargs
             )
         elif learning_model == 'GAT_Model':
             learning_model = GAT_Model(
@@ -704,6 +705,8 @@ class Experiment(object):
         extend the dataset size prior to writing; this way, the newly written
         data is always in the last row of the dataset.
         '''
+        index = kwargs.get('index',-1)
+        n_samples = kwargs.get('n_samples',1)
         if self.config.settings['experiments'][0].get('export_samples',True):
             self.logger.debug('Writing data')
             if self._time >= self._write_start and self._time % self._write_every == 0:
@@ -712,21 +715,21 @@ class Experiment(object):
                         # Store samples
                         _loss_sample = kwargs.get(loss_name,None)
                         _loss_sample = _loss_sample.clone().detach().cpu().numpy().item() if _loss_sample is not None else None
-                        getattr(self,loss_name).resize(getattr(self,loss_name).shape[0] + 1, axis = 0)
-                        getattr(self,loss_name)[-1] = _loss_sample
+                        getattr(self,loss_name).resize(getattr(self,loss_name).shape[0] + n_samples, axis = 0)
+                        getattr(self,loss_name)[index] = _loss_sample
 
                 if 'theta' in self.output_names:
                     _theta_sample = kwargs.get('theta',[None]*len(self.thetas))
                     _theta_sample = _theta_sample.clone().detach().cpu() if _theta_sample is not None else None
                     for idx, dset in enumerate(self.thetas):
-                        dset.resize(dset.shape[0] + 1, axis = 0)
-                        dset[-1] = _theta_sample[idx]
+                        dset.resize(dset.shape[0] + n_samples, axis = 0)
+                        dset[index] = _theta_sample[idx]
 
                 for sample in ['r2','log_posterior_approximation']:
                     if sample in self.output_names:
                         sample_value = kwargs.get(sample,None)
                         sample_value = sample_value.clone().detach().cpu() if sample_value is not None else None
-                        getattr(self,sample)[kwargs['index']] = sample_value
+                        getattr(self,sample)[index] = sample_value
 
                 for sample in [
                     'log_destination_attraction','sign','table', 'intensity',
@@ -739,9 +742,9 @@ class Experiment(object):
                             if torch.is_tensor(sample_value) \
                             else sample_value
                         # Resize h5 data
-                        getattr(self,sample).resize(getattr(self,sample).shape[0] + 1, axis = 0)
+                        getattr(self,sample).resize(getattr(self,sample).shape[0] + n_samples, axis = 0)
                         # Store latest sample
-                        getattr(self,sample)[-1] = sample_value
+                        getattr(self,sample)[index] = sample_value
 
 
     def print_initialisations(self,parameter_inits,print_lengths:bool = True,print_values:bool = False):
@@ -788,7 +791,7 @@ class Experiment(object):
                     "torch":torch
                 },
                 {
-                    **self.xr_inputs.data_vars(),
+                    **self.inputs.data_vars(),
                     **self.inputs.data.dims,
                     "mask":mask,
                     "prediction": prediction
@@ -2790,8 +2793,16 @@ class RandomForest_Comparison(Experiment):
         # Pass inputs to device
         self.inputs.pass_to_device()
         # Keep a separate copy of inputs that is cast to xarray
-        self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
-        self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        # self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
+        # self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.inputs.cast_to_xarray(datasets = [
+            'ground_truth_table',
+            'train_cells_mask',
+            'test_cells_mask',
+            'validation_cells_mask'
+        ])
+
+        self.logger.progress('casted to xarray')
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2837,6 +2848,7 @@ class RandomForest_Comparison(Experiment):
             'RF_Model',
             config = self.config,
             trial = trial,
+            verbose = 10,
             **kwargs
         )
         # Get and remove config
@@ -2850,6 +2862,8 @@ class RandomForest_Comparison(Experiment):
         
         # Store number of samples
         self._time = 1
+        # Store number of samples
+        N = self.config.settings['training']['N']
 
         # Get covariates/features
         # features_max = self.inputs.data.region_features.max(dim=0).values
@@ -2878,12 +2892,12 @@ class RandomForest_Comparison(Experiment):
             "origin": np.arange(1,self.inputs.data.dims['origin']+1,1,dtype='int32'),
             "destination": np.arange(1,self.inputs.data.dims['destination']+1,1,dtype='int32'),
         }
-
         # Create output array
         intensity_xr = xr.DataArray(
             torch.zeros(self.inputs.data.dims['origin'],self.inputs.data.dims['destination']),
             coords = coordinates
         )
+
         # Update train cells
         intensity_xr = xr.where(
             self.inputs.data.train_cells_mask,
@@ -2893,46 +2907,60 @@ class RandomForest_Comparison(Experiment):
 
         # Initialise validation metrics
         validation_metrics = []
-
-        # Track the epoch training time
-        start_time = time.time()
-
+        
         # Train
-        intensity = self.learning_model.run_single(
+        self.learning_model.train(
             train_x = train_x,
-            train_y = train_y,
-            test_x = evaluation_x
+            train_y = train_y
         )
+        
+        # For each estimator
+        for i in tqdm(
+            range(N),
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
+            desc = f"{self.__class__.__name__} instance: {self.position}"
+        ):
+            # Track the epoch training time
+            start_time = time.time()
 
-        # Populate output array at evaluation index
-        intensity = populate_array(
-            shape = unpack_dims(self.inputs.data.dims,time_dims=False),
-            index = evaluation_index,
-            res = intensity
-        )
-
-        # Update test cells
-        intensity_xr = xr.where(
-            evaluation_mask,
-            intensity,
-            intensity_xr
-        )
-
-        # Clean and write to file
-        self.write_data(
-            intensity = intensity_xr,
-            compute_time = time.time() - start_time
-        )
-        self._time += 1
-
-        # Update optuna progress
-        validation_metrics.append(
-            self.update_optimisation_progress(
-                index = 0,
-                prediction = intensity_xr, 
-                mask = evaluation_mask
+            # Predict
+            intensity = self.learning_model.predict_single(
+                test_x = evaluation_x,
+                estimator_index = i
             )
-        )
+
+            # Populate output array at evaluation index
+            intensity = populate_array(
+                shape = unpack_dims(self.inputs.data.dims,time_dims=False),
+                index = evaluation_index.T,
+                res = intensity
+            )
+
+            # Update test cells
+            intensity_xr = xr.where(
+                evaluation_mask,
+                intensity,
+                intensity_xr
+            )
+
+            print(intensity_xr.where(evaluation_mask, drop=True))
+            # Clean and write to file
+            self.write_data(
+                intensity = intensity_xr,
+                compute_time = time.time() - start_time
+            )
+            self._time += 1
+
+            # Update optuna progress
+            validation_metrics.append(
+                self.update_optimisation_progress(
+                    index = 0,
+                    prediction = intensity_xr, 
+                    mask = evaluation_mask
+                )
+            )
     
         # Update metadata
         self.show_progress()
