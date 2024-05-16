@@ -108,7 +108,6 @@ load_experiment = ''
       ['table_likelihood_loss'],
       ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
     ]
-  
   [neural_network.loss.loss_function.sweep]
     default = ['custom']
     range = [
@@ -117,46 +116,50 @@ load_experiment = ''
     ]
     coupled = true
     target_name = 'loss_name'
-
-  [neural_network.loss.loss_kwargs.sweep]
-    coupled = true
-    target_name = 'loss_name'
-    [neural_network.loss.loss_kwargs.sweep.default]
-      nokey = nan
-    [[neural_network.loss.loss_kwargs.sweep.range]]
-      nokey = nan
-    [[neural_network.loss.loss_kwargs.sweep.range]]
-      noise_percentage = nan
-
   [neural_network.hyperparameters]
-    num_hidden_layers = +5
+    num_hidden_layers = +1
     optimizer = 'Adam'
-    learning_rate = +0.0000534563395155105
+    learning_rate = +0.002
     [neural_network.hyperparameters.biases]
-      default = 2.026003035
+      default = [0.0,4.0]
       [neural_network.hyperparameters.biases.layer_specific]
-        0 = 2.026003035
-        1 = 0.957112068
-        2 = 1.487798921
-        3 = 0.845822705
-        4 = 3.910202558
     [neural_network.hyperparameters.nodes_per_layer]
-      default = 17
+      default = 20
       [neural_network.hyperparameters.nodes_per_layer.layer_specific]
-        0 = 17
-        1 = 25
-        2 = 21
-        3 = 13
-        4 = 9
     [neural_network.hyperparameters.activation_funcs]
-      default = 'hardsigmoid'
+      default = 'linear'
       [neural_network.hyperparameters.activation_funcs.layer_specific]
-        0 = 'hardsigmoid'
-        1 = 'relu'
-        2 = 'hardsigmoid'
-        3 = 'relu'
-        4 = 'linear'
-        5 = 'linear'
+        1 = 'abs'
+
+  # [neural_network.hyperparameters]
+  #   num_hidden_layers = +5
+  #   optimizer = 'Adam'
+  #   learning_rate = +0.0000534563395155105
+  #   [neural_network.hyperparameters.biases]
+  #     default = 2.026003035
+  #     [neural_network.hyperparameters.biases.layer_specific]
+  #       0 = 2.026003035
+  #       1 = 0.957112068
+  #       2 = 1.487798921
+  #       3 = 0.845822705
+  #       4 = 3.910202558
+  #   [neural_network.hyperparameters.nodes_per_layer]
+  #     default = 17
+  #     [neural_network.hyperparameters.nodes_per_layer.layer_specific]
+  #       0 = 17
+  #       1 = 25
+  #       2 = 21
+  #       3 = 13
+  #       4 = 9
+  #   [neural_network.hyperparameters.activation_funcs]
+  #     default = 'hardsigmoid'
+  #     [neural_network.hyperparameters.activation_funcs.layer_specific]
+  #       0 = 'hardsigmoid'
+  #       1 = 'relu'
+  #       2 = 'hardsigmoid'
+  #       3 = 'relu'
+  #       4 = 'linear'
+  #       5 = 'linear'
 
 [[experiments]]
   type = 'JointTableSIM_NN'
