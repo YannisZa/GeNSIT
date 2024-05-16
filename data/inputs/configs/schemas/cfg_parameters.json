@@ -398,12 +398,6 @@
   "random_forest": {
     "disable_tqdm": true,
     "hyperparameters": {
-      "rf_n_estimators": {
-        "sweep": {
-          "default": true,
-          "range": true
-        }
-      },
       "rf_oob_score": {
         "sweep": {
           "default": true,
@@ -433,12 +427,6 @@
   "gradient_boosted_regression_trees": {
     "disable_tqdm": true,
     "hyperparameters": {
-      "gbrt_n_estimators": {
-        "sweep": {
-          "default": true,
-          "range": true
-        }
-      },
       "gbrt_max_depth": {
         "sweep": {
           "default": true,
@@ -462,12 +450,6 @@
   "xgboost": {
     "disable_tqdm": true,
     "hyperparameters": {
-      "xg_n_estimators": {
-        "sweep": {
-          "default": true,
-          "range": true
-        }
-      },
       "xg_max_depth": {
         "sweep": {
           "default": true,

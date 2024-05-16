@@ -15,7 +15,8 @@ load_experiment = ''
   
 [inputs.data]
     [inputs.data.region_features]
-      file = 'region_features.npy'
+      file = 'mini_region_features.npy'
+      # 'region_features.npy'
     [inputs.data.adjacency_matrix]
       file = 'adjacency_matrix.txt'
     [inputs.data.origin_demand]
@@ -42,7 +43,7 @@ load_experiment = ''
 [training]
   num_steps = +1
   batch_size = +1000
-  N = 100000
+  N = 1000
   intensity_model = 'spatial_interaction_model'
   physics_model = 'harris_wilson_model'
   
@@ -55,7 +56,6 @@ load_experiment = ''
 [xgboost]
   disable_tqdm = true
   [xgboost.hyperparameters]
-    xg_n_estimators = 60
     xg_max_depth = 4
     xg_learning_rate = 0.5473698638379005
     xg_objective = 'reg:squarederror'
@@ -71,7 +71,6 @@ load_experiment = ''
 [random_forest]
   disable_tqdm = true
   [random_forest.hyperparameters]
-    rf_n_estimators = 60
     rf_max_depth = 2
     rf_min_samples_split = 22
     rf_min_samples_leaf = 21
@@ -81,7 +80,6 @@ load_experiment = ''
 [gradient_boosted_regression_trees]
   disable_tqdm = true
   [gradient_boosted_regression_trees.hyperparameters]
-    gbrt_n_estimators = 10
     gbrt_max_depth = 8
     gbrt_min_samples_split = 92
     gbrt_min_samples_leaf = 16

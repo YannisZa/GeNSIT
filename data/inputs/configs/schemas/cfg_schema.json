@@ -1821,26 +1821,6 @@
       "optional": true,
       "exclude": false,
 
-      "xg_n_estimators": {
-        "sweepable": true,
-        "optional": true,
-        "exclude": false,
-
-        "sweep": {
-          "default": {
-            "dtype": "int",
-            "default-value": 1,
-            "valid-range": [1, null]
-          },
-          "range": {
-            "dtype": "list",
-            "list-dtype": "int",
-            "default-value": 1,
-            "valid-range": [1, null],
-            "unique-vals": true
-          }
-        }
-      },
       "xg_max_depth": {
         "sweepable": true,
         "optional": true,
@@ -2074,26 +2054,6 @@
       "optional": true,
       "exclude": false,
 
-      "rf_n_estimators": {
-        "sweepable": true,
-        "optional": true,
-        "exclude": false,
-
-        "sweep": {
-          "default": {
-            "dtype": "int",
-            "default-value": 100,
-            "valid-range": [1, null]
-          },
-          "range": {
-            "dtype": "list",
-            "list-dtype": "int",
-            "default-value": 100,
-            "valid-range": [1, null],
-            "unique-vals": true
-          }
-        }
-      },
       "rf_oob_score": {
         "sweepable": true,
         "optional": true,
@@ -2193,26 +2153,6 @@
       "optional": true,
       "exclude": false,
 
-      "gbrt_n_estimators": {
-        "sweepable": true,
-        "optional": true,
-        "exclude": false,
-
-        "sweep": {
-          "default": {
-            "dtype": "int",
-            "default-value": 3,
-            "valid-range": [1, null]
-          },
-          "range": {
-            "dtype": "list",
-            "list-dtype": "int",
-            "default-value": 3,
-            "valid-range": [1, null],
-            "unique-vals": true
-          }
-        }
-      },
       "gbrt_max_depth": {
         "sweepable": true,
         "optional": true,
