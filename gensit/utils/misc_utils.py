@@ -1600,12 +1600,14 @@ def create_mask(shape,index):
 def populate_array(shape,index,res):
     # Create an empty output array
     arr = np.zeros(shape,dtype='float32')
+    
     # Flatten the indices and values arrays
-    flat_indices = np.ravel_multi_index(index, shape[1:])
-    flat_indices = np.repeat(flat_indices[np.newaxis,:],shape[0],axis=0)
+    flat_indices = np.ravel_multi_index(index, shape)
+    
     # Use np.unravel_index to convert flattened indices back to multi-dimensional indices
     multi_indices = np.unravel_index(flat_indices, shape)
+    
     # Assign values to the output array using tuple indexing
-    arr[multi_indices] = res.reshape(res.shape[0],np.prod(res.shape[1:]))
+    arr[multi_indices] = res.flatten()
 
     return arr
