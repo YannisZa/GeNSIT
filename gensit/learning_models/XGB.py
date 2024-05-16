@@ -9,15 +9,13 @@ from sklearn.utils.validation import check_is_fitted
 
 from gensit.config import Config
 from gensit.utils.exceptions import *
-from gensit.utils.misc_utils import setup_logger, fn_name, eval_dtype
-from gensit.static.global_variables import ACTIVATION_FUNCS, OPTIMIZERS, LOSS_FUNCTIONS, LOSS_DATA_REQUIREMENTS, LOSS_KWARG_OPERATIONS
+from gensit.utils.misc_utils import setup_logger
 
 
 MODEL_TYPE = 'xgboost'
 MODEL_PREFIX = 'xg_'
 
 DEFAULT_HYPERPARAMS = {
-    'n_estimators': 1,
     'max_depth': 8,
     'learning_rate': 0.5, 
     'eval_metric': 'rmse',
@@ -37,6 +35,7 @@ class XGB_Model(object):
         *,
         trial: optuna.trial,
         config: Config,
+        logger,
         **kwargs
     ):  
         # Setup logger
@@ -45,7 +44,7 @@ class XGB_Model(object):
             __name__+kwargs.get('instance',''),
             console_level = level,
             
-        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        ) if kwargs.get('logger',None) is None else logger
         # Update logger level
         self.logger.setLevels( console_level = level )
         
@@ -77,6 +76,7 @@ class XGB_Model(object):
                 'min_child_weight': self.trial.suggest_float('min_child_weight', 1.0, 10.0)
             } 
         
+        self.hyperparams['n_estimators'] = 1
         for pname in DEFAULT_HYPERPARAMS.keys():
             if self.trial is not None and pname in OPTUNA_HYPERPARAMS:
                 self.hyperparams[pname] = OPTUNA_HYPERPARAMS[pname]
@@ -89,19 +89,12 @@ class XGB_Model(object):
                 # Update object and config hyperparameters
                 self.config[self.model_type]['hyperparameters'][(self.model_prefix+pname)] = self.hyperparams[pname]
 
-
     def train(self, train_x, train_y, **kwargs):
-        self.xgboost_model.fit(
-            train_x,
-            train_y,
-            eval_set = [(train_x, train_y)],
-            xgb_model = kwargs.get('trained_model',None),
-            verbose = False
-        )
+        self.xgboost_model.fit(X = train_x, y = train_y,**kwargs)
 
     def predict(self, test_x):
         return self.xgboost_model.predict(test_x)
-
+    
     def run_single(self,train_x,train_y,test_x):
         # Get previously trained model if one has been fitted
         try:
@@ -114,13 +107,14 @@ class XGB_Model(object):
         self.train(
             train_x = train_x,
             train_y = train_y,
-            trained_model = trained_model
+            xgb_model = trained_model
         )
         
         # Test (predict)
         intensity = self.predict(
             test_x = test_x
         )
+
         return intensity
         
     def __repr__(self):

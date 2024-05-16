@@ -14,7 +14,6 @@ MODEL_TYPE = 'gradient_boosted_regression_trees'
 MODEL_PREFIX = 'gbrt_'
 
 DEFAULT_HYPERPARAMS = {
-    'n_estimators': 3,
     'max_depth': None,
     'min_samples_split': 10,
     'min_samples_leaf': 1
@@ -27,6 +26,7 @@ class GBRT_Model(object):
         *,
         config: Config,
         trial: optuna.trial,
+        logger,
         **kwargs
     ):
         # Setup logger
@@ -35,7 +35,7 @@ class GBRT_Model(object):
             __name__+kwargs.get('instance',''),
             console_level = level,
             
-        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        ) if kwargs.get('logger',None) is None else logger
         # Update logger level
         self.logger.setLevels( console_level = level )
         
@@ -52,7 +52,8 @@ class GBRT_Model(object):
         
         # Initialise Gradient Boosted Trees Regressor
         self.gbrt = GradientBoostingRegressor(
-            **{k.replace('gbrt_',''):v for k,v in self.hyperparams.items()}
+            **{k.replace('gbrt_',''):v for k,v in self.hyperparams.items()},
+            **kwargs
         )
 
     def update_hyperparameters(self):
@@ -66,6 +67,7 @@ class GBRT_Model(object):
                 'min_samples_leaf': self.trial.suggest_int('min_samples_leaf', 1, 50, step = 5),
             }
         
+        self.hyperparams['n_estimators'] = self.config['training']['N']
         for pname in DEFAULT_HYPERPARAMS.keys():
             if self.trial is not None and pname in OPTUNA_HYPERPARAMS:
                 self.hyperparams[pname] = OPTUNA_HYPERPARAMS[pname]
@@ -79,28 +81,11 @@ class GBRT_Model(object):
                 self.config[self.model_type]['hyperparameters'][(self.model_prefix+pname)] = self.hyperparams[pname]
 
     def train(self, train_x, train_y, **kwargs):
-        # Train
-        return self.gbrt.fit(
-            X = train_x,
-            y = train_y
-        )
-
-    def predict(self, test_x):
-        return self.gbrt.predict(test_x)
+        self.gbrt.fit(X = train_x,y = train_y)
     
-    def run_single(self,train_x,train_y,test_x):
-        # Train
-        self.train(
-            train_x = train_x,
-            train_y = train_y
-        )
-        
-        # Test (predict)
-        intensity = self.predict(
-            test_x = test_x
-        )
-        return intensity
-
+    def predict_single(self, test_x, estimator_index):
+        return self.gbrt.estimators_[estimator_index].predict(test_x)
+    
     def __repr__(self):
         return self.gbrt.__repr__()
     

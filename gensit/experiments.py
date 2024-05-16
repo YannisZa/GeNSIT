@@ -1299,6 +1299,11 @@ class SIM_MCMC(Experiment):
         # Keep a separate copy of inputs that is cast to xarray
         self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
         self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.inputs.cast_to_xarray(datasets = [
+            'train_cells_mask',
+            'test_cells_mask',
+            'validation_cells_mask'
+        ])
 
         # Create outputs
         self.outputs = Outputs(
@@ -1491,6 +1496,11 @@ class JointTableSIM_MCMC(Experiment):
         # Keep a separate copy of inputs that is cast to xarray
         self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
         self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.inputs.cast_to_xarray(datasets = [
+            'train_cells_mask',
+            'test_cells_mask',
+            'validation_cells_mask'
+        ])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -1905,6 +1915,11 @@ class SIM_NN(Experiment):
         # Keep a separate copy of inputs that is cast to xarray
         self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
         self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.inputs.cast_to_xarray(datasets = [
+            'train_cells_mask',
+            'test_cells_mask',
+            'validation_cells_mask'
+        ])
 
         # Create outputs
         self.outputs = Outputs(
@@ -2112,6 +2127,11 @@ class NonJointTableSIM_NN(Experiment):
         # Keep a separate copy of inputs that is cast to xarray
         self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
         self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.inputs.cast_to_xarray(datasets = [
+            'train_cells_mask',
+            'test_cells_mask',
+            'validation_cells_mask'
+        ])
         
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2355,6 +2375,11 @@ class JointTableSIM_NN(Experiment):
         # Keep a separate copy of inputs that is cast to xarray
         self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
         self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.inputs.cast_to_xarray(datasets = [
+            'train_cells_mask',
+            'test_cells_mask',
+            'validation_cells_mask'
+        ])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2608,6 +2633,11 @@ class XGBoost_Comparison(Experiment):
         # Keep a separate copy of inputs that is cast to xarray
         self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
         self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.inputs.cast_to_xarray(datasets = [
+            'train_cells_mask',
+            'test_cells_mask',
+            'validation_cells_mask'
+        ])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -2663,10 +2693,11 @@ class XGBoost_Comparison(Experiment):
 
         # Initialise data structures
         self.initialise_data_structures()
-    
+        
+        # Store current iteration number
+        self._time = 1
         # Store number of samples
         N = self.config['training']['N']
-        self._time = 1
 
         # Get covariates/features
         features_max = self.inputs.data.region_features.max(dim=0).values
@@ -2731,7 +2762,7 @@ class XGBoost_Comparison(Experiment):
             # Populate output array at evaluation index
             intensity = populate_array(
                 shape = unpack_dims(self.inputs.data.dims,time_dims=False),
-                index = evaluation_index,
+                index = evaluation_index.T,
                 res = intensity
             )
 
@@ -2859,10 +2890,10 @@ class RandomForest_Comparison(Experiment):
         # Initialise data structures
         self.initialise_data_structures()
         
-        # Store number of samples
+        # Store current iteration number
         self._time = 1
         # Store number of samples
-        N = self.config.settings['training']['N']
+        N = self.config['training']['N']
 
         # Get covariates/features
         # features_max = self.inputs.data.region_features.max(dim=0).values
@@ -2997,6 +3028,11 @@ class GBRT_Comparison(Experiment):
         # Keep a separate copy of inputs that is cast to xarray
         self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
         self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.inputs.cast_to_xarray(datasets = [
+            'train_cells_mask',
+            'test_cells_mask',
+            'validation_cells_mask'
+        ])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -3042,6 +3078,7 @@ class GBRT_Comparison(Experiment):
             'GBRT_Model',
             config = self.config,
             trial = trial,
+            verbose = 10,
             **kwargs
         )
         # Get and remove config
@@ -3053,8 +3090,10 @@ class GBRT_Comparison(Experiment):
         # Initialise data structures
         self.initialise_data_structures()
         
-        # Store number of samples
+        # Store current iteration number
         self._time = 1
+        # Store number of samples
+        N = self.config['training']['N']
 
         # Get covariates/features
         # features_max = self.inputs.data.region_features.max(dim=0).values
@@ -3099,45 +3138,58 @@ class GBRT_Comparison(Experiment):
         # Initialise validation metrics
         validation_metrics = []
 
-        # Track the epoch training time
-        start_time = time.time()
-
         # Train
-        intensity = self.learning_model.run_single(
+        self.learning_model.train(
             train_x = train_x,
-            train_y = train_y,
-            test_x = evaluation_x
+            train_y = train_y
         )
+        
+        # For each estimator
+        for i in tqdm(
+            range(N),
+            disable = self.tqdm_disabled,
+            leave = False,
+            position = self.position,
+            desc = f"{self.__class__.__name__} instance: {self.position}"
+        ):
+            # Track the epoch training time
+            start_time = time.time()
 
-        # Populate output array at evaluation index
-        intensity = populate_array(
-            shape = unpack_dims(self.inputs.data.dims,time_dims=False),
-            index = evaluation_index,
-            res = intensity
-        )
-
-        # Update test cells
-        intensity_xr = xr.where(
-            evaluation_mask,
-            intensity,
-            intensity_xr
-        )
-
-        # Clean and write to file
-        self.write_data(
-            intensity = intensity_xr,
-            compute_time = time.time() - start_time
-        )
-        self._time += 1
-
-        # Update optuna progress
-        validation_metrics.append(
-            self.update_optimisation_progress(
-                index = 0,
-                prediction = intensity_xr, 
-                mask = evaluation_mask
+            # Predict
+            intensity = self.learning_model.predict_single(
+                test_x = evaluation_x,
+                estimator_index = i
             )
-        )
+
+            # Populate output array at evaluation index
+            intensity = populate_array(
+                shape = unpack_dims(self.inputs.data.dims,time_dims=False),
+                index = evaluation_index.T,
+                res = intensity
+            )
+
+            # Update test cells
+            intensity_xr = xr.where(
+                evaluation_mask,
+                intensity,
+                intensity_xr
+            )
+
+            # Clean and write to file
+            self.write_data(
+                intensity = intensity_xr,
+                compute_time = time.time() - start_time
+            )
+            self._time += 1
+
+            # Update optuna progress
+            validation_metrics.append(
+                self.update_optimisation_progress(
+                    index = 0,
+                    prediction = intensity_xr, 
+                    mask = evaluation_mask
+                )
+            )
     
         # Update metadata
         self.show_progress()
@@ -3177,6 +3229,11 @@ class GraphAttentionNetwork_Comparison(Experiment):
         # Keep a separate copy of inputs that is cast to xarray
         self.xr_inputs = self.inputs.copy(datasets=['dims','ground_truth_table'])
         self.xr_inputs.cast_to_xarray(datasets = ['ground_truth_table'])
+        self.inputs.cast_to_xarray(datasets = [
+            'train_cells_mask',
+            'test_cells_mask',
+            'validation_cells_mask'
+        ])
 
         # Build contingency table
         self.logger.note("Initializing the contingency table ...")
@@ -3262,10 +3319,10 @@ class GraphAttentionNetwork_Comparison(Experiment):
         # Initialise data structures
         self.initialise_data_structures()
         
-        # Store time
+        # Store current iteration number
         self._time = 1
         # Store number of samples
-        N = self.config.settings['training']['N']
+        N = self.config['training']['N']
         
         # Get training and evaluation cells
         train_index = self.inputs.data.train_cells
@@ -3332,7 +3389,7 @@ class GraphAttentionNetwork_Comparison(Experiment):
             # Populate output array at evaluation index
             intensity = populate_array(
                 shape = unpack_dims(self.inputs.data.dims,time_dims=False),
-                index = evaluation_index,
+                index = evaluation_index.T,
                 res = intensity
             )
 

@@ -1,12 +1,8 @@
 import sys
 import json
 import optuna
-import numpy as np
 
-from copy import deepcopy
-from sklearn.exceptions import NotFittedError
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.utils.validation import check_is_fitted
 
 from gensit.config import Config
 from gensit.utils.exceptions import *
@@ -87,7 +83,7 @@ class RF_Model(object):
         
 
     def train(self, train_x, train_y, **kwargs):
-        self.random_forest.fit(train_x, train_y)
+        self.random_forest.fit(X = train_x, y = train_y)
     
     def predict_single(self, test_x, estimator_index):
         return self.random_forest.estimators_[estimator_index].predict(test_x)
