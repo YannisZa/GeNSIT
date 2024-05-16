@@ -459,7 +459,7 @@ class Outputs(object):
             dim_names = dim_names.split('+')
             # Get the intersection between available dims and specified dims
             dim_names = list(set(samples.dims).intersection(dim_names))
-
+            
             # if samples do not have these dimensions, carry on
             if len(dim_names) <= 0:
                 continue
@@ -523,7 +523,7 @@ class Outputs(object):
                 for d in dim_names: 
                     sliced_dims.add(d)
                 sliced_settings.add(str(slice_setts))
-                sliced_new_shape = ({k:v for k,v in dict(samples.sizes).items() if v > 1})
+                sliced_new_shape = ({k:v for k,v in dict(sliced_samples.sizes).items() if v > 1})
                     # if d not in sliced_dims:
                     #     sliced_dims[d] = {"slice_settings":slice_setts,"new_shape":({k:v for k,v in dict(samples.sizes).items() if v > 1})}
                 # Update current samples to be the sliced samples
