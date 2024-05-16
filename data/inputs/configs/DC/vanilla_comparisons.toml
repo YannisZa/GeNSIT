@@ -86,7 +86,7 @@ load_experiment = ''
 
 
 [graph_attention_network]
-  disable_tqdm = false
+  disable_tqdm = true
   [graph_attention_network.hyperparameters]
     gat_nodes_per_layer = 32
     gat_num_hidden_layers = 1
