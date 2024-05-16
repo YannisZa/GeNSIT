@@ -81,7 +81,7 @@ class GAT_Model(nn.Module):
         # Graph
         self.graph = graph
         # tqdm flag
-        self.tqdm_disabled = kwargs.get('disable_tqdm',False)
+        self.tqdm_disabled = self.config['graph_attention_network'].get('disable_tqdm',False)
 
         # init super class
         super().__init__()
