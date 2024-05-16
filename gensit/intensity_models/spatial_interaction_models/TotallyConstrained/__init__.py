@@ -84,10 +84,6 @@ def log_flow_matrix(**kwargs):
     log_destination_attraction = kwargs['log_destination_attraction']
     alpha = kwargs['alpha']
     beta = kwargs['beta']
-
-    # Get iteration dims
-    iter_dims = [x for x in alpha.dims if x in ['iter','seed','N']]
-    iter_sizes = [dict(alpha.sizes)[x] for x in alpha.dims]
     
     # Extract dimensions
     origin,destination = cost_matrix.size(dim = 0), cost_matrix.size(dim = 1)
@@ -95,11 +91,17 @@ def log_flow_matrix(**kwargs):
     # If input is torch use the following code
     if tensor:
         if log_destination_attraction.ndim > 2:
+            iter_sizes = [log_destination_attraction.size(dim = 0)]
             sweep = log_destination_attraction.size(dim = 2)
         else:
+            iter_sizes = [1]
             sweep = 1
     # If input is xarray use the following code
     else:
+        # Get iteration dims
+        iter_dims = [x for x in alpha.dims if x in ['iter','seed','N']]
+        iter_sizes = [dict(alpha.sizes)[x] for x in alpha.dims]
+
         # Create dummy sweep coordinate
         if 'sweep' not in log_destination_attraction.dims:
             log_destination_attraction = log_destination_attraction.expand_dims(
