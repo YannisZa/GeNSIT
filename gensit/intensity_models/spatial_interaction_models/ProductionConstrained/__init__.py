@@ -168,9 +168,6 @@ def log_flow_matrix(**kwargs):
         # Return torch tensor
         return log_flow
     else:
-        print('log_flow',log_flow.shape)
-        print(dims)
-        print({k:coords[k] for k in dims})
         # Create outputs xr data array
         return xr.DataArray(
             data = log_flow.detach().cpu().numpy(), 
