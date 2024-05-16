@@ -68,18 +68,24 @@ clear; gensit run ./data/inputs/configs/DC/experiment1_mcmc_low_noise.toml -et J
 clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et RandomForest_Comparison -nt 15 -nw 2 -rf 'mini_region_features.npy' -ttl '_doubly_and_cell_constrained_mini_region_features'
 
 
+
 clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et RandomForest_Comparison -nt 15 -nw 2 -rf 'region_features.npy' -ttl '_doubly_and_cell_constrained_all_region_features'
 
-
 clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et GBRT_Comparison -nt 15 -nw 2 -rf 'mini_region_features.npy' -ttl '_doubly_and_cell_constrained_mini_region_features'
+
+
+
 
 clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et GBRT_Comparison -nt 15 -nw 2 -rf 'region_features.npy' -ttl '_doubly_and_cell_constrained_all_region_features'
 
 clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et XGBoost_Comparison -nt 15 -nw 2 -rf 'mini_region_features.npy' -ttl '_doubly_and_cell_constrained_mini_region_features'
 
-
-
 clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et XGBoost_Comparison -nt 15 -nw 2 -rf 'region_features.npy' -ttl '_doubly_and_cell_constrained_all_region_features'
+
+clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et GraphAttentionNetwork_Comparison -nt 15 -nw 2 -rf 'mini_region_features.npy' -ttl '_doubly_and_cell_constrained_mini_region_features'
+
+clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et GraphAttentionNetwork_Comparison -nt 15 -nw 2 -rf 'region_features.npy' -ttl '_doubly_and_cell_constrained_all_region_features'
+
 
 ```
 
@@ -271,26 +277,40 @@ clear; gensit summarise -dn DC/exp1 -et JointTableSIM_NN \
 
 #### Coverage Probabilities
 
-Get coverage probabilities for all samples and all experiments:
+Get coverage probabilities for intensity samples and my experiments:
 
+-et SIM_NN -et JointTableSIM_NN -et NonJointTableSIM_NN
 ```
-clear; gensit summarise \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
--et SIM_NN -et SIM_MCMC -et JointTableSIM_NN -et JointTableSIM_MCMC -et NonJointTableSIM_NN  \ \
+clear; gensit summarise -dn DC/exp1 -et SIM_NN \
 -el np -el MathUtils -el xr \
--e intensity_coverage "xr.apply_ufunc(roundint, 100*intensity_covered.mean(['origin','destination']))" \
--e table_coverage "xr.apply_ufunc(roundint, 100*table_covered.mean(['origin','destination']))" \
--ea table -ea intensity \
+-e intensity_cp_all_mean "intensity_cp_all_mean_by_seed" \
+-e intensity_cp_all_std "intensity_cp_all_std_by_seed" \
+-e intensity_cp_train_mean "intensity_cp_train_mean_by_seed" \
+-e intensity_cp_train_std "intensity_cp_train_std_by_seed" \
+-e intensity_cp_test_mean "intensity_cp_test_mean_by_seed" \
+-e intensity_cp_test_std "intensity_cp_test_std_by_seed" \
+-ea intensity \
+-ea "test_cells=outputs.get_sample('test_cells')" \
+-ea "train_cells=outputs.get_sample('train_cells')" \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
--ea "coverage_func=MathUtils.coverage_probability" \
--ea "region_masses=[0.99]" \
+-ea "cp_func=MathUtils.coverage_probability" \
 -ea "roundint=MathUtils.roundint" \
--ea "intensity_covered=coverage_func(prediction=intensity,ground_truth=ground_truth,region_mass=region_masses)" \
--ea "table_covered=coverage_func(prediction=table,ground_truth=ground_truth,region_mass=region_masses)" \
--cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
--k sigma -k type -k name -k title \
--fe CoverageProbabilities -nw 20
+-ea "region_masses=0.99" \
+-ea "intensity_stacked=intensity.stack(id=['iter'])" \
+-ea "intensity_cp_all=intensity_stacked.groupby('seed').map(cp_func,ground_truth=ground_truth,region_mass=region_masses)" \
+-ea "intensity_cp_train=intensity_stacked.groupby('seed').map(cp_func,ground_truth=ground_truth,mask=outputs.inputs.data.train_cells_mask,region_mass=region_masses)" \
+-ea "intensity_cp_test=intensity_stacked.groupby('seed').map(cp_func,ground_truth=ground_truth,mask=outputs.inputs.data.test_cells_mask,region_mass=region_masses)" \
+-ea "intensity_cp_all_mean_by_seed=xr.apply_ufunc(roundint, 100*intensity_cp_all.mean(['origin','destination'])).mean('seed',dtype='float64',skipna=True)" \
+-ea "intensity_cp_train_mean_by_seed=xr.apply_ufunc(roundint, 100*intensity_cp_train.mean(['origin','destination'])).mean('seed',dtype='float64',skipna=True)" \
+-ea "intensity_cp_test_mean_by_seed=xr.apply_ufunc(roundint, 100*intensity_cp_test.mean(['origin','destination'])).mean('seed',dtype='float64',skipna=True)" \
+-ea "intensity_cp_all_std_by_seed=xr.apply_ufunc(roundint, 100*intensity_cp_all.mean(['origin','destination'])).std('seed',dtype='float64',skipna=True)" \
+-ea "intensity_cp_train_std_by_seed=xr.apply_ufunc(roundint, 100*intensity_cp_train.mean(['origin','destination'])).std('seed',dtype='float64',skipna=True)" \
+-ea "intensity_cp_test_std_by_seed=xr.apply_ufunc(roundint, 100*intensity_cp_test.mean(['origin','destination'])).std('seed',dtype='float64',skipna=True)" \
+-btt 'iter' 10000 9 10000 \
+-k type -k title -fe intensity_CoverageProbabilities -nw 2
 ```
+
+Get coverage probabilities for intensity samples and vanilla algorithm comparisons:
 
 ```
 clear; gensit summarise \
