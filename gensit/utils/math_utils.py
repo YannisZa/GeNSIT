@@ -245,17 +245,17 @@ def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     """
 
     mask = kwargs.get('mask',None)
+    if mask is not None:
+        # Apply mask
+        ground_truth = ground_truth.where(mask)
+        prediction = prediction.where(mask)
+
     # Compute denominator
     denominator = (ground_truth + prediction)
-    denominator = xr.where(denominator <= 0, 1., denominator)
     # Compute numerator
     numerator = 2*np.minimum(ground_truth,prediction)
     ratio = numerator / denominator
 
-    if mask is not None:
-        # Apply mask
-        ratio = ratio.where(mask)
-        
     # Compute SSI
     ssi = ratio.mean(dim=['origin','destination'],skipna=True)
     return ssi
@@ -278,6 +278,9 @@ def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,
     # Get region mass
     region_mass = kwargs.get('region_mass',0.95)
     
+    # Get iteration dimension name
+    dim = kwargs.get('dim','id')
+    
     # Get test mask
     mask = kwargs.get('mask',None)
     
@@ -291,12 +294,13 @@ def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,
     stacked_dims = deepcopy(prediction.dims)
 
     # Sort all samples by iteration-seed
-    prediction[:] = np.sort(prediction.values, axis = stacked_dims.index('id'))
+    prediction[:] = np.sort(prediction.values, axis = stacked_dims.index(dim))
     
     # Get lower and upper bound high posterior density regions
     lower_bound_hpdr,upper_bound_hpdr = calculate_min_interval(
         prediction,
-        alpha
+        alpha,
+        dim = dim
     )
     # Compute flag for whether ground truth table is covered
     cell_coverage = (ground_truth >= lower_bound_hpdr) & (ground_truth <= upper_bound_hpdr)
@@ -309,13 +313,14 @@ def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,
     return cell_coverage
 
 
-def calculate_min_interval(x, alpha):
+def calculate_min_interval(x, alpha, **kwargs):
     """
     Taken from https://github.com/aloctavodia/Doing_bayesian_data_analysis/blob/a34212340de7e2eb1723046dead980a3a13447ff/hpd.py#L7
     Internal method to determine the minimum interval of a given width
     Assumes that x is sorted numpy array.
     """
-    N = x.sizes['id']
+    dim = kwargs.get('dim','id')
+    N = x.sizes[dim]
     credible_interval_mass = 1.0-alpha
     
     # Get number of intervals within that mass
@@ -335,11 +340,11 @@ def calculate_min_interval(x, alpha):
         raise ValueError('Samples were not correctly sorted')
     
     # Make sure that the high posterior density interval is not zero
-    if interval_width.sizes['id'] == 0:
+    if interval_width.sizes[dim] == 0:
         raise ValueError('Too few elements for interval calculation')
     
     # Find indices of tails of high density region
-    min_idx = interval_width.argmin('id').unstack('space')
+    min_idx = interval_width.argmin(dim).unstack('space')
     max_idx = min_idx.copy(deep = True)
     max_idx[:] = min_idx[:] + interval_index0
     
@@ -347,8 +352,8 @@ def calculate_min_interval(x, alpha):
     x = x.unstack('space')
     
     # Get hpd boundaries
-    hdi_min = x.isel(id = min_idx)
-    hdi_max = x.isel(id = max_idx)
+    hdi_min = x.isel(**{dim:min_idx})
+    hdi_max = x.isel(**{dim:max_idx})
 
     return hdi_min, hdi_max
 
