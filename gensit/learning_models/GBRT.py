@@ -84,7 +84,7 @@ class GBRT_Model(object):
         self.gbrt.fit(X = train_x,y = train_y)
     
     def predict_single(self, test_x, estimator_index):
-        return self.gbrt.estimators_[estimator_index].predict(test_x)
+        return self.gbrt.estimators_.flatten()[estimator_index].predict(test_x)
     
     def __repr__(self):
         return self.gbrt.__repr__()
