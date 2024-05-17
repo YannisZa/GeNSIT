@@ -213,12 +213,12 @@ def srmse(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     prediction,ground_truth = xr.broadcast(prediction,ground_truth)
     prediction,ground_truth = xr.align(prediction,ground_truth, join='exact')
     mask = kwargs.get('mask',None)
-    
     if mask is not None:
         # Apply mask
         prediction = prediction.where(mask)
         ground_truth = ground_truth.where(mask)
     
+
     numerator = ( ((prediction - ground_truth)**2).sum(dim=['origin','destination'],skipna=True) / (~np.isnan(prediction)).sum()) ** 0.5
     denominator = ground_truth.sum(dim=['origin','destination'],skipna=True) / (~np.isnan(ground_truth)).sum()
     srmse = numerator / denominator
@@ -243,7 +243,10 @@ def ssi(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
         Standardised root mean square error of t_hat.
 
     """
-
+    prediction = prediction.astype('float32')
+    ground_truth = ground_truth.astype('float32')
+    prediction,ground_truth = xr.broadcast(prediction,ground_truth)
+    prediction,ground_truth = xr.align(prediction,ground_truth, join='exact')
     mask = kwargs.get('mask',None)
     if mask is not None:
         # Apply mask
