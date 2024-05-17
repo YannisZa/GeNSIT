@@ -340,7 +340,7 @@ class Outputs(object):
                 )
                 if successful_val_slices and index == 0:
                     # Announce successful coordinate value slices
-                    self.logger.success(f"Slicing {','.join(list(set(sample_name)))} using coordinate slice {str(successful_val_slices)} succeded")
+                    self.logger.success(f"Slicing {sample_name} using coordinate slice {str(successful_val_slices)} succeded")
             except Exception as exc:
                 # traceback.print_exc()
                 # If coordinate slice failed remove group from data collection
@@ -1234,6 +1234,16 @@ class Outputs(object):
                 # Extract sample name and data
                 sample_name = list(sample_dict.keys())[0]
                 sample_data = list(sample_dict.values())[0]
+                
+                # Slice data
+                if self.settings.get('slice',False):
+                    self.logger.warning(f"Slicing {sample_name} {dict(sample_data.sizes)} which has already been potentially sliced.")
+                    sample_data = self.slice_coordinates(
+                        sample_name = sample_name,
+                        index = group[1],
+                        samples = sample_data.astype(DATA_SCHEMA[sample_name]["dtype"])
+                    )
+
                 # append array to data arrays
                 if sample_data is not None:
                     data_arrs.append(sample_data.astype(DATA_SCHEMA[sample_name]["dtype"]))
@@ -2734,7 +2744,7 @@ class OutputSummary(object):
                     self.logger.debug(traceback.format_exc())
                     continue
                 
-                self.logger.success(f"Evaluation {operation_name} using {expression} succeded {np.shape(evaluation) if not isinstance(evaluation,xr.DataArray) else dict(evaluation.sizes)}")
+                self.logger.success(f"Evaluation {operation_name} using {expression} succeded: {evaluation if not isinstance(evaluation,xr.DataArray) else evaluation.values.flatten()} {np.shape(evaluation) if not isinstance(evaluation,xr.DataArray) else dict(evaluation.sizes)}")
                 print('\n')
 
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
