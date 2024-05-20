@@ -936,7 +936,7 @@ def plot(
     settings = {k:v for k,v in locals().items() if k != 'ctx'}
     
     # Capitalise all single-letter arguments
-    settings = {(key.upper() if len(key) == 1 else key):value for key, value in settings.items()}
+    settings = {(key.upper() if key == 'n' else key):value for key, value in settings.items()}
     
     # Add context arguments
     undefined_settings = {ctx.args[i][2:]: ctx.args[i+1] for i in range(0, len(ctx.args), 2)}
