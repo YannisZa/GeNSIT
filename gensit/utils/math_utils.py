@@ -457,3 +457,13 @@ def compute_gradient_penalty(D, real_samples, fake_samples, device):
     gradients = gradients.view(gradients.size(0), -1)
     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     return gradient_penalty
+
+def reshape_null_data(x):
+    # Create a mask for rows that are not all NaN
+    non_nan_rows = ~np.all(np.isnan(x), axis=1)
+
+    # Create a mask for columns that are not all NaN
+    non_nan_cols = ~np.all(np.isnan(x), axis=0)
+
+    # Apply the masks to filter out the rows and columns
+    return x[non_nan_rows][:, non_nan_cols]
