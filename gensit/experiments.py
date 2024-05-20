@@ -467,9 +467,10 @@ class Experiment(object):
             if param == 'table':
                 # Get initial margins
                 try:
-                    initialisations['table'] = deep_call(self,'.ct_mcmc.initialise_table()',None)
+                    initialisations['table'] = self.ct_mcmc.initialise_table()
                     assert initialisations['table'] is not None
                 except:
+                    traceback.print_exc()
                     self.logger.error("Table could not be initialised.")
             
             elif param == 'theta':

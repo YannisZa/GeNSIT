@@ -143,7 +143,6 @@ def log_flow_matrix(**kwargs):
     
     # Reshape tensors to ensure operations are possible
     log_destination_attraction = torch.reshape(log_destination_attraction,(*iter_sizes,sweep,1,destination))
-    origin_demand = origin_demand.repeat((*([1]*len(iter_sizes)),sweep))
     cost_matrix = cost_matrix.repeat((*([1]*len(iter_sizes)),sweep,1))
     alpha = torch.reshape(alpha,(*iter_sizes,sweep,1,1))
     beta = torch.reshape(beta,(*iter_sizes,sweep,1,1))

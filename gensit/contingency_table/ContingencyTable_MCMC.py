@@ -178,8 +178,6 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         if intensity is None:
             intensity = torch.ones(tuplize(list(unpack_dims(self.ct.data.dims))),dtype = float32)
 
-        # Sample uncostrained margins
-        self.sample_unconstrained_margins(intensity)
         # Use table solver to get initial table
         table0 = self.table_solver(
             intensity = intensity,
@@ -404,7 +402,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             # Extract indices
             fixed_indices = np.ravel_multi_index(fixed_cells.T, self.ct.dims)
             # Fix table cells
-            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.view(-1)[fixed_indices]
+            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.to(float32).view(-1)[fixed_indices]
 
         # Non fixed (free) indices
         free_cells = np.array(self.ct.cells)
@@ -429,7 +427,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             # Extract indices
             fixed_indices = np.ravel_multi_index(fixed_cells.T, self.ct.dims)
             # Fix table cells
-            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.view(-1)[fixed_indices]
+            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.to(float32).view(-1)[fixed_indices]
 
         # Non fixed (free) indices
         free_cells = np.array(self.ct.cells)
@@ -465,7 +463,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             # Extract indices
             fixed_indices = np.ravel_multi_index(fixed_cells.T, self.ct.dims)
             # Fix table cells
-            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.view(-1)[fixed_indices]
+            table_new.view(-1)[fixed_indices] = self.ct.data.ground_truth_table.to(float32).view(-1)[fixed_indices]
 
         # Non fixed (free) indices
         free_cells = np.array(self.ct.cells)

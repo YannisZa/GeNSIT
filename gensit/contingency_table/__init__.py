@@ -115,7 +115,6 @@ class ContingencyTable(object):
             # Update table properties
             self.update_table_properties_from_table()
 
-
         else:
             self.logger.error('Neither table nor config provided.')
             raise Exception('Cannot initialise Contingency table.')
@@ -825,7 +824,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         # Set configuration file
         super().__init__(config, **kwargs)
         # Build
-        self.build(config = config, **kwargs)        
+        self.build(config = config, **kwargs)
 
     def admissibility_debugging(self,sampler_name,table0):
         try:
@@ -951,11 +950,10 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 residual_margins[tuplize(range(ndims(self)))] / torch.sum(min_residual.flatten() != 0)
             )
             # Make sure that max ent solution is non-zero
-            maxent_solution = maxent_solution if maxent_solution > 0 else 1
-
-            min_residual[min_residual > 0] = torch.floor( torch.min(
-                    maxent_solution,
-                    residual_margins[tuplize(range(ndims(self)))]
+            maxent_solution = maxent_solution if maxent_solution > 0 else torch.tensor(1)
+            min_residual[min_residual > 0] = torch.floor( min(
+                maxent_solution,
+                residual_margins[tuplize(range(ndims(self)))]
             ))
 
             return min_residual
@@ -999,17 +997,14 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         else:
             # Minimum residual
             minres_solution = torch.floor(
-                min(*[torch.min(val) for val in residual_margins.values()]) / torch.tensor(sum(min_residual.ravel() != 0))
+                min([torch.min(val) for val in residual_margins.values()]) / torch.tensor(sum(min_residual.ravel() != 0))
             )
-            print([torch.min(val) for val in residual_margins.values()],torch.tensor(sum(min_residual.ravel() != 0)))
-            print(minres_solution)
 
             # Make sure that min res solution is non-zero
-            minres_solution = minres_solution if np.isfinite(minres_solution) and minres_solution > 0 else 1
-
-            min_residual[min_residual > 0] = torch.floor( torch.min(
-                    minres_solution,
-                    min(*[torch.min(val) for val in residual_margins.values()])
+            minres_solution = minres_solution if np.isfinite(minres_solution) and minres_solution > 0 else torch.tensor(1)
+            min_residual[min_residual > 0] = torch.floor( min(
+                minres_solution,
+                min([torch.min(val) for val in residual_margins.values()])
             ))
             return min_residual
 
@@ -1159,7 +1154,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             # Set minimum residual to zero
             np.put(min_residual, fixed_indices, 0)
 
-        # Keep a copy of row and column sums
+        # Keep a copy of summay statitics
         residual_margins = deepcopy(self.residual_margins)
         # Get only constrained residual margins
         residual_margins = {k:v for k,v in residual_margins.items() if k in self.constraints['constrained_axes']}
@@ -1172,13 +1167,23 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 dtype = float32
             )
             cells = np.array(self.cells)
-            # Extract indices,
+            # Extract indices
             indices = [ cells[:,i] for i in range(ndims(self)) ]
             # Update table
             table0[indices] += torch.tensor(min_residual[indices], dtype = float32,device = self.device)
+
+            # Update residual margins
+            residual_margins = self.update_margins_from_cells(
+                margins = residual_margins, 
+                axes = list(residual_margins.keys()),
+                constrained_cells = cells,
+                table = table0
+            )
+
         else:
             min_residual = torch.tensor(min_residual, dtype = float32)
         
+        self.logger.debug(f"RESIDUAL MARGINS {dict({k:v.sum() for k,v in residual_margins.items()})}")
         # Count number of steps run max entropy updates
         counter = 0
         
@@ -1227,11 +1232,6 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
 
             # Increment counter
             counter += 1
-            # print(residual_margins)
-            # print(self.data.margins)
-            # print({ax:self.table_axis_margin_summary_statistic(table0,ax = ax) for ax in sorted(self.constraints['constrained_axes'])})
-            # print(self.table_margins_admissible(table0),self.table_cells_admissible(table0))
-            # print('\n')
 
         self.admissibility_debugging('Maximum entropy solution',table0)
         return table0.to(device = self.device,dtype = float32)
