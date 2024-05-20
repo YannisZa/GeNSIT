@@ -83,9 +83,9 @@ clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et XGBoost_
 clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et GraphAttentionNetwork_Comparison -nt 15 -nw 2 -rf 'mini_region_features.npy' -ttl '_doubly_and_cell_constrained_mini_region_features' -n 10000
 
 # csic41
+clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et XGBoost_Comparison -nt 15 -nw 1 -rf 'region_features.npy' -ttl '_doubly_and_cell_constrained_all_region_features'
 
 # csic43
-clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et XGBoost_Comparison -nt 15 -nw 1 -rf 'region_features.npy' -ttl '_doubly_and_cell_constrained_all_region_features'
 
 # csic46
 clear; gensit run ./data/inputs/configs/DC/vanilla_comparisons.toml -et GraphAttentionNetwork_Comparison -nt 15 -nw 2 -rf 'region_features.npy' -ttl '_doubly_and_cell_constrained_all_region_features' -n 10000
