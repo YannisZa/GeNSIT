@@ -32,10 +32,10 @@ load_experiment = ''
   sparse_margins = false
   [contingency_table.constraints]
     cells = true
-    axes = [[0],[1]]
+    axes = [[0,1]]#[[0],[1]]
 
 [spatial_interaction_model]
-  name = 'ProductionConstrained'
+  name = 'TotallyConstrained'# 'ProductionConstrained'
   grand_total = +200029
   [spatial_interaction_model.parameters]
     bmax = +1.0
@@ -76,7 +76,7 @@ load_experiment = ''
       table_steps = +1
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
-      proposal = 'degree_higher'
+      proposal = 'direct_sampling'#'degree_higher'
       
     [mcmc.parameters]
       theta_steps = 1
@@ -195,4 +195,4 @@ load_experiment = ''
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'exp1'
-    title = '_doubly_and_cell_constrained'
+    title = '_totally_and_cell_constrained'#'_doubly_and_cell_constrained'
