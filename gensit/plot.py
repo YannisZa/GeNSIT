@@ -475,6 +475,14 @@ class Plot(object):
                 marker = kwargs.get('marker',None),
                 hatch = kwargs.get('hatch',None)
             )
+        elif plot_type == 'imshow':
+            cmap = plt.get_cmap(kwargs.get('colourmap',None))
+            cmap.set_bad('white',1.)
+            ax.imshow(
+                X = np.ma.array (kwargs['x'], mask=np.isnan(kwargs['x'])),
+                alpha = kwargs.get('alpha',None),
+                cmap = cmap
+            )
         
         return ax
     
@@ -548,6 +556,8 @@ class Plot(object):
         marker_size = [float(marker_size)] if not isinstance(marker_size,Iterable) else marker_size
         colour = plot_settings.get('colour','black')
         colour = [colour] if isinstance(colour,str) else colour
+        colourmap = plot_settings.get('colourmap','black')
+        colourmap = [colourmap] if isinstance(colourmap,str) else colourmap
         # Convert transparency levels to approapriate data type
         opacity = plot_settings.get('opacity','1.0')
         opacity = [float(opacity)] if isinstance(opacity,str) else opacity
@@ -706,7 +716,7 @@ class Plot(object):
             group_axes_data.setdefault(axes_id,{})
             for feature in ['x','y','s','linestyle', 'linewidth', 'c', 'alpha', 
                             'zorder', 'label', 'marker', 'hatch', 'hatch_opacity',
-                            'facecolor', 'edgecolor', 'annotate']:
+                            'facecolor', 'edgecolor', 'annotate', 'colourmap']:
                 group_axes_data[axes_id].setdefault(feature,[])
             
             # Unpack data
@@ -723,6 +733,7 @@ class Plot(object):
             group_axes_data[axes_id]['hatch'] = unpack_data(hatch,sid)
             group_axes_data[axes_id]['hatch_opacity'] = unpack_data(hatch_opacity,sid)
             group_axes_data[axes_id]['annotate'] = unpack_data(annotate,sid)
+            group_axes_data[axes_id]['colourmap'] = unpack_data(colourmap,sid)
             group_axes_data[axes_id]['facecolor'] = group_axes_data[axes_id]['c']
             group_axes_data[axes_id]['edgecolor'] = ('black',group_axes_data[axes_id]['hatch_opacity']) \
                 if group_axes_data[axes_id]['hatch_opacity'] \
@@ -911,6 +922,440 @@ class Plot(object):
         self.logger.info(f"Filename: {filename}")
         self.logger.success(f"Figure exported to {dirpath}")
 
+    def plot_tabular(self,plot_settings,**kwargs):
+
+        # Get directory path and file name
+        dirpath = kwargs['dirpath']
+        filename = kwargs['filename']
+        filepath = os.path.join(dirpath,filename)
+
+        # Flag for whether multiple subplots are plotted
+        plot_settings = plot_settings[0]
+        # Store whether either x or y are grouped by 
+        group_hashmap = {}
+        for var in ['x','y']:
+            # Get flag for whether multiple groups exist for var
+            if len(plot_settings[f'{var}_group']) <= 0:
+                group_hashmap[var] = {}
+            else:
+                # Get group hashmap
+                _,group_hashmap[var] = self.get_discrete_ticks(
+                    var = var+'_group',
+                    plot_settings = plot_settings
+                )
+                # print(var,group_hashmap[var])
+        # Store whether subplots will be created
+        subplots_exist = any([v for v in group_hashmap.values()])
+        # Get axes ids and arange them in order
+        self.axids = {}
+        # Count number of axes ids
+        counter = 0
+        # Set ticks
+        for r in range(max(len(group_hashmap['y']),1)):
+            for c in range(max(len(group_hashmap['x']),1)):
+                self.axids[(r,c)] = counter
+                counter += 1
+
+        # Get discrete variable hashmaps
+        discrete_hashmaps = {}
+        discrete_ticks = {}
+        for var in ['x','y']:
+            if self.settings.get(f'{var}_discrete',False):
+                # Get discrete ticks
+                discrete_ticks[var],discrete_hashmaps[var] = self.get_discrete_ticks(
+                    var = var,
+                    tick_locator_var = f"{var}_tick_locations",
+                    plot_settings = plot_settings
+                )
+        
+        # print(plot_settings['x'])
+        # print(discrete_hashmaps['x'])
+        # print(group_hashmap)
+        # print(discrete_ticks['x'])
+        
+        # Extract data
+        x_range = list(map(lambda v: hash_major_minor_var(
+            discrete_hashmaps['x'],
+            v,
+            scientific=self.settings.get('x_scientific',False)
+        ), plot_settings['x'])) \
+        if self.settings.get('x_discrete',False) \
+        else [dt[0] for dt in plot_settings['x']] # keep only major axis data
+        y_range = list(map(lambda v: hash_major_minor_var(
+            discrete_hashmaps['y'],
+            v,
+            scientific=self.settings.get('y_scientific',False)
+        ), plot_settings['y'])) \
+        if self.settings.get('y_discrete',False) \
+        else [dt[0] for dt in plot_settings['y']] # keep only major axis data
+        marker_size = plot_settings.get('marker_size',1.0)
+        marker_size = [float(marker_size)] if not isinstance(marker_size,Iterable) else marker_size
+        colour = plot_settings.get('colour','black')
+        colour = [colour] if isinstance(colour,str) else colour
+        # Convert transparency levels to approapriate data type
+        opacity = plot_settings.get('opacity','1.0')
+        opacity = [float(opacity)] if isinstance(opacity,str) else opacity
+        # Convert hatch pattern transparency levels to approapriate data type
+        hatch_opacity = plot_settings.get('hatch_opacity','1.0')
+        hatch_opacity = [float(hatch_opacity)] if isinstance(hatch_opacity,str) else hatch_opacity
+        zorder = plot_settings.get('zorder',[1])
+        zorder = [float(zorder)] if isinstance(zorder,str) else zorder 
+        label = plot_settings.get('label',[''])
+        label = [label] if isinstance(label,str) else label
+        marker = plot_settings.get('marker',['o'])
+        marker = [marker] if isinstance(marker,str) else marker
+        line_style = plot_settings.get('line_style',['-'])
+        line_style = [line_style] if isinstance(line_style,str) else line_style
+        line_width = plot_settings.get('line_width','1.0')
+        line_width = [float(line_width)] if isinstance(line_width,str) else line_width
+        annotate = plot_settings.get('annotate','')
+        annotate = [annotate] if isinstance(annotate,str) else annotate
+        hatch = plot_settings.get('hatch','')
+        hatch = [hatch] if isinstance(hatch,str) else hatch
+
+        # print(y_range)
+        # print(x_range)
+        
+
+        # Figure size 
+        fig, ax = plt.subplots(
+            figsize = self.settings['figure_size'],
+            ncols = max(1,len(group_hashmap['x'])),
+            nrows = max(1,len(group_hashmap['y'])),
+            squeeze = False
+        )
+
+        # Global axes label
+        for var in ['x','y']:
+            if self.settings.get(f'{var}_label',''):
+                axis_label = self.settings[f'{var}_label'].replace("_"," ")
+                getattr(plt,f"{var}label",plt.xlabel)(
+                    axis_label,
+                    fontsize = self.settings[f'{var}_label_size'],
+                    labelpad = self.settings[f'{var}_label_pad'],
+                    rotation = self.settings[f'{var}_label_rotation']
+                )
+        
+        # # Global axes limits
+        # if not subplots_exist:
+        #     # Get global axes limits
+        #     axes_lims = self.get_axes_limits( 
+        #         plot_settings = plot_settings,
+        #         vars = ['x','y'],
+        #         axes_id = (0,0),
+        #         discrete_hashmaps = discrete_hashmaps
+        #     )
+        #     plt.xlim(left = axes_lims['x'][0], right = axes_lims['x'][1])
+        #     plt.ylim(bottom = axes_lims['y'][0], top = axes_lims['y'][1])
+
+        # Count number of axes ids
+        counter = 0
+        # Set ticks
+        # print(group_hashmap)
+        for r in range(max(len(group_hashmap['y']),1)):
+            for c in range(max(len(group_hashmap['x']),1)):
+                for j,var in enumerate(['x','y']):
+                    # Count number of discrete tick types
+                    discrete_tick_types = 0
+                    for i,tick_type in enumerate(['major','minor']):
+                        if self.settings.get(f'{var}_discrete',False) and i < len(discrete_ticks[var]):
+                            # Get discrete ticks
+                            tick_locations = discrete_ticks[var][i]['locations']
+                            tick_labels = discrete_ticks[var][i]['labels']
+                            # print(tick_labels)
+                            # print(tick_locations)
+                            # Plot ticks
+                            getattr(ax[r,c],f"set_{var}ticks",ax[r,c].set_xticks)(
+                                ticks = tick_locations,
+                                labels = tick_labels,
+                                minor = (tick_type == 'minor')
+                            )
+                            # Get tick label pad
+                            tick_pad = safe_list_get(self.settings[f"{var}_tick_pad"],i,self.settings[f"{var}_tick_pad"][0])
+                            # Get tick label pad
+                            tick_rotation = safe_list_get(self.settings[f"{var}_tick_rotation"],i,self.settings[f"{var}_tick_rotation"][0])
+                            # Get tick label size
+                            tick_size = safe_list_get(self.settings[f"{var}_tick_size"],i,self.settings[f"{var}_tick_size"][0])
+                            # print(tick_type,tick_pad,tick_rotation,tick_size)
+                            ax[r,c].tick_params(
+                                axis = var, 
+                                which = tick_type, 
+                                pad = tick_pad,
+                                bottom = True,
+                                labelsize = tick_size,
+                                rotation = tick_rotation
+                            )
+                            # Increment discrete tick types
+                            discrete_tick_types += 1
+                        else:
+                            # Set tick parameters for continuous ticks if there are properly specified
+                            if self.settings[f"{var}_tick_locations"] and self.settings[f"{var}_tick_locations"][0]:
+                                # Read axis limits
+                                start, end = getattr(
+                                    ax[r,c],
+                                    f"get_{var}lim()",
+                                    ax[r,c].get_xlim()
+                                )
+                                # Change frequency at which continuous ticks appear
+                                getattr(
+                                    ax[r,c],
+                                    f"{var}axis",
+                                    ax[r,c].xaxis
+                                ).set_ticks(np.arange(
+                                    self.settings[f"{var}_tick_locations"][0][0], 
+                                    end,
+                                    self.settings[f"{var}_tick_locations"][0][1]
+                                ))
+                            tick_params = {
+                                "pad": self.settings[f"{var}_tick_pad"][0] if self.settings[f"{var}_tick_pad"] else None,
+                                "labelsize": self.settings[f"{var}_tick_size"][0] if self.settings[f"{var}_tick_size"] else None,
+                                "rotation": self.settings[f"{var}_tick_rotation"][0] if self.settings[f"{var}_tick_rotation"] else None
+                            }
+                            ax[r,c].tick_params(
+                                axis = var, 
+                                which = 'both',
+                                bottom = True,
+                                **{k:v for k,v in tick_params.items() if v}
+                            )
+
+                    
+                    # Set gridlines for discrete ticks (major or (major and minor))
+                    if discrete_tick_types > 0:
+                        ax[r,c].grid(
+                            axis = var,
+                            which = 'major'# if discrete_tick_types == 1 else 'both')
+                        )
+                        ax[r,c].set_axisbelow(True)
+                        getattr(
+                            ax[r,c],
+                            f"{var}axis",
+                            ax[r,c].xaxis
+                        ).remove_overlapping_locs = False
+                    
+        # Keep track of each group's axes limits
+        group_axes_limits = {}
+        group_axes_data = {}
+        
+        # Loop over sweeps
+        for sid in range(len(y_range)):
+            # Get axes id 
+            axes_id = self.map_groups_to_axes(
+                index = sid,
+                plot_settings = plot_settings,
+                group_hashmap = group_hashmap
+            )
+            axes_id = tuple([int(axes_id[var]) for var in ['y','x']])
+            
+            # Initialise group axes data (if required)
+            group_axes_data.setdefault(axes_id,{})
+            for feature in ['x','y','s','linestyle', 'linewidth', 'c', 'alpha', 
+                            'zorder', 'label', 'marker', 'hatch', 'hatch_opacity',
+                            'facecolor', 'edgecolor', 'annotate']:
+                group_axes_data[axes_id].setdefault(feature,[])
+            
+            # Unpack data
+            group_axes_data[axes_id]['x'] = x_range[sid]
+            group_axes_data[axes_id]['y'] = y_range[sid]
+            group_axes_data[axes_id]['s'] = unpack_data(marker_size,sid)
+            group_axes_data[axes_id]['linestyle'] = unpack_data(line_style,sid)
+            group_axes_data[axes_id]['linewidth'] = unpack_data(line_width,sid)
+            group_axes_data[axes_id]['c'] = unpack_data(colour,sid)
+            group_axes_data[axes_id]['alpha'] = unpack_data(opacity,sid)
+            group_axes_data[axes_id]['zorder'] = unpack_data(zorder,sid)
+            group_axes_data[axes_id]['label'] = unpack_data(label,sid)
+            group_axes_data[axes_id]['marker'] = unpack_data(marker,sid)
+            group_axes_data[axes_id]['hatch'] = unpack_data(hatch,sid)
+            group_axes_data[axes_id]['hatch_opacity'] = unpack_data(hatch_opacity,sid)
+            group_axes_data[axes_id]['annotate'] = unpack_data(annotate,sid)
+            group_axes_data[axes_id]['facecolor'] = group_axes_data[axes_id]['c']
+            group_axes_data[axes_id]['edgecolor'] = ('black',group_axes_data[axes_id]['hatch_opacity']) \
+                if group_axes_data[axes_id]['hatch_opacity'] \
+                else (group_axes_data[axes_id]['facecolor'],group_axes_data[axes_id]['hatch_opacity'])
+            
+            # print(sid,axes_id)
+            # Print plotting data
+            self.print_data(
+                index = None,
+                plot_setting = plot_settings,
+                local_vars = group_axes_data[axes_id],
+                #dict(locals().vars)
+                plot_vars = [],
+                summarise = False
+            )
+            self.print_data(
+                index = None,
+                plot_setting = plot_settings,
+                local_vars = group_axes_data[axes_id],
+                #dict(locals().vars)
+                plot_vars = [],
+                summarise = True
+            )
+            
+            # Plot x versus y
+            self.plot_wrapper(
+                ax = ax[axes_id],
+                plot_type = PLOT_TYPES[self.settings.get('plot_type','scatter')],
+                **group_axes_data[axes_id]
+            )
+
+            # Shade area between line and axis
+            if self.settings.get('x_shade',False):
+                plt.rcParams['hatch.linewidth'] = self.settings.get('hatch_linewidth',1.0)
+                ax[axes_id].fill_betweenx(
+                    y = group_axes_data[axes_id]['y'],
+                    x1 = 0,
+                    x2 = group_axes_data[axes_id]['x'],
+                    **{
+                        k:v for k,v in group_axes_data[axes_id].items()
+                        if k in ['facecolor', 'edgecolor', 'zorder', 'hatch', 'label', 'alpha']
+                    }
+                )
+            if self.settings.get('y_shade',False):
+                plt.rcParams['hatch.linewidth'] = self.settings.get('hatch_linewidth',1.0)
+                # print(axes_id,group_axes_data[axes_id]['x'],group_axes_data[axes_id]['y'])
+                ax[axes_id].fill_between(
+                    x = group_axes_data[axes_id]['x'],
+                    y1 = 0,
+                    y2 = group_axes_data[axes_id]['y'],
+                    **{ 
+                        k:v for k,v in group_axes_data[axes_id].items()
+                        if k in ['facecolor', 'edgecolor', 'zorder', 'hatch', 'label', 'alpha']
+                    }
+                )
+
+            # Annotate data
+            if group_axes_data[axes_id]['annotate']:
+                txt = group_axes_data[axes_id]['annotate']
+                ax[axes_id].annotate(
+                    str(string_to_numeric(txt) 
+                        if str(txt).isnumeric() 
+                        else str(txt)), 
+                    (group_axes_data[axes_id]['x'], group_axes_data[axes_id]['y']),
+                    zorder = 10000 # bring annotation data to front
+                )
+
+            # # Get local group axes limits
+            # group_axes_limits[axes_id] = self.get_axes_limits(
+            #     plot_settings = {
+            #         "x":x_range[sid],
+            #         "y":y_range[sid],
+            #         **{k:v for k,v in plot_settings.items() if k not in ['x','y']}
+            #     },
+            #     vars = ['x','y'],
+            #     axes_id = axes_id,
+            #     axes_lims = group_axes_limits,
+            #     discrete_hashmaps = discrete_hashmaps
+            # )
+
+        # # Set local group axes limits, label etc..
+        # for r in range(max(len(group_hashmap['y']),1)):
+        #     for c in range(max(len(group_hashmap['x']),1)):
+        #         for var in ['x','y']:
+        #             if var in group_axes_limits[(r,c)]:
+        #                 # Set axis limits for var that is grouped
+        #                 getattr(
+        #                     ax[r,c],
+        #                     f"set_{var}lim",
+        #                     ax[r,c].set_ylim
+        #                 )(
+        #                     group_axes_limits[(r,c)][var][0], 
+        #                     group_axes_limits[(r,c)][var][1]
+        #                 )
+        #             # Set axis scaling
+        #             if self.settings.get(f"{var}_scale",''):
+        #                 getattr(
+        #                     ax[r,c],
+        #                     f"set_{var}scale",
+        #                     ax[r,c].set_yscale(self.settings[f"{var}_scale"])
+        #                 )
+
+        #             # Try to set `axes label for var that is grouped
+        #             try:
+        #                 if group_hashmap[var]:
+        #                     ax[r,c].set_ylabel(
+        #                         list(group_hashmap[var].keys())[r],
+        #                         fontsize = self.settings[f'{var}_label_size'],
+        #                         labelpad = self.settings[f'{var}_label_pad'],
+        #                         rotation = self.settings[f'{var}_label_rotation']
+        #                     )
+        #             except:
+        #                 # print(r,c, 'y label skipped')
+        #                 continue
+
+        # Aspect ratio equal
+        if self.settings['equal_aspect']:
+            plt.gca().set_aspect('equal')
+    
+        # Legend
+        # try:
+        # Create dictionary of labels
+        by_label = {}
+        handles, label, label_split = [],[],[]
+        # Find each label from each plot
+        for axid in self.axids.keys():
+            # Ensure no duplicate entries in legend exist
+            ax_handles, ax_labels = ax[axid].get_legend_handles_labels()
+            # Convert everything to numpy arrays
+            ax_label_split = [lab.split(', ') for lab in ax_labels]
+            
+            # Add legend handles and labels to list
+            handles += ax_handles
+            label_split += ax_label_split
+            label += ax_labels
+        
+        # Create a legend for specific or all axes
+        plot_legend = self.settings['legend_axis'] in list(self.axids.keys())
+        if plot_legend:
+            label_split = np.array(label_split,dtype='str')
+            # Sort label first by first label, then by second etc.
+            index_sorted = np.lexsort(label_split.T)
+            # Do not worry about duplicates. These will be handled here
+            # Create dictionary of label
+            by_label = dict(zip(
+                np.array(label)[index_sorted].tolist(), 
+                np.array(handles)[index_sorted].tolist()
+            ))
+
+            # Gather legend kwargs
+            leg_kwargs = {
+                'bbox_to_anchor': self.settings.get('bbox_to_anchor',None),
+                'ncols': self.settings.get('legend_cols',1),
+                'columnspacing': self.settings.get('legend_col_spacing',None),
+                'handletextpad': self.settings.get('legend_pad',None),
+                'loc': self.settings.get('legend_location','best')
+            }
+            # print(leg_kwargs)
+            # Remove nulls 
+            leg_kwargs = {k:v for k,v in leg_kwargs.items() if v}
+            # If more than one column are provided split legend patches and keys
+            # into sublists of length ncols
+            leg = ax[axid].legend(
+                flip(list(by_label.values()), self.settings.get('legend_cols',1)), 
+                flip(list(by_label.keys()), self.settings.get('legend_cols',1)),
+                frameon = False,
+                prop = {'size': self.settings.get('legend_label_size',None)},
+                **leg_kwargs
+            )
+            leg._ncol = 1
+        
+
+        
+        # Tight layout
+        if self.settings.get('figure_format','pdf') == 'ps':
+            fig.tight_layout(rect=(0, 0, 0.7, 1.1))
+        else:
+            fig.tight_layout()
+
+        # Write figure
+        write_figure(
+            fig,
+            filepath,
+            **self.settings
+        )
+        self.logger.info(f"Filename: {filename}")
+        self.logger.success(f"Figure exported to {dirpath}")
+
+
     '''
     Extracting plotting data
     '''
@@ -977,20 +1422,20 @@ class Plot(object):
             label_strs = []
             # Get label key and value
             for label_key in settings['label']:
-                label_strs.append(
-                    latex_it(
-                        key = label_key,
-                        value = meta[label_key],
-                        default = DATA_SCHEMA.get(label_key,{}).get('default',None)
+                if label_key != '':
+                    label_strs.append(
+                        latex_it(
+                            key = label_key,
+                            value = meta[label_key],
+                            default = DATA_SCHEMA.get(label_key,{}).get('default',None)
+                        )
                     )
-                )
             value = ', '.join(label_strs)
         
         elif var == 'zorder':
             # Get label key and value
             order_tuple = []
             for order_var in settings['zorder']:
-                
                 # get ordering (ascending/descending)
                 order = order_var[0]
                 # get ordering variable

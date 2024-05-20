@@ -37,7 +37,8 @@ PLOT_VIEWS = {
 PLOT_TYPES = {
     "empty":"",
     "line": "plot",
-    "scatter" : "scatter"
+    "scatter" : "scatter",
+    "imshow": "imshow"
 }
 
 PLOT_MARKERS = {
