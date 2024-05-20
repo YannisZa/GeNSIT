@@ -44,8 +44,10 @@ class Plot(object):
 
         # Store settings
         self.settings = settings
+        # Read output directories
+        self.output_directories = kwargs.get('output_directories',[])
 
-        self.logger.info(f"{','.join([Path(out_dir).stem for out_dir in self.outputs_directories])}")
+        self.logger.info(f"{','.join([Path(out_dir).stem for out_dir in self.output_directories])}")
         # Run plotting
         self.data_plot(plot_func = self.compile_plot(plot_view), **kwargs)
 
@@ -301,7 +303,7 @@ class Plot(object):
         # For each subtick (one for major and one for minor ticks)
         for i, tick_type in reversed(list(enumerate(['major','minor']))):
             try:
-                # print(var,i,len(plot_settings[var]),len(plot_settings[var][0]))
+                # print(var,i,tick_type,len(plot_settings[var]),len(plot_settings[var][0]))
                 # Get major or minor ticks
                 ticks[i]['data'] = [v[i] for v in plot_settings[var]]
                 # print(var,tick_type,ticks[i]['data'])
@@ -352,7 +354,7 @@ class Plot(object):
                     )[:len(ticks[i]['labels'])]
                 # print(var,'locations',tick_type,ticks[i]['locations'])
             except (IndexError,AssertionError):
-                traceback.print_exc()
+                # traceback.print_exc()
                 ticks[i]['unique'] = [None]
                 continue
             except Exception:
@@ -766,6 +768,7 @@ class Plot(object):
                 )
             if self.settings.get('y_shade',False):
                 plt.rcParams['hatch.linewidth'] = self.settings.get('hatch_linewidth',1.0)
+                # print(axes_id,group_axes_data[axes_id]['x'],group_axes_data[axes_id]['y'])
                 ax[axes_id].fill_between(
                     x = group_axes_data[axes_id]['x'],
                     y1 = 0,

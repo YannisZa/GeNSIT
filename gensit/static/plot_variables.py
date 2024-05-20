@@ -86,8 +86,8 @@ PLOT_COLOURS = {
         "_total_constrained":COLOR_NAMES["tab20b_purple"],
         "_row_constrained":COLOR_NAMES["tab20b_green"],
         "_doubly_constrained":COLOR_NAMES["tab20b_orange"],
-        "_doubly_10%_cell_constrained":COLOR_NAMES["tab20b_red"],
-        "_doubly_20%_cell_constrained":COLOR_NAMES["tab20c_blue"],
+        "_doubly_10#%_cell_constrained":COLOR_NAMES["tab20b_red"],
+        "_doubly_20#%_cell_constrained":COLOR_NAMES["tab20c_blue"],
     }
 }
 
@@ -118,26 +118,26 @@ RAW_EXPRESSIONS = {
     "NonJointTableSIM_NN": 'Disjoint (\\frameworktag)',
     "_unconstrained":'$\\emptyset$',
     "_total_constrained":'$T_{++}$',
-    "_total_intensity_row_table_constrained":'$\\mathbf{T}_{+\\cdot}$',
-    "_row_constrained":'$\\mathbf{T}_{+\\cdot}$',
-    "_doubly_constrained":'$\\mathbf{T}_{+\\cdot},\\mathbf{T}_{\\cdot +}$',
-    "_doubly_10%_cell_constrained":'$\\mathbf{T}_{+\\cdot},\\mathbf{T}_{\\cdot +},\\mathbf{T}_{\\mathcal{X}_1}$',
-    "_doubly_20%_cell_constrained":'$\\mathbf{T}_{+\\cdot},\\mathbf{T}_{\\cdot +},\\mathbf{T}_{\\mathcal{X}_2}$',
-    "TotallyConstrained":'$\\Lambda_{++}$',
-    "ProductionConstrained":'$\\boldsymbol{\\Lambda}_{+\\cdot}$',
-    "dest_attraction_ts_likelihood_loss":"$\\lossoperator\\left(\\mathbf{x} \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \\right)$",
-    "dest_attraction_ts_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mathbf{x}, \\mytable, \\myintensity \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \\right)$",
-    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mathbf{x},\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
-    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss":"$\\lossoperator\\left( \\mathbf{x}, \\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
-    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mathbf{x},\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
-    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss":"$\\lossoperator\\left( \\mathbf{x}, \\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
-    "table_likelihood_loss":"$\\lossoperator\\left(\\mytable, \\myintensity \\right)$",
-    "total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
-    "total_intensity_distance_likelihood_loss":"$\\lossoperator\\left(\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
-    "total_intensity_distance_loss":"$\\lossoperator\\left(\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
-    "total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
-    "total_table_distance_likelihood_loss":"$\\lossoperator\\left(\\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
-    "total_table_distance_loss":"$\\lossoperator\\left(\\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$"
+    "_total_intensity_row_table_constrained":'$\\mytablerowsums$',
+    "_row_constrained":'$\\mytablerowsums$',
+    "_doubly_constrained":'$\\mytablerowsums,\\mytablecolsums$',
+    "_doubly_10#%_cell_constrained":'$\\mytablerowsums,\\mytablecolsums,\\mytablecells{1}$',
+    "_doubly_20#%_cell_constrained":'$\\mytablerowsums,\\mytablecolsums,\\mytablecells{2}$',
+    "TotallyConstrained":'$\\myintensitytotal$',
+    "ProductionConstrained":'$\myintensityrowsums$',
+    "dest_attraction_ts_likelihood_loss":"$\\lossoperator\(\\mylogdestattr \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \)$",
+    "dest_attraction_ts_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mylogdestattr, \\mytable, \\myintensity \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \)$",
+    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mylogdestattr,\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
+    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss":"$\\lossoperator\( \\mylogdestattr, \\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
+    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mylogdestattr,\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$",
+    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss":"$\\lossoperator\( \\mylogdestattr, \\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$",
+    "table_likelihood_loss":"$\\lossoperator\(\\mytable, \\myintensity \)$",
+    "total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
+    "total_intensity_distance_likelihood_loss":"$\\lossoperator\(\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
+    "total_intensity_distance_loss":"$\\lossoperator\(\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
+    "total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$",
+    "total_table_distance_likelihood_loss":"$\\lossoperator\(\\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$",
+    "total_table_distance_loss":"$\\lossoperator\(\\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$"
 }
 LABEL_EXPRESSIONS = {
     "sigma": '$\\sigma = '
@@ -154,16 +154,26 @@ LATEX_PREAMBLE = r'''
 \usepackage{xcolor}
 \usepackage{color}
 
+\newcommand{\mysilver}[1]{{\textcolor[HTML]{909090}{#1}}}
 \newcommand{\skyblue}[1]{{\textcolor[HTML]{1E88E5}{#1}}}
 \newcommand{\deepred}[1]{{\textcolor[HTML]{E20000}{#1}}}
 \newcommand{\myseagreen}[1]{{\textcolor[HTML]{2E8B57}{#1}}}
 \newcommand{\myorange}[1]{{\textcolor[HTML]{FFA500}{#1}}}
 \newcommand{\mydarkmagenta}[1]{{\textcolor[HTML]{8B008B}{#1}}}
 \newcommand{\mybrown}[1]{{\textcolor[HTML]{A52A2A}{#1}}}
+\newcommand{\tabcmpurple}[1]{{\textcolor[HTML]{5856c4}{#1}}}
+\newcommand{\tabcmgreen}[1]{{\textcolor[HTML]{a6c858}{#1}}}
+\newcommand{\tabcmorange}[1]{{\textcolor[HTML]{e0ad41}{#1}}}
+\newcommand{\tabcmred}[1]{{\textcolor[HTML]{ca4a58}{#1}}}
+\newcommand{\tabcmpink}[1]{{\textcolor[HTML]{c153af}{#1}}}
+\newcommand{\tabcmblue}[1]{{\textcolor[HTML]{8ebeda}{#1}}}
 
-\newcommand{\zachosframeworkbasename}{SIMT-MCMC}
+\newcommand{\zachosframeworkbasename}{SIT-MCMC}
 \newcommand{\gaskinframeworkbasename}{SIM-NN}
 \newcommand{\ellamframeworkbasename}{SIM-MCMC}
+\newcommand{\zachosframeworkfullname}{\textbf{S}patial \textbf{I}nteraction \textbf{T}able \textbf{M}arkov \textbf{C}hain \textbf{M}onte \textbf{C}arlo \;}
+\newcommand{\gaskinframeworkfullname}{\textbf{S}patial \textbf{I}nteraction \textbf{M}odel \textbf{N}eural \textbf{N}etwork\;}
+\newcommand{\ellamframeworkfullname}{\textbf{S}patial \textbf{I}nteraction \textbf{M}odel \textbf{M}arkov \textbf{C}hain \textbf{M}onte \textbf{C}arlo \;}
 \newcommand{\zachosframework}{\zachosframeworkbasename \;}
 \newcommand{\gaskinframework}{\gaskinframeworkbasename \;}
 \newcommand{\ellamframework}{\ellamframeworkbasename \;}
@@ -177,31 +187,74 @@ LATEX_PREAMBLE = r'''
 \newcommand{\frameworkname}{GeNSIT}
 \newcommand{\frameworktag}{\textsc{\frameworkname}}
 \newcommand{\frameworkpackage}{\texttt{gensit}}
-\newcommand{\frameworkfullname}{\textbf{Ge}nerating \textbf{N}eural \textbf{S}patial \textbf{I}nteraction \textbf{T}ables \;}
+\newcommand{\frameworkfig}{\hyperref[fig:framework]{\frameworktag}}
+\newcommand{\frameworkfullname}{\textbf{Ge}nerating \textbf{N}eural \textbf{S}patial \textbf{I}nteraction \textbf{T}ables}
 \newcommand{\frameworknamespace}{\frameworkname\;}
 \newcommand{\frameworktagspace}{\textsc{\frameworktag\;}}
 \newcommand{\frameworkpackagespace}{\frameworkpackage \;}
-\newcommand{\mytable}{\skyblue{\mathbf{T}}}
-\newcommand{\myintensity}{\deepred{\boldsymbol{\Lambda}}}
-\newcommand{\mytableoned}{\skyblue{T}}
-\newcommand{\myintensityoned}{\deepred{\Lambda}}
-\newcommand{\mytablerowsums}{\myseagreen{\mathbf{T}_{\cdot +}}}
-\newcommand{\mytablecolsums}{\myorange{\mathbf{T}_{+\cdot}}}
-\newcommand{\mytablerowsumsoned}{\myseagreen{T_{i+}}}
-\newcommand{\mytablecolsumsoned}{\myorange{T_{+j}}}
-\newcommand{\mytabletotal}{\mydarkmagenta{T_{++}}}
-\newcommand{\mytablecells}{\mybrown{\mathbf{T}_{\mathcal{X}}}}
-\newcommand{\myintensityrowsums}{\myseagreen{\boldsymbol{\Lambda}_{\cdot +}}}
-\newcommand{\myintensitycolsums}{\myorange{\boldsymbol{\Lambda}_{+\cdot}}}
-\newcommand{\myintensityrowsumsoned}{\myseagreen{\Lambda_{i+}}}
-\newcommand{\myintensitycolsumsoned}{\myorange{\Lambda_{+j}}}
-\newcommand{\myintensitytotal}{\mydarkmagenta{\Lambda_{++}}}
-\newcommand{\tableconstraints}{\mathcal{C}_{\mytableoned}}
-\newcommand{\intensityconstraints}{\mathcal{C}_{\myintensityoned}}
-\newcommand{\allconstraints}{\mathcal{C}}
-\newcommand{\lossoperator}{\mathcal{L}}
+\newcommand{\frameworkfigspace}{\hyperref[fig:framework]{\frameworktagspace}}
+
+\newcommand{\tablecolour}[1]{#1}
+\newcommand{\intensitycolour}[1]{#1}
+\newcommand{\constraintcolour}[1]{\deepred{#1}}
+\newcommand{\rowsumscolour}[1]{\deepred{#1}}
+\newcommand{\colsumscolour}[1]{\deepred{#1}}
+\newcommand{\totalcolour}[1]{\deepred{#1}}
+\newcommand{\cellcolour}[1]{\deepred{#1}}
+\newcommand{\uncostrainedcolour}[1]{#1}
+\newcommand{\totallyconstrainedcolour}[1]{#1}
+\newcommand{\singlyconstrainedcolour}[1]{#1}
+\newcommand{\singlyconstrainedgaskincolour}[1]{#1}
+\newcommand{\singlyconstrainedellamcolour}[1]{#1}
+\newcommand{\doublyconstrainedcolour}[1]{#1}
+\newcommand{\doublytencellconstrainedcolour}[1]{#1}
+\newcommand{\doublytwentycellconstrainedcolour}[1]{#1}
+
+\newcommand{\mytable}{\tablecolour{\mathbf{T}}}
+\newcommand{\myintensity}{\boldsymbol{\Lambda}}
+\newcommand{\myprobability}{\intensitycolour{\boldsymbol{\pi}}}
+\newcommand{\mytableoned}{\tablecolour{T}}
+\newcommand{\myintensityoned}{\intensitycolour{\Lambda}}
+\newcommand{\mytablerowsums}{\rowsumscolour{\mathbf{T}_{\cdot+}}}
+\newcommand{\mytablecolsums}{\colsumscolour{\mathbf{T}_{+\cdot}}}
+\newcommand{\mytablerowsumsoned}[1]{\rowsumscolour{T_{#1+}}}
+\newcommand{\mytablecolsumsoned}[1]{\colsumscolour{T_{+1}}}
+\newcommand{\mytabletotal}{\totalcolour{T_{++}}}
+\newcommand{\mycells}[1]{\mathcal{X}#1}
+\newcommand{\mytablecells}[1]{\cellcolour{\mathbf{T}_{\mycells{#1}}}}
+\newcommand{\myintensityrowsums}{\rowsumscolour{\boldsymbol{\Lambda}_{\cdot +}}}
+\newcommand{\myintensitycolsums}{\colsumscolour{\boldsymbol{\Lambda}_{+\cdot}}}
+\newcommand{\myintensityrowsumsoned}[1]{\rowsumscolour{\Lambda_{#1+}}}
+\newcommand{\myintensitycolsumsoned}[1]{\colsumscolour{\Lambda_{+1}}}
+\newcommand{\myintensitytotal}{\totalcolour{\Lambda_{++}}}
+\newcommand{\tableconstraints}{\constraintcolour{\mathcal{C}_{\mytableoned}}}
+\newcommand{\intensityconstraints}{\constraintcolour{\mathcal{C}_{\myintensityoned}}}
+\newcommand{\allconstraints}{\constraintcolour{\mathcal{C}}}
+\newcommand{\unconstrained}[1]{\uncostrainedcolour{#1}}
+
+
+\newcommand{\totallyconstrained}[1]{\totallyconstrainedcolour{#1}}
+\newcommand{\singlyconstrained}[1]{\singlyconstrainedcolour{#1}}
+\newcommand{\singlyconstrainedgaskin}[1]{\singlyconstrainedgaskincolour{#1}}
+\newcommand{\singlyconstrainedellam}[1]{\singlyconstrainedellamcolour{#1}}
+\newcommand{\doublyconstrained}[1]{\doublyconstrainedcolour{#1}}
+\newcommand{\doublytencellconstrained}[1]{\doublytencellconstrainedcolour{#1}}
+\newcommand{\doublytwentycellconstrained}[1]{\doublytwentycellconstrainedcolour{#1}}
+\newcommand{\tablespace}{\mathcal{T}}
 \newcommand{\obsdata}{\mathcal{D}}
-\newcommand{\groundtruthtable}{\mytable^{\obsdata}}
+\newcommand{\obstablespace}{\tablespace_{\obsdata}}
+\newcommand{\constrainedtablespace}{\tablespace_{\allconstraints}}
+\newcommand{\lossoperator}{\mathcal{L}}
+\newcommand{\powerset}{\mathcal{P}}
+\newcommand{\groundtruthtable}{\mytable^{*}}
+\newcommand{\bigoh}[1]{\mathcal{O}(#1)}
+\newcommand{\mytheta}{\boldsymbol{\theta}}
+\newcommand{\mylogdestattr}{\mathbf{x}}
+\newcommand{\mydestattr}{\mathbf{z}}
+\newcommand{\mydestattroned}[1]{z_{#1}}
+\newcommand{\mylogdestattrobs}{\mathbf{y}}
+\newcommand{\markovbasis}{\mathcal{M}}
+
 '''
 
 # "pgf.texsystem": "xelatex",

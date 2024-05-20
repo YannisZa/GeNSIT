@@ -962,7 +962,7 @@ def plot(
     # Run plot
     Plot(
         plot_view = plot_view,
-        outputs_directories = list(directories),
+        output_directories = list(directories),
         settings = settings,
         logger = logger,
         pop = False
@@ -1093,7 +1093,7 @@ def reproduce(figure):
             "-k", "sigma", "-k", "type", "-k", "title", 
             "-ft", 'figure1/figure1_table_like_loss_kernel_density', "-ff", "ps", 
             "-hchv", "0.5", "-hch", "sigma", "-c", "title", "-op", "1.0", "-msz", "1", "-l", "title", "-l", "sigma", "-or", "asc", "table_density_height", 
-            "-xlab", '$\mathcal{L}\left(\mytable,\myintensity\\right)$', "-ylab", "Kernel density",
+            "-xlab", '$\lossoperator\left(\mytable,\myintensity\\right)$', "-ylab", "Kernel density",
             "-fs", "6", "10", "-lls", "11", "-lp", "0.5", "-la", "2", "0", "-lc", "2", "-loc", 'lower center', "-bbta", "0.5", "-bbta", "-1.1", 
             "-ylr", "90", "-xts", "12", "12", "-yts", "12", "12", "-xtp", "0", "0", "-ytp", "0", "0", "-ylp", "2", "-xlp", "1",
             "-xlim", "2.8", "3.7", "-xlim", "3.61", "3.67", "-xlim", "3.61", "3.67", "-ylim", "0", "10", "-ylim", "0", "300", "-ylim", "0", "500", "-hlw", "0.2"
@@ -1143,7 +1143,7 @@ def reproduce(figure):
             "-k", "sigma", "-k", "type", "-k", "name", "-k", "title", "-k", "N", 
             "-mrkr", "sigma", "-c", "title", "-msz", "table_coverage_probability_size", "-op", "1.0", "-or", "asc", "table_coverage_probability_size", "-l", "sigma", "-l", "title", 
             "-fs", "10", "10", "-ff", "ps", "-ft", "figure3/exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed", 
-            "-xlab", "Method, ($N$, $E$)", "-ylab", "SRMSE$\left(\mathbb{E}[\mytable^{(1:N)}],\mytable^{\mathcal{D}}\\right)$", 
+            "-xlab", "Method, ($N$, $E$)", "-ylab", "SRMSE$\left(\mathbb{E}[\mytable^{(1:N)}\vert \allconstraints,\obsdata],\mytable^{\mathcal{D}}\\right)$", 
             "-ylim", "0.0", "3.2", "-ylr", "90", "-xtp", "0", "80", "-ytl", "0.0", "0.2", "-ytl", "0.0", "0.0", "-xtl", "5", "8", "-xtl", "9", "16", "-yts", "18", "18", "-xts", "18", "18", "-xts", "18", "18", 
             "-xtr", "70", "0", "-xls", "20", "-yls", "20", "-xlim", "0", "111", "-la", "0", "0", "-lls", "14", "-loc", "upper center", "-bbta", "0.45", "-bbta", "1.3", "-btta", "0.4", "-btta", "1.0", "-lc", "3", "-lp", "0.01", "-lcs", "0.1"
         ])
