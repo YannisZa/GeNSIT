@@ -312,3 +312,36 @@ clear; gensit summarise -dn DC/exp1 -et NonJointTableSIM_NN \
 -btt 'iter' 10000 9 10000 \
 -k type -k title -fe table_CoverageProbabilities -nw 1
 ```
+
+
+# Plots
+
+## Figure 5
+```
+clear; gensit plot tabular imshow -x residual_mean_reshaped -y residual_mean_reshaped  \
+-dn DC/comparisons -et RandomForest_Comparison_UnsetNoise__doubly_and_cell_constrained_all_region_features \
+-el np -el MathUtils \
+-e residual_mean_reshaped "reshape_null_data(residual_mean.values.squeeze())" \
+-ea intensity \
+-ea "reshape_null_data=MathUtils.reshape_null_data" \
+-ea "intensity_mean=intensity.groupby('seed').mean('iter',dtype='float64')" \
+-ea "residual_mean=intensity_mean.groupby('seed').map(lambda x: (x-outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask)).mean('seed',skipna=True)" \
+-fs 10 10 -ff ps -ft 'figure5/mean_residual' -cm RdYlGn  \
+-xlab 'Destinations' -ylab 'Origins' \
+-xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 1
+```
+
+
+```
+clear; gensit plot tabular imshow -x residual_mean_reshaped -y residual_mean_reshaped  \
+-pdd ./data/outputs/DC/comparisons/paper_figures/figure5/ \
+-el np -el MathUtils \
+-e residual_mean_reshaped "reshape_null_data(residual_mean.values.squeeze())" \
+-ea intensity \
+-ea "reshape_null_data=MathUtils.reshape_null_data" \
+-ea "intensity_mean=intensity.groupby('seed').mean('iter',dtype='float64')" \
+-ea "residual_mean=intensity_mean.groupby('seed').map(lambda x: (x-outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask)).mean('seed',skipna=True)" \
+-fs 10 10 -ff ps -ft 'mean_residual' -cm RdYlGn \
+-xlab 'Destinations' -ylab 'Origins' \
+-xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 1
+```
