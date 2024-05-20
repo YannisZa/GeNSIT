@@ -2744,7 +2744,16 @@ class OutputSummary(object):
                     self.logger.debug(traceback.format_exc())
                     continue
                 
-                self.logger.success(f"Evaluation {operation_name} using {expression} succeded: {evaluation if not isinstance(evaluation,xr.DataArray) else evaluation.values.flatten()} {np.shape(evaluation) if not isinstance(evaluation,xr.DataArray) else dict(evaluation.sizes)}")
+                if isinstance(evaluation,xr.DataArray) and 'sweep' in evaluation.dims:
+                    prefix = f"for sweep {evaluation['sweep'].values.flatten()}"
+                else:
+                    prefix = ""
+
+                self.logger.success(f"""
+                    Evaluation {operation_name} using {expression} succeded {prefix}: 
+                    {evaluation if not isinstance(evaluation,xr.DataArray) else evaluation.values.flatten()} 
+                    {np.shape(evaluation) if not isinstance(evaluation,xr.DataArray) else dict(evaluation.sizes)}
+                """)
                 print('\n')
 
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):
