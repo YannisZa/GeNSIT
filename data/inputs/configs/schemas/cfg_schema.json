@@ -275,6 +275,52 @@
           }
         }
       },
+      "region_geometries": {
+        "sweepable": false,
+        "optional": true,
+        "exclude": false,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "geojson",
+              "default-value": "region_geometries.geojson"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "geojson",
+              "default-value": "region_geometries.geojson",
+              "unique-vals": true
+            }
+          }
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "geopandas",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "geopandas",
+              "default-value": []
+            }
+          }
+        }
+      },
       "train_cells": {
         "sweepable": false,
         "optional": true,

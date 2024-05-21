@@ -37,6 +37,14 @@
           }
         }
       },
+      "region_geometries": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        }
+      },
       "train_cells": {
         "file": {
           "sweep": {
