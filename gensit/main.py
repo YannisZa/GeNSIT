@@ -736,18 +736,22 @@ def plot_coordinate_options(func):
               type=click.FLOAT, help = f'Box that is used to position the legend in conjunction with legend_location.')
 @click.option('--legend_axis', '-la', default = None, show_default = True,
               type=(click.IntRange(0,None), click.IntRange(0,None)), help = f'Sets axis inside which to plot legend.')
+@click.option('--axis_title', '-at', default = None, show_default = False,
+              type = click.STRING, help = f'Sets axis title.')
+@click.option('--axis_title_size', '-ats', default = 16, show_default = True,
+              type = click.INT, help = f'Sets subplot (group) title font size.')
 @click.option('--figure_title', '-ft', default = None, show_default = False,
               type = click.STRING, help = f'Sets figure title.')
-@click.option('--figure_title_size', '-fts', default = 16, show_default = True,
-              type = click.INT, help = f'Sets subplot (group) title font size.')
 @click.option('--group_title_size', '-gts', default = 12, show_default = True,
               type = click.INT, help = f'Sets subplot (group) title font size.')
 @click.option('--legend_label_size', '-lls', default = 8, show_default = False,
               type = click.INT, help = f'Sets legend font size.')
 @click.option('--annotation_size', '-as', default = 12, show_default = False,
               type = click.INT, help = f'Sets text annotation font size.')
-@click.option('--colourmap', '-cm', default=['cblue'],required = False, show_default = True, multiple = True, callback = to_list,
-            type = click.STRING, help = f'Sets colourmap(s) (e.g. colourmap corresponding to flows).')
+@click.option('--colourmap', '-cm', default='cblue',required = False, show_default = True,
+            type = click.STRING, help = f'Sets main colourmap.')
+@click.option('--colourmap_midpoint', '-vmid', default=None, show_default = True,
+              type=click.FLOAT, help = f"Center the colormap around this midpoint.")
 @click.option('--colourbar/--no-colourbar', default = None, is_flag = True, show_default = True,
               help = f'Flag for plotting colourbars or not.')
 @click.option('--colourbar_title', '-ct', default = [None], show_default = False, multiple = True, callback = to_list, 
@@ -858,12 +862,14 @@ def plot(
         legend_pad,
         bbox_to_anchor,
         legend_axis,
+        axis_title,
+        axis_title_size,
         figure_title,
-        figure_title_size,
         group_title_size,
         legend_label_size,
         annotation_size,
         colourmap,
+        colourmap_midpoint,
         colourbar,
         colourbar_title,
         colourbar_limit,
@@ -1153,4 +1159,5 @@ def reproduce(figure):
 if __name__ == '__main__':
     # run()
     plot()
-    # summarise()
+    # summarise()'
+    

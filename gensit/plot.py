@@ -11,6 +11,7 @@ import sklearn.manifold
 import scipy.stats as stats
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 from glob import glob
 from pathlib import Path
@@ -22,6 +23,7 @@ from statsmodels.graphics.tsaplots import plot_acf
 from matplotlib.gridspec import GridSpec,GridSpecFromSubplotSpec
 
 from gensit.config import Config
+from gensit.inputs import Inputs
 from gensit.utils.misc_utils import *
 from gensit.static.plot_variables import *
 from gensit.static.global_variables import *
@@ -172,42 +174,6 @@ class Plot(object):
         else:
             raise Exception(f"Experiment class {PLOT_VIEWS[visualiser_name]} not found")
     
-    def compile_table_records_in_geodataframe(self,table,geometry):
-        # Extract ids from geometry
-        origin_geometry_ids = geometry[geometry.geometry_type == self.settings['origin_geometry_type']].geometry_id.tolist()
-        destination_geometry_ids = geometry[geometry.geometry_type == self.settings['destination_geometry_type']].geometry_id.tolist()
-        # Create dataframe
-        table_df = pd.DataFrame(table,index = origin_geometry_ids,columns = destination_geometry_ids)
-        # Create pairs of flow records instead of 2D flows
-        table_df = table_df.stack().reset_index()
-        # Rename columns
-        table_df.rename(columns={"level_0":"origin","level_1":"destination",0:"flow"},inplace = True)
-        # Attach origin geometry
-        table_df = table_df.merge(
-                        geometry[['geometry_id','LONG','LAT','geometry','origin_demand']].set_index('geometry_id'),
-                        left_on='origin',
-                        right_index = True,
-                        how='left'
-        )
-        # Rename geometry
-        table_df.rename(columns={"LONG":"origin_long","LAT":"origin_lat","geometry":"origin_geometry"},inplace = True)
-        # Attach destination geometry
-        table_df = table_df.merge(
-                        geometry[['geometry_id','LONG','LAT','geometry','destination_demand']].set_index('geometry_id'),
-                        left_on='destination',
-                        right_index = True,
-                        how='left'
-        )
-        # Rename geometry
-        table_df.rename(
-                columns={
-                    "LONG":"destination_long",
-                    "LAT":"destination_lat",
-                    "geometry":"destination_geometry"
-                },inplace = True)
-
-        # Convert to geopandas
-        return gpd.GeoDataFrame(table_df,geometry='origin_geometry')
 
     def get_axes_limits(self,plot_settings,vars:list,axes_id:str,axes_lims=None,discrete_hashmaps:dict={}):
         # Axes limits from settings (read only x,y limits)
@@ -251,16 +217,34 @@ class Plot(object):
                     # If var is not discrete read only major axis data, i.e. axis 0
                     if isinstance(plot_settings[var],Iterable):
                         try:
-                            min_val = min(np.nanmin(np.ravel(plot_settings[var])),min_val)
+                            min_val = min(np.nanmin(
+                                list(flatten(
+                                    [dt['data'].values.tolist() \
+                                    if isinstance(dt,pd.DataFrame) \
+                                    else dt \
+                                    for dt in np.ravel(plot_settings[var])]
+                                ))
+                            ),min_val)
                         except:
-                            min_val = min(np.nanmin(np.ravel([dt[0] for dt in plot_settings[var]])),min_val)
+                            min_val = min(np.nanmin(np.ravel(
+                                [dt[0] for dt in plot_settings[var]]
+                            )),min_val)
                     else:
                         min_val = min(plot_settings[var],min_val)
                     if isinstance(plot_settings[var],Iterable):
                         try:
-                            max_val = max(np.nanmax(np.ravel(plot_settings[var])),max_val)
+                            max_val = max(np.nanmax(
+                                list(flatten(
+                                    [dt['data'].values.tolist() \
+                                    if isinstance(dt,pd.DataFrame) \
+                                    else dt \
+                                    for dt in np.ravel(plot_settings[var])]
+                                ))
+                            ),max_val)
                         except:
-                            max_val = max(np.nanmax(np.ravel([dt[0] for dt in plot_settings[var]])),max_val)
+                            max_val = max(np.nanmax(np.ravel(
+                                [dt[0] for dt in plot_settings[var]]
+                            )),max_val)
                     else:
                         max_val = max(plot_settings[var],max_val)
                 
@@ -483,6 +467,28 @@ class Plot(object):
                 alpha = kwargs.get('alpha',None),
                 cmap = cmap
             )
+        elif plot_type == 'geoshow':
+            vmin = 0.6875967979000001#-31438.0324774265 #kwargs.get('vmin',None)
+            vmax = 8142008.5# 1451.6155# kwargs.get('vmax',None)
+            print('vmin',vmin,'vmax',vmax)
+            ax = kwargs['x'].plot(
+                column = 'data',
+                ax = ax,
+                alpha = kwargs.get('alpha',None),
+                markersize = kwargs.get('s',None),
+                cmap = self.cmap,
+                norm = mcolors.SymLogNorm(vmin=vmin, linthresh=1.0, vmax=vmax), #mcolors.TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax),
+                edgecolor = ('black',0.8),
+                legend = True,
+                # legend_kwds = dict(
+                    # ticks = mpl.ticker.FixedLocator(list(np.linspace(vmin,0,5,False))+list(np.linspace(0,vmax,5,False)))
+                # )
+            )
+            ax.tick_params(labelsize=30)
+            # Access the colorbar
+            cbar = ax.get_figure().get_axes()[1]
+            # Set the fontsize of the colorbar
+            cbar.tick_params(labelsize=30)
         
         return ax
     
@@ -558,6 +564,8 @@ class Plot(object):
         colour = [colour] if isinstance(colour,str) else colour
         colourmap = plot_settings.get('colourmap','black')
         colourmap = [colourmap] if isinstance(colourmap,str) else colourmap
+        colourmap_midpoint = plot_settings.get('colourmap_midpoint',0.0)
+        colourmap_midpoint = [colourmap_midpoint] if isinstance(colourmap_midpoint,str) else colourmap_midpoint
         # Convert transparency levels to approapriate data type
         opacity = plot_settings.get('opacity','1.0')
         opacity = [float(opacity)] if isinstance(opacity,str) else opacity
@@ -716,7 +724,7 @@ class Plot(object):
             group_axes_data.setdefault(axes_id,{})
             for feature in ['x','y','s','linestyle', 'linewidth', 'c', 'alpha', 
                             'zorder', 'label', 'marker', 'hatch', 'hatch_opacity',
-                            'facecolor', 'edgecolor', 'annotate', 'colourmap']:
+                            'facecolor', 'edgecolor', 'annotate']:
                 group_axes_data[axes_id].setdefault(feature,[])
             
             # Unpack data
@@ -733,7 +741,8 @@ class Plot(object):
             group_axes_data[axes_id]['hatch'] = unpack_data(hatch,sid)
             group_axes_data[axes_id]['hatch_opacity'] = unpack_data(hatch_opacity,sid)
             group_axes_data[axes_id]['annotate'] = unpack_data(annotate,sid)
-            group_axes_data[axes_id]['colourmap'] = unpack_data(colourmap,sid)
+            group_axes_data[axes_id]['colourmap'] = self.settings['colourmap']
+            group_axes_data[axes_id]['colourmap_midpoint'] = self.settings['colourmap_midpoint']
             group_axes_data[axes_id]['facecolor'] = group_axes_data[axes_id]['c']
             group_axes_data[axes_id]['edgecolor'] = ('black',group_axes_data[axes_id]['hatch_opacity']) \
                 if group_axes_data[axes_id]['hatch_opacity'] \
@@ -922,7 +931,7 @@ class Plot(object):
         self.logger.info(f"Filename: {filename}")
         self.logger.success(f"Figure exported to {dirpath}")
 
-    def plot_tabular(self,plot_settings,**kwargs):
+    def plot_spatial(self,plot_settings,**kwargs):
 
         # Get directory path and file name
         dirpath = kwargs['dirpath']
@@ -950,44 +959,33 @@ class Plot(object):
         self.axids = {}
         # Count number of axes ids
         counter = 0
-        # Set ticks
+        # Set axes number
         for r in range(max(len(group_hashmap['y']),1)):
             for c in range(max(len(group_hashmap['x']),1)):
                 self.axids[(r,c)] = counter
                 counter += 1
-
-        # Get discrete variable hashmaps
-        discrete_hashmaps = {}
-        discrete_ticks = {}
-        for var in ['x','y']:
-            if self.settings.get(f'{var}_discrete',False):
-                # Get discrete ticks
-                discrete_ticks[var],discrete_hashmaps[var] = self.get_discrete_ticks(
-                    var = var,
-                    tick_locator_var = f"{var}_tick_locations",
-                    plot_settings = plot_settings
-                )
+        
+        
+        # Canonicalise data
+        plot_settings['x'] = [
+            [pd.read_json(pt[0]) if pt[0] else pt[0], pt[1] if pt[1] else pt[1]]
+            for pt in plot_settings['x']
+        ]
+        # Get global axes limits
+        axes_lims = self.get_axes_limits( 
+            plot_settings = plot_settings,
+            vars = ['x'],
+            axes_id = (0,0),
+            discrete_hashmaps = {}
+        )
         
         # print(plot_settings['x'])
-        # print(discrete_hashmaps['x'])
         # print(group_hashmap)
+        print(axes_lims)
         # print(discrete_ticks['x'])
         
         # Extract data
-        x_range = list(map(lambda v: hash_major_minor_var(
-            discrete_hashmaps['x'],
-            v,
-            scientific=self.settings.get('x_scientific',False)
-        ), plot_settings['x'])) \
-        if self.settings.get('x_discrete',False) \
-        else [dt[0] for dt in plot_settings['x']] # keep only major axis data
-        y_range = list(map(lambda v: hash_major_minor_var(
-            discrete_hashmaps['y'],
-            v,
-            scientific=self.settings.get('y_scientific',False)
-        ), plot_settings['y'])) \
-        if self.settings.get('y_discrete',False) \
-        else [dt[0] for dt in plot_settings['y']] # keep only major axis data
+        x_range = [dt[0] for dt in plot_settings['x']] # keep only major axis data
         marker_size = plot_settings.get('marker_size',1.0)
         marker_size = [float(marker_size)] if not isinstance(marker_size,Iterable) else marker_size
         colour = plot_settings.get('colour','black')
@@ -998,6 +996,10 @@ class Plot(object):
         # Convert hatch pattern transparency levels to approapriate data type
         hatch_opacity = plot_settings.get('hatch_opacity','1.0')
         hatch_opacity = [float(hatch_opacity)] if isinstance(hatch_opacity,str) else hatch_opacity
+        colourmap = plot_settings.get('colourmap','black')
+        colourmap = [colourmap] if isinstance(colourmap,str) else colourmap
+        colourmap_midpoint = plot_settings.get('colourmap_midpoint',0.0)
+        colourmap_midpoint = [colourmap_midpoint] if isinstance(colourmap_midpoint,str) else colourmap_midpoint
         zorder = plot_settings.get('zorder',[1])
         zorder = [float(zorder)] if isinstance(zorder,str) else zorder 
         label = plot_settings.get('label',[''])
@@ -1025,119 +1027,32 @@ class Plot(object):
             squeeze = False
         )
 
+        # Set colormap
+        self.cmap = plt.get_cmap(self.settings.get('colourmap',None))
+
         # Global axes label
         for var in ['x','y']:
             if self.settings.get(f'{var}_label',''):
                 axis_label = self.settings[f'{var}_label'].replace("_"," ")
                 getattr(plt,f"{var}label",plt.xlabel)(
                     axis_label,
-                    fontsize = self.settings[f'{var}_label_size'],
-                    labelpad = self.settings[f'{var}_label_pad'],
-                    rotation = self.settings[f'{var}_label_rotation']
+                    fontsize = self.settings.get(f'{var}_label_size',None),
+                    labelpad = self.settings.get(f'{var}_label_pad',None),
+                    rotation = self.settings.get(f'{var}_label_rotation',None)
                 )
-        
-        # # Global axes limits
-        # if not subplots_exist:
-        #     # Get global axes limits
-        #     axes_lims = self.get_axes_limits( 
-        #         plot_settings = plot_settings,
-        #         vars = ['x','y'],
-        #         axes_id = (0,0),
-        #         discrete_hashmaps = discrete_hashmaps
-        #     )
-        #     plt.xlim(left = axes_lims['x'][0], right = axes_lims['x'][1])
-        #     plt.ylim(bottom = axes_lims['y'][0], top = axes_lims['y'][1])
-
-        # Count number of axes ids
-        counter = 0
-        # Set ticks
-        # print(group_hashmap)
-        for r in range(max(len(group_hashmap['y']),1)):
-            for c in range(max(len(group_hashmap['x']),1)):
-                for j,var in enumerate(['x','y']):
-                    # Count number of discrete tick types
-                    discrete_tick_types = 0
-                    for i,tick_type in enumerate(['major','minor']):
-                        if self.settings.get(f'{var}_discrete',False) and i < len(discrete_ticks[var]):
-                            # Get discrete ticks
-                            tick_locations = discrete_ticks[var][i]['locations']
-                            tick_labels = discrete_ticks[var][i]['labels']
-                            # print(tick_labels)
-                            # print(tick_locations)
-                            # Plot ticks
-                            getattr(ax[r,c],f"set_{var}ticks",ax[r,c].set_xticks)(
-                                ticks = tick_locations,
-                                labels = tick_labels,
-                                minor = (tick_type == 'minor')
-                            )
-                            # Get tick label pad
-                            tick_pad = safe_list_get(self.settings[f"{var}_tick_pad"],i,self.settings[f"{var}_tick_pad"][0])
-                            # Get tick label pad
-                            tick_rotation = safe_list_get(self.settings[f"{var}_tick_rotation"],i,self.settings[f"{var}_tick_rotation"][0])
-                            # Get tick label size
-                            tick_size = safe_list_get(self.settings[f"{var}_tick_size"],i,self.settings[f"{var}_tick_size"][0])
-                            # print(tick_type,tick_pad,tick_rotation,tick_size)
-                            ax[r,c].tick_params(
-                                axis = var, 
-                                which = tick_type, 
-                                pad = tick_pad,
-                                bottom = True,
-                                labelsize = tick_size,
-                                rotation = tick_rotation
-                            )
-                            # Increment discrete tick types
-                            discrete_tick_types += 1
-                        else:
-                            # Set tick parameters for continuous ticks if there are properly specified
-                            if self.settings[f"{var}_tick_locations"] and self.settings[f"{var}_tick_locations"][0]:
-                                # Read axis limits
-                                start, end = getattr(
-                                    ax[r,c],
-                                    f"get_{var}lim()",
-                                    ax[r,c].get_xlim()
-                                )
-                                # Change frequency at which continuous ticks appear
-                                getattr(
-                                    ax[r,c],
-                                    f"{var}axis",
-                                    ax[r,c].xaxis
-                                ).set_ticks(np.arange(
-                                    self.settings[f"{var}_tick_locations"][0][0], 
-                                    end,
-                                    self.settings[f"{var}_tick_locations"][0][1]
-                                ))
-                            tick_params = {
-                                "pad": self.settings[f"{var}_tick_pad"][0] if self.settings[f"{var}_tick_pad"] else None,
-                                "labelsize": self.settings[f"{var}_tick_size"][0] if self.settings[f"{var}_tick_size"] else None,
-                                "rotation": self.settings[f"{var}_tick_rotation"][0] if self.settings[f"{var}_tick_rotation"] else None
-                            }
-                            ax[r,c].tick_params(
-                                axis = var, 
-                                which = 'both',
-                                bottom = True,
-                                **{k:v for k,v in tick_params.items() if v}
-                            )
-
+                ax[r,c].tick_params(
+                    axis = var, 
+                    pad = self.settings.get(f"{var}_tick_pad",[None])[0],
+                    bottom = True,
+                    labelsize = self.settings.get(f"{var}_tick_size",[None])[0],
+                    rotation = self.settings.get(f"{var}_tick_rotation",[None])[0]
+                )
                     
-                    # Set gridlines for discrete ticks (major or (major and minor))
-                    if discrete_tick_types > 0:
-                        ax[r,c].grid(
-                            axis = var,
-                            which = 'major'# if discrete_tick_types == 1 else 'both')
-                        )
-                        ax[r,c].set_axisbelow(True)
-                        getattr(
-                            ax[r,c],
-                            f"{var}axis",
-                            ax[r,c].xaxis
-                        ).remove_overlapping_locs = False
-                    
-        # Keep track of each group's axes limits
-        group_axes_limits = {}
+        # Keep track of each group's axes data
         group_axes_data = {}
         
         # Loop over sweeps
-        for sid in range(len(y_range)):
+        for sid in range(len(x_range)):
             # Get axes id 
             axes_id = self.map_groups_to_axes(
                 index = sid,
@@ -1148,14 +1063,14 @@ class Plot(object):
             
             # Initialise group axes data (if required)
             group_axes_data.setdefault(axes_id,{})
-            for feature in ['x','y','s','linestyle', 'linewidth', 'c', 'alpha', 
+            for feature in ['x','s','linestyle', 'linewidth', 'c', 'alpha', 
                             'zorder', 'label', 'marker', 'hatch', 'hatch_opacity',
                             'facecolor', 'edgecolor', 'annotate']:
                 group_axes_data[axes_id].setdefault(feature,[])
             
             # Unpack data
-            group_axes_data[axes_id]['x'] = x_range[sid]
-            group_axes_data[axes_id]['y'] = y_range[sid]
+            group_axes_data[axes_id]['x'] = self.merge_data_with_geometries(x_range[sid],plot_settings)
+            # print(group_axes_data[axes_id]['x'])
             group_axes_data[axes_id]['s'] = unpack_data(marker_size,sid)
             group_axes_data[axes_id]['linestyle'] = unpack_data(line_style,sid)
             group_axes_data[axes_id]['linewidth'] = unpack_data(line_width,sid)
@@ -1167,10 +1082,14 @@ class Plot(object):
             group_axes_data[axes_id]['hatch'] = unpack_data(hatch,sid)
             group_axes_data[axes_id]['hatch_opacity'] = unpack_data(hatch_opacity,sid)
             group_axes_data[axes_id]['annotate'] = unpack_data(annotate,sid)
+            group_axes_data[axes_id]['colourmap'] = self.settings['colourmap']
+            group_axes_data[axes_id]['colourmap_midpoint'] = self.settings['colourmap_midpoint']
             group_axes_data[axes_id]['facecolor'] = group_axes_data[axes_id]['c']
             group_axes_data[axes_id]['edgecolor'] = ('black',group_axes_data[axes_id]['hatch_opacity']) \
                 if group_axes_data[axes_id]['hatch_opacity'] \
                 else (group_axes_data[axes_id]['facecolor'],group_axes_data[axes_id]['hatch_opacity'])
+            group_axes_data[axes_id]['vmin'] = axes_lims['x'][0]
+            group_axes_data[axes_id]['vmax'] = axes_lims['x'][1]
             
             # print(sid,axes_id)
             # Print plotting data
@@ -1191,152 +1110,23 @@ class Plot(object):
                 summarise = True
             )
             
-            # Plot x versus y
+            # Plot spatial view
             self.plot_wrapper(
                 ax = ax[axes_id],
                 plot_type = PLOT_TYPES[self.settings.get('plot_type','scatter')],
                 **group_axes_data[axes_id]
             )
 
-            # Shade area between line and axis
-            if self.settings.get('x_shade',False):
-                plt.rcParams['hatch.linewidth'] = self.settings.get('hatch_linewidth',1.0)
-                ax[axes_id].fill_betweenx(
-                    y = group_axes_data[axes_id]['y'],
-                    x1 = 0,
-                    x2 = group_axes_data[axes_id]['x'],
-                    **{
-                        k:v for k,v in group_axes_data[axes_id].items()
-                        if k in ['facecolor', 'edgecolor', 'zorder', 'hatch', 'label', 'alpha']
-                    }
+            # Set title
+            if self.settings.get('axis_title',''):
+                ax[axes_id].set_title(
+                    self.settings.get('axis_title',''),
+                    fontdict = {'fontsize':self.settings.get('axis_title_size',None)}
                 )
-            if self.settings.get('y_shade',False):
-                plt.rcParams['hatch.linewidth'] = self.settings.get('hatch_linewidth',1.0)
-                # print(axes_id,group_axes_data[axes_id]['x'],group_axes_data[axes_id]['y'])
-                ax[axes_id].fill_between(
-                    x = group_axes_data[axes_id]['x'],
-                    y1 = 0,
-                    y2 = group_axes_data[axes_id]['y'],
-                    **{ 
-                        k:v for k,v in group_axes_data[axes_id].items()
-                        if k in ['facecolor', 'edgecolor', 'zorder', 'hatch', 'label', 'alpha']
-                    }
-                )
-
-            # Annotate data
-            if group_axes_data[axes_id]['annotate']:
-                txt = group_axes_data[axes_id]['annotate']
-                ax[axes_id].annotate(
-                    str(string_to_numeric(txt) 
-                        if str(txt).isnumeric() 
-                        else str(txt)), 
-                    (group_axes_data[axes_id]['x'], group_axes_data[axes_id]['y']),
-                    zorder = 10000 # bring annotation data to front
-                )
-
-            # # Get local group axes limits
-            # group_axes_limits[axes_id] = self.get_axes_limits(
-            #     plot_settings = {
-            #         "x":x_range[sid],
-            #         "y":y_range[sid],
-            #         **{k:v for k,v in plot_settings.items() if k not in ['x','y']}
-            #     },
-            #     vars = ['x','y'],
-            #     axes_id = axes_id,
-            #     axes_lims = group_axes_limits,
-            #     discrete_hashmaps = discrete_hashmaps
-            # )
-
-        # # Set local group axes limits, label etc..
-        # for r in range(max(len(group_hashmap['y']),1)):
-        #     for c in range(max(len(group_hashmap['x']),1)):
-        #         for var in ['x','y']:
-        #             if var in group_axes_limits[(r,c)]:
-        #                 # Set axis limits for var that is grouped
-        #                 getattr(
-        #                     ax[r,c],
-        #                     f"set_{var}lim",
-        #                     ax[r,c].set_ylim
-        #                 )(
-        #                     group_axes_limits[(r,c)][var][0], 
-        #                     group_axes_limits[(r,c)][var][1]
-        #                 )
-        #             # Set axis scaling
-        #             if self.settings.get(f"{var}_scale",''):
-        #                 getattr(
-        #                     ax[r,c],
-        #                     f"set_{var}scale",
-        #                     ax[r,c].set_yscale(self.settings[f"{var}_scale"])
-        #                 )
-
-        #             # Try to set `axes label for var that is grouped
-        #             try:
-        #                 if group_hashmap[var]:
-        #                     ax[r,c].set_ylabel(
-        #                         list(group_hashmap[var].keys())[r],
-        #                         fontsize = self.settings[f'{var}_label_size'],
-        #                         labelpad = self.settings[f'{var}_label_pad'],
-        #                         rotation = self.settings[f'{var}_label_rotation']
-        #                     )
-        #             except:
-        #                 # print(r,c, 'y label skipped')
-        #                 continue
 
         # Aspect ratio equal
         if self.settings['equal_aspect']:
             plt.gca().set_aspect('equal')
-    
-        # Legend
-        # try:
-        # Create dictionary of labels
-        by_label = {}
-        handles, label, label_split = [],[],[]
-        # Find each label from each plot
-        for axid in self.axids.keys():
-            # Ensure no duplicate entries in legend exist
-            ax_handles, ax_labels = ax[axid].get_legend_handles_labels()
-            # Convert everything to numpy arrays
-            ax_label_split = [lab.split(', ') for lab in ax_labels]
-            
-            # Add legend handles and labels to list
-            handles += ax_handles
-            label_split += ax_label_split
-            label += ax_labels
-        
-        # Create a legend for specific or all axes
-        plot_legend = self.settings['legend_axis'] in list(self.axids.keys())
-        if plot_legend:
-            label_split = np.array(label_split,dtype='str')
-            # Sort label first by first label, then by second etc.
-            index_sorted = np.lexsort(label_split.T)
-            # Do not worry about duplicates. These will be handled here
-            # Create dictionary of label
-            by_label = dict(zip(
-                np.array(label)[index_sorted].tolist(), 
-                np.array(handles)[index_sorted].tolist()
-            ))
-
-            # Gather legend kwargs
-            leg_kwargs = {
-                'bbox_to_anchor': self.settings.get('bbox_to_anchor',None),
-                'ncols': self.settings.get('legend_cols',1),
-                'columnspacing': self.settings.get('legend_col_spacing',None),
-                'handletextpad': self.settings.get('legend_pad',None),
-                'loc': self.settings.get('legend_location','best')
-            }
-            # print(leg_kwargs)
-            # Remove nulls 
-            leg_kwargs = {k:v for k,v in leg_kwargs.items() if v}
-            # If more than one column are provided split legend patches and keys
-            # into sublists of length ncols
-            leg = ax[axid].legend(
-                flip(list(by_label.values()), self.settings.get('legend_cols',1)), 
-                flip(list(by_label.keys()), self.settings.get('legend_cols',1)),
-                frameon = False,
-                prop = {'size': self.settings.get('legend_label_size',None)},
-                **leg_kwargs
-            )
-            leg._ncol = 1
         
 
         
@@ -1395,9 +1185,12 @@ class Plot(object):
                     # TODO: Fix the fact that default sigma is none and not learned
 
                     # Convert coordinate to list
-                    if isinstance(var_value,Iterable) and \
+                    if isinstance(var_value,pd.DataFrame):
+                        var_value = var_value.reset_index().to_json()
+                    elif isinstance(var_value,Iterable) and \
                         not isinstance(var_value,str):
                         var_value = list(var_value)
+                        
                     # add to sub-variable values
                     if len(grp) > 1:
                         if var not in (PLOT_COORDINATES+PLOT_COORDINATE_DERIVATIVES):
@@ -1640,7 +1433,53 @@ class Plot(object):
                 # print(key,merged_settings[key])
 
         return [merged_settings]
-    
+
+    def merge_data_with_geometries(self,data,plot_sett):
+        if getattr(self,'region_geometries',None) is None:
+            if getattr(plot_sett['outputs'],'inputs') is not None:
+                # Make sure region_geometries exist
+                try:
+                    region_geometries = getattr(plot_sett['outputs'].inputs.data,'region_geometries')
+                    assert region_geometries is not None
+                except:
+                    raise Exception(f"Inputs {list(plot_sett['outputs'].inputs.data_vars().keys())} do not have region_geometries data") 
+            elif getattr(plot_sett['outputs'],'config') is not None:
+                try:
+                    assert 'region_geometries' in plot_sett['outputs'].config['inputs']['data']
+                except:
+                    raise Exception(f"Inputs {plot_sett['outputs'].config} do not have region_geometries data") 
+                # Read inputs using config
+                inputs = Inputs(
+                    config = plot_sett['outputs'].config,
+                    synthetic_data = False,
+                    logger = self.logger
+                )
+                region_geometries = inputs.data.region_geometries
+            else:
+                raise Exception(f"Cannot read region geometries")
+            # Store region geometries
+            self.region_geometries = region_geometries
+        
+        # Make sure data in json format has been read appropriately
+        try:
+            assert isinstance(data,(pd.DataFrame))
+        except:
+            raise Exception(f"Data type {type(data)} is not a str or dict.")
+        
+        # Stored dims in data
+        location_dims = [dim for dim in data.columns.values if dim in ['origin','destination']]
+
+        # CAUTION: Merge based on first location dim found
+        data_with_geometries = pd.merge(
+            data,
+            self.region_geometries[['LOCATIONID','geometry']],
+            how = 'left',
+            left_on = location_dims[0],
+            right_on = 'LOCATIONID'
+        ) 
+        # Convert back to geodataframe
+        return gpd.GeoDataFrame(data_with_geometries.drop(columns=['LOCATIONID']))
+
     def flatten_merged_settings(self,merged_data):
         for key in merged_data.keys():
             if key in ['outputs']:

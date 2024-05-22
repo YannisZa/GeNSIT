@@ -2754,6 +2754,7 @@ class OutputSummary(object):
                     {evaluation if not isinstance(evaluation,xr.DataArray) else evaluation.values.flatten()} 
                     {np.shape(evaluation) if not isinstance(evaluation,xr.DataArray) else dict(evaluation.sizes)}
                 """)
+                # print(evaluation.drop(columns=['sigma','to_learn']).reset_index().drop(columns=['sigma','to_learn']).to_json())
                 print('\n')
 
             if isinstance(evaluation,(xr.DataArray,xr.Dataset)):

@@ -107,10 +107,6 @@ Get SRMSEs for intensity samples and my experiments:
 ```
 clear; gensit summarise -dn DC/exp1 -et SIM_NN \
 -el np -el MathUtils -el xr \
--e intensity_srmse_all_mean "intensity_srmse_all_by_seed.mean('seed',dtype='float64',skipna=True)" \
--e intensity_srmse_all_std "intensity_srmse_all_by_seed.mean('seed',dtype='float64',skipna=True)" \
--e intensity_srmse_train_mean "intensity_srmse_train_by_seed.mean('seed',dtype='float64',skipna=True)" \
--e intensity_srmse_train_std "intensity_srmse_train_by_seed.std('seed',dtype='float64',skipna=True)" \
 -e intensity_srmse_test_mean "intensity_srmse_test_by_seed.mean('seed',dtype='float64',skipna=True)" \
 -e intensity_srmse_test_std "intensity_srmse_test_by_seed.std('seed',dtype='float64',skipna=True)" \
 -ea intensity \
@@ -119,7 +115,7 @@ clear; gensit summarise -dn DC/exp1 -et SIM_NN \
 -ea "intensity_srmse_train_by_seed=intensity_mean.groupby('seed').map(MathUtils.srmse,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.train_cells_mask)" \
 -ea "intensity_srmse_test_by_seed=intensity_mean.groupby('seed').map(MathUtils.srmse,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask)" \
 -btt 'iter' 10000 9 10000 \
--k sigma -k type -k name -k title -fe intensity_SRMSEs -nw 1
+-k sigma -k type -k name -k title -fe total_constrained_intensity_SRMSEs -nw 1
 ```
 
 #### Vanilla comparisons
@@ -193,7 +189,7 @@ clear; gensit summarise \
 -ea "intensity_ssi_train=intensity_mean.groupby('seed').map(MathUtils.ssi,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.train_cells_mask)" \
 -ea "intensity_ssi_test=intensity_mean.groupby('seed').map(MathUtils.ssi,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask)" \
 -btt 'iter' 10000 10 100000 \
--k sigma -k type -k name -k title -fe intensity_SSIs -nw 1
+-k sigma -k type -k name -k title -fe total_constrained_intensity_SSIs -nw 1
 ```
 
 #### Vanilla Comparisons
@@ -262,7 +258,7 @@ clear; gensit summarise -dn DC/exp1 -et SIM_NN -et JointTableSIM_NN -et NonJoint
 -ea "intensity_cp_train=intensity.stack(id=['iter']).groupby('seed').map(cp_func,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.train_cells_mask,region_mass=region_masses)" \
 -ea "intensity_cp_test=intensity.stack(id=['iter']).groupby('seed').map(cp_func,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask,region_mass=region_masses)" \
 -btt 'iter' 10000 9 10000 \
--k type -k title -fe intensity_CoverageProbabilities -nw 1
+-k type -k title -fe total_constrained_intensity_CoverageProbabilities -nw 1
 ```
 
 #### Vanilla Comparisons
@@ -317,31 +313,32 @@ clear; gensit summarise -dn DC/exp1 -et NonJointTableSIM_NN \
 # Plots
 
 ## Figure 5
+
 ```
-clear; gensit plot tabular imshow -x residual_mean_reshaped -y residual_mean_reshaped  \
--dn DC/comparisons -et RandomForest_Comparison_UnsetNoise__doubly_and_cell_constrained_all_region_features \
+clear; gensit plot spatial empty -x residual_mean_colsums_spatial  \
+-dn DC/comparisons -et GraphAttentionNetwork_Comparison_UnsetNoise__doubly_and_cell_constrained_all_region_features \
 -el np -el MathUtils \
--e residual_mean_reshaped "reshape_null_data(residual_mean.values.squeeze())" \
+-e residual_mean_total_spatial "residual_mean_colsums.sum('destination')" \
+-e residual_mean_colsums_spatial "residual_mean_colsums.to_dataframe(name='data',dim_order=['destination'])" \
 -ea intensity \
--ea "reshape_null_data=MathUtils.reshape_null_data" \
 -ea "intensity_mean=intensity.groupby('seed').mean('iter',dtype='float64')" \
--ea "residual_mean=intensity_mean.groupby('seed').map(lambda x: (x-outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask)).mean('seed',skipna=True)" \
--fs 10 10 -ff ps -ft 'figure5/mean_residual' -cm RdYlGn  \
--xlab 'Destinations' -ylab 'Origins' \
--xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 1
+-ea "residual_mean_colsums=intensity_mean.groupby('seed').map(lambda x: (x-outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True)).mean('seed',skipna=True).sum('origin')" \
+-xlab 'Longitude' -ylab 'Latitute' -at 'GMEL' \
+-fs 10 10 -ff ps -ft 'mean_residual' -cm bwr  \
+-ats 18 -ylr 90 -yts 12 0 -xts 12 0 -nw 1
 ```
 
 
+
 ```
-clear; gensit plot tabular imshow -x residual_mean_reshaped -y residual_mean_reshaped  \
+clear; gensit plot spatial geoshow -x residual_mean_colsums_spatial  \
 -pdd ./data/outputs/DC/comparisons/paper_figures/figure5/ \
 -el np -el MathUtils \
--e residual_mean_reshaped "reshape_null_data(residual_mean.values.squeeze())" \
+-e residual_mean_colsums_spatial "residual_mean_colsums.to_dataframe(name='data',dim_order=['destination'])" \
 -ea intensity \
--ea "reshape_null_data=MathUtils.reshape_null_data" \
 -ea "intensity_mean=intensity.groupby('seed').mean('iter',dtype='float64')" \
--ea "residual_mean=intensity_mean.groupby('seed').map(lambda x: (x-outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask)).mean('seed',skipna=True)" \
--fs 10 10 -ff ps -ft 'mean_residual' -cm RdYlGn \
--xlab 'Destinations' -ylab 'Origins' \
--xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 1
+-ea "residual_mean_colsums=intensity_mean.groupby('seed').map(lambda x: (x-outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True)).mean('seed',skipna=True).sum('origin')" \
+-xlab 'Longitude' -ylab 'Latitute' -at 'GMEL' \
+-fs 10 10 -ff ps -ft ' mean_residual' -cm RdYlBu_r -vmid 0.0 -la 0 0 \
+-ats 18 -ylr 90 -yts 12 0 -xts 12 0 -nw 1
 ```

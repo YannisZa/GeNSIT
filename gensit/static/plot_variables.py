@@ -35,10 +35,11 @@ PLOT_VIEWS = {
 }
 
 PLOT_TYPES = {
-    "empty":"",
+    "empty": "",
     "line": "plot",
     "scatter" : "scatter",
-    "imshow": "imshow"
+    "imshow": "imshow",
+    "geoshow": "geoshow"
 }
 
 PLOT_MARKERS = {

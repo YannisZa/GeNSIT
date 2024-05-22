@@ -22,7 +22,7 @@ from gensit.utils.math_utils import torch_optimize
 from gensit.utils.probability_utils import random_vector
 from gensit.physics_models.HarrisWilsonModel import HarrisWilson
 from gensit.intensity_models import instantiate_intensity_model
-from gensit.static.global_variables import TRAIN_SCHEMA, PARAMETER_DEFAULTS, TRAIN_SCHEMA, VALIDATION_SCHEMA, INPUT_SCHEMA, Dataset
+from gensit.static.global_variables import TRAIN_SCHEMA, PARAMETER_DEFAULTS, TRAIN_SCHEMA, VALIDATION_SCHEMA, PLOT_SCHEMA, INPUT_SCHEMA, Dataset
 from gensit.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims, eval_dtype, read_file
 
 class Inputs:
@@ -80,7 +80,7 @@ class Inputs:
     def copy(self,datasets:list=None):
         # Try to cast all data to tensor from xarray
         keys_of_interest = [
-            sam_name for sam_name in dict({**TRAIN_SCHEMA,**VALIDATION_SCHEMA}).keys() \
+            sam_name for sam_name in dict({**INPUT_SCHEMA}).keys() \
             if getattr(self.data,sam_name,None) is not None
         ]
         datasets = list(set(datasets).intersection(set(keys_of_interest))) \
@@ -114,32 +114,7 @@ class Inputs:
             self.config.settings['inputs'].get("dims",{"origin":None,"destination":None,"time":None})
         )
 
-        # Import all data
-        for attr,schema in TRAIN_SCHEMA.items():
-            if len(schema) > 0 and attr in list(self.config.settings['inputs']['data'].keys()):
-                filename = self.config.settings['inputs']['data'][attr]
-                filename = filename.get('file','') if isinstance(filename,dict) else filename
-                filepath = os.path.join(
-                    self.config.in_directory,
-                    self.config.settings['inputs']['dataset'],
-                    filename
-                )
-                if os.path.isfile(filepath):
-                    # Import data
-                    data = np.loadtxt(filepath,dtype = schema['dtype'], ndmin = schema['ndmin'])
-                    setattr(self.data,attr,data)
-                    # Check to see see that they are all positive
-                    if schema.get('positive',True) and (getattr(self.data,attr) < 0).any():
-                        raise Exception(f"{attr.replace('_',' ').capitalize()} {getattr(self.data,attr)} are NOT positive")
-                    # Update dims
-                    for ax,dim in zip(schema.get("axes",[]),schema.get("dims",[])):
-                        if getattr(self.data,attr) is not None:
-                            self.data.dims[dim] = int(np.shape(getattr(self.data,attr))[ax])
-                else:
-                    raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
-        
-        
-        for attr,schema in VALIDATION_SCHEMA.items():
+        for attr,schema in INPUT_SCHEMA.items():
             if len(schema) > 0 and attr in list(self.config.settings['inputs']['data'].keys()):
                 filename = self.config.settings['inputs']['data'][attr]
                 filename = filename.get('file','') if isinstance(filename,dict) else filename
@@ -151,27 +126,25 @@ class Inputs:
                 if os.path.isfile(filepath):
                     # Import data
                     data = read_file(filepath, dtype = schema['dtype'], ndmin = schema['ndmin'])
-                    # # Apply function
-                    # if schema.get('apply_function','') != '':
-                    #     data = eval(
-                    #         schema['apply_function'],
-                    #         {"np":np,"torch":torch,"da":data}
-                    #     )
                     setattr(self.data,attr,data)
                     # Check to see see that they are all positive
                     if schema.get('positive',True) and (getattr(self.data,attr) < 0).any():
                         raise Exception(f"{attr.replace('_',' ').capitalize()} {getattr(self.data,attr)} are NOT positive")
+                    # Update dims
+                    for ax,dim in zip(schema.get("axes",[]),schema.get("dims",[])):
+                        if getattr(self.data,attr) is not None:
+                            self.data.dims[dim] = int(np.shape(getattr(self.data,attr))[ax])
                 else:
                     raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
         
-        # Create masks based on train/test/validation cells
-        self.create_cell_masks()
         # Import table margin data
         self.import_margins()
         # Import partial table cell data
         self.import_cells_subset()
         # Validate dimensions
         self.validate_dims()
+        # Create masks based on train/test/validation cells
+        self.create_cell_masks()
         
         # Update grand total if it is not specified
         if hasattr(self.data,'ground_truth_table') and self.data.ground_truth_table is not None:

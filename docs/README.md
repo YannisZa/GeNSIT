@@ -1,6 +1,5 @@
 # GeNSIT: Generating Neural Spatial Interaction Tables
 
-**Author:** [Ioannis Zachos](https://yannisza.github.io/)
 
 [![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org) ![Python](https://img.shields.io/badge/Python-3.9-blue)
 
@@ -24,7 +23,6 @@
   - [Summarise](#summarise)
   - [Reproduce](#reproduce)
 - [Conclusion](#conclusion)
-- [Related publications](#related-publications)
 - [Acknowledgments](#acknowledgments)
 
 > **_Quick Start:_** We recommended going through sections on [Installation](#installation) and [Run](#run) if you wish to run `GeNSIT` using default settings.
@@ -52,7 +50,7 @@ This repository introduces a [computational framework named `GeNSIT`](#introduct
 Assuming Python >=3.9.7 and git are installed, clone this repository by running
 
 ```
-git clone git@github.com:YannisZa/GeNSIT.git
+git clone git@github.com:[REPONAME]/GeNSIT.git
 ```
 
 Once available locally, navigate to the main folder as follows:
@@ -395,14 +393,7 @@ docker run gensit reproduce figure4;
 
 We have introduced `GeNSIT`, an efficient framework for sampling jointly the discrete combinatorial space of agent trips ($\mathbf{T}$) subject to summary statistic data $\mathcal{C}$ and its mean-field $\boldsymbol{\Lambda}$ limit. Therefore, users of this package can perform agent location choice synthesis based on the available data $\mathcal{C},\mathcal{D}$. Although our discussion has been limited to residence to work trips, other types of trips could be modelled too, such as residence to shopping center. The main limitations of this package are the inability to model **activity chains** as opposed to trips and the fact that only static (time-independent) origin destination matrices are considered.
 
-# Related publications
-
-- Ioannis Zachos, Mark Girolami, Theodoros Damoulas. _Generating Origin-Destination Matrices in Neural Spatial Interaction Models_. (Under review).
-- Ioannis Zachos, Theodoros Damoulas, Mark Girolami. _Table Inference for Combinatorial Origin-Destination Choices in Agent-based Population Synthesis_. [https://arxiv.org/abs/2307.02184](https://arxiv.org/abs/2307.02184) (Stat, 2024).
-
 # Acknowledgments
-
-We acknowledge support from [Arup](https://www.arup.com/), the [UK Research and Innovation (UKRI) Research Council](https://www.ukri.org/) and Cambridge University's [Center for Doctoral Training in Future Infrastructure and Built Environment](https://www.fibe-cdt.eng.cam.ac.uk/). We thank [Arup's City Modelling Lab](https://www.arup.com/services/digital/city-modelling-lab) for their insightful discussions and feedback without which this project would not have come to fruition.
 
 Thank you for visiting our GitHub repository! We're thrilled to have you here. If you find our project useful or interesting, please consider showing your support by starring the repository and forking it to explore its features and contribute to its development. Your support means a lot to us and helps us grow the community around this project. If you have any questions or feedback, feel free to open an issue or reach out to us.
 

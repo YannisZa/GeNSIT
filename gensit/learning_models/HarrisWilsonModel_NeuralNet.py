@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-'''
-    Code extended from https://github.com/ThGaskin/NeuralABM
-'''
 
 import sys
 import torch

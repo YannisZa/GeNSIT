@@ -467,3 +467,30 @@ def reshape_null_data(x):
 
     # Apply the masks to filter out the rows and columns
     return x[non_nan_rows][:, non_nan_cols]
+
+
+def subtract(x,y,**kwargs):
+    x = x.astype('float32')
+    y = y.astype('float32')
+    x,y = xr.broadcast(x,y)
+    x,y = xr.align(x,y, join='exact')
+    mask = kwargs.get('mask',None)
+    if mask is not None:
+        # Apply mask
+        y = y.where(mask)
+        x = x.where(mask)
+
+    return x - y
+
+def l2(x,y,**kwargs):
+    x = x.astype('float32')
+    y = y.astype('float32')
+    x,y = xr.broadcast(x,y)
+    x,y = xr.align(x,y, join='exact')
+    mask = kwargs.get('mask',None)
+    if mask is not None:
+        # Apply mask
+        y = y.where(mask)
+        x = x.where(mask)
+
+    return (x - y)**2

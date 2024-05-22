@@ -117,6 +117,15 @@ LOSS_KWARG_OPERATIONS = {
     }
 }
 
+PLOT_SCHEMA = {
+    "region_geometries": {
+        "dtype":"",
+        "positive": False,
+        "ndmin":1,
+        "cast_to_xarray":False
+    }
+}
+
 VALIDATION_SCHEMA = {
     "test_cells": {
         "dtype":"int32",
@@ -187,7 +196,7 @@ VALIDATION_SCHEMA = {
         "args_dtype":["int32","int32"],
         "dims":["origin","destination"],
         "cast_to_xarray":True
-    },
+    }
 }
 
 
@@ -430,7 +439,7 @@ for loss in LOSS_DATA_REQUIREMENTS.keys():
         "is_iterable": True
     }
 
-INPUT_SCHEMA = {**TRAIN_SCHEMA,**VALIDATION_SCHEMA}
+INPUT_SCHEMA = {**TRAIN_SCHEMA,**VALIDATION_SCHEMA,**PLOT_SCHEMA}
 DATA_SCHEMA = {**INPUT_SCHEMA,**OUTPUT_SCHEMA}
 
 SAMPLE_DATA_REQUIREMENTS = {

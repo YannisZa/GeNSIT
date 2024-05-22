@@ -1,6 +1,4 @@
-""" The Harris and Wilson model numerical solver 
-    Code extended from https://github.com/ThGaskin/NeuralABM
-"""
+""" The Harris and Wilson model numerical solver """
 import sys
 import torch
 import optuna

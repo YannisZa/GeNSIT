@@ -183,7 +183,7 @@ clear; gensit plot simple scatter -y table_srmse -x type -x end --x_discrete \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
 -cs "~da.title.isin(['_unconstrained','_total_constrained','_total_intensity_row_table_constrained'])" \
 -c title -op 1.0 -mrkr sigma -msz table_coverage_probability_size -l title -l sigma -or asc table_coverage_probability_size  \
--ft 'figure2/cumulative_srmse_and_cp_by_method' -ylab 'SRMSE$(\mathbb{E}[\mytable^{(1:N)}\vert \allconstraints,\obsdata],\groundtruthtable)$' -xlab 'Method, $N$' \
+-ft 'figure2/cumulative_srmse_and_cp_by_method' -ylab 'SRMSE' -xlab 'Method, $N$' \
 -la 0 0 -lc 2 -loc 'upper center' -bbta 0.5 -bbta 1.35 -lls 14 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 12 16 \
 -xtp 0 102 -ytl 0.0 0.2 -xtl 1 1 -xtl 2 3 -xlim 0 19 -ylim 0 1.8 -xtr 75 0
 ```
@@ -194,7 +194,7 @@ Load plot data and replot
 clear; gensit plot simple scatter -y table_srmse -x type -x end --x_discrete \
 -pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp1/paper_figures/figure2/ \
 -fs 10 10 -ff ps -ft 'cumulative_srmse_and_cp_by_method' \
--ylab 'SRMSE$(\mathbb{E}[\mytable^{(1:N)}\vert \allconstraints,\obsdata],\groundtruthtable)$' -xlab 'Method, $N$' \
+-ylab 'SRMSE' -xlab 'Method, $N$' \
 -la 0 0 -lc 2 -loc 'upper center' -bbta 0.5 -bbta 1.35 -lls 14 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 12 16 \
 -xtp 0 102 -ytl 0.0 0.2 -xtl 1 1 -xtl 2 3 -xlim 0 19 -ylim 0 1.8 -xtr 75 0
 ```
@@ -219,7 +219,7 @@ clear; gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size' --
 -k sigma -k type -k name -k title -k N \
 -mrkr sigma -c title -msz table_coverage_probability_size -op 1.0 -or asc table_coverage_probability_size -l sigma -l title \
 -fs 10 10 -ff ps -ft 'figure3/exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
--xlab 'Method, ($N$, $E$)' -ylab 'SRMSE$(\mathbb{E}[\mytable^{(1:N)}\vert \allconstraints,\obsdata],\mytable^{\mathcal{D}})$' \
+-xlab 'Method, ($N$, $E$)' -ylab 'SRMSE' \
 -ylim 0.0 3.2 -ylr 90 -xtp 0 80 -ytl 0.0 0.2 -ytl 0.0 0.0 -xtl 5 8 -xtl 9 16 -yts 18 18 -xts 18 18 -xts 18 18 \
 -xtr 70 0 -xls 20 -yls 20 -xlim 0 111 -la 0 0 -lls 14 -loc 'upper center' -bbta 0.45 -bbta 1.3 -btta 0.4 -btta 1.0 -lc 3 -lp 0.01 -lcs 0.1
 ```
@@ -230,7 +230,7 @@ Load plot data and replot
 clear; gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
 -pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp2/paper_figures/figure3/ \
 -fs 10 10 -ff ps -ft 'exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
--xlab 'Method, ($N$, $E$)' -ylab 'SRMSE$(\mathbb{E}[\mytable^{(1:N)}\vert \allconstraints,\obsdata],\mytable^{\mathcal{D}})$' \
+-xlab 'Method, ($N$, $E$)' -ylab 'SRMSE' \
 -ylim 0.0 3.2 -ylr 90 -xtp 0 80 -ytl 0.0 0.2 -ytl 0.0 0.0 -xtl 5 8 -xtl 9 16 -yts 18 18 -xts 18 18 -xts 18 18 \
 -xtr 70 0 -xls 20 -yls 20 -xlim 0 111 -la 0 0 -lls 14 -loc 'upper center' -bbta 0.45 -bbta 1.3 -btta 0.4 -btta 1.0 -lc 3 -lp 0.01 -lcs 0.1
 ```
@@ -251,7 +251,7 @@ clear; gensit plot simple scatter -y table_srmse -x loss_name --x_discrete  \
 -cs "da.title.isin(['_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained'])" \
 -fs 10 10 -ff ps -ft 'figure4/loss_function_validation_intractable_odms' \
 -mrkr sigma -c title -msz table_coverage_probability_size -or asc table_coverage_probability_size -l sigma -l title \
--xlab 'Loss operator $\lossoperator$' -ylab 'SRMSE$(\mathbb{E}[\mytable^{(1:N)}\vert \allconstraints,\obsdata],\mytable^{\mathcal{D}})$' \
+-xlab 'Loss operator $\lossoperator$' -ylab 'SRMSE' \
 -ylim 0.0 2.2 -xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 1
 ```
 
@@ -266,7 +266,7 @@ Load plot data and replot
 clear; gensit plot simple scatter -y table_srmse -x loss_name --x_discrete  \
 -pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp3/paper_figures/figure4/ \
 -fs 10 10 -ff ps -ft 'figure4_loss_function_validation_all_odms' \
--xlab 'Loss operator $\lossoperator$' -ylab 'SRMSE$(\mathbb{E}[\mytable^{(1:N)}\vert \allconstraints,\obsdata],\mytable^{\mathcal{D}})$' \
+-xlab 'Loss operator $\lossoperator$' -ylab 'SRMSE' \
 -la 0 0 -lc 2 -loc 'upper center' -bbta 0.5 -bbta 1.4 -lls 14 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 12 16 \
 -xtp 0 92 -ytl 0.0 0.2 -xtl 3 3 -xtl 3 3 -xlim 0 27 -ylim 0 1.4 -xtr 75 0
 ```
