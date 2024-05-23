@@ -1,0 +1,85 @@
+clear; gensit plot spatial geoshow -x residual_mean_colsums_spatial  \
+-dn DC/comparisons -et GraphAttentionNetwork_Comparison_UnsetNoise__doubly_and_cell_constrained_all_region_features \
+-el np -el MathUtils \
+-e residual_mean_colsums_spatial "residual_mean_colsums.to_dataframe(name='data',dim_order=['destination'])" \
+-ea intensity \
+-ea "intensity_mean=intensity.squeeze('seed').drop_vars('seed').mean('iter',dtype='float64')" \
+-ea "residual_mean_colsums=MathUtils.l2(intensity_mean,outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True).sum('origin')" \
+-cs "da.seed==1" --slice \
+-xlab 'Longitude' -ylab 'Latitute' -at 'GMEL' \
+-fs 10 10 -ff pdf -ft 'figure5/GMEL_mean_residual' -cm bwr  \
+-ats 18 -ylr 90 -yts 12 0 -xts 12 0 -nw 1
+
+
+clear; gensit plot spatial geoshow -x residual_mean_colsums_spatial  \
+-pdd ./data/outputs/DC/comparisons/paper_figures/figure5/ \
+-el np -el MathUtils \
+-e residual_mean_colsums_spatial "residual_mean_colsums.to_dataframe(name='data',dim_order=['destination'])" \
+-ea intensity \
+-ea "intensity_mean=intensity.mean('iter',dtype='float64')" \
+-ea "residual_mean_colsums=MathUtils.l2(intensity_mean,outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True).sum('origin')" \
+-xlab 'Longitude' -ylab 'Latitute' -at '\textsc{GMEL}' \
+-fs 10 10 -ff pdf -ft 'GMEL_mean_residual' -cm bwr  \
+-cm bwr -ats 18 -ylr 90 -yls 30 0 -xls 30 0 -xts 12 0 -nw 1
+
+===========================================================================================================================
+
+-cs "da.sigma==0.0141" -cs "da.seed==1" \
+-btt 'iter' 10000 9 10000 \
+
+clear; gensit plot spatial geoshow -x residual_mean_colsums_spatial  \
+-dn DC/exp1 -et SIM_NN_SweepedNoise__totally_and_cell_constrained_20_05_2024_15_59_08 \
+-el np -el MathUtils \
+-e residual_mean_colsums_spatial "residual_mean_colsums.to_dataframe(name='data',dim_order=['destination','sweep']).drop(columns=['sigma','to_learn']).reset_index().drop(columns=['sigma','to_learn']).to_json()" \
+-ea intensity \
+-ea "intensity_mean=intensity.squeeze('seed').drop_vars('seed').mean('iter',dtype='float64')" \
+-ea "residual_mean_colsums=MathUtils.l2(intensity_mean,outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True).sum('origin')" \
+-xlab 'Longitude' -ylab 'Latitute' -at '\textsc{SIM-NN}' \
+-fs 10 10 -ff pdf -ft 'figure6/SIM_NN_mean_residual' \
+-cs "da.seed==1" --slice \
+-cm bwr -ats 18 -ylr 90 -yts 12 0 -xts 12 0 -nw 1
+
+
+
+clear; gensit plot spatial geoshow -x residual_mean_colsums_spatial  \
+-pdd ./data/outputs/DC/exp1/paper_figures/figure6/ \
+-el np -el MathUtils \
+-e residual_mean_colsums_spatial "residual_mean_colsums.to_dataframe(name='data',dim_order=['destination','sweep']).drop(columns=['sigma','to_learn']).reset_index().set_index('destination').drop(columns=['sigma','to_learn'])" \
+-ea intensity \
+-ea "intensity_mean=intensity.squeeze('seed').drop_vars('seed').mean('iter',dtype='float64')" \
+-ea "residual_mean_colsums=MathUtils.l2(intensity_mean,outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True).sum('origin')" \
+-xlab 'Longitude' -ylab 'Latitute' -at r'\textsc{SIM-NN}' \
+-fs 10 10 -ff pdf -ft 'SIM_NN_mean_residual' \
+-cm bwr -ats 18 -ylr 90 -yls 30 0 -xls 30 0 -xts 12 0 -nw 1
+
+
+===========================================================================================================================
+
+-cs "da.seed==1" \
+-btt 'iter' 10000 9 10000 \
+
+
+clear; gensit plot spatial geoshow -x residual_mean_colsums_spatial  \
+-dn DC/exp1 -d JointTableSIM_NN_SweepedNoise__totally_and_cell_constrained_21_05_2024_13_25_40 \
+-el np -el MathUtils \
+-e residual_mean_colsums_spatial "residual_mean_colsums.to_dataframe(name='data',dim_order=['destination','sweep']).drop(columns=['sigma','loss_name','loss_kwargs','to_learn','loss_function']).reset_index().drop(columns=['sigma','loss_name','loss_kwargs','to_learn','loss_function']).to_json()" \
+-ea table \
+-ea "table_mean=table.mean('iter',dtype='float64')" \
+-ea "residual_mean_colsums=MathUtils.l2(table_mean,outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True).sum('origin')" \
+-xlab 'Longitude' -ylab 'Latitute' -at 'JointTableSIM_NN' \
+-fs 10 10 -ff pdf -ft 'figure7/JointTableSIM_NN_mean_residual' \
+-cs "da.loss_name==str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])" \
+-cs "da.sigma=0.1414" --slice \
+-cm bwr -ats 18 -ylr 90 -yts 12 0 -xts 12 0 -nw 1 
+
+
+clear; gensit plot spatial geoshow -x residual_mean_colsums_spatial  \
+-pdd ./data/outputs/DC/exp1/paper_figures/figure7/ \
+-el np -el MathUtils \
+-e residual_mean_colsums_spatial "residual_mean_colsums.to_dataframe(name='data',dim_order=['destination','sweep']).drop(columns=['sigma','to_learn']).reset_index().drop(columns=['sigma','to_learn']).to_json()" \
+-ea table \
+-ea "table_mean=table.mean('iter',dtype='float64')" \
+-ea "residual_mean_colsums=MathUtils.l2(table_mean,outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True).sum('origin')" \
+-xlab 'Longitude' -ylab 'Latitute' -at '\textsc{GeNSIT} (Joint)' \
+-fs 10 10 -ff pdf -ft 'JointTableSIM_NN_mean_residual' \
+-cm bwr -ats 18 -ylr 90 -yls 30 0 -xls 30 0 -xts 12 0 -nw 1

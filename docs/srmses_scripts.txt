@@ -1,0 +1,50 @@
+clear; gensit summarise -dn DC/exp1 -et SIM_NN \
+-el np -el MathUtils -el xr \
+-e intensity_srmse_test_mean "intensity_srmse_test_by_seed.mean('seed',dtype='float64',skipna=True)" \
+-e intensity_srmse_test_std "intensity_srmse_test_by_seed.std('seed',dtype='float64',skipna=True)" \
+-ea intensity \
+-ea "intensity_stacked=intensity.stack(looped_dims=['sweep','seed'])" \
+-ea "intensity_mean=intensity_stacked.groupby('looped_dims').mean('iter',dtype='float64')" \
+-ea "intensity_srmse_test_by_seed=intensity_mean.groupby('looped_dims').map(MathUtils.srmse,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask)" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_intensity_SRMSEs -nw 1
+
+clear; gensit summarise -dn DC/exp1 -et NonJointTableSIM_NN  \
+-el np -el MathUtils -el xr \
+-e intensity_srmse_test "intensity.mean('iter').groupby('sweep').map(MathUtils.srmse,ground_truth=ground_truth,mask=test_cells_mask)" \
+-ea intensity \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "test_cells_mask=outputs.inputs.data.test_cells_mask" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_intensity_SRMSEs -nw 1
+
+clear; gensit summarise -dn DC/exp1/ -d JointTableSIM_NN_SweepedNoise__totally_and_cell_constrained_21_05_2024_13_25_40  \
+-el np -el MathUtils -el xr \
+-e intensity_srmse_test "intensity.mean('iter').groupby('sweep').map(MathUtils.srmse,ground_truth=ground_truth,mask=test_cells_mask)" \
+-ea intensity \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "test_cells_mask=outputs.inputs.data.test_cells_mask" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_intensity_SRMSEs -nw 1
+
+
+clear; gensit summarise -dn DC/exp1 -et NonJointTableSIM_NN \
+-el np -el MathUtils -el xr \
+-e table_srmse_test "MathUtils.srmse(prediction=table_mean,ground_truth=ground_truth,mask=test_cells_mask)" \
+-ea table \
+-ea "table_mean=table.mean('iter',dtype='float64')" \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "test_cells_mask=outputs.inputs.data.test_cells_mask" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_table_SRMSEs -nw 1
+
+
+clear; gensit summarise -dn DC/exp1/ -d JointTableSIM_NN_SweepedNoise__totally_and_cell_constrained_21_05_2024_13_25_40  \
+-el np -el MathUtils -el xr \
+-e table_srmse_test "MathUtils.srmse(prediction=table_mean,ground_truth=ground_truth,mask=test_cells_mask)" \
+-ea table \
+-ea "table_mean=table.mean('iter',dtype='float64')" \
+-ea "ground_truth=outputs.inputs.data.ground_truth_table" \
+-ea "test_cells_mask=outputs.inputs.data.test_cells_mask" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_table_SRMSEs -nw 1

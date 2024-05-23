@@ -1,0 +1,57 @@
+clear; gensit summarise -dn DC/exp1 -et SIM_NN \
+-el np -el MathUtils -el xr \
+-e intensity_cp_test_mean "xr.apply_ufunc(roundint, 100*intensity_cp_test.mean(['origin','destination'],skipna=True)).mean('seed',dtype='float64',skipna=True)" \
+-e intensity_cp_test_std "xr.apply_ufunc(roundint, 100*intensity_cp_test.mean(['origin','destination'],skipna=True)).std('seed',dtype='float64',skipna=True)" \
+-ea intensity \
+-ea "cp_func=MathUtils.coverage_probability" \
+-ea "roundint=MathUtils.roundint" \
+-ea "region_masses=0.99" \
+-ea "intensity_cp_test=intensity.stack(id=['iter']).groupby('seed').map(cp_func,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask,region_mass=region_masses)" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_intensity_CoverageProbabilities -nw 1
+
+clear; gensit summarise -dn DC/exp1 -et NonJointTableSIM_NN  \
+-el np -el MathUtils -el xr \
+-e intensity_cp_test_mean "xr.apply_ufunc(roundint, 100*intensity_cp_test.mean(['origin','destination'],skipna=True))" \
+-ea intensity \
+-ea "cp_func=MathUtils.coverage_probability" \
+-ea "roundint=MathUtils.roundint" \
+-ea "region_masses=0.99" \
+-ea "intensity_cp_test=cp_func(prediction=intensity.stack(id=['iter']),ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask,region_mass=region_masses)" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_intensity_CoverageProbabilities -nw 1
+
+clear; gensit summarise -dn DC/exp1/ -d JointTableSIM_NN_SweepedNoise__totally_and_cell_constrained_21_05_2024_13_25_40  \
+-el np -el MathUtils -el xr \
+-e intensity_cp_test_mean "xr.apply_ufunc(roundint, 100*intensity_cp_test.mean(['origin','destination'],skipna=True))" \
+-ea intensity \
+-ea "cp_func=MathUtils.coverage_probability" \
+-ea "roundint=MathUtils.roundint" \
+-ea "region_masses=0.99" \
+-ea "intensity_cp_test=cp_func(prediction=intensity.stack(id=['iter']),ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask,region_mass=region_masses)" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_intensity_CoverageProbabilities -nw 1
+
+
+clear; gensit summarise -dn DC/exp1 -et NonJointTableSIM_NN \
+-el np -el MathUtils -el xr \
+-e table_cp_test_mean "xr.apply_ufunc(roundint, 100*table_cp_test.mean(['origin','destination'],skipna=True))" \
+-ea table \
+-ea "cp_func=MathUtils.coverage_probability" \
+-ea "roundint=MathUtils.roundint" \
+-ea "region_masses=0.99" \
+-ea "table_cp_test=cp_func(prediction=table.stack(id=['iter']),ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask,region_mass=region_masses)" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_table_CoverageProbabilities -nw 1
+
+
+clear; gensit summarise -dn DC/exp1/ -d JointTableSIM_NN_SweepedNoise__totally_and_cell_constrained_21_05_2024_13_25_40  \
+-el np -el MathUtils -el xr \
+-e table_cp_test_mean "xr.apply_ufunc(roundint, 100*table_cp_test.mean(['origin','destination'],skipna=True))" \
+-ea table \
+-ea "cp_func=MathUtils.coverage_probability" \
+-ea "roundint=MathUtils.roundint" \
+-ea "region_masses=0.99" \
+-ea "table_cp_test=cp_func(prediction=table.stack(id=['iter']),ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask,region_mass=region_masses)" \
+-btt 'iter' 10000 9 10000 \
+-k sigma -k type -k name -k title -fe total_constrained_table_CoverageProbabilities -nw 1
