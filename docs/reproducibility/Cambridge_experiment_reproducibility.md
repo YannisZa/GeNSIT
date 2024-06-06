@@ -5,21 +5,22 @@ Set `ulimit -n 50000`
 ## Experiment 1
 
 ```
-clear; gensit run ./data/inputs/configs/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 4 -nw 7
-clear; gensit run ./data/inputs/configs/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 4 -nw 7
+clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 4 -nw 7
+clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 4 -nw 7
+clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/repeated_experiments.toml -sm -et JointTableSIM_MCMC -nt 4 -nw 7
 ```
 
 ## Experiment 2
 
 ```
-clear; gensit run ./data/inputs/configs/experiment2_disjoint.toml -sm -et NonJointTableSIM_NN -nt 20 -nw 1
-clear; gensit run ./data/inputs/configs/experiment2_joint.toml -sm -et JointTableSIM_NN -nt 20 -nw 1
+clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment2_disjoint.toml -sm -et NonJointTableSIM_NN -nt 20 -nw 1
+clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment2_joint.toml -sm -et JointTableSIM_NN -nt 20 -nw 1
 ```
 
 ## Experiment 3
 
 ```
-clear; gensit run ./data/inputs/configs/experiment3_joint.toml -sm -et JointTableSIM_NN -nt 5 -nw 7
+clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment3_joint.toml -sm -et JointTableSIM_NN -nt 5 -nw 7
 ```
 
 # Summaries and Metrics
