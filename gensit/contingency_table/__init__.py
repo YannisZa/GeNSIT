@@ -127,6 +127,7 @@ class ContingencyTable(object):
         
         # Fill in missing margins that can be recovered from existing (user input) margins
         self.distribution_name = map_constraints_to_distribution_name(self.constraints)
+        self.config['contingency_table']['distribution_name'] = self.distribution_name
 
         # Fill in missing cell margins and 
         # Update residual margins based on exhaustive list of cell constraints
