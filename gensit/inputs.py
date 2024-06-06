@@ -134,6 +134,9 @@ class Inputs:
                     for ax,dim in zip(schema.get("axes",[]),schema.get("dims",[])):
                         if getattr(self.data,attr) is not None:
                             self.data.dims[dim] = int(np.shape(getattr(self.data,attr))[ax])
+                elif attr in VALIDATION_SCHEMA:
+                    self.logger.debug(f"{attr} set to empty numpy array")
+                    setattr(self.data,attr,np.array([]))
                 else:
                     raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
         
