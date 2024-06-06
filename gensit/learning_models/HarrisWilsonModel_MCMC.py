@@ -126,10 +126,10 @@ class HarrisWilson_MCMC(object):
     def build(self,**kwargs):
         # Store table distribution name
         try:
-            self.table_distribution_name = self.config.settings['inputs']['contingency_table']['distribution_name']
+            self.table_distribution_name = self.config.settings['contingency_table']['distribution_name']
         except:
             try:
-                self.table_distribution_name = kwargs.get('table_distribution_name','multinomial')
+                self.table_distribution_name = kwargs.get('table_distribution_name','unknown')
             except:
                 raise Exception("No distribution name provided in config.")
 
@@ -179,10 +179,9 @@ class HarrisWilson_MCMC(object):
         self.table_distribution = f"log_{self.table_distribution_name}_pmf"
         if hasattr(ProbabilityUtils, (self.table_distribution+"_unnormalised")):
             self.table_unnormalised_log_likelihood = getattr(ProbabilityUtils, self.table_distribution+"_unnormalised")
-            # print(self.table_unnormalised_log_likelihood)
         else:
             raise Exception(f"Input class ProbabilityUtils does not have distribution {(self.table_distribution+'_unnormalised')}")
-        
+        print(self.table_distribution)
     
     def negative_table_log_likelihood(
         self,
@@ -207,7 +206,6 @@ class HarrisWilson_MCMC(object):
 
         """
         self.logger.debug('negative_table_log_likelihood')
-        
         log_likelihood = self.table_unnormalised_log_likelihood(
             log_intensity = log_intensity,
             table = table
@@ -246,7 +244,7 @@ class HarrisWilson_MCMC(object):
             beta = beta
         )
         log_likelihood = self.table_unnormalised_log_likelihood(
-            log_intensity = log_intensity,
+            log_intensity = log_intensity.squeeze(),
             table = table
         )
         return -log_likelihood
