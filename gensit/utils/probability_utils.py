@@ -165,8 +165,8 @@ def log_fishers_hypergeometric_pmf_unnormalised(table:torch.tensor,log_intensity
     # Compute log odds ratio
     log_or = log_odds_ratio_wrt_intensity(log_intensity)
     # Compute log_probabilities
-    log_or_colsums = torch.logsumexp(log_or,dim = 0).unsqueeze(0).to(dtype = float32)
-    log_or_probabilities = log_or - log_or_colsums
+    log_or_totals = torch.logsumexp(log_or,dim = (0,1))
+    log_or_probabilities = log_or - log_or_totals
     # Compute log pmf
     return (table.to(dtype = float32).ravel() * log_or_probabilities.ravel()).sum() - log_factorial_sum(table.ravel()).sum()
 
@@ -175,10 +175,10 @@ def log_fishers_hypergeometric_loss(table:xr.DataArray,log_intensity:xr.DataArra
     # Compute log odds ratio
     log_or = log_odds_ratio_wrt_intensity_xarray(log_intensity)
     # Compute log_probabilities
-    log_or_colsums = logsumexp(log_or,dim=['origin']).expand_dims(dim={'origin':origins})
-    log_or_probabilities = log_or - log_or_colsums
+    log_or_totals = logsumexp(log_or,dim=['origin','destination'])
     # Align
-    log_or,log_or_colsums = xr.align(log_or,log_or_colsums,join='override')
+    log_or,log_or_totals = xr.align(log_or,log_or_totals,join='override')
+    log_or_probabilities = log_or - log_or_totals
     table,log_or_probabilities = xr.align(table,log_or_probabilities,join='override')
     # Compute log pmf
     term1 = -(table.astype('float32') * log_or_probabilities).sum(['origin','destination'])
@@ -189,14 +189,13 @@ def log_fishers_hypergeometric_loss(table:xr.DataArray,log_intensity:xr.DataArra
 def log_fishers_hypergeometric_pmf_normalised(table:torch.tensor,log_intensity:torch.tensor,**kwargs) -> float:
     # Return log pmf
     return  log_fishers_hypergeometric_pmf_unnormalised(log_intensity,table) + \
-        log_factorial_sum(table.sum(dim = 0).to(dtype = int32))
+        log_factorial_sum(table.sum(dim = (0,1)).to(dtype = int32))
 
 def fishers_hypergeometric_pmf_ground_truth(table:torch.tensor,log_intensity:torch.tensor,axis:int = None) -> float:
-    if axis is None:
-        axis = 0
     # Compute odds ratio
     odds_ratio = torch.exp(log_odds_ratio_wrt_intensity(log_intensity = log_intensity))
-    return torch.sum(table,dim = axis) * (odds_ratio / torch.sum(odds_ratio,dim = axis))
+    odds_ratio_total = odds_ratio.sum()
+    return torch.sum(table,dim = (0,1)) * (odds_ratio / odds_ratio_total)
 
 
 def table_similarity_measure(tab:torch.tensor,tab0:Union[float,torch.tensor],log_intensity:torch.tensor,**kwargs) -> float:
