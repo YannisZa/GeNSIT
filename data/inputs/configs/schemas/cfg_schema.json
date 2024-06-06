@@ -336,7 +336,7 @@
               "dtype": "file",
               "file-exists": false,
               "file-extension": "txt",
-              "default-value": "train_cells.txt"
+              "default-value": ""
             },
             "range": {
               "dtype": "list",
@@ -344,7 +344,7 @@
               "list-dtype": "file",
               "file-exists": false,
               "file-extension": "txt",
-              "default-value": "train_cells.txt",
+              "default-value": "",
               "unique-vals": true
             }
           }
@@ -1122,7 +1122,7 @@
             "dtype": "list",
             "list-dtype": "bool",
             "default-value": true,
-            "unique-vals": true
+            "unique-vals": false
           }
         }
       }
