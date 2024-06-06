@@ -181,7 +181,6 @@ class HarrisWilson_MCMC(object):
             self.table_unnormalised_log_likelihood = getattr(ProbabilityUtils, self.table_distribution+"_unnormalised")
         else:
             raise Exception(f"Input class ProbabilityUtils does not have distribution {(self.table_distribution+'_unnormalised')}")
-        print(self.table_distribution)
     
     def negative_table_log_likelihood(
         self,
