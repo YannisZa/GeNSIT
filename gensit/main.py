@@ -103,8 +103,8 @@ _run_and_optimise_options = [
         default = None, help = 'Overwrites dataset name in config'),
         click.option('--in_directory','-id', type = click.Path(exists = True),
         default = None, help = 'Overwrites inputs directory in config'),
-        click.option('--to_learn','-tl', type = click.Choice(['alpha','beta','kappa','sigma']), default = None,
-        help = 'Overwrites parameters to learn.'),
+        click.option('--to_learn','-tl', type = click.Choice(['alpha','beta','kappa','sigma']), callback = to_list,
+        default = None, multiple = True,help = 'Overwrites parameters to learn.'),
         click.option('--mcmc_workers','-mcmcnw', type = click.IntRange(min = 1,max = AVAILABLE_CORES), 
         help = 'Overwrites number of MCMC workers'),
         click.option('--name','-nm', type = click.Choice(['TotallyConstrained','ProductionConstrained']),
@@ -121,6 +121,8 @@ _run_and_optimise_options = [
         default = None, help = 'Overwrites input destination attraction time series filename in config'),
         click.option('--margins','-ma', type = click.STRING, cls = OptionEatAll,
         default = None, help = 'Overwrites input margin filenames in config'),
+        click.option('--train_cells','-tc', type = click.STRING,
+        default = None, help = 'Overwrites input training cell filename in config'),
         click.option('--sparse_margins','-sm', is_flag = True, default = False,
         help = 'Flag for allowing sparsity in margins of contingency table'),
         click.option('--store_progress','-sp', default = 1.0, show_default = True, 
@@ -130,8 +132,8 @@ _run_and_optimise_options = [
         help = '''Overwrites constrained margin axes (axes over which table is summed) in config.\
         Use the following syntax: -ax '[ENTER AXES SEPARATED BY COMMA HERE]' e.g -ax '[0]' -ax '[0, 1]'
         The unconstrained case is just -ax '[]' '''),
-        click.option('--cells','-c', type = click.STRING, default = None,
-        help = 'Overwrites constrained cells filename in config. '),
+        click.option('--cells','-c', type = click.BOOL, default = None,
+        help = 'Overwrites constrained cells flag in config. '),
         click.option('--seed','-seed', type = click.IntRange(min = 0), show_default = True,
         default = None, help = 'Overwrites random number generation seed for model runs.'),
         click.option('--proposal','-p', type = click.Choice(['direct_sampling','degree_higher','degree_one']),
@@ -158,7 +160,7 @@ _run_and_optimise_options = [
         help = 'Overwrites initialisation of beta parameter in MCMC.'),
         click.option('--beta_max','-bm', type = click.FloatRange(min = 0), default = None,
         help = 'Overwrites maximum beta in SIM parameters.'),
-        click.option('--covariance','-cov', type = click.STRING, default = None,
+        click.option('--covariance','-cov', type = click.STRING, default = None, callback = evaluate_string,
         help = 'Overwrites covariance matrix of parameter Gaussian Randow walk proposal'),
         click.option('--step_size','-ss', type = click.FloatRange(min = 0), default = None,
         help = 'Overwrites step size in parameter Gaussian Randow walk proposal'),
@@ -217,7 +219,7 @@ def setup_experiments(logger,settings,config_path,**kwargs):
 
     # Update root
     config.path_sets_root()
-
+    
     # Intialise experiment handler
     eh = ExperimentHandler(
         config,
@@ -375,6 +377,7 @@ def run(
         cost_matrix,
         destination_attraction_ts,
         margins,
+        train_cells,
         axes,
         store_progress,
         cells,
@@ -440,11 +443,11 @@ def run(
     set_threads(settings['n_threads'])
 
     # Import all modules
-    from numpy import asarray
+    from numpy import asarray, shape
     
     # Convert covariance to 2x2 array
     if 'covariance' in list(settings.keys()):
-        settings['covariance'] = asarray([float(x) for x in settings['covariance'].split(",")]).reshape((2,2)).tolist()
+        settings['covariance'] = asarray(settings['covariance']).reshape((2,2)).tolist()
 
     # Setup logger
     logger = setup_logger(
@@ -491,6 +494,7 @@ def optimise(
         cost_matrix,
         destination_attraction_ts,
         margins,
+        train_cells,
         axes,
         store_progress,
         cells,
@@ -560,7 +564,7 @@ def optimise(
     
     # Convert covariance to 2x2 array
     if 'covariance' in list(settings.keys()):
-        settings['covariance'] = asarray([float(x) for x in settings['covariance'].split(",")]).reshape((2,2)).tolist()
+        settings['covariance'] = asarray(settings['covariance']).reshape((2,2)).tolist()
 
     # Setup logger
     logger = setup_logger(
