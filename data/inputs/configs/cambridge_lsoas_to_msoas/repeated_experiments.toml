@@ -93,11 +93,7 @@ seed = 1234
       table_steps = +1
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
-      [mcmc.contingency_table.proposal.sweep]
-        default = 'direct_sampling'
-        range = ['degree_higher','degree_higher','degree_higher']
-        coupled = true
-        target_name = 'title'
+      proposal = 'degree_higher'
 
     [mcmc.parameters]
       theta_steps = 1
