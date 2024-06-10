@@ -499,8 +499,8 @@ AUXILIARY_COORDINATES_DTYPES = {
 CORE_COORDINATES_DTYPES = {
  "iter":"int32",
  "time":"int32",
- "origin":"int16",
- "destination":"int16",
+ "origin":"uint16",
+ "destination":"uint16",
  "seed":"int32",
  "alpha_range":"int32",
  "beta_range":"int32"

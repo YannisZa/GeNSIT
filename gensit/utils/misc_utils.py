@@ -352,8 +352,8 @@ def str_to_tuple(s:str) -> Tuple[int,int]:
     return (int(s.split('(')[1].split(',')[0]),int(s.split(',')[1].split(')')[0]))
 
 
-def ndims(__self__,time_dims:bool = True):
-    return np.sum([1 for dim in unpack_dims(__self__.data.dims,time_dims = time_dims) if dim > 1],dtype='uint8')
+def ndims(__self__,time_dims:bool = True, dtype:str = 'uint16'):
+    return np.sum([1 for dim in unpack_dims(__self__.data.dims,time_dims = time_dims) if dim > 1],dtype=dtype)
 
 def deep_merge(dict1,dict2):
     result = dict1.copy()

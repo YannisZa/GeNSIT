@@ -523,7 +523,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # Get all unconstrained axes
         axis_uncostrained = deepcopy(self.ct.constraints['unconstrained_axes'])
         # Initialise shape of probability normalisation matrix
-        new_shape = torch.ones(ndims(self.ct), dtype = torch.uint8)
+        new_shape = torch.ones(ndims(self.ct), dtype = torch.uint16)
 
         if len(axis_constrained) == ndims(self.ct):
             # Calculate normalisation of multinomial probabilities (total intensity)

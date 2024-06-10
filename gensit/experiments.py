@@ -7,7 +7,7 @@ import traceback
 from tqdm import tqdm
 from copy import deepcopy
 from datetime import datetime
-from torch import float32, uint8
+from torch import float32, int16
 from optuna.trial import TrialState
 from multiprocessing import Manager
 
@@ -505,7 +505,7 @@ class Experiment(object):
                 initialisations['log_destination_attraction'].requires_grad = True
 
             elif param == 'sign':
-                initialisations['sign'] = torch.tensor(1,dtype = uint8,device = self.device)
+                initialisations['sign'] = torch.tensor(1,dtype = int16,device = self.device)
             
             elif param == 'loss':
                 initialisations['loss'] = {
@@ -3335,7 +3335,7 @@ class GraphAttentionNetwork_Comparison(Experiment):
         # Get training set
         train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
         train_y = torch.concatenate((
-            torch.tensor(train_index,dtype=uint8),
+            torch.tensor(train_index,dtype=uint16),
             train_y.unsqueeze(1)
         ), dim = 1)
         train_inflow = torch.concatenate((
