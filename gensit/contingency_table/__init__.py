@@ -136,6 +136,8 @@ class ContingencyTable(object):
         # Update type of table to determine the type of Markov basis to use
         self.update_table_type_and_markov_basis_class()
 
+        print(len(self.cells))
+
         # Get total from table
         if 'spatial_interaction_model' in list(self.config.keys()) and tuplize(range(ndims(self))) in list(self.data.margins.keys()):
             self.config['spatial_interaction_model']['grand_total'] = int(self.data.margins[tuplize(range(ndims(self)))])
@@ -354,7 +356,7 @@ class ContingencyTable(object):
             if torch.any(self.data.ground_truth_table < 0):
                 partial_ground_truth = True
                 # Update only dimensions
-                self.data.dims = dict(zip(self.dim_names,np.asarray(np.shape(self.data.ground_truth_table), dtype='uint8')))
+                self.data.dims = dict(zip(self.dim_names,np.asarray(np.shape(self.data.ground_truth_table), dtype=CORE_COORDINATES_DTYPES['origin'])))
             else:
                 partial_ground_truth = False
                 # Update all table properties
@@ -447,24 +449,16 @@ class ContingencyTable(object):
             if 'constraints' in list(self.config.settings['contingency_table'].keys()):
                 if 'axes' in list(self.config.settings['contingency_table']['constraints'].keys()):
                     constrained_axes = [tuplize(ax) for ax in self.config.settings['contingency_table']['constraints']['axes'] if len(ax) > 0]
+                # read training cells from input data
+                cell_constraints = kwargs.get('train_cells',np.array([]))
                 if self.config.settings['contingency_table']['constraints'].get('cells',False):
                     # Train cells must be provided if the contingency table has cell constraints
-                    if self.config.settings['inputs']['data'].get('train_cells','') == '':
+                    if len(cell_constraints) == 0:
                         raise MissingData(
                             missing_data_name = 'train_cells',
-                            data_names = ', '.join(list(self.config.settings['inputs']['data'].keys())),
+                            data_names = ', '.join(list(kwargs.keys())),
                             location = 'Input Data'
                         )
-                    # Get cell constraints path
-                    cell_constraints = os.path.join(
-                        os.path.relpath(self.config.in_directory,os.path.realpath(os.getcwd())),
-                        self.config.settings['inputs']['dataset'],
-                        self.config.settings['inputs']['data']['train_cells'].get(
-                            'file',
-                            self.config.settings['inputs']['data']['train_cells']
-                        )
-                    )
-
         ## Reading kwargs if provided
         elif 'constraints' in list(kwargs.keys()):
             if 'axes' in list(kwargs['constraints'].keys().keys()):
@@ -507,7 +501,7 @@ class ContingencyTable(object):
             if isinstance(cell_constraints,str):
                 if os.path.isfile(cell_constraints):
                     # Load cell constraints from file
-                    cells = np.loadtxt(cell_constraints, dtype='uint8')
+                    cells = np.loadtxt(cell_constraints, dtype='uint16')
                     # Reshape cells
                     cells = cells.reshape(np.size(cells)//ndims(self), ndims(self)).tolist()
                     # Remove invalid cells (i.e. cells than do not have the right number of dims or are out of bounds)
@@ -629,7 +623,7 @@ class ContingencyTable(object):
                         # Update last index
                         last_axis_index = cell_index[-1]['index']
                     # Construct cell index
-                    query_index = np.zeros(ndims(self), dtype='uint8')
+                    query_index = np.zeros(ndims(self), dtype='uint16')
                     for c in cell_index:
                         query_index[c['axis']] = c['index'][0]
                     # Reverse order
@@ -734,7 +728,7 @@ class ContingencyTable(object):
 
     def update_table_properties_from_table(self) -> None:
         # Update dimensions
-        self.data.dims = dict(zip(self.dim_names,np.asarray(np.shape(self.data.ground_truth_table), dtype='uint8')))
+        self.data.dims = dict(zip(self.dim_names,np.asarray(np.shape(self.data.ground_truth_table), dtype=CORE_COORDINATES_DTYPES['origin'])))
         # Update margins
         self.update_margins_from_table(self.data.ground_truth_table)
     
@@ -1040,7 +1034,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             # Loop through columns
             for j in range(self.data.dims[self.dim_names[constrained_axis1]]):
                 # Create index appropriately
-                query_index = np.zeros(ndims(self), dtype='uint8')
+                query_index = np.zeros(ndims(self), dtype='uint16')
                 query_index[constrained_axis2] = i
                 query_index[constrained_axis1] = j
                 query_index = tuplize(query_index)
