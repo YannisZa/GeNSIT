@@ -14,6 +14,7 @@ data/raw/cambridge_commuter/*
 !data/raw/cambridge_commuter/cambridge.osm.pbf
 !data/raw/cambridge_commuter/lower_super_output_areas_to_medium_super_output_areas_work_flows_cambridge_2011.csv
 !data/raw/cambridge_commuter/cambridge_lsoas_to_msoas.geojson
+!data/raw/cambridge_commuter/employment_survey_lsoa.csv
 tests/test_outputs/**
 notebooks/logs/**
 notebooks/data/**
