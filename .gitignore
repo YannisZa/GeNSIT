@@ -10,6 +10,7 @@ data/outputs/**
 data/raw/cambridge_commuter/*
 !data/raw/cambridge_commuter/facilities_v2.geojson
 !data/raw/cambridge_commuter/network.geojson
+!data/raw/cambridge_commuter/employment_survey_msoa.csv
 !data/raw/cambridge_commuter/cambridge.osm.pbf
 tests/test_outputs/**
 notebooks/logs/**
