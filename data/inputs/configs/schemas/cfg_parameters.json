@@ -37,6 +37,22 @@
           }
         }
       },
+      "origin_region_features": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        }
+      },
+      "destination_region_features": {
+        "file": {
+          "sweep": {
+            "default": false,
+            "range": false
+          }
+        }
+      },
       "region_geometries": {
         "file": {
           "sweep": {

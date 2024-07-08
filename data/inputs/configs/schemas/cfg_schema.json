@@ -275,6 +275,102 @@
           }
         }
       },
+      "origin_region_features": {
+        "sweepable": false,
+        "optional": true,
+        "exclude": false,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "npy",
+              "default-value": "region_features.npy"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "npy",
+              "default-value": "region_features.npy",
+              "unique-vals": true
+            }
+          }
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "list",
+              "list-list-dtype": "int",
+              "default-value": []
+            }
+          }
+        }
+      },
+      "destination_region_features": {
+        "sweepable": false,
+        "optional": true,
+        "exclude": false,
+
+        "file": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "file",
+              "file-exists": false,
+              "file-extension": "npy",
+              "default-value": "region_features.npy"
+            },
+            "range": {
+              "dtype": "list",
+              "list-length": [1, null],
+              "list-dtype": "file",
+              "file-exists": false,
+              "file-extension": "npy",
+              "default-value": "region_features.npy",
+              "unique-vals": true
+            }
+          }
+        },
+        "value": {
+          "sweepable": true,
+          "optional": true,
+          "exclude": false,
+
+          "sweep": {
+            "default": {
+              "dtype": "list",
+              "list-dtype": "int",
+              "default-value": []
+            },
+            "range": {
+              "dtype": "list",
+              "list-dtype": "list",
+              "list-list-dtype": "int",
+              "default-value": []
+            }
+          }
+        }
+      },
       "region_geometries": {
         "sweepable": false,
         "optional": true,
@@ -345,7 +441,7 @@
               "file-exists": false,
               "file-extension": "txt",
               "default-value": "",
-              "unique-vals": true
+              "unique-vals": false
             }
           }
         }
@@ -374,7 +470,7 @@
               "file-exists": false,
               "file-extension": "txt",
               "default-value": "test_cells.txt",
-              "unique-vals": true
+              "unique-vals": false
             }
           }
         }
@@ -403,7 +499,7 @@
               "file-exists": false,
               "file-extension": "txt",
               "default-value": "validation_cells.txt",
-              "unique-vals": true
+              "unique-vals": false
             }
           }
         }
@@ -432,7 +528,7 @@
               "file-exists": false,
               "file-extension": "txt",
               "default-value": "origin_demand.txt",
-              "unique-vals": true
+              "unique-vals": false
             }
           }
         },
@@ -531,7 +627,7 @@
               "file-exists": false,
               "file-extension": "txt",
               "default-value": "destination_demand.txt",
-              "unique-vals": true
+              "unique-vals": false
             }
           }
         },

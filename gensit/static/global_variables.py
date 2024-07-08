@@ -272,7 +272,20 @@ TRAIN_SCHEMA = {
     "region_features":{
         "dtype":"float32",
         "ndmin":2,
-        "cast_to_xarray":False
+        "cast_to_xarray":False,
+        "positive": False
+    },
+    "origin_region_features":{
+        "dtype":"float32",
+        "ndmin":2,
+        "cast_to_xarray":False,
+        "positive": False
+    },
+    "destination_region_features":{
+        "dtype":"float32",
+        "ndmin":2,
+        "cast_to_xarray":False,
+        "positive": False
     },
     "adjacency_matrix":{
         "axes":[0,1],
@@ -492,15 +505,21 @@ AUXILIARY_COORDINATES_DTYPES = {
     "cost_matrix":"str",
     "adjacency_matrix":"str",
     "region_features":"str",
+    "origin_region_features":"str",
+    "destination_region_features":"str",
     "destination_attraction_ts":"str",
-    "proposal":"str"
+    "proposal":"str",
+    "train_cells":"str",
+    "test_cells":"str",
+    "validation_cells":"str",
+    "gat_multitask_weights":"str"
 }
 
 CORE_COORDINATES_DTYPES = {
  "iter":"int32",
  "time":"int32",
- "origin":"uint16",
- "destination":"uint16",
+ "origin":"int16",
+ "destination":"int16",
  "seed":"int32",
  "alpha_range":"int32",
  "beta_range":"int32"

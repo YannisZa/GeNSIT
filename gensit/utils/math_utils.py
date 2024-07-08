@@ -494,3 +494,6 @@ def l2(x,y,**kwargs):
         x = x.where(mask)
 
     return (x - y)**2
+
+def check_symmetric(a, rtol=1e-05, atol=1e-08):
+    return np.allclose(a, a.T, rtol=rtol, atol=atol)

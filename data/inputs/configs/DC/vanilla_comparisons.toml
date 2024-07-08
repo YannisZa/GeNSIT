@@ -14,9 +14,10 @@ load_experiment = ''
   range = "1:10:1"
   
 [inputs.data]
-    [inputs.data.region_features]
+    [inputs.data.origin_region_features]
       file = 'mini_region_features.npy'
-      # 'region_features.npy'
+    [inputs.data.destination_region_features]
+      file = 'mini_region_features.npy'
     [inputs.data.adjacency_matrix]
       file = 'adjacency_matrix.txt'
     [inputs.data.origin_demand]
@@ -99,32 +100,6 @@ load_experiment = ''
     gat_multitask_weights = [0.7037524669618522, 0.036865784928021526, 0.25938174811012615]
     
 
-[[experiments]]
-  type = 'XGBoost_Comparison'
-  comment = 'Gradient Boosted Trees Vanilla Algorithm Comparison'
-  disable_tqdm = true
-  export_samples = true
-  export_metadata = true
-  overwrite = true
-  validate_samples = false
-
-[[experiments]]
-  type = 'RandomForest_Comparison'
-  comment = 'Random Forest Vanilla Algorithm Comparison'
-  disable_tqdm = false
-  export_samples = true
-  export_metadata = true
-  overwrite = true
-  validate_samples = false
-
-[[experiments]]
-  type = 'GBRT_Comparison'
-  comment = 'Gradient Boosted Trees Vanilla Algorithm Comparison'
-  disable_tqdm = false
-  export_samples = true
-  export_metadata = true
-  overwrite = true
-  validate_samples = false
 
 [[experiments]]
   type = 'GraphAttentionNetwork_Comparison'

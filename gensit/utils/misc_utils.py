@@ -331,6 +331,7 @@ def parse(value,default:str='none',ndigits:int = 5):
         try:
             value = string_to_numeric(value)
         except:
+            # value = unstringify(value)
             pass
     elif hasattr(value,'__len__'):
         return np.array2string(np.array(value))
@@ -1566,10 +1567,12 @@ def build_graph_from_matrix(weigthed_adjacency_matrix, region_features, device='
     '''
     # get edge nodes' tuples [(src, dst)]
     nonzerocells = weigthed_adjacency_matrix.nonzero()
-    dst, src = nonzerocells.T
+    # dst, src = nonzerocells.T
+    src, dst = nonzerocells.T
     # get edge weights
-    d = weigthed_adjacency_matrix[nonzerocells[:,0],nonzerocells[:,1]]
-    # create a graph
+    # d = weigthed_adjacency_matrix[nonzerocells[:,0],nonzerocells[:,1]]
+    d = weigthed_adjacency_matrix[src,dst]
+     # create a graph
     g = dgl.DGLGraph()
     # add nodes
     g.add_nodes(weigthed_adjacency_matrix.shape[0])
@@ -1577,6 +1580,7 @@ def build_graph_from_matrix(weigthed_adjacency_matrix, region_features, device='
     g.add_edges(src, dst, {'d': torch.tensor(d).float().view(-1, 1)})
     # add node attribute, i.e. the geographical features of census tract
     g.ndata['attr'] = region_features.to(device)
+    
     # compute the degree norm
     norm = comp_deg_norm(g)
     # add nodes norm

@@ -770,7 +770,6 @@ class Config:
                 if key_path[-1] == 'sweep_mode':
                     self.logger.trace('check 6')
                     self.sweep_active = settings_val
-                
                 # 7: If sweep is deactivated and
                 # A: a sweep configuration is provided or the values are provided
                 # then read the default sweep configuration
@@ -778,7 +777,6 @@ class Config:
                 # then read the values provided
                 if key_path[-1] == 'sweep' and (not self.sweep_active or not settings_found):
                     self.logger.trace('check 7')
-                    
                     # If a sweep configuration has been provided
                     # read the default values
                     if settings_found:
@@ -835,7 +833,7 @@ class Config:
                             """)
                     
                     # If this is the case we have modified the config
-                    # Parse settings value into approapriate data structure
+                    # Parse settings value into appropriate data structure
                     if settings_child_found:
                         try:
                             entry = instantiate_data_type(
@@ -847,7 +845,7 @@ class Config:
                             print(settings_child_val)
                             print(schema_val)
                             print(key_path)
-                            # traceback.print_exc()
+                            traceback.print_exc()
                             self.logger.error(f"Config for experiment(s) {kwargs.get('experiment_type','UNKNOWN')} failed.")
                             sys.exit()
 

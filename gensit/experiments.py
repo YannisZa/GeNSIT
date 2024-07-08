@@ -408,8 +408,8 @@ class Experiment(object):
                 trial = trial,
                 config = config,
                 graph = kwargs.pop('graph',None),
-                num_regions = kwargs.pop('num_regions',None),
-                input_size = kwargs.pop('input_size',None),
+                n_features = kwargs.pop('n_features',None),
+                dims = kwargs.pop('dims',None),
                 device = self.device, 
                 logger = self.logger,
                 **kwargs
@@ -3276,9 +3276,17 @@ class GraphAttentionNetwork_Comparison(Experiment):
             self.position = (trial.number % self.config['inputs']['n_workers']) + 1
 
         # Get covariates/features
-        features_mean = self.inputs.data.region_features.mean(dim=0)
-        features_std = self.inputs.data.region_features.std(dim=0)
-        features = (self.inputs.data.region_features - features_mean) / features_std
+        region_features_mean = self.inputs.data.region_features.mean(dim=0)
+        region_features_std = self.inputs.data.region_features.std(dim=0)
+        region_features = (self.inputs.data.region_features - region_features_mean) / region_features_std
+
+        # origin_features_mean = self.inputs.data.origin_region_features.mean(dim=0)
+        # origin_features_std = self.inputs.data.origin_region_features.std(dim=0)
+        # origin_features = (self.inputs.data.origin_region_features - origin_features_mean) / origin_features_std
+        
+        # destination_features_mean = self.inputs.data.destination_region_features.mean(dim=0)
+        # destination_features_std = self.inputs.data.destination_region_features.std(dim=0)
+        # destination_features = (self.inputs.data.destination_region_features - destination_features_mean) / destination_features_std
 
         # Compute graph adjacency matrix 
         weighted_adjacency_matrix = torch.where(
@@ -3290,15 +3298,9 @@ class GraphAttentionNetwork_Comparison(Experiment):
         # Construct graph using adjacency matrix
         graph = build_graph_from_matrix(
             weigthed_adjacency_matrix = weighted_adjacency_matrix, 
-            region_features = features,
+            region_features = region_features,
             device = self.device
         ).to(self.device)
-
-        # Get number of regions
-        if self.inputs.data.dims['origin'] == self.inputs.data.dims['destination']:
-            num_regions = self.inputs.data.dims['origin']
-        else:
-            num_regions = self.inputs.data.dims['origin'] + self.inputs.data.dims['destination']
 
         # TODO: Modify this to elicit number of nodes in non square adjacency matrices / graphs
         # Set up the model
@@ -3307,8 +3309,8 @@ class GraphAttentionNetwork_Comparison(Experiment):
             config = self.config,
             trial = trial,
             graph = graph,
-            num_regions = num_regions,
-            input_size = features.shape[1],
+            n_features = region_features.shape[1],
+            dims = self.inputs.data.dims,
             **kwargs
         )
         # Get and remove config
@@ -3335,16 +3337,16 @@ class GraphAttentionNetwork_Comparison(Experiment):
         # Get training set
         train_y = self.inputs.data.ground_truth_table[train_index[:,0],train_index[:,1]]
         train_y = torch.concatenate((
-            torch.tensor(train_index,dtype=uint16),
+            torch.tensor(train_index,dtype=int16),
             train_y.unsqueeze(1)
         ), dim = 1)
         train_inflow = torch.concatenate((
             torch.tensor(np.arange(0,self.inputs.data.dims['destination'],1), dtype=torch.int32, device=self.device).unsqueeze(1),
-            self.inputs.data.ground_truth_table.sum(axis=TRAIN_SCHEMA['ground_truth_table']['dims'].index('destination')).unsqueeze(1),
+            self.inputs.data.ground_truth_table.sum(axis=TRAIN_SCHEMA['ground_truth_table']['dims'].index('origin')).unsqueeze(1),
         ), dim = 1)
         train_outflow = torch.concatenate((
             torch.tensor(np.arange(0,self.inputs.data.dims['origin'],1), dtype=torch.int32, device=self.device).unsqueeze(1),
-            self.inputs.data.ground_truth_table.sum(axis=TRAIN_SCHEMA['ground_truth_table']['dims'].index('origin')).unsqueeze(1),
+            self.inputs.data.ground_truth_table.sum(axis=TRAIN_SCHEMA['ground_truth_table']['dims'].index('destination')).unsqueeze(1),
         ), dim = 1)
 
         # Define output xarray coordinates 

@@ -2474,14 +2474,15 @@ class OutputSummary(object):
         if config.sweep_mode():
             # If sweep is over input data
             input_sweep_param_names = set(config.sweep_param_names).intersection(
-                set(list(TRAIN_SCHEMA.keys()))
+                set(list(INPUT_SCHEMA.keys()))
             )
             input_sweep_param_names = set(input_sweep_param_names).difference(set(['to_learn']))
             input_sweep_param_names = input_sweep_param_names.union(
                 set(config.sweep_param_names).intersection(
                     set(list(PARAMETER_DEFAULTS.keys()))
                 )
-        )
+            )
+
             if len(input_sweep_param_names) > 0:
                 # Load inputs for every single output
                 passed_inputs = None

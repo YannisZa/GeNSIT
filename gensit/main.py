@@ -160,7 +160,7 @@ _run_and_optimise_options = [
         help = 'Overwrites initialisation of beta parameter in MCMC.'),
         click.option('--beta_max','-bm', type = click.FloatRange(min = 0), default = None,
         help = 'Overwrites maximum beta in SIM parameters.'),
-        click.option('--covariance','-cov', type = click.STRING, default = None, callback = evaluate_string,
+        click.option('--covariance','-cov', type = click.STRING, default = None, cls = PythonLiteralOption,
         help = 'Overwrites covariance matrix of parameter Gaussian Randow walk proposal'),
         click.option('--step_size','-ss', type = click.FloatRange(min = 0), default = None,
         help = 'Overwrites step size in parameter Gaussian Randow walk proposal'),

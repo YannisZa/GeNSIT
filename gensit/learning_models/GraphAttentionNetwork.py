@@ -1,3 +1,4 @@
+import sys
 import torch
 import optuna
 import numpy as np
@@ -10,7 +11,7 @@ from tqdm import tqdm
 
 from gensit.config import Config
 from gensit.utils.exceptions import *
-from gensit.utils.misc_utils import setup_logger
+from gensit.utils.misc_utils import setup_logger, comp_deg_norm
 from gensit.static.global_variables import OPTIMIZERS
 
 
@@ -32,20 +33,20 @@ MODEL_PREFIX = 'gat_'
 class GAT_Model(nn.Module):
 
     def __init__(
-            self, 
-            trial:optuna.trial,
-            config: Config,
-            graph, 
-            num_regions, 
-            input_size, 
-            device:str = 'cpu', 
-            **kwargs
-        ):
+        self, 
+        trial: optuna.trial,
+        config: Config,
+        graph, 
+        n_features,
+        dims: dict, 
+        device:str = 'cpu', 
+        **kwargs
+    ):
         '''
         Inputs:
         ---------------------
         graph: the graph
-        num_regions: number of nodes in graph
+        n_features: number of geographical features at origin/destination
         input_size: original node attributes' dimension
         nodes_per_layer: node embedding dimension
         num_hidden_layers: number of hidden layers in graph neural network
@@ -85,8 +86,6 @@ class GAT_Model(nn.Module):
 
         # init super class
         super().__init__()
-
-        self.num_regions = num_regions
         
         # Update hyperparameters
         self.update_hyperparameters()
@@ -94,25 +93,25 @@ class GAT_Model(nn.Module):
         # create modules
         # GAT for origin nodes
         self.origin_gat = GAT(
-            graph,
-            num_regions, 
-            input_size, 
-            self.hyperparams['nodes_per_layer'], 
-            self.hyperparams['nodes_per_layer'], 
-            self.hyperparams['num_hidden_layers'], 
-            self.hyperparams['dropout'], 
-            device
+            graph = graph,
+            num_regions = dims['origin'],
+            input_size = n_features,
+            nodes_per_layer = self.hyperparams['nodes_per_layer'], 
+            output_size = self.hyperparams['nodes_per_layer'], 
+            num_hidden_layers = self.hyperparams['num_hidden_layers'], 
+            dropout = self.hyperparams['dropout'], 
+            device = device
         ) 
         # GAT for destination nodes
         self.destination_gat = GAT(
-            graph,
-            num_regions, 
-            input_size, 
-            self.hyperparams['nodes_per_layer'], 
-            self.hyperparams['nodes_per_layer'], 
-            self.hyperparams['num_hidden_layers'], 
-            self.hyperparams['dropout'], 
-            device
+            graph = graph,
+            num_regions = dims['destination'], 
+            input_size = n_features, 
+            nodes_per_layer = self.hyperparams['nodes_per_layer'], 
+            output_size = self.hyperparams['nodes_per_layer'], 
+            num_hidden_layers = self.hyperparams['num_hidden_layers'], 
+            dropout = self.hyperparams['dropout'], 
+            device = device
         )
         # linear plan
         self.edge_regressor = nn.Bilinear(self.hyperparams['nodes_per_layer'], self.hyperparams['nodes_per_layer'], 1)
@@ -362,7 +361,6 @@ class GAT_Model(nn.Module):
             trip_od = mini_batch[:, :2].long().to(self.device)
             # get trip volume
             scaled_trip_volume = torch.sqrt(mini_batch[:, -1].float()).to(self.device)
-
             # evaluate loss
             loss = self.get_loss(
                 trip_od, 
@@ -446,7 +444,7 @@ class GAT(nn.Module):
 
     def forward(self, graph):
         h = graph.ndata['attr']
-        for layer in self.layers:
+        for i,layer in enumerate(self.layers):
             h = layer(h)
         return h
 
@@ -504,7 +502,7 @@ class GATLayer(nn.Module):
             self, 
             graph, 
             in_ndim, 
-            out_ndim, 
+            out_ndim,
             in_edim=1, 
             out_edim=1
         ):
@@ -560,10 +558,11 @@ class GATLayer(nn.Module):
     def forward(self, h):
         # equation (1)
         self.graph.apply_edges(self.edge_feat_func)
+        
         z = self.fc1(h) 
-        self.graph.ndata['z'] = z # message passed to the others
+        self.graph.ndata['z'] = z
         z_i = self.fc2(h) 
-        self.graph.ndata['z_i'] = z_i # message passed to self
+        self.graph.ndata['z_i'] = z_i
         # equation (2)
         self.graph.apply_edges(self.edge_attention)
         # equation (3) & (4)

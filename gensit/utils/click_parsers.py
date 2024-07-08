@@ -59,9 +59,6 @@ def unstringify_callback(ctx, param, value):
             decoded_val = val
         res.append(decoded_val)
     return res
-
-def evaluate_string(ctx, param, value):
-    return eval(value)
     
 def list_of_str(ctx, param, value):
     if value is None:
