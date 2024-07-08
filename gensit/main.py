@@ -160,7 +160,7 @@ _run_and_optimise_options = [
         help = 'Overwrites initialisation of beta parameter in MCMC.'),
         click.option('--beta_max','-bm', type = click.FloatRange(min = 0), default = None,
         help = 'Overwrites maximum beta in SIM parameters.'),
-        click.option('--covariance','-cov', type = click.STRING, default = None, cls = PythonLiteralOption,
+        click.option('--covariance','-cov', type = click.STRING, default = None, callback = unstringify_callback,
         help = 'Overwrites covariance matrix of parameter Gaussian Randow walk proposal'),
         click.option('--step_size','-ss', type = click.FloatRange(min = 0), default = None,
         help = 'Overwrites step size in parameter Gaussian Randow walk proposal'),
@@ -620,7 +620,7 @@ _output_options = [
                 callback = list_of_lists, help = f'''Evaluates expressions for one or more datasets. 
                 First argument is the name of the evaluation. Second is the evaluation expression'''),
     click.option('--folder_kwargs','-fa', multiple = True, type = click.STRING, required = False, default = [{}], 
-                callback = unstringify_callback, help = f'''Expression evaluation keyword arguments by output folder.'''),
+                callback = list_unstringify_callback, help = f'''Expression evaluation keyword arguments by output folder.'''),
     click.option('--evaluation_kwargs','-ea', multiple = True, type = click.STRING, required = False, default = None, 
                 callback = evaluate_kwargs_callback, help = f'''Expression evaluation keyword arguments.'''),
     click.option('--evaluation_library','-el', multiple = True, type = click.STRING, required = False, default = ["np"], callback = list_of_str, help = f'''Expression evaluation libraries that needs to be loaded before applying evaluation'''),
