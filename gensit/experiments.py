@@ -3280,14 +3280,6 @@ class GraphAttentionNetwork_Comparison(Experiment):
         region_features_std = self.inputs.data.region_features.std(dim=0)
         region_features = (self.inputs.data.region_features - region_features_mean) / region_features_std
 
-        # origin_features_mean = self.inputs.data.origin_region_features.mean(dim=0)
-        # origin_features_std = self.inputs.data.origin_region_features.std(dim=0)
-        # origin_features = (self.inputs.data.origin_region_features - origin_features_mean) / origin_features_std
-        
-        # destination_features_mean = self.inputs.data.destination_region_features.mean(dim=0)
-        # destination_features_std = self.inputs.data.destination_region_features.std(dim=0)
-        # destination_features = (self.inputs.data.destination_region_features - destination_features_mean) / destination_features_std
-
         # Compute graph adjacency matrix 
         weighted_adjacency_matrix = torch.where(
             self.inputs.data.adjacency_matrix,
