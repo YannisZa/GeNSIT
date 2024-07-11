@@ -29,10 +29,14 @@ seed = 1234
         file = 'constraints/augmented_test_cells.txt'
     [inputs.data.train_cells.file.sweep]
         default = 'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt'
+        # range = [
+        #   'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
+        #   'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
+        #   'constraints/augmented_train_cells_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt',
+        #   'constraints/augmented_train_cells_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
+        # ]
         range = [
           'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
-          'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
-          'constraints/augmented_train_cells_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt',
           'constraints/augmented_train_cells_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
         ]
         coupled = true
@@ -41,10 +45,14 @@ seed = 1234
         default = 'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt'
         range = [
           'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
-          'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
-          'constraints/augmented_train_cells_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt',
           'constraints/augmented_train_cells_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
         ]
+        # range = [
+        #   'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
+        #   'constraints/augmented_train_cells_permuted_size_90_cell_percentage_10_constrained_axes_0_1_seed_1234.txt',
+        #   'constraints/augmented_train_cells_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt',
+        #   'constraints/augmented_train_cells_permuted_size_179_cell_percentage_20_constrained_axes_0_1_seed_1234.txt'
+        # ]
         coupled = true
         target_name = 'title'
 
@@ -78,16 +86,17 @@ seed = 1234
     gat_grad_norm = 1.0
     gat_optimizer = 'Adam'
     gat_learning_rate = 0.02
-    [graph_attention_network.hyperparameters.gat_multitask_weights.sweep]
-      default = [0.5, 0.25, 0.25]
-      range = [
-        [0.5, 0.25, 0.25],
-        [1.0, 0.0, 0.0],
-        [0.5, 0.25, 0.25],
-        [1.0, 0.0, 0.0],
-      ]
-      coupled = true
-      target_name = 'title'
+    gat_multitask_weights = [0.5, 0.25, 0.25]
+    # [graph_attention_network.hyperparameters.gat_multitask_weights.sweep]
+    #   default = [0.5, 0.25, 0.25]
+      # range = [
+      #   [0.5, 0.25, 0.25],
+      #   [1.0, 0.0, 0.0],
+      #   [0.5, 0.25, 0.25],
+      #   [1.0, 0.0, 0.0],
+      # ]
+      # coupled = true
+      # target_name = 'title'
     
 [[experiments]]
   type = 'GraphAttentionNetwork_Comparison'
@@ -106,10 +115,16 @@ seed = 1234
     out_directory = './data/outputs/'
     out_group = 'comparisons'
     [outputs.title.sweep] 
-      default = '_doubly_10%_cell_constrained_with_table_marginal_loss'
+      default = '_doubly_10%_cell_constrained'
       range = [
-        '_doubly_10%_cell_constrained_with_table_marginal_loss',
-        '_doubly_10%_cell_constrained_only_table_loss',
-        '_doubly_20%_cell_constrained_with_table_marginal_loss',
-        '_doubly_20%_cell_constrained_only_table_loss'
+        '_doubly_10%_cell_constrained',
+        '_doubly_20%_cell_constrained'
       ]
+    # [outputs.title.sweep] 
+    #   default = '_doubly_10%_cell_constrained_with_table_marginal_loss'
+    #   range = [
+    #     '_doubly_10%_cell_constrained_with_table_marginal_loss',
+    #     '_doubly_10%_cell_constrained_only_table_loss',
+    #     '_doubly_20%_cell_constrained_with_table_marginal_loss',
+    #     '_doubly_20%_cell_constrained_only_table_loss'
+    #   ]
