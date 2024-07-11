@@ -95,17 +95,11 @@ clear; gensit summarise \
 clear; gensit summarise -dn cambridge_work_commuter_lsoas_to_msoas/comparisons \
 -et GraphAttentionNetwork_Comparison \
 -el np -el MathUtils -el xr \
--e intensity_srmse_all_mean "intensity_srmse_all.mean('seed',dtype='float64',skipna=True)" \
--e intensity_srmse_all_std "intensity_srmse_all.std('seed',dtype='float64',skipna=True)" \
--e intensity_srmse_train_mean "intensity_srmse_train.mean('seed',dtype='float64',skipna=True)" \
--e intensity_srmse_train_std "intensity_srmse_train.std('seed',dtype='float64',skipna=True)" \
--e intensity_srmse_test_mean "intensity_srmse_test.mean('seed',dtype='float64',skipna=True)" \
--e intensity_srmse_test_std "intensity_srmse_test.std('seed',dtype='float64',skipna=True)" \
+-e "intensity_all_srmse" "MathUtils.srmse(intensity_mean,ground_truth=ground_truth_table,mask=test_cells_mask)" \
+-e "intensity_train_srmse" "MathUtils.srmse(intensity_mean,ground_truth=ground_truth_table,mask=train_cells_mask)" \
 -ea intensity \
--ea "intensity_mean=intensity.groupby('seed').mean('iter',dtype='float64')" \
--ea "intensity_srmse_all=intensity_mean.groupby('seed').map(MathUtils.srmse,ground_truth=outputs.inputs.data.ground_truth_table)" \
--ea "intensity_srmse_train=intensity_mean.groupby('seed').map(MathUtils.srmse,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.train_cells_mask)" \
--ea "intensity_srmse_test=intensity_mean.groupby('seed').map(MathUtils.srmse,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask)" \
+-ea "intensity_mean=intensity.mean('iter',dtype='float64')" \
+-btt 'iter' 10000 9 10000 \
 -k type -k title -fe intensity_SRMSEs -nw 2
 ```
 
@@ -114,14 +108,11 @@ Get SSI for all samples:
 clear; gensit summarise -dn cambridge_work_commuter_lsoas_to_msoas/comparisons \
 -et GraphAttentionNetwork_Comparison \
 -el np -el MathUtils -el xr \
--e intensity_ssi_train_mean "intensity_ssi_train.mean('seed',dtype='float64',skipna=True)" \
--e intensity_ssi_train_std "intensity_ssi_train.std('seed',dtype='float64',skipna=True)" \
--e intensity_ssi_test_mean "intensity_ssi_test.mean('seed',dtype='float64',skipna=True)" \
--e intensity_ssi_test_std "intensity_ssi_test.std('seed',dtype='float64',skipna=True)" \
+-e intensity_ssi_train "MathUtils.ssi(intensity_mean,ground_truth=ground_truth_table,mask=train_cells_mask)" \
+-e intensity_ssi_test "MathUtils.ssi(intensity_mean,ground_truth=ground_truth_table,mask=test_cells_mask)" \
 -ea intensity \
--ea "intensity_mean=intensity.groupby('seed').mean('iter',dtype='float64')" \
--ea "intensity_ssi_train=intensity_mean.groupby('seed').map(MathUtils.ssi,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.train_cells_mask)" \
--ea "intensity_ssi_test=intensity_mean.groupby('seed').map(MathUtils.ssi,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask)" \
+-ea "intensity_mean=intensity.mean('iter',dtype='float64')" \
+-btt 'iter' 10000 9 10000 \
 -k type -k title -fe intensity_SSIs -nw 2
 ```
 
@@ -154,18 +145,15 @@ clear; gensit summarise \
 clear; gensit summarise  -dn cambridge_work_commuter_lsoas_to_msoas/comparisons \
 -et GraphAttentionNetwork_Comparison \
 -el np -el MathUtils -el xr \
--e intensity_cp_train_mean "xr.apply_ufunc(roundint, 100*intensity_cp_train.mean(['origin','destination'],skipna=True)).mean('seed',dtype='float64',skipna=True)" \
--e intensity_cp_train_std "xr.apply_ufunc(roundint, 100*intensity_cp_train.mean(['origin','destination'],skipna=True)).std('seed',dtype='float64',skipna=True)" \
--e intensity_cp_all_mean "xr.apply_ufunc(roundint, 100*intensity_cp_all.mean(['origin','destination'],skipna=True)).mean('seed',dtype='float64',skipna=True)" \
--e intensity_cp_all_std "xr.apply_ufunc(roundint, 100*intensity_cp_all.mean(['origin','destination'],skipna=True)).std('seed',dtype='float64',skipna=True)" \
+-e intensity_cp_train "xr.apply_ufunc(roundint, 100*intensity_cp_train.mean(['origin','destination'],skipna=True))" \
+-e intensity_cp_test "xr.apply_ufunc(roundint, 100*intensity_cp_test.mean(['origin','destination'],skipna=True))" \
 -ea intensity \
 -ea "cp_func=MathUtils.coverage_probability" \
 -ea "roundint=MathUtils.roundint" \
 -ea "region_masses=0.99" \
--ea "intensity_cp_train=intensity.stack(id=['iter']).groupby('seed').map(cp_func,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.train_cells_mask,region_mass=region_masses)" \
--ea "intensity_cp_all=intensity.stack(id=['iter']).groupby('seed').map(cp_func,ground_truth=outputs.inputs.data.ground_truth_table,region_mass=region_masses)" \
+-ea "intensity_cp_train=cp_func(intensity.stack(id=['iter']),ground_truth=ground_truth_table,mask=train_cells_mask,region_mass=region_masses)" \
+-ea "intensity_cp_test=cp_func(intensity.stack(id=['iter']),ground_truth=ground_truth_table,region_mass=region_masses,mask=test_cells_mask)" \
 -btt 'iter' 10000 9 10000 \
--btt 'iter' 0 1 10000 \
 -k type -k title -fe intensity_CoverageProbabilities -nw 2
 ```
 
