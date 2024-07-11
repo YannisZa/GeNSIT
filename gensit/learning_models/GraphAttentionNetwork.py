@@ -135,9 +135,10 @@ class GAT_Model(nn.Module):
         self.hyperparams = {}
         if self.trial is not None:
             OPTUNA_HYPERPARAMS = {
+                # "optimizer":  self.trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
                 "nodes_per_layer": self.trial.suggest_categorical('nodes_per_layer', [32, 64, 128]),
                 "num_hidden_layers": self.trial.suggest_int('num_hidden_layers', 0, 12, step = 1),
-                "optimizer":  self.trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
+                "reg_param": self.trial.suggest_float('learning_rate', 0.0, 1.0),
                 "learning_rate": self.trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True),
                 "multitask_weights": [0.5, 0.25, 0.25]
             } 
