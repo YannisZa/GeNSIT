@@ -1,5 +1,5 @@
 log_level = 'info'
-sweep_mode = true
+sweep_mode = false
 
 [inputs]
 n_workers = +1
