@@ -22,7 +22,7 @@ from gensit.utils.math_utils import torch_optimize
 from gensit.utils.probability_utils import random_vector
 from gensit.physics_models.HarrisWilsonModel import HarrisWilson
 from gensit.intensity_models import instantiate_intensity_model
-from gensit.static.global_variables import TRAIN_SCHEMA, PARAMETER_DEFAULTS, TRAIN_SCHEMA, VALIDATION_SCHEMA, PLOT_SCHEMA, INPUT_SCHEMA, Dataset
+from gensit.static.global_variables import TRAIN_SCHEMA, PARAMETER_DEFAULTS, TRAIN_SCHEMA, VALIDATION_SCHEMA, INPUT_SCHEMA, Dataset
 from gensit.utils.misc_utils import makedir, read_json, safe_delete, set_seed, setup_logger, tuplize, unpack_dims, write_txt, deep_call, ndims, eval_dtype, read_file
 
 class Inputs:
@@ -65,7 +65,7 @@ class Inputs:
             self.read_data()
 
     def data_vars(self):
-        return {k:v for k,v in vars(self.data).items() if k in TRAIN_SCHEMA}
+        return {k:v for k,v in vars(self.data).items() if k in INPUT_SCHEMA}
     
     def validate_dims(self):
         for attr,schema in TRAIN_SCHEMA.items():
