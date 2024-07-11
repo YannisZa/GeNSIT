@@ -47,7 +47,7 @@ def to_dict(ctx, param, value):
     else:
         return {val[0]:val[1] for val in value}
 
-def unstringify_callback(ctx, param, value):
+def list_unstringify_callback(ctx, param, value):
     if not value:
         return [{}]
     res = []
@@ -59,6 +59,12 @@ def unstringify_callback(ctx, param, value):
             decoded_val = val
         res.append(decoded_val)
     return res
+
+def unstringify_callback(ctx, param, value):
+    if (value is None) | (value == '[]'):
+        return
+    else:
+        return eval(value)
     
 def list_of_str(ctx, param, value):
     if value is None:

@@ -711,7 +711,7 @@ class Experiment(object):
         if self.config.settings['experiments'][0].get('export_samples',True):
             self.logger.debug('Writing data')
             if self._time >= self._write_start and self._time % self._write_every == 0:
-                if 'loss' in self.output_names:
+                if 'loss' in self.output_names and 'loss' in kwargs:
                     for loss_name in list(self.learning_model.loss_functions.keys())+['total_loss']:
                         # Store samples
                         _loss_sample = kwargs.get(loss_name,None)
@@ -720,14 +720,15 @@ class Experiment(object):
                         getattr(self,loss_name)[index] = _loss_sample
 
                 if 'theta' in self.output_names:
-                    _theta_sample = kwargs.get('theta',[None]*len(self.thetas))
+                    _theta_sample = kwargs.get('theta',None)
                     _theta_sample = _theta_sample.clone().detach().cpu() if _theta_sample is not None else None
-                    for idx, dset in enumerate(self.thetas):
-                        dset.resize(dset.shape[0] + n_samples, axis = 0)
-                        dset[index] = _theta_sample[idx]
+                    if _theta_sample is not None and 'theta' in kwargs:
+                        for idx, dset in enumerate(self.thetas):
+                            dset.resize(dset.shape[0] + n_samples, axis = 0)
+                            dset[index] = _theta_sample[idx]
 
                 for sample in ['r2','log_posterior_approximation']:
-                    if sample in self.output_names:
+                    if sample in self.output_names and sample in kwargs:
                         sample_value = kwargs.get(sample,None)
                         sample_value = sample_value.clone().detach().cpu() if sample_value is not None else None
                         getattr(self,sample)[index] = sample_value
@@ -736,7 +737,7 @@ class Experiment(object):
                     'log_destination_attraction','sign','table', 'intensity',
                     'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time'
                 ]:
-                    if sample in self.output_names:
+                    if sample in self.output_names and sample in kwargs:
                         # Get sample value
                         sample_value = kwargs.get(sample,None)
                         sample_value = sample_value.clone().detach().cpu() \
@@ -762,23 +763,24 @@ class Experiment(object):
 
     
     def show_progress(self):
-        if hasattr(self,'theta_acc'):
-            self.config['theta_acceptance'] = int(100*self.theta_acc[:].mean(axis = 0))
-            self.logger.progress(f"Theta acceptance: {self.config['theta_acceptance']}")
-        if hasattr(self,'signs'):
-            self.config['positives_percentage'] = int(100*self.signs[:].sum(axis = 0))
-            self.logger.progress(f"Positives %: {self.config['positives_percentage']}")
-        if hasattr(self,'log_destination_attraction_acc'):
-            self.config['log_destination_attraction_acceptance'] = int(100*self.log_destination_attraction_acc[:].mean(axis = 0))
-            self.logger.progress(f"Log destination attraction acceptance: {self.config['log_destination_attraction_acceptance']}")
-        if hasattr(self,'table_acc'):
-            self.config['table_acceptance'] = int(100*self.table_acc[:].mean(axis = 0))
-            self.logger.progress(f"Table acceptance: {self.config['table_acceptance']}")
-        if hasattr(self,'learning_model') and self.learning_model.model_type == 'neural_network':
-            loss_names = list(self.learning_model.loss_functions.keys())
-            loss_names = loss_names if len(loss_names) <= 1 else loss_names+['total_loss']
-            for loss_name in loss_names:
-                self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:][-1]}')
+        if self._time >= 1:
+            if hasattr(self,'theta_acc'):
+                self.config['theta_acceptance'] = int(100*self.theta_acc[:].mean(axis = 0))
+                self.logger.progress(f"Theta acceptance: {self.config['theta_acceptance']}")
+            if hasattr(self,'signs'):
+                self.config['positives_percentage'] = int(100*self.signs[:].sum(axis = 0))
+                self.logger.progress(f"Positives %: {self.config['positives_percentage']}")
+            if hasattr(self,'log_destination_attraction_acc'):
+                self.config['log_destination_attraction_acceptance'] = int(100*self.log_destination_attraction_acc[:].mean(axis = 0))
+                self.logger.progress(f"Log destination attraction acceptance: {self.config['log_destination_attraction_acceptance']}")
+            if hasattr(self,'table_acc'):
+                self.config['table_acceptance'] = int(100*self.table_acc[:].mean(axis = 0))
+                self.logger.progress(f"Table acceptance: {self.config['table_acceptance']}")
+            if hasattr(self,'learning_model') and self.learning_model.model_type == 'neural_network':
+                loss_names = list(self.learning_model.loss_functions.keys())
+                loss_names = loss_names if len(loss_names) <= 1 else loss_names+['total_loss']
+                for loss_name in loss_names:
+                    self.logger.progress(f'{loss_name.capitalize()}: {getattr(self,loss_name)[:][-1]}')
 
     def update_optimisation_progress(self,index,prediction,mask):
         # If hyperparameter optimisation mode is activated:
@@ -941,6 +943,7 @@ class RSquared_Analysis(Experiment):
         theta_sample = initial_params['theta']
 
         # reset these values so that outputs can be written to file
+        self._time = 1
         self._write_start = 0
         self._write_every = 1
         
@@ -1020,6 +1023,7 @@ class RSquared_Analysis(Experiment):
                             r2 = None,
                             index = (i,j)
                         )
+                        self._time += 1
                         continue
                     
                     # Get predictions
@@ -1058,6 +1062,7 @@ class RSquared_Analysis(Experiment):
                     r2 = r2,
                     index = (i,j)
                 )
+                self._time += 1
 
                 if r2 > max_r2:
                     max_w_prediction = deepcopy(w_pred)
@@ -1353,6 +1358,9 @@ class SIM_MCMC(Experiment):
         # Fix random seed
         set_seed(self.seed)
 
+        # Initialise data structures
+        self.initialise_data_structures()
+
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
         theta_sample = initial_params['theta']
@@ -1382,6 +1390,8 @@ class SIM_MCMC(Experiment):
         # Total samples for table,theta,x posteriors, respectively
         M = self.learning_model.theta_steps
         L = self.learning_model.log_destination_attraction_steps
+        # Update time
+        self._time += 1
 
         for i in tqdm(
             range(N),
@@ -1393,7 +1403,7 @@ class SIM_MCMC(Experiment):
 
             # Track the epoch training time
             start_time = time.time()
-        
+
             # Run theta sampling
             for j in tqdm(
                 range(M),
@@ -1422,9 +1432,9 @@ class SIM_MCMC(Experiment):
 
                 # Write to file
                 self.write_data(
-                    theta = theta_sample,
-                    theta_acc = theta_acc,
-                    sign = sign_sample
+                    theta = torch.tensor(theta_sample),
+                    theta_acc = torch.tensor(theta_acc),
+                    sign = torch.tensor(sign_sample)
                 )
             
             # Run x sampling
@@ -1449,8 +1459,8 @@ class SIM_MCMC(Experiment):
                 )
                 # Write to data
                 self.write_data(
-                    log_destination_attraction = log_destination_attraction_sample,
-                    log_destination_attraction_acc = log_dest_attract_acc
+                    log_destination_attraction = torch.tensor(log_destination_attraction_sample).unsqueeze(1),
+                    log_destination_attraction_acc = torch.tensor(log_dest_attract_acc)
                 )
 
             # print statements
@@ -1461,6 +1471,8 @@ class SIM_MCMC(Experiment):
 
             # Write the epoch training time (wall clock time)
             self.write_data(compute_time = time.time() - start_time)
+            # Update time
+            self._time += 1
         
         # Update metadata
         self.show_progress()
@@ -1567,6 +1579,9 @@ class JointTableSIM_MCMC(Experiment):
         # Fix random seed
         set_seed(self.seed)
 
+        # Initialise data structures
+        self.initialise_data_structures()
+
         # Initialise parameters
         initial_params = self.initialise_parameters(self.output_names)
         theta_sample = initial_params['theta']
@@ -1606,6 +1621,8 @@ class JointTableSIM_MCMC(Experiment):
         # Total samples for table,theta,x posteriors, respectively
         M = self.learning_model.theta_steps
         L = self.learning_model.log_destination_attraction_steps
+        # Update time
+        self._time += 1
 
         for i in tqdm(
             range(N),
@@ -1649,9 +1666,9 @@ class JointTableSIM_MCMC(Experiment):
 
                 # Write to file
                 self.write_data(
-                    theta = theta_sample,
-                    theta_acc = theta_acc,
-                    sign = sign_sample
+                    theta = torch.tensor(theta_sample),
+                    theta_acc = torch.tensor(theta_acc),
+                    sign = torch.tensor(sign_sample)
                 )
             
             # Run x sampling
@@ -1679,8 +1696,8 @@ class JointTableSIM_MCMC(Experiment):
                 )
                 # Write to data
                 self.write_data(
-                    log_destination_attraction = log_destination_attraction_sample,
-                    log_destination_attraction_acc = log_dest_attract_acc,
+                    log_destination_attraction = torch.tensor(log_destination_attraction_sample).unsqueeze(1),
+                    log_destination_attraction_acc = torch.tensor(log_dest_attract_acc),
                 )
 
             # Compute new intensity
@@ -1704,8 +1721,8 @@ class JointTableSIM_MCMC(Experiment):
 
                 # Write to file
                 self.write_data(
-                    table = table_sample,
-                    table_acc = table_accepted
+                    table = torch.tensor(table_sample),
+                    table_acc = torch.tensor(table_accepted)
                 )
             
             # Compute table likelihood for updated table
@@ -1723,7 +1740,9 @@ class JointTableSIM_MCMC(Experiment):
             
             # Write the epoch training time (wall clock time)
             self.write_data(compute_time = time.time() - start_time)
-            
+            # Update time
+            self._time += 1
+
         # Update metadata
         self.show_progress()
 
@@ -1845,6 +1864,8 @@ class Table_MCMC(Experiment):
 
         # Store number of samples
         N = self.config['training']['N']
+        # Update time
+        self._time += 1
 
         # For each epoch
         for i in tqdm(
@@ -2695,8 +2716,6 @@ class XGBoost_Comparison(Experiment):
         # Initialise data structures
         self.initialise_data_structures()
         
-        # Store current iteration number
-        self._time = 1
         # Store number of samples
         N = self.config['training']['N']
 
@@ -2743,6 +2762,9 @@ class XGBoost_Comparison(Experiment):
         # Initialise validation metrics
         validation_metrics = []
         self.tqdm_disabled = False
+        # Update time
+        self._time += 1
+
         for i in tqdm(
             range(N),
             disable = self.tqdm_disabled,
@@ -2891,8 +2913,6 @@ class RandomForest_Comparison(Experiment):
         # Initialise data structures
         self.initialise_data_structures()
         
-        # Store current iteration number
-        self._time = 1
         # Store number of samples
         N = self.config['training']['N']
 
@@ -2944,6 +2964,8 @@ class RandomForest_Comparison(Experiment):
             train_x = train_x,
             train_y = train_y
         )
+        # Update time
+        self._time += 1
         
         # For each estimator
         for i in tqdm(
@@ -3091,8 +3113,6 @@ class GBRT_Comparison(Experiment):
         # Initialise data structures
         self.initialise_data_structures()
         
-        # Store current iteration number
-        self._time = 1
         # Store number of samples
         N = self.config['training']['N']
 
@@ -3144,6 +3164,9 @@ class GBRT_Comparison(Experiment):
             train_x = train_x,
             train_y = train_y
         )
+
+        # Update time
+        self._time += 1
         
         # For each estimator
         for i in tqdm(
@@ -3314,8 +3337,6 @@ class GraphAttentionNetwork_Comparison(Experiment):
         # Initialise data structures
         self.initialise_data_structures()
         
-        # Store current iteration number
-        self._time = 1
         # Store number of samples
         N = self.config['training']['N']
         
@@ -3361,6 +3382,9 @@ class GraphAttentionNetwork_Comparison(Experiment):
         
         # Initialise validation metrics
         validation_metrics = []
+
+        # Update time
+        self._time += 1
 
         # For each epoch
         for i in tqdm(
