@@ -325,7 +325,7 @@ class Experiment(object):
     
     def instantiate_intensity_and_physics_models(self,config:Config,trial:optuna.trial=None,**kwargs):
         # Instantiate intensity model
-        self.logger.note("Initializing the intensity model ...")
+        self.logger.hilight("Initializing the intensity model ...")
         intensity_model = instantiate_intensity_model(
             config = config,
             trial = trial,
@@ -337,7 +337,7 @@ class Experiment(object):
         config = pop_variable(intensity_model,'config',config)
 
         # Build the physics model
-        self.logger.note("Initializing the physics model ...")
+        self.logger.hilight("Initializing the physics model ...")
         physics_model = instantiate_physics_model(
             config = config,
             trial = trial,
@@ -351,7 +351,7 @@ class Experiment(object):
     def instantiate_learning_model(self,learning_model:str,config:Config,trial:optuna.trial,**kwargs):
         if learning_model in ['HarrisWilson_NN','HarrisWilson_MCMC']:
             # Build the intensity and physics models
-            self.logger.note("Initializing the intensity and physics models ...")
+            self.logger.hilight("Initializing the intensity and physics models ...")
             physics_model = self.instantiate_intensity_and_physics_models(
                 config = config,
                 trial = trial,
@@ -362,7 +362,7 @@ class Experiment(object):
             
         if learning_model == 'HarrisWilson_NN':
             # Set up the neural net
-            self.logger.note("Initializing the neural net ...")
+            self.logger.hilight("Initializing the neural net ...")
             neural_network = NeuralNet(
                 config = config,
                 trial = trial,
@@ -374,7 +374,7 @@ class Experiment(object):
             config = pop_variable(neural_network,'config',config)
 
             # Instantiate harris and wilson neural network model
-            self.logger.note("Initializing the Harris Wilson Neural Network model ...")
+            self.logger.hilight("Initializing the Harris Wilson Neural Network model ...")
             learning_model = HarrisWilson_NN(
                 config = config,
                 neural_net = neural_network,
@@ -386,7 +386,7 @@ class Experiment(object):
             )
         elif learning_model == 'HarrisWilson_MCMC':
             # Set up intensity model MCMC
-            self.logger.note("Initializing the physics model MCMC")
+            self.logger.hilight("Initializing the physics model MCMC")
             learning_model = HarrisWilson_MCMC(
                 config = config,
                 physics_model = physics_model,
@@ -396,7 +396,7 @@ class Experiment(object):
 
         elif learning_model in ['XGB_Model','GBRT_Model','RF_Model']:
             # Set up the model
-            self.logger.note(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
+            self.logger.hilight(f"Initializing the {self.__class__.__name__.replace('_Comparison','')} algorithm ...")
             learning_model = globals()[learning_model](
                 trial = trial,
                 config = config,
@@ -615,7 +615,8 @@ class Experiment(object):
 
             for sample in [
                 'log_destination_attraction','table','log_target','intensity',
-                'sign','theta_acc','log_destination_attraction_acc','table_acc','compute_time'
+                'sign','theta_acc','log_destination_attraction_acc','table_acc',
+                'compute_time','table_compute_time','intensity_compute_time'
             ]:
                 if sample in self.output_names:
                     # Setup chunked dataset to store the state data in
@@ -735,7 +736,8 @@ class Experiment(object):
 
                 for sample in [
                     'log_destination_attraction','sign','table', 'intensity',
-                    'theta_acc','log_destination_attraction_acc','table_acc', 'compute_time'
+                    'theta_acc','log_destination_attraction_acc','table_acc', 
+                    'compute_time','table_compute_time','intensity_compute_time'
                 ]:
                     if sample in self.output_names and sample in kwargs:
                         # Get sample value
@@ -922,7 +924,7 @@ class RSquared_Analysis(Experiment):
             self.position = (trial.number % self.config['inputs']['n_workers']) + 1
 
         # Build the intensity and physics models
-        self.logger.note("Initializing the intensity and physics models ...")
+        self.logger.hilight("Initializing the intensity and physics models ...")
         self.physics_model = self.instantiate_intensity_and_physics_models(
             config = self.config,
             trial = trial,
@@ -1105,7 +1107,7 @@ class RSquared_Analysis(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
 
 class LogTarget_Analysis(Experiment):
 
@@ -1279,7 +1281,7 @@ class LogTarget_Analysis(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
 
 class SIM_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -1483,7 +1485,7 @@ class SIM_MCMC(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
 
 class JointTableSIM_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -1516,13 +1518,14 @@ class JointTableSIM_MCMC(Experiment):
         ])
 
         # Build contingency table
-        self.logger.note("Initializing the contingency table ...")
+        self.logger.hilight("Initializing the contingency table ...")
         ct = instantiate_ct(
             config = self.config,
             logger = self.logger,
             **vars(self.inputs.data)
         )
         
+        self.logger.hilight("Initializing contingency table MCMC ...")
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
@@ -1752,7 +1755,7 @@ class JointTableSIM_MCMC(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
 
 class Table_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -1777,7 +1780,7 @@ class Table_MCMC(Experiment):
         self.inputs.pass_to_device()
 
         # Build contingency table
-        self.logger.note("Initializing the contingency table ...")
+        self.logger.hilight("Initializing the contingency table ...")
         ct = instantiate_ct(
             config = self.config,
             logger = self.logger,
@@ -1786,6 +1789,7 @@ class Table_MCMC(Experiment):
         # Update table distribution
         self.config.settings['contingency_table']['distribution_name'] = ct.distribution_name
 
+        self.logger.hilight("Initializing contingency table MCMC ...")
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
@@ -1820,7 +1824,7 @@ class Table_MCMC(Experiment):
                 )
                 # Get and remove config
                 self.config = pop_variable(intensity_model,'config',self.config)
-                self.logger.note("Using intensity model as ground truth intensity")
+                self.logger.hilight("Using intensity model as ground truth intensity")
                 
                 # intensity model for intensity
                 self.log_intensity = intensity_model.log_intensity(
@@ -1851,9 +1855,19 @@ class Table_MCMC(Experiment):
         self.logger.note(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
 
-    def run(self,**kwargs) -> None:
+    def run(self,*trial,**kwargs) -> None:
+
+        # Extract first element
+        trial = trial[0] if trial else None
+
+        # Update tqdm position if trial is provided
+        if trial is not None:
+            self.position = (trial.number % self.config['inputs']['n_workers']) + 1
 
         self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')}.")
+
+        # Fix random seed
+        set_seed(self.seed)
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -1863,7 +1877,7 @@ class Table_MCMC(Experiment):
         table_sample = initial_params['table']
 
         # Store number of samples
-        N = self.config['training']['N']
+        N = self.config.settings['training']['N']
         # Update time
         self._time += 1
 
@@ -1911,7 +1925,7 @@ class Table_MCMC(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
 
 class SIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
@@ -1952,7 +1966,6 @@ class SIM_NN(Experiment):
             experiment_id = self.sweep_experiment_id,
             logger = self.logger
         )
-
         # Prepare writing to file
         self.outputs.open_output_file(sweep = kwargs.get('sweep',{}))
 
@@ -2121,7 +2134,7 @@ class SIM_NN(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
         
         return np.mean(validation_metrics)
 
@@ -2156,13 +2169,14 @@ class NonJointTableSIM_NN(Experiment):
         ])
         
         # Build contingency table
-        self.logger.note("Initializing the contingency table ...")
+        self.logger.hilight("Initializing the contingency table ...")
         ct = instantiate_ct(
             config = self.config,
             logger = self.logger,
             **vars(self.inputs.data)
         )
-        
+
+        self.logger.hilight("Initializing contingency table MCMC ...")
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
@@ -2216,7 +2230,7 @@ class NonJointTableSIM_NN(Experiment):
         self.config = getattr(self.learning_model,'config',self.config)
         
         self.logger.debug(f"{self.learning_model}")
-        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} training of physics model.")
+        self.logger.hilight(f"Running {self.__class__.__name__.replace('_',' ')} training of physics model.")
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -2258,7 +2272,6 @@ class NonJointTableSIM_NN(Experiment):
         # Track number of elements in each loss function
         n_processed_steps = {nm : 0 for nm in self.learning_model.loss_functions.keys()}
         
-
         # For each epoch
         for i in tqdm(
             range(N),
@@ -2306,11 +2319,14 @@ class NonJointTableSIM_NN(Experiment):
                     requires_grad = True
                 )
 
+                # Track the table sampling time
+                start_table_time = time.time()
                 # Sample table
                 table_sample,accepted = self.ct_mcmc.table_gibbs_step(
                     table_prev = table_sample,
                     log_intensity = log_intensity_sample
                 )
+                table_compute_time = time.time() - start_table_time
 
                 # Update losses
                 loss_sample,n_processed_steps = self.learning_model.update_loss(
@@ -2325,6 +2341,7 @@ class NonJointTableSIM_NN(Experiment):
                 )
 
                 # Clean and write to file
+                total_compute_time = time.time() - start_time
                 loss_sample,n_processed_steps = self.model_update_and_export(
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
@@ -2332,7 +2349,9 @@ class NonJointTableSIM_NN(Experiment):
                     log_destination_attraction = torch.log(destination_attraction_sample),
                     table = table_sample,
                     table_acceptance = accepted,
-                    compute_time = time.time() - start_time,
+                    compute_time = total_compute_time,
+                    table_compute_time = table_compute_time,
+                    intensity_compute_time = total_compute_time-table_compute_time,
                     # Batch size is in training settings
                     t = t,
                     data_size = len(training_data),
@@ -2369,7 +2388,7 @@ class NonJointTableSIM_NN(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
 
         return np.mean(validation_metrics)
 
@@ -2404,12 +2423,14 @@ class JointTableSIM_NN(Experiment):
         ])
 
         # Build contingency table
-        self.logger.note("Initializing the contingency table ...")
+        self.logger.hilight("Initializing the contingency table ...")
         ct = instantiate_ct(
             config = self.config,
             logger = self.logger,
             **vars(self.inputs.data)
         )
+
+        self.logger.hilight("Initializing contingency table MCMC ...")
         # Build contingency table MCMC
         self.ct_mcmc = ContingencyTableMarkovChainMonteCarlo(
             ct = ct,
@@ -2554,6 +2575,8 @@ class JointTableSIM_NN(Experiment):
                     requires_grad = True
                 )
                 
+                # Track the table sampling time
+                start_table_time = time.time()
                 # Sample table(s)
                 table_samples = []
                 for _ in range(self.config['mcmc']['contingency_table'].get('table_steps',1)):
@@ -2563,6 +2586,7 @@ class JointTableSIM_NN(Experiment):
                         log_intensity = log_intensity_sample
                     )
                     table_samples.append(table_sample/table_sample.sum())
+                table_compute_time = time.time() - start_table_time
 
                 # Update losses
                 loss_sample,n_processed_steps = self.learning_model.update_loss(
@@ -2582,6 +2606,7 @@ class JointTableSIM_NN(Experiment):
 
                 # Clean loss and write to file
                 # This will only store the last table sample
+                total_compute_time = time.time() - start_time
                 loss_sample,n_processed_steps = self.model_update_and_export(
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
@@ -2589,7 +2614,9 @@ class JointTableSIM_NN(Experiment):
                     log_destination_attraction = torch.log(destination_attraction_sample),
                     table = table_sample,
                     table_acceptance = accepted,
-                    compute_time = time.time() - start_time,
+                    compute_time = total_compute_time,
+                    table_compute_time = table_compute_time,
+                    intensity_compute_time = total_compute_time-table_compute_time,
                     # Batch size is in training settings
                     t = t,
                     data_size = len(training_data),
@@ -2627,7 +2654,7 @@ class JointTableSIM_NN(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
 
         return np.mean(validation_metrics)
 
@@ -2662,7 +2689,7 @@ class XGBoost_Comparison(Experiment):
         ])
 
         # Build contingency table
-        self.logger.note("Initializing the contingency table ...")
+        self.logger.hilight("Initializing the contingency table ...")
         self.ct = instantiate_ct(
             config = self.config,
             logger = self.logger,
@@ -2821,7 +2848,7 @@ class XGBoost_Comparison(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
         
         return np.mean(validation_metrics)
 
@@ -2858,7 +2885,7 @@ class RandomForest_Comparison(Experiment):
         self.logger.progress('casted to xarray')
 
         # Build contingency table
-        self.logger.note("Initializing the contingency table ...")
+        self.logger.hilight("Initializing the contingency table ...")
         self.ct = instantiate_ct(
             config = self.config,
             logger = self.logger,
@@ -3023,7 +3050,7 @@ class RandomForest_Comparison(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
 
         return np.mean(validation_metrics)
 
@@ -3058,7 +3085,7 @@ class GBRT_Comparison(Experiment):
         ])
 
         # Build contingency table
-        self.logger.note("Initializing the contingency table ...")
+        self.logger.hilight("Initializing the contingency table ...")
         self.ct = instantiate_ct(
             config = self.config,
             logger = self.logger,
@@ -3224,7 +3251,7 @@ class GBRT_Comparison(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
         
         return np.mean(validation_metrics)
 
@@ -3260,7 +3287,7 @@ class GraphAttentionNetwork_Comparison(Experiment):
         ])
 
         # Build contingency table
-        self.logger.note("Initializing the contingency table ...")
+        self.logger.hilight("Initializing the contingency table ...")
         self.ct = instantiate_ct(
             config = self.config,
             logger = self.logger,
@@ -3444,7 +3471,7 @@ class GraphAttentionNetwork_Comparison(Experiment):
         # Write log and close outputs
         self.close_outputs()
         
-        self.logger.note("Experiment finished.")
+        self.logger.success("Experiment finished.")
         
         return np.mean(validation_metrics)
 
@@ -3500,23 +3527,30 @@ class ExperimentSweep():
 
         # Temporarily disable sample output writing
         export_samples = deepcopy(self.config['experiments'][0]['export_samples'])
+        export_metadata = deepcopy(self.config['experiments'][0]['export_metadata'])
         deep_update(self.config.settings,'export_samples',False)
+        deep_update(self.config.settings,'export_metadata',False)
 
         # Keep only first dataset just to instantiate outputs
-        dir_range = []
+        datasets = []
         if isinstance(self.config['inputs']['dataset'],dict):
-            dir_range = deepcopy(self.config['inputs']['dataset']['sweep']['range'])
-            self.config['inputs']['dataset'] = dir_range[0]
-        
+            datasets = deepcopy(self.config['inputs']['dataset'])
+            self.config['inputs']['dataset'] = ''
+
         self.outputs = Outputs(
             config = self.config,
             sweep = kwargs.get('sweep',{}),
             logger = self.logger
         )
-        # Make output home directory
-        self.outputs_base_dir = self.outputs.outputs_path
+        
+        if len(datasets['sweep']['range']) == 1:
+            # Make output home directory
+            self.outputs_base_dir = self.outputs.outputs_path
+        else:
+            self.outputs_base_dir = None
         self.outputs_experiment_id = self.outputs.experiment_id
 
+        
         # Check if outputs exist 
         # and remove them from sweep configurations
         if self.config.settings['load_data']:
@@ -3526,22 +3560,25 @@ class ExperimentSweep():
             )
 
         # Prepare writing to file
-        self.outputs.open_output_file(sweep={})
+        if len(datasets['sweep']['range']) == 1:
+            self.outputs.open_output_file(sweep={})
 
         # Enable it again
         deep_updates(self.config.settings,{'export_samples':export_samples})
+        deep_updates(self.config.settings,{'export_metadata':export_metadata})
 
-        # Write metadata
-        if self.config.settings['experiments'][0].get('export_metadata',True):
-            # Write to file
-            self.outputs.write_metadata(
-                dir_path='',
-                filename = f"config"
-            )
+        if len(datasets['sweep']['range']) == 1:
+            # Write metadata
+            if self.config.settings['experiments'][0].get('export_metadata',True):
+                # Write to file
+                self.outputs.write_metadata(
+                    dir_path='',
+                    filename = f"config"
+                )
         
         # Restore dataset config entries
-        if len(dir_range) > 0:
-            self.config['inputs']['dataset'] = dir_range
+        if len(datasets['sweep']['range']) > 0:
+            self.config['inputs']['dataset'] = datasets
         self.logger.note(f"ExperimentSweep: {self.outputs.experiment_id} prepared")
 
     
@@ -3589,7 +3626,7 @@ class ExperimentSweep():
     def prepare_experiment(self,config:Config,sweep_configuration:list):
         # Deactivate logging
         self.logger.setLevels(
-            console_level='ERROR',#'ERROR','DEBUG'
+            console_level='HILIGHT',#'ERROR','DEBUG'
             file_level='DEBUG'
         )
         return config.prepare_experiment_config(sweep_configuration)
@@ -3597,7 +3634,6 @@ class ExperimentSweep():
     
     def prepare_instantiate_and_run(self,config:Config,instance_num:int,sweep_configuration:dict,active_positions = None):
         try:
-
             # Prepare experiment
             new_config,sweep = self.prepare_experiment(config,sweep_configuration)
             self.logger.info(f'Instance = {str(instance_num)} START')
