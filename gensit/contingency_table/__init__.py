@@ -971,7 +971,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 updated_cells = broadcast2d(
                     residual_margins[ax],
                     shape = tuple(list(self.dims)),
-                    expanded_axis = ax
+                    expanded_axis = ax[0]
                 )
                 updated_cells = torch.tensor(updated_cells,dtype = float32)
                 # Update cells at locations where there is residual value left
