@@ -1256,7 +1256,7 @@
 
       "sweep": {
         "default": {
-          "dtype": "float",
+          "dtype": "int",
           "default-value": 1.0,
           "valid-range": [1.0, null]
         },
