@@ -172,6 +172,13 @@ seed = 8888
   export_metadata = true
   overwrite = true
 
+[[experiments]]
+  type = 'Table_MCMC'
+  comment = 'Table learning'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
 
 # [[experiments]]
 #   type = 'GraphAttentionNetwork'
