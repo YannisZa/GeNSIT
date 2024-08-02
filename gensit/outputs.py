@@ -115,7 +115,7 @@ class Outputs(object):
                     self.config['outputs'].get('out_group',''),
                     self.experiment_id
             ) if kwargs.get('base_dir',None) is None else kwargs['base_dir']
-            
+
         elif isinstance(config,str):
             
             # Remove potentially added filenames
@@ -923,16 +923,12 @@ class Outputs(object):
             return sweep_experiment_id
 
     def create_output_subdirectories(self,sweep_id:str='') -> None:
-        export_samples = list(deep_get(key='export_samples',value = self.config.settings))
-        export_metadata = list(deep_get(key='export_metadata',value = self.config.settings))
-        export_samples = export_samples[0] if len(export_samples) > 0 else True
-        export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
-        if export_samples or export_metadata:
-            # Create output directories
-            makedir(os.path.join(self.outputs_path,'samples'))
-            if len(sweep_id) > 0 and isinstance(sweep_id,str):
-                makedir(os.path.join(self.outputs_path,'samples',sweep_id))
-            makedir(os.path.join(self.outputs_path,'figures'))
+        # Create output directories
+        makedir(os.path.join(self.outputs_path,'samples'))
+        if len(sweep_id) > 0 and isinstance(sweep_id,str):
+            makedir(os.path.join(self.outputs_path,'samples',sweep_id))
+        makedir(os.path.join(self.outputs_path,'figures'))
+
 
     def write_log(self):
         if isinstance(self.logger,DualLogger):
@@ -970,17 +966,20 @@ class Outputs(object):
 
     def open_output_file(self,sweep:dict={}):
         # Create output directories if necessary
-        self.create_output_subdirectories(sweep_id = self.sweep_id)
+        export_samples = list(deep_get(key='export_samples',value = self.config.settings))
+        export_metadata = list(deep_get(key='export_metadata',value = self.config.settings))
+        # Keep first entry of these values
+        export_samples = export_samples[0] if len(export_samples) > 0 else True
+        export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
+        
+        self.logger.info(f"Creating output file at:\n        {self.outputs_path}")
+        makedir(self.outputs_path)
+        if export_samples or export_metadata:
+            self.create_output_subdirectories(sweep_id = self.sweep_id)
+        
         if hasattr(self,'config') and hasattr(self.config,'settings'):
-            export_samples = list(deep_get(key='export_samples',value = self.config.settings))
-            export_metadata = list(deep_get(key='export_metadata',value = self.config.settings))
-            # Keep first entry of these values
-            export_samples = export_samples[0] if len(export_samples) > 0 else True
-            export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
-            
             # Write to file
             if export_samples:
-                self.logger.note(f"Creating output file at:\n        {self.outputs_path}")
                 try:
                     self.h5file = h5.File(
                         os.path.join(
@@ -2195,6 +2194,7 @@ class OutputSummary(object):
             experiment_titles = __self__.settings.get('title',[''])
             # Get dataset name
             dataset_names = __self__.settings.get('dataset_name',['.*'])
+            dataset_names = list(dataset_names)
             # Get type of experiment
             experiment_types = __self__.settings.get('experiment_type',[''])
 
@@ -2228,7 +2228,14 @@ class OutputSummary(object):
                         dataset,
                         output_group
                     )
-                ) for dataset in dataset_names
+                ) for dataset in dataset_names 
+                if os.path.isdir(
+                    os.path.join(
+                        output_directory,
+                        dataset,
+                        output_group
+                    )
+                )
             ])
             # Sort them by string
             output_dirs = sorted(list(output_dirs))
@@ -2508,7 +2515,8 @@ class OutputSummary(object):
             data_names = self.settings['sample'],
             inputs = passed_inputs,
             console_handling_level = self.settings['logging_mode'],
-            logger = self.logger
+            logger = self.logger,
+            # base_dir = output_folder
         )
         
         # Load all output data
