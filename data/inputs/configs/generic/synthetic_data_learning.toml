@@ -41,8 +41,14 @@ seed = 8888
 [contingency_table]
   disable_tqdm = false
   sparse_margins = false
-  [contingency_table.constraints]
-    axes = [[0],[1]]
+  [contingency_table.constraints.axes.sweep]
+    default = [[1]]
+    range = [ 
+      [[1]],
+      [[0],[1]]
+    ]
+    coupled = true
+    target_name = 'proposal'
 
 [spatial_interaction_model]
   grand_total = +1
@@ -92,9 +98,11 @@ seed = 8888
     
     [mcmc.contingency_table]
       table_steps = +1
-      proposal = 'degree_higher'
       table0 = 'maximum_entropy_solution'
       margin0 = 'multinomial'
+      [mcmc.contingency_table.proposal.sweep]
+        default = 'direct_sampling'
+        range = ['direct_sampling', 'degree_higher']
 
 [hyperparameter_optimisation]
   n_trials = 100
