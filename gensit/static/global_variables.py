@@ -298,7 +298,7 @@ TRAIN_SCHEMA = {
     },
     "margins":{},
     "cells_subset":{},
-    "dims":{},
+    "dims":{"dtype":"dict"},
     "to_learn":{},
     "true_parameters":{},
     "dataset":{}
@@ -442,6 +442,16 @@ OUTPUT_SCHEMA = {
         "dtype":"float32",
         "is_iterable": True,
     },
+    "table_compute_time":{
+        "axes":[],
+        "dtype":"float32",
+        "is_iterable": True,
+    },
+    "intensity_compute_time":{
+        "axes":[],
+        "dtype":"float32",
+        "is_iterable": True,
+    },
     **INTENSITY_SCHEMA,
     **TABLE_SCHEMA
 }
@@ -466,15 +476,15 @@ EXPERIMENT_OUTPUT_NAMES = {
     "RSquared_Analysis": ["r2"],
     "LogTarget_Analysis": ["log_posterior_approximation"],
     "SIM_MCMC": ["log_destination_attraction","theta","sign",
-                 "log_target","compute_time",
+                 "log_target","compute_time"
                  "theta_acc","log_destination_attraction_acc"],
     "JointTableSIM_MCMC": ["log_destination_attraction","theta","sign","table",
-                           "log_target","compute_time",
+                           "log_target","compute_time","table_compute_time","intensity_compute_time",
                            "theta_acc","log_destination_attraction_acc","table_acc"],
     "Table_MCMC": ["table","compute_time"],
     "SIM_NN": ["log_destination_attraction","theta","loss","compute_time"],
-    "NonJointTableSIM_NN": ["log_destination_attraction","theta", "loss", "table","compute_time"],
-    "JointTableSIM_NN": ["log_destination_attraction","theta","loss", "table","compute_time"],
+    "NonJointTableSIM_NN": ["log_destination_attraction","theta", "loss", "table","compute_time","table_compute_time","intensity_compute_time"],
+    "JointTableSIM_NN": ["log_destination_attraction","theta","loss", "table","compute_time","table_compute_time","intensity_compute_time"],
     "XGBoost_Comparison": ["intensity","compute_time"],
     "RandomForest_Comparison": ["intensity","compute_time"],
     "GBRT_Comparison": ["intensity","compute_time"],
