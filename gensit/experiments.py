@@ -664,8 +664,8 @@ class Experiment(object):
             self._time += 1
 
             # Update gradients
-            loss = kwargs.get('loss',None)
-            if loss is not None:
+            loss = kwargs.get('loss',{})
+            if len(loss) > 0:
                 # Extract values from each sub-loss
                 loss_values = sum([val for val in loss.values()])
                 # Perform gradient update
@@ -1804,12 +1804,12 @@ class Table_MCMC(Experiment):
         self.config = getattr(self.ct_mcmc.ct,'config',self.config)
 
         # Initialise intensity
-        if (ct is not None) and (ct.ground_truth_table is not None):
+        if (self.inputs.data.ground_truth_table is not None):
             self.logger.info("Using table as ground truth intensity")
             # Use ground truth table to construct intensity
             with np.errstate(invalid='ignore',divide='ignore'):
                 self.log_intensity = torch.log(
-                    ct.ground_truth_table
+                    self.inputs.data.ground_truth_table
                 ).to(float32)
             
         else:
@@ -1899,15 +1899,17 @@ class Table_MCMC(Experiment):
                 log_intensity = self.log_intensity
             )
 
+            # Make sure table is admissible
+            try:
+                assert self.ct_mcmc.ct.table_admissible(table_sample)
+            except:
+                raise Exception(f"Inadmissible table for iteration {i}")
+
             # Clean and write to file
-            _,_ = self.model_update_and_export(
+            self.write_data(
                 table = table_sample,
                 table_acceptance = accepted,
-                compute_time = time.time() - start_time,
-                # Batch size is in training settings
-                t = 0,
-                data_size = 1,
-                **self.config['training']
+                compute_time = time.time() - start_time
             )
 
             # print statements
