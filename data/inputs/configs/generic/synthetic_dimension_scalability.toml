@@ -186,5 +186,5 @@ seed = 8888
     write_start = +1
     write_every = +1
     out_directory = './data/outputs/synthetic/'
-    out_group = ''
+    out_group = 'dimension_scalability'
     title = ''
