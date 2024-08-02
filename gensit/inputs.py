@@ -17,9 +17,10 @@ from copy import deepcopy
 
 from gensit.config import Config
 from gensit.utils.exceptions import *
-from gensit.utils.misc_utils import create_mask
+from gensit.utils.misc_utils import create_mask,write_json
 from gensit.utils.math_utils import torch_optimize
 from gensit.utils.probability_utils import random_vector
+from gensit.contingency_table import *
 from gensit.physics_models.HarrisWilsonModel import HarrisWilson
 from gensit.intensity_models import instantiate_intensity_model
 from gensit.static.global_variables import TRAIN_SCHEMA, PARAMETER_DEFAULTS, TRAIN_SCHEMA, VALIDATION_SCHEMA, INPUT_SCHEMA, Dataset
@@ -47,13 +48,15 @@ class Inputs:
         # Create data
         self.data = Dataset()
 
+        # Define device to set 
+        self.device = self.config.settings['inputs']['device']
+
         # Flag for whether data are stored in device
         self.data_in_device = False
 
         # Get instance of experiment 
         # this is relevant in the case of the DataGeneration experiment
         self.instance = kwargs.get('instance',1)
-
 
         self.seed = None
         if 'data_generation_seed' in list(self.config.settings['inputs']['data'].keys()):
@@ -136,9 +139,23 @@ class Inputs:
                             self.data.dims[dim] = int(np.shape(getattr(self.data,attr))[ax])
                 elif attr in VALIDATION_SCHEMA:
                     self.logger.debug(f"{attr} set to empty numpy array")
-                    setattr(self.data,attr,np.array([]))
+                    if attr == 'test_cells':
+                        setattr(
+                            self.data,attr,np.array([[i,j] \
+                            for i in range(self.data.dims['origin']) \
+                            for j in range(self.data.dims['destination'])])
+                        )
+                    else:
+                        setattr(self.data,attr,np.array([]))
                 else:
                     raise Exception(f"{attr.replace('_',' ').capitalize()} file {filepath} NOT found")
+        # Initialise test cells if none are provided
+        if getattr(self.data,'test_cells',None) is None:
+            setattr(
+                self.data,'test_cells',np.array([[i,j] \
+                for i in range(self.data.dims['origin']) \
+                for j in range(self.data.dims['destination'])])
+            )
         
         # Import table margin data
         self.import_margins()
@@ -260,7 +277,7 @@ class Inputs:
                     torch.tensor(
                         getattr(self.data,sample_name).values,
                         dtype = int32,
-                        device = self.config.settings['inputs']['device']
+                        device = self.device
                     )
                 )
             else:
@@ -331,8 +348,6 @@ class Inputs:
                     )
                 )
     def pass_to_device(self):
-        # Define device to set 
-        device = self.config.settings['inputs']['device']
 
         if not self.data_in_device:
             for input,schema in TRAIN_SCHEMA.items():
@@ -347,7 +362,7 @@ class Inputs:
                                     )
                                 ),
                                 tuple([self.data.dims[name] for name in schema["dims"]])
-                            ).to(device)
+                            ).to(self.device)
                         else:
                             data = torch.from_numpy(
                                 getattr(self.data,input)).to(dtype = eval_dtype(
@@ -364,12 +379,12 @@ class Inputs:
             if hasattr(self.data,'log_destination_attraction') and getattr(self.data,'log_destination_attraction') is not None:
                 self.data.log_destination_attraction = torch.squeeze(self.data.log_destination_attraction)
             if hasattr(self.data,'grand_total') and getattr(self.data,'grand_total') is not None:
-                self.data.grand_total = torch.tensor(self.data.grand_total).float().to(device)
+                self.data.grand_total = torch.tensor(self.data.grand_total).float().to(self.device)
             if hasattr(self.data,'margins') and getattr(self.data,'margins') is not None:
-                self.data.margins = {axis: torch.tensor(margin,dtype = int32,device = device) for axis,margin in self.data.margins.items()}
+                self.data.margins = {axis: torch.tensor(margin,dtype = int32,device = self.device) for axis,margin in self.data.margins.items()}
             if hasattr(self,'true_parameters') and len(getattr(self,'true_parameters')) > 0:
                 for param in self.true_parameters.keys():
-                    self.true_parameters[param] = torch.tensor(self.true_parameters[param]).float().to(device)
+                    self.true_parameters[param] = torch.tensor(self.true_parameters[param]).float().to(self.device)
 
         self.data_in_device = True
     
@@ -636,6 +651,9 @@ class Inputs:
                 size=(self.data.dims['origin'], self.data.dims['destination']),
             )
         ).astype('float32')
+        # Make matrix symmetric if origins = destinations
+        if self.data.dims['origin'] ==  self.data.dims['destination']:
+            self.data.cost_matrix += self.data.cost_matrix.T
         self.data.total_cost_by_origin = self.data.cost_matrix.sum(axis = 1)
 
         # Normalise to sum to one
@@ -658,6 +676,10 @@ class Inputs:
         # Update true parameters to multiply
         self.true_parameters['beta'] *= self.true_parameters['bmax']
 
+        # Get grand total
+        grand_total = self.config.settings['spatial_interaction_model'].get('grand_total',1)
+        self.data.grand_total = grand_total
+
         # Pass all data to device
         self.pass_to_device()
 
@@ -671,6 +693,7 @@ class Inputs:
 
         # Initialise the Harris Wilson model
         HWM = HarrisWilson(
+            trial = None,
             intensity_model = intensity_model,
             config = self.config,
             dt = self.config['harris_wilson_model'].get('dt',0.001),
@@ -689,8 +712,41 @@ class Inputs:
         # Get training data size from dimensions
         data_time_steps = self.config.settings['inputs']["dims"].get('time',destination_attraction_ts.shape[0])
         # Extract the training data from the time series data
-        self.data.destination_attraction_ts = destination_attraction_ts[-data_time_steps:]
-        # self.data.log_destination_attraction = torch.log(destination_attraction_ts[-1:])
+        self.data.destination_attraction_ts = destination_attraction_ts[-data_time_steps:].T
+        # self.data.log_destination_attraction = 
+
+        # Create synthetic table
+        # Get log probability (normalised intensity)
+        if self.data.dims['origin'] != self.data.dims['destination']:
+            log_probability = HWM.intensity_model.log_intensity(
+                log_destination_attraction = torch.log(destination_attraction_ts[-1:]),
+                grand_total = torch.tensor(1.0),
+                **HWM.hyperparams
+            )
+        else:
+            log_intensity = torch.log(destination_attraction_ts[-1:].repeat(self.data.dims['origin'],1)/self.data.cost_matrix)
+            log_probability = log_intensity - torch.logsumexp(log_intensity.ravel(),dim=(0))
+
+        # Initialise ground truth table
+        ground_truth_table = torch.zeros(self.data.dims['origin']*self.data.dims['destination'],dtype=int32)
+
+        # Sample from multinomial with grand total fixed
+        continue_loop = True
+        while continue_loop:
+            # Sample free cells from multinomial
+            updated_cells = distr.multinomial.Multinomial(
+                total_count = int(grand_total),
+                probs = torch.exp(log_probability).ravel()
+            ).sample()
+            # Update free cells
+            ground_truth_table = updated_cells.to(dtype = float32,device = self.device)
+            # Reshape table to match original dims
+            ground_truth_table = torch.reshape(ground_truth_table, tuplize(list(unpack_dims(self.data.dims))))
+            # Continue loop only if table is not sparse admissible
+            continue_loop = False
+
+        # Store ground truth table to input data
+        self.data.ground_truth_table = ground_truth_table.to(dtype = float32,device = self.device)
 
         # Receive all data from device
         self.receive_from_device()
@@ -699,10 +755,9 @@ class Inputs:
         set_seed(None)
 
         # Set dataset name
-        grand_total = self.config.settings['spatial_interaction_model'].get('grand_total',1)
         dataset_name = f"./data/inputs/synthetic/" + \
-        f"synthetic_{'x'.join([str(self.data.dims[name]) for name in TRAIN_SCHEMA[key]['dims']])}_total_{grand_total}_" + \
-        f"using_{synthetis_method}_samples_{str(num_samples)}_steps_{str(num_steps)}_sigma_{str(np.round(self.true_parameters['sigma'],2))}"
+        f"synthetic_{'x'.join([str(self.data.dims[name]) for name in TRAIN_SCHEMA[key]['dims']])}_total_{int(grand_total)}"
+        # f"_using_{synthetis_method}_samples_{str(num_samples)}_steps_{str(num_steps)}_sigma_{str(np.round(self.true_parameters['sigma'],2))}"
 
         # Create inputs folder
         if os.path.isdir(dataset_name) and not self.config.settings['experiments'][0]['overwrite']:
@@ -710,10 +765,17 @@ class Inputs:
             # raise Exception(f"Synthetic dataset {dataset_name} already exists.")
         else:
             makedir(dataset_name)
+
+        # Write config used to synthesize the data
+        write_json(
+            self.config.settings,
+            os.path.join(dataset_name,'config.json'),
+            indent = 2
+        )
         
         # Write data to inputs folder
         for key in vars(self.data):
-            if key != "dims":
+            if key not in ["dims","grand_total"]:
                 self.logger.note(f"Dataset {os.path.join(dataset_name,f'{key}.txt')} created")
                 write_txt(
                     getattr(self.data,key),
@@ -741,7 +803,7 @@ class Inputs:
                 physics_model.run(
                     init_destination_attraction = self.data.destination_attraction_ts,
                     n_iterations = num_steps,
-                    free_parameters = None,
+                    free_parameters = physics_model.hyperparams,
                     generate_time_series = True,
                     requires_grad = False,
                     seed = instance
