@@ -110,7 +110,7 @@ _run_and_optimise_options = [
         click.option('--name','-nm', type = click.Choice(['TotallyConstrained','ProductionConstrained']),
         default = None, help = 'Overwrites spatial interaction model of choice (intensity function)'),
         click.option('--grand_total','-gt', type = click.FloatRange(min=1.0),
-        default = None, help = 'Overwrites input grand total in config'),
+        default = 1.0, help = 'Overwrites input grand total in config'),
         click.option('--origin_demand','-od', type = click.STRING,
         default = None, help = 'Overwrites input origin demand filename in config'),
         click.option('--region_features','-rf', type = click.STRING,
