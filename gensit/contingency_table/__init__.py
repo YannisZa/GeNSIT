@@ -136,8 +136,6 @@ class ContingencyTable(object):
         # Update type of table to determine the type of Markov basis to use
         self.update_table_type_and_markov_basis_class()
 
-        print(len(self.cells))
-
         # Get total from table
         if 'spatial_interaction_model' in list(self.config.keys()) and tuplize(range(ndims(self))) in list(self.data.margins.keys()):
             self.config['spatial_interaction_model']['grand_total'] = int(self.data.margins[tuplize(range(ndims(self)))])
