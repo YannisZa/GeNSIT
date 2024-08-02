@@ -303,7 +303,10 @@ class Config:
             current_key = string_to_numeric(current_key) \
                 if isinstance(current_key,str) and current_key.isnumeric() \
                 else current_key
-            deleted,settings = self.path_delete(settings[current_key],key_path[1:],deleted)
+            try:
+                deleted,settings = self.path_delete(settings[current_key],key_path[1:],deleted)
+            except:
+                self.logger.warning(f"Could not delete path {key_path}. It might not exist.")
         return deleted,settings
 
     def path_set(self,settings,value,key_path=[],overwrite:bool = False):
