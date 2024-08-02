@@ -62,7 +62,7 @@ _common_options = [
     click.option('--table','-tab', type = click.STRING,default = None, help = 'Overwrites input table filename in config'),
     click.option('--device','-dev', type = click.Choice(['cpu', 'cuda', 'mps']), default='cpu',
             help = f'Type of device used for torch operations.'),
-    click.option('--out_directory', '-o', required = True, type = click.Path(exists = True), default='./data/outputs/'),
+    click.option('--out_directory', '-o', required = False, type = click.Path(exists = True), default=None),
     click.option('--out_group', '-og', required = False, type = click.Path(exists = False), default=''),
 ]
 
@@ -304,54 +304,19 @@ def create(
     # Update number of workers
     set_threads(settings['n_threads'])
 
-    # Import modules
-    from gensit.utils.misc_utils import deep_updates
-    from gensit.experiments import ExperimentHandler
-
     # Setup logger
     logger = setup_logger(
         __name__,
         console_level = settings.get('logging_mode','info'),
     )
 
-    # Read config
-    config = Config(
-        path = config_path,
-        settings = None,
-        console_level = settings.get('logging_mode','info'),
-        logger = logger
+    eh = exec(
+        logger,
+        settings = settings,
+        config_path = config_path,
+        experiment_type = {"DataGeneration":0}
     )
 
-    # Update settings with overwritten values
-    deep_updates(config.settings,settings,overwrite = True)
-
-    # Maintain a dictionary of available experiments and their list index
-    experiment_types = {
-        exp.get('type',''):i  
-        for i,exp in enumerate(config.settings['experiments']) 
-        if exp.get('type','') == 'DataGeneration'
-    }
-    config.settings.setdefault('experiment_type',experiment_types)
-
-    # Update root
-    config.path_sets_root()
-    
-    logger.info(f"Validating config provided...")
-    
-    # Validate config
-    config.experiment_validate()
-
-    # Get sweep-related data
-    config.get_sweep_data()
-
-    # Intialise experiment handler
-    eh = ExperimentHandler(
-        config,
-        logger = logger,
-        skip_output_prep = True
-    )
-    # Run experiments
-    eh.run_and_write_experiments_sequentially()
 
 @cli.command('run')
 @click.option('--load_experiment','-le', multiple = False, type = click.Path(exists = True), default = None, 
