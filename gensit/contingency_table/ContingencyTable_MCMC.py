@@ -78,6 +78,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
                     raise Exception('Incompatible Markov Basis object passed')
             else:
                 # Instantiate markov basis object
+                self.logger.hilight("Initializing Markov Bases ...")
                 self.markov_basis = instantiate_markov_basis(
                     self.ct, 
                     monitor_progress = False,
@@ -523,7 +524,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # Get all unconstrained axes
         axis_uncostrained = deepcopy(self.ct.constraints['unconstrained_axes'])
         # Initialise shape of probability normalisation matrix
-        new_shape = torch.ones(ndims(self.ct), dtype = torch.uint16)
+        new_shape = torch.ones(ndims(self.ct), dtype = torch.int16)
 
         if len(axis_constrained) == ndims(self.ct):
             # Calculate normalisation of multinomial probabilities (total intensity)
