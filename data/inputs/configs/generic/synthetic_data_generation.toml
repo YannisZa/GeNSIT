@@ -15,6 +15,10 @@ load_experiment = ''
     'synthetic_100x100_total_1000000',
     'synthetic_250x250_total_1000000',
     'synthetic_500x500_total_1000000',
+    'synthetic_1000x1000_total_10000',
+    'synthetic_1000x1000_total_100000',
+    'synthetic_1000x1000_total_250000',
+    'synthetic_1000x1000_total_500000',
     'synthetic_1000x1000_total_1000000',
   ]
 
@@ -26,12 +30,12 @@ load_experiment = ''
     time = +1
     [inputs.data.dims.origin.sweep]
       default = +50
-      range = [50,100,250,500,1000]
+      range = [50,100,250,500,1000,1000,1000,1000,1000]
       coupled = true
       target_name = 'dataset'
     [inputs.data.dims.destination.sweep]
       default = +50
-      range = [50,100,250,500,1000]
+      range = [50,100,250,500,1000,1000,1000,1000,1000]
       coupled = true
       target_name = 'dataset'
   [inputs.data.origin_demand]
@@ -53,9 +57,23 @@ load_experiment = ''
 [spatial_interaction_model]
   # name = 'ProductionConstrained','TotallyConstrained'
   name = 'TotallyConstrained'
-  grand_total = +1_000_000.0
+  [spatial_interaction_model.grand_total.sweep]
+    default = 10_000.0
+    range = [
+      1_000_000.0,
+      1_000_000.0,
+      1_000_000.0,
+      1_000_000.0,
+      10_000.0,
+      100_000.0,
+      250_000.0,
+      500_000.0,
+      1_000_000.0
+    ]
+    coupled = true
+    target_name = 'dataset'
   [spatial_interaction_model.parameters]
-    bmax = +10_000.0
+    bmax = +1.0
     alpha = +0.0
     beta = +1.2
   
@@ -79,7 +97,7 @@ load_experiment = ''
   physics_model = 'harris_wilson_model'
   [training.num_steps.sweep]
     default = +1_000
-    range = [1_000,1_000,2_000,2_000,3_000]
+    range = [1_000,1_000,2_000,2_000,3_000,3_000,3_000,3_000,3_000]
     coupled = true
     target_name = 'dataset'
 
