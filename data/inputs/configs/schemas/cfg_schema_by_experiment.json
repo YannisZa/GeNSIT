@@ -5,7 +5,8 @@
     "xgboost>exclude": true,
     "random_forest>exclude": true,
     "gradient_boosted_regression_trees>exclude": true,
-    "graph_attention_network>exclude": true
+    "graph_attention_network>exclude": true,
+    "hyperparameter_optimisation>exclude": true
   },
   "RSquared_Analysis": {
     "neural_network>exclude": true,

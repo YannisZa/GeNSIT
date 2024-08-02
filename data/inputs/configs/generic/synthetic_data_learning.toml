@@ -9,22 +9,13 @@ load_experiment = ''
 in_directory = './data/inputs/synthetic/'
 seed = 8888
 [inputs.dataset.sweep]
-  default = "synthetic_100x25_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.01"
+  default = "synthetic_50x50_total_1000000"
   range = [
-    "synthetic_100x25_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.01",
-    "synthetic_100x25_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.14",
-    "synthetic_100x50_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.01",
-    "synthetic_100x50_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.14",
-    "synthetic_100x75_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.01",
-    "synthetic_100x75_total_1_using_sde_solver_samples_1_steps_1000_sigma_0.14",
-    "synthetic_500x25_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.01",
-    "synthetic_500x25_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.14",
-    "synthetic_500x50_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.01",
-    "synthetic_500x50_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.14",
-    "synthetic_500x75_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.01",
-    "synthetic_500x75_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.14",
-    "synthetic_500x100_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.01",
-    "synthetic_500x100_total_1_using_sde_solver_samples_1_steps_3000_sigma_0.14"
+    'synthetic_50x50_total_1000000',
+    'synthetic_100x100_total_1000000',
+    'synthetic_250x250_total_1000000',
+    'synthetic_500x500_total_1000000',
+    'synthetic_1000x1000_total_1000000',
   ]
 
 [inputs.data]
@@ -34,43 +25,52 @@ seed = 8888
     file = 'destination_attraction_ts.txt'
   [inputs.data.cost_matrix]
     file = 'cost_matrix.txt'
-  [[inputs.data.margins]]
-    axis = [0,1]
-    value = [+10000]
+  [inputs.data.ground_truth_table]
+    file = 'ground_truth_table.txt'
+  # [inputs.data.region_features]
+  #   file = 'mini_region_features.npy'
+  # [inputs.data.adjacency_matrix]
+  #   file = 'adjacency_matrix.txt'
+  # [inputs.data.test_cells]
+  #     file = 'test_cells.txt'
+  # [inputs.data.train_cells]
+  #     file = 'zero_and_train_cells.txt'
+  # [inputs.data.validation_cells]
+  #     file = 'validation_cells.txt'
 
 [contingency_table]
+  disable_tqdm = false
   sparse_margins = false
   [contingency_table.constraints]
-    axes = [[0,1]]
-    # cells = [[0,1],[1,2]]
+    axes = [[0],[1]]
 
 [spatial_interaction_model]
   grand_total = +1
   name = 'TotallyConstrained'
   [spatial_interaction_model.parameters]
     bmax = +1.0
-    alpha = +1.0
-    beta = +1.0
+    # alpha = +1.0
+    # beta = +1.0
   
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
     epsilon = 1.0
     kappa = 0.1
-    # sigma = 0.0141421356
-    [harris_wilson_model.parameters.sigma.sweep]
-      default = 0.0141421356
-      range = [
-        0.0141421356,0.141421356,
-        0.0141421356,0.141421356,
-        0.0141421356,0.141421356,
-        0.0141421356,0.141421356,
-        0.0141421356,0.141421356,
-        0.0141421356,0.141421356,
-        0.0141421356,0.141421356
-      ]
-      coupled = true
-      target_name = 'dataset'
+    sigma = 0.141421356
+    # [harris_wilson_model.parameters.sigma.sweep]
+    #   default = 0.0141421356
+    #   range = [
+    #     0.0141421356,0.141421356,
+    #     0.0141421356,0.141421356,
+    #     0.0141421356,0.141421356,
+    #     0.0141421356,0.141421356,
+    #     0.0141421356,0.141421356,
+    #     0.0141421356,0.141421356,
+    #     0.0141421356,0.141421356
+    #   ]
+    #   coupled = true
+    #   target_name = 'dataset'
 
 [training]
   batch_size = +1
@@ -78,99 +78,71 @@ seed = 8888
   to_learn = ['alpha', 'beta']
   intensity_model = 'spatial_interaction_model'
   physics_model = 'harris_wilson_model'
-  [training.N.sweep]
-    default = +10_000
-    range = [10_000,10_000,10_000,10_000,10_000,10_000,
-              50_000,50_000,50_000,50_000,50_000,50_000,50_000,50_000]
-    coupled = true
-    target_name = 'dataset'
+  N = 100
+  # [training.N.sweep]
+  #   default = +10_000
+  #   range = [10_000,10_000,10_000,10_000,10_000,10_000,
+  #             50_000,50_000,50_000,50_000,50_000,50_000,50_000,50_000]
+  #   coupled = true
+  #   target_name = 'dataset'
+
+[mcmc]
+    disable_tqdm = true
+    mcmc_workers = +1
+    
+    [mcmc.contingency_table]
+      table_steps = +1
+      proposal = 'degree_higher'
+      table0 = 'maximum_entropy_solution'
+      margin0 = 'multinomial'
 
 [hyperparameter_optimisation]
   n_trials = 100
   timeout = nan
   metric_minimise = true
   metric_evaluation = "MathUtils.srmse(prediction=prediction,ground_truth=ground_truth_table,mask=mask)"
-  
-[mcmc]
-    disable_tqdm = false
-    mcmc_workers = 1
-    [mcmc.parameters]
-        theta_steps = 1
-        [mcmc.parameters.covariance.sweep]
-            default = [[0.0149674,0.00182529],[0.00182529,0.0109968]]
-            range = [
-              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]],
-              [[0.0149674,0.00182529],[0.00182529,0.0109968]],[[ 1.0,  0.00], [ 0.00,  1.0]]
-            ]
-            coupled = true
-            target_name = 'dataset'
-        [mcmc.parameters.step_size.sweep]
-            default = 1.0
-            range = [
-              1.0,0.2,
-              1.0,0.2,
-              1.0,0.2,
-              1.0,0.2,
-              1.0,0.2,
-              1.0,0.2,
-              1.0,0.2
-            ]
-            coupled = true
-            target_name = 'dataset'
-    [mcmc.destination_attraction]
-        log_destination_attraction_steps = 1
-        leapfrog_steps = 3#10
-        leapfrog_step_size = 0.01 #0.02
-        ais_leapfrog_steps = 3#10
-        ais_leapfrog_step_size = 0.2#0.1
-        ais_samples = 10
-        n_bridging_distributions = 50
-    [mcmc.contingency_table]
-      table_steps = 1
-      proposal = 'direct_sampling' # ['degree_one','degree_higher','direct_sampling']
-      table0 = 'maximum_entropy_solution' #['direct_sampling','random_sample','maximum_entropy_solution']
-      margin0 = 'multinomial' # ['multinomial','import']
+
+# [graph_attention_network]
+#   disable_tqdm = true
+#   [graph_attention_network.hyperparameters]
+#     gat_nodes_per_layer = 32
+#     gat_num_hidden_layers = 1
+#     gat_dropout = 0
+#     gat_reg_param = 0
+#     gat_negative_sampling_rate = 0
+#     gat_grad_norm = 1.0
+#     gat_optimizer = 'Adam'
+#     gat_learning_rate = 0.02
+#     gat_multitask_weights = [0.5, 0.25, 0.25]
 
 [neural_network]
   disable_tqdm = true
-  [neural_network.loss_function]
-    loss_name = 'mseloss'
+  [neural_network.loss]
+    loss_name = ['dest_attraction_ts_likelihood_loss']
+    # ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+    loss_function = ['custom']
+    # ['custom','custom']
+    [neural_network.loss.loss_kwargs]
+      nokey = nan
   [neural_network.hyperparameters]
     num_hidden_layers = +1
     optimizer = 'Adam'
     learning_rate = +0.002
-    [neural_network.hyperparameters.biases]
-      default = [+0.0, +4.0]
-      [neural_network.hyperparameters.biases.layer_specific]
-    [neural_network.hyperparameters.nodes_per_layer]
-      default = +20
-      [neural_network.hyperparameters.nodes_per_layer.layer_specific]
-    [neural_network.hyperparameters.activation_funcs]
-      default = 'linear'
-      [neural_network.hyperparameters.activation_funcs.layer_specific]
-        1 = 'abs'
-
+  [neural_network.hyperparameters.biases]
+    default = [+0.0, +4.0]
+    [neural_network.hyperparameters.biases.layer_specific]
+  [neural_network.hyperparameters.nodes_per_layer]
+    default = +20
+    [neural_network.hyperparameters.nodes_per_layer.layer_specific]
+  [neural_network.hyperparameters.activation_funcs]
+    default = 'linear'
+    [neural_network.hyperparameters.activation_funcs.layer_specific]
+      1 = 'abs'
 
 [[experiments]]
   type = 'SIM_NN'
   comment = 'Spatial interaction model parameter learning using neural networks'
   disable_tqdm = false
-  print_statements = true
-  export_samples = true
-  export_metadata = true
-  overwrite = true
-
-
-[[experiments]]
-  type = 'SIM_MCMC'
-  comment = 'Spatial interaction model parameter learning using MCMC'
-  disable_tqdm = false
-  print_statements = true
   export_samples = true
   export_metadata = true
   overwrite = true
@@ -179,7 +151,6 @@ seed = 8888
   type = 'NonJointTableSIM_NN'
   comment = 'Independent Table and Spatial interaction model parameter learning using neural networks'
   disable_tqdm = false
-  print_statements = true
   export_samples = true
   export_metadata = true
   overwrite = true
@@ -189,23 +160,23 @@ seed = 8888
   type = 'JointTableSIM_NN'
   comment = 'Joint Table and Spatial interaction model parameter learning using neural networks'
   disable_tqdm = false
-  print_statements = true
   export_samples = true
   export_metadata = true
   overwrite = true
 
 
-[[experiments]]
-  type = 'JointTableSIM_MCMC'
-  comment = 'Joint Table and Spatial interaction model parameter learning using Markov Chain Monte Carlo'
-  disable_tqdm = false
-  print_statements = true
-  export_samples = true
-  export_metadata = true
-  overwrite = true
+# [[experiments]]
+#   type = 'GraphAttentionNetwork'
+#   comment = 'Spatial interaction model parameter learning using MCMC'
+#   disable_tqdm = false
+#   export_samples = true
+#   export_metadata = true
+#   overwrite = true
+
 
 [outputs]
     write_start = +1
     write_every = +1
     out_directory = './data/outputs/synthetic/'
-    experiment_title = ''
+    out_group = ''
+    title = ''

@@ -1,32 +1,37 @@
 log_level = 'info'
-sweep_mode = false
+sweep_mode = true
 
 [inputs]
 n_workers = +1
 n_threads = +6
 device = 'cpu'
 seed = 9876
-in_directory = './data/inputs/'
+in_directory = './data/inputs/synthetic'
 load_experiment = ''
 [inputs.dataset.sweep] 
-  default = 'synthetic_100x25'
-  range = ['synthetic_100x25','synthetic_100x50','synthetic_100x75', 
-  'synthetic_500x25','synthetic_500x50','synthetic_500x75', 'synthetic_500x100']
+  default = 'synthetic_50x50_total_1000000'
+  range = [
+    'synthetic_50x50_total_1000000',
+    'synthetic_100x100_total_1000000',
+    'synthetic_250x250_total_1000000',
+    'synthetic_500x500_total_1000000',
+    'synthetic_1000x1000_total_1000000',
+  ]
 
 [inputs.data]
   data_generation_seed = 4321
   synthesis_method = 'sde_solver'
-  synthesis_n_samples = +100
+  synthesis_n_samples = +1
   [inputs.data.dims]
     time = +1
     [inputs.data.dims.origin.sweep]
-      default = +100
-      range = [100,100,100,500,500,500,500]
+      default = +50
+      range = [50,100,250,500,1000]
       coupled = true
       target_name = 'dataset'
     [inputs.data.dims.destination.sweep]
-      default = +25
-      range = [25,50,75,25,50,75,100]
+      default = +50
+      range = [50,100,250,500,1000]
       coupled = true
       target_name = 'dataset'
   [inputs.data.origin_demand]
@@ -48,11 +53,11 @@ load_experiment = ''
 [spatial_interaction_model]
   # name = 'ProductionConstrained','TotallyConstrained'
   name = 'TotallyConstrained'
-  grand_total = +1
+  grand_total = +1_000_000.0
   [spatial_interaction_model.parameters]
     bmax = +10_000.0
-    alpha = +1.2
-    beta = +0.2
+    alpha = +0.0
+    beta = +1.2
   
 [harris_wilson_model]
   dt = +0.001
@@ -61,9 +66,10 @@ load_experiment = ''
     epsilon = 1.0
     # kappa = 0.5
     # delta = 0
-    [harris_wilson_model.parameters.sigma.sweep]
-      default = 0.0141421356
-      range = [0.0141421356,0.141421356]
+    sigma = 0.141421356
+    # [harris_wilson_model.parameters.sigma.sweep]
+    #   default = 0.0141421356
+    #   range = [0.0141421356,0.141421356]
 
 [training]
   batch_size = +1
@@ -73,21 +79,14 @@ load_experiment = ''
   physics_model = 'harris_wilson_model'
   [training.num_steps.sweep]
     default = +1_000
-    range = [1_000,1_000,1_000,3_000,3_000,3_000,3_000]
+    range = [1_000,1_000,2_000,2_000,3_000]
     coupled = true
     target_name = 'dataset'
-
-[hyperparameter_optimisation]
-  n_trials = 100
-  timeout = nan
-  metric_minimise = true
-  metric_evaluation = "MathUtils.srmse(prediction=prediction,ground_truth=ground_truth_table,mask=mask)"
 
 [[experiments]]
   type = 'DataGeneration'
   comment = 'Generates synthetic datasets and store them to file'
   disable_tqdm = false
-  print_statements = true
   export_samples = false
   export_metadata = false
   overwrite = true
