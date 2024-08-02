@@ -440,7 +440,6 @@ class HarrisWilson:
         if not generate_time_series:
             sizes = init_destination_attraction.clone().unsqueeze(1)
 
-
             for _ in range(n_iterations):
                 # Compute log intensity
                 log_intensity_sample = self.intensity_model.log_intensity(
@@ -461,6 +460,7 @@ class HarrisWilson:
                 # Compute log intensity
                 log_intensity_sample = self.intensity_model.log_intensity(
                     log_destination_attraction = torch.log(sizes[-1]),
+                    grand_total = torch.tensor(1.0),
                     **free_parameters
                 ).squeeze()
 
