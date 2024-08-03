@@ -84,7 +84,7 @@ seed = 8888
   to_learn = ['alpha', 'beta']
   intensity_model = 'spatial_interaction_model'
   physics_model = 'harris_wilson_model'
-  N = 100000
+  N = 10000
   # [training.N.sweep]
   #   default = +10_000
   #   range = [10_000,10_000,10_000,10_000,10_000,10_000,
