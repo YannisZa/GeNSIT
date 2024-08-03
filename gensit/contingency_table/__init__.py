@@ -1154,11 +1154,11 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 dtype = float32
             )
             # Get the indices of non-zero elements
-            non_zero_indices = np.nonzero(min_residual)
+            non_zero_indices = torch.nonzero(min_residual)
             # Get all cells that have non-zero entries
             cells = np.array([])
             if len(non_zero_indices) > 0:
-                cells = np.array(list(zip(non_zero_indices[0], non_zero_indices[1])))
+                cells = np.array(list(zip(non_zero_indices[:,0], non_zero_indices[:,1])))
             # Update table
             table0[non_zero_indices] += torch.tensor(
                                             min_residual[non_zero_indices], 
@@ -1210,6 +1210,7 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
                 dtype=float32, 
                 device = self.device
             )
+            self.logger.iteration(f"{smallest_value_cell}: {min_residual[smallest_value_cell]}. Total residual: {residual_margins[(0,1)]}")
                 
             # Update residual margins
             residual_margins = self.update_margins_from_cells(
@@ -1221,7 +1222,9 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             
             # Update min residual
             min_residual = self.maxent_given_constraints(min_residual,residual_margins)
-            if min_residual[smallest_value_cell] < 0 or any([v.sum() < 0 for v in residual_margins.values()]):
+            if (min_residual[smallest_value_cell] < 0) or \
+                any([v.sum() < 0 for v in residual_margins.values()]) or \
+                (residual_margins[tuplize(range(ndims(self)))] <= 0 and not self.table_admissible(table0)):
                 self.logger.error('Failed to update min residual in maximum entropy solution')
                 print(min_residual)
                 print(table0.sum())
