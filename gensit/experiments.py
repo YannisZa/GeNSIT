@@ -750,7 +750,6 @@ class Experiment(object):
                         # Store latest sample
                         getattr(self,sample)[index] = sample_value
 
-
     def print_initialisations(self,parameter_inits,print_lengths:bool = True,print_values:bool = False):
         for p,v in parameter_inits.items():
             if isinstance(v,(list,np.ndarray)):
@@ -856,6 +855,9 @@ class DataGeneration(Experiment):
     def __init__(self, config:Config, **kwargs):
         # Initalise superclass
         super().__init__(config,**kwargs)
+
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
         
         self.config = config
         self.instance = int(kwargs.get('instance',0))
@@ -874,6 +876,9 @@ class RSquared_Analysis(Experiment):
     def __init__(self, config:Config, **kwargs):
         # Initalise superclass
         super().__init__(config,**kwargs)
+
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
     
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
@@ -912,9 +917,6 @@ class RSquared_Analysis(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
-    
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -1116,6 +1118,9 @@ class LogTarget_Analysis(Experiment):
     def __init__(self, config:Config, **kwargs):
         # Initalise superclass
         super().__init__(config,**kwargs)
+
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
     
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
@@ -1153,8 +1158,6 @@ class LogTarget_Analysis(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -1292,6 +1295,9 @@ class SIM_MCMC(Experiment):
 
         # Initalise superclass
         super().__init__(config,**kwargs)
+
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
 
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
@@ -1497,6 +1503,9 @@ class JointTableSIM_MCMC(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
+
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
@@ -1558,8 +1567,6 @@ class JointTableSIM_MCMC(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
         
     def run(self,*trial,**kwargs) -> None:
 
@@ -1769,6 +1776,9 @@ class Table_MCMC(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
+
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
@@ -1860,8 +1870,6 @@ class Table_MCMC(Experiment):
         
         self.logger.note(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -1942,6 +1950,9 @@ class SIM_NN(Experiment):
         
         # Initalise superclass
         super().__init__(config,**kwargs)
+
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
     
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
@@ -1982,11 +1993,7 @@ class SIM_NN(Experiment):
         # Write metadata
         self.write_metadata()
         
-        
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
-        
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -2156,6 +2163,9 @@ class NonJointTableSIM_NN(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
+
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
@@ -2217,9 +2227,6 @@ class NonJointTableSIM_NN(Experiment):
         
         self.logger.note(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
-
         
     def run(self,*trial,**kwargs) -> None:
 
@@ -2244,7 +2251,7 @@ class NonJointTableSIM_NN(Experiment):
         self.config = getattr(self.learning_model,'config',self.config)
         
         self.logger.debug(f"{self.learning_model}")
-        self.logger.hilight(f"Running {self.__class__.__name__.replace('_',' ')} training of physics model.")
+        self.logger.note(f"Running {self.__class__.__name__.replace('_',' ')} training of physics model.")
 
         # Initialise data structures
         self.initialise_data_structures()
@@ -2412,6 +2419,9 @@ class JointTableSIM_NN(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
+
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
@@ -2473,8 +2483,6 @@ class JointTableSIM_NN(Experiment):
         
         self.logger.info(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}.")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -2555,7 +2563,6 @@ class JointTableSIM_NN(Experiment):
 
             # Track the epoch training time
             start_time = time.time()
-
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(
                 torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)
@@ -2591,18 +2598,18 @@ class JointTableSIM_NN(Experiment):
                     requires_grad = True
                 )
                 
-                # Track the table sampling time
-                start_table_time = time.time()
                 # Sample table(s)
                 table_samples = []
                 for _ in range(self.config['mcmc']['contingency_table'].get('table_steps',1)):
+                    # Track the table sampling time
+                    start_table_time = time.time()
                     # Perform table step
                     table_sample,accepted = self.ct_mcmc.table_gibbs_step(
                         table_prev = table_sample,
                         log_intensity = log_intensity_sample
                     )
+                    table_compute_time = time.time() - start_table_time
                     table_samples.append(table_sample/table_sample.sum())
-                table_compute_time = time.time() - start_table_time
 
                 # Update losses
                 loss_sample,n_processed_steps = self.learning_model.update_loss(
@@ -2680,6 +2687,9 @@ class XGBoost_Comparison(Experiment):
         # Initalise superclass
         super().__init__(config,**kwargs)
 
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
+
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
         # Fix random seed
@@ -2732,9 +2742,6 @@ class XGBoost_Comparison(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
-        
 
     def run(self,*trial,**kwargs) -> None:
         
@@ -2875,6 +2882,9 @@ class RandomForest_Comparison(Experiment):
         
         # Initalise superclass
         super().__init__(config,**kwargs)
+
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
         
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
@@ -2930,9 +2940,6 @@ class RandomForest_Comparison(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
-        
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -3079,6 +3086,9 @@ class GBRT_Comparison(Experiment):
         
         # Initalise superclass
         super().__init__(config,**kwargs)
+
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
     
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
@@ -3132,9 +3142,6 @@ class GBRT_Comparison(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
-        
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -3283,6 +3290,9 @@ class GraphAttentionNetwork_Comparison(Experiment):
         
         # Initalise superclass
         super().__init__(config,**kwargs)
+
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
     
         self.output_names = EXPERIMENT_OUTPUT_NAMES[self.__class__.__name__]
 
@@ -3336,9 +3346,6 @@ class GraphAttentionNetwork_Comparison(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
-        if kwargs.get('sweep',{}):
-            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
-        
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -3604,7 +3611,6 @@ class ExperimentSweep():
         if len(datasets['sweep']['range']) > 0:
             self.config['inputs']['dataset'] = datasets
         self.logger.note(f"ExperimentSweep: {self.outputs.experiment_id} prepared")
-
     
     def __repr__(self) -> str:
         return "ParameterSweep("+(self.experiment.__repr__())+")"
