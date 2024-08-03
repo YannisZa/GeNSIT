@@ -230,6 +230,11 @@ class MarkovBasis(object):
         # Create list of row-column pairs such that no pair share the same row OR column
         basis_cells = []
 
+        # Define set of Markov bases
+        self.basis_dictionaries = []
+        # Define active cells i.e. cells of a basis function that map to non-zero values
+        # self.basis_active_cells = []
+
         # Get all cells in lexicographic order (order first by row and then by col index)
         sorted_cells = sorted(self.ct.cells)
         sorted_cells_set = set(sorted_cells)
@@ -253,46 +258,61 @@ class MarkovBasis(object):
                 # Every cell in the proposed basis should be entirely contained
                 # in the list of available (free) cells.
                 if set([tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])]).issubset(sorted_cells_set):
-                    basis_cells.append((tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])))
+                    # basis_cells.append((tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])))
+                    basis_cells = (tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1]))
+
+                    # Construct Markov basis function
+                    def make_f_i(findex):
+                        def f_i(x):
+                            return np.int8(x == basis_cells[0] or x == basis_cells[1]) - \
+                                np.int8(x == (basis_cells[0][0],basis_cells[1][1]) or x == (basis_cells[1][0],basis_cells[0][1]))
+                        return f_i
+                    # Make function
+                    # self.logger.progress('Generating function')
+                    my_f_i = make_f_i(index)
+                    # self.logger.progress('Converting function to dictionary \n')
+                    my_f_i_dict = dict(zip(basis_cells,list(map(my_f_i, basis_cells))))
+
+                    # Update cells that map to non-zero values (i.e. active cells)
+                    # https://stackoverflow.com/questions/46172705/how-to-omit-keys-with-empty-non-zero-values
+                    # Add function to list of Markov bases
+                    self.basis_dictionaries.append(my_f_i_dict)
         
         self.logger.progress(f"{len(basis_cells)} basis functions found")
 
-        # Define set of Markov bases
-        self.basis_dictionaries = []
-        # Define active cells i.e. cells of a basis function that map to non-zero values
-        self.basis_active_cells = []
-        for index in tqdm(
-            range(len(basis_cells)),
-            disable = self.tqdm_disabled,
-            desc = 'Generating both margin Markov Basis functions',
-            leave = False
-        ):
-            # self.logger.progress('Checking cell admissibility')
-            # This is commented out because it checked in the previous loop
-            # Make sure that no cell in the basis is a constrained cell
-            # if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
-            #     print('inadmissible basis function found')
-            #     continue
+        
+        # for index in tqdm(
+        #     range(len(basis_cells)),
+        #     disable = self.tqdm_disabled,
+        #     desc = 'Generating both margin Markov Basis functions',
+        #     leave = False
+        # ):
+        #     # self.logger.progress('Checking cell admissibility')
+        #     # This is commented out because it checked in the previous loop
+        #     # Make sure that no cell in the basis is a constrained cell
+        #     # if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
+        #     #     print('inadmissible basis function found')
+        #     #     continue
             
-            # self.logger.progress('Defining generating function')
-            # Construct Markov basis function
-            def make_f_i(findex):
-                def f_i(x):
-                    return int(x == basis_cells[findex][0] or x == basis_cells[findex][1]) - \
-                        int(x == (basis_cells[findex][0][0],basis_cells[findex][1][1]) or x == (basis_cells[findex][1][0],basis_cells[findex][0][1]))
-                return f_i
-            # Make function
-            # self.logger.progress('Generating function')
-            my_f_i = make_f_i(index)
-            # self.logger.progress('Converting function to dictionary \n')
-            my_f_i_dict = dict(zip(basis_cells[index],list(map(my_f_i, basis_cells[index]))))
+        #     # self.logger.progress('Defining generating function')
+        #     # Construct Markov basis function
+        #     def make_f_i(findex):
+        #         def f_i(x):
+        #             return np.int8(x == basis_cells[findex][0] or x == basis_cells[findex][1]) - \
+        #                 np.int8(x == (basis_cells[findex][0][0],basis_cells[findex][1][1]) or x == (basis_cells[findex][1][0],basis_cells[findex][0][1]))
+        #         return f_i
+        #     # Make function
+        #     # self.logger.progress('Generating function')
+        #     my_f_i = make_f_i(index)
+        #     # self.logger.progress('Converting function to dictionary \n')
+        #     my_f_i_dict = dict(zip(basis_cells[index],list(map(my_f_i, basis_cells[index]))))
 
-            # Update cells that map to non-zero values (i.e. active cells)
-            # https://stackoverflow.com/questions/46172705/how-to-omit-keys-with-empty-non-zero-values
-            # self.basis_active_cells.append({k: v for k, v in my_f_i_dict.items() if v != 0})
-            # Add function to list of Markov bases
-            # self.basis_functions.append(my_f_i)
-            self.basis_dictionaries.append(my_f_i_dict)
+        #     # Update cells that map to non-zero values (i.e. active cells)
+        #     # https://stackoverflow.com/questions/46172705/how-to-omit-keys-with-empty-non-zero-values
+        #     # self.basis_active_cells.append({k: v for k, v in my_f_i_dict.items() if v != 0})
+        #     # Add function to list of Markov bases
+        #     # self.basis_functions.append(my_f_i)
+        #     self.basis_dictionaries.append(my_f_i_dict)
 
     def import_basis_function(self,filepath:str) -> Dict:
         # Import basis function from csv
