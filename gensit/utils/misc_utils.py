@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import dgl
+import ast
 import zlib
 import gzip
 import json
