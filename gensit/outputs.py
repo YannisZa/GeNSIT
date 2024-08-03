@@ -2213,6 +2213,7 @@ class OutputSummary(object):
                             folder_patterns.append(
                                 os.path.join(
                                     data_name,
+                                    output_group,
                                     (f"{(exp_type+'.*') if len(exp_type) > 0 else ''}") +\
                                     (f"{('_'+exp_title+'.*') if len(exp_title) > 0 else ''}") +\
                                     (f"{(dt+'*') if len(dt) > 0 else ''}")
@@ -2240,16 +2241,16 @@ class OutputSummary(object):
             # Sort them by string
             output_dirs = sorted(list(output_dirs))
             # Get all output dirs that match the pattern
-            output_dirs = [output_folder for output_folder in output_dirs if re.search(folder_patterns_re,output_folder)]
+            matching_dirs = [output_folder for output_folder in output_dirs if re.search(folder_patterns_re,output_folder)]
             # Exclude those that are specified
             if len(__self__.settings.get('exclude',[])) > 0:
-                output_dirs = [
-                    output_folder for output_folder in output_dirs if __self__.settings['exclude'] not in output_folder
+                matching_dirs = [
+                    output_folder for output_folder in matching_dirs if __self__.settings['exclude'] not in output_folder
                 ]
             # Sort by datetime
             date_pattern = re.compile(r"\d{1,2}\_\d{1,2}\_\d{2,4}\_\d{1,2}\_\d{1,2}\_\d{1,2}")
-            output_dirs = sorted(
-                output_dirs,
+            matching_dirs = sorted(
+                matching_dirs,
                 key=(
                     lambda dt: datetime.strptime(
                         date_pattern.search(dt).group(0), 
@@ -2258,12 +2259,12 @@ class OutputSummary(object):
                 )
             )
         # If no directories found terminate
-        if len(output_dirs) == 0 :
+        if len(matching_dirs) == 0 :
             __self__.logger.error(f'No directories found in {os.path.join(output_directory,"*")}')
             raise MissingFiles('Cannot read outputs.')
         else:
-            __self__.logger.info(f"{len(output_dirs)} output folders found.")
-        return output_dirs
+            __self__.logger.info(f"{len(matching_dirs)} output folders found.")
+        return matching_dirs
     
     def collect_metadata(self,**kwargs):
         
