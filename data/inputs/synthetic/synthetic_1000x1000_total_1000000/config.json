@@ -48,11 +48,11 @@
   },
   "spatial_interaction_model": {
     "name": "TotallyConstrained",
-    "grand_total": 1000000.0,
+    "grand_total": 1000000,
     "parameters": {
-      "bmax": 10000.0,
+      "bmax": 1.0,
       "alpha": 0.0,
-      "beta": 12000.0
+      "beta": 1.2000000476837158
     }
   },
   "harris_wilson_model": {
@@ -69,7 +69,7 @@
     "to_learn": [],
     "intensity_model": "spatial_interaction_model",
     "physics_model": "harris_wilson_model",
-    "num_steps": 3000
+    "num_steps": 5000
   },
   "experiments": [
     {
@@ -90,7 +90,7 @@
   },
   "experiment_type": "DataGeneration",
   "load_data": false,
-  "datetime": "02_08_2024_19_13_39",
+  "datetime": "03_08_2024_17_33_28",
   "export_samples": true,
   "noise_regime": "high"
 }

@@ -147,5 +147,16 @@
     "xgboost>exclude": true,
     "random_forest>exclude": true,
     "gradient_boosted_regression_trees>exclude": true
+  },
+  "Table_MCMC": {
+    "spatial_interaction_model>exclude": true,
+    "training>to_learn>optional": true,
+    "harris_wilson_model>exclude": true,
+    "training>to_learn>exclude": true,
+    "neural_network>exclude": true,
+    "xgboost>exclude": true,
+    "random_forest>exclude": true,
+    "gradient_boosted_regression_trees>exclude": true,
+    "graph_attention_network>exclude": true
   }
 }

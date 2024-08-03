@@ -9,13 +9,13 @@ load_experiment = ''
 in_directory = './data/inputs/synthetic/'
 seed = 8888
 [inputs.dataset.sweep]
-  default = 'synthetic_1000x1000_total_10000'
+  default = 'synthetic_250x250_total_10000'
   range = [
-    'synthetic_1000x1000_total_10000',
-    'synthetic_1000x1000_total_100000',
-    'synthetic_1000x1000_total_250000',
-    'synthetic_1000x1000_total_500000',
-    "synthetic_1000x1000_total_1000000"
+    'synthetic_250x250_total_10000',
+    'synthetic_250x250_total_100000',
+    'synthetic_250x250_total_250000',
+    'synthetic_250x250_total_500000',
+    "synthetic_250x250_total_1000000"
   ]
 
 [inputs.data]
@@ -27,16 +27,10 @@ seed = 8888
     file = 'cost_matrix.txt'
   [inputs.data.ground_truth_table]
     file = 'ground_truth_table.txt'
-  # [inputs.data.region_features]
-  #   file = 'mini_region_features.npy'
-  # [inputs.data.adjacency_matrix]
-  #   file = 'adjacency_matrix.txt'
-  # [inputs.data.test_cells]
-  #     file = 'test_cells.txt'
-  # [inputs.data.train_cells]
-  #     file = 'zero_and_train_cells.txt'
-  # [inputs.data.validation_cells]
-  #     file = 'validation_cells.txt'
+  [inputs.data.test_cells]
+      file = 'test_cells_50%.txt'
+  [inputs.data.train_cells]
+      file = 'training_cells_50%.txt'
 
 [contingency_table]
   disable_tqdm = false
@@ -50,34 +44,6 @@ seed = 8888
     coupled = true
     target_name = 'proposal'
 
-[spatial_interaction_model]
-  grand_total = +1
-  name = 'TotallyConstrained'
-  [spatial_interaction_model.parameters]
-    bmax = +1.0
-    # alpha = +1.0
-    # beta = +1.0
-  
-[harris_wilson_model]
-  dt = +0.001
-  [harris_wilson_model.parameters]
-    epsilon = 1.0
-    kappa = 0.1
-    sigma = 0.141421356
-    # [harris_wilson_model.parameters.sigma.sweep]
-    #   default = 0.0141421356
-    #   range = [
-    #     0.0141421356,0.141421356,
-    #     0.0141421356,0.141421356,
-    #     0.0141421356,0.141421356,
-    #     0.0141421356,0.141421356,
-    #     0.0141421356,0.141421356,
-    #     0.0141421356,0.141421356,
-    #     0.0141421356,0.141421356
-    #   ]
-    #   coupled = true
-    #   target_name = 'dataset'
-
 [training]
   batch_size = +1
   num_steps = +1
@@ -85,12 +51,6 @@ seed = 8888
   intensity_model = 'spatial_interaction_model'
   physics_model = 'harris_wilson_model'
   N = 10000
-  # [training.N.sweep]
-  #   default = +10_000
-  #   range = [10_000,10_000,10_000,10_000,10_000,10_000,
-  #             50_000,50_000,50_000,50_000,50_000,50_000,50_000,50_000]
-  #   coupled = true
-  #   target_name = 'dataset'
 
 [mcmc]
     disable_tqdm = true
@@ -110,68 +70,6 @@ seed = 8888
   metric_minimise = true
   metric_evaluation = "MathUtils.srmse(prediction=prediction,ground_truth=ground_truth_table,mask=mask)"
 
-# [graph_attention_network]
-#   disable_tqdm = true
-#   [graph_attention_network.hyperparameters]
-#     gat_nodes_per_layer = 32
-#     gat_num_hidden_layers = 1
-#     gat_dropout = 0
-#     gat_reg_param = 0
-#     gat_negative_sampling_rate = 0
-#     gat_grad_norm = 1.0
-#     gat_optimizer = 'Adam'
-#     gat_learning_rate = 0.02
-#     gat_multitask_weights = [0.5, 0.25, 0.25]
-
-[neural_network]
-  disable_tqdm = true
-  [neural_network.loss]
-    loss_name = ['dest_attraction_ts_likelihood_loss']
-    # ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
-    loss_function = ['custom']
-    # ['custom','custom']
-    [neural_network.loss.loss_kwargs]
-      nokey = nan
-  [neural_network.hyperparameters]
-    num_hidden_layers = +1
-    optimizer = 'Adam'
-    learning_rate = +0.002
-  [neural_network.hyperparameters.biases]
-    default = [+0.0, +4.0]
-    [neural_network.hyperparameters.biases.layer_specific]
-  [neural_network.hyperparameters.nodes_per_layer]
-    default = +20
-    [neural_network.hyperparameters.nodes_per_layer.layer_specific]
-  [neural_network.hyperparameters.activation_funcs]
-    default = 'linear'
-    [neural_network.hyperparameters.activation_funcs.layer_specific]
-      1 = 'abs'
-
-[[experiments]]
-  type = 'SIM_NN'
-  comment = 'Spatial interaction model parameter learning using neural networks'
-  disable_tqdm = false
-  export_samples = true
-  export_metadata = true
-  overwrite = true
-
-[[experiments]]
-  type = 'NonJointTableSIM_NN'
-  comment = 'Independent Table and Spatial interaction model parameter learning using neural networks'
-  disable_tqdm = false
-  export_samples = true
-  export_metadata = true
-  overwrite = true
-
-
-[[experiments]]
-  type = 'JointTableSIM_NN'
-  comment = 'Joint Table and Spatial interaction model parameter learning using neural networks'
-  disable_tqdm = false
-  export_samples = true
-  export_metadata = true
-  overwrite = true
-
 [[experiments]]
   type = 'Table_MCMC'
   comment = 'Table learning'
@@ -179,15 +77,6 @@ seed = 8888
   export_samples = true
   export_metadata = true
   overwrite = true
-
-
-# [[experiments]]
-#   type = 'GraphAttentionNetwork'
-#   comment = 'Spatial interaction model parameter learning using MCMC'
-#   disable_tqdm = false
-#   export_samples = true
-#   export_metadata = true
-#   overwrite = true
 
 
 [outputs]
