@@ -1,15 +1,16 @@
 import os
 import sys
 import torch
+import time
 import numpy as np
 import pandas as pd
 
 from torch import int32
-from joblib import Parallel, delayed
 from tqdm.auto import tqdm
 from typing import Dict,Tuple,List
+from joblib import Parallel, delayed
 
-from gensit.utils.misc_utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string, unpack_dims, ndims
+from gensit.utils.misc_utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string, unpack_dims, ndims, flatten
 from gensit.contingency_table import ContingencyTable
 
 def instantiate_markov_basis(ct:ContingencyTable,**kwargs): #-> Union[MarkovBasis,None]:
@@ -64,7 +65,7 @@ class MarkovBasis(object):
         # Try to import markov basis
         imported = False 
         # This is too Slowwww....
-        #imported = self.import_markov_basis()
+        # imported = self.import_markov_basis()
 
         if not imported:
             self.logger.debug('Generating Markov Basis...')
@@ -224,95 +225,114 @@ class MarkovBasis(object):
             # Add function to list of Markov bases
             # self.basis_functions.append(my_f_i)
             self.basis_dictionaries.append(my_f_i_dict)
-
-
-    def generate_both_margin_preserving_markov_basis(self) -> None:
-        # Create list of row-column pairs such that no pair share the same row OR column
-        basis_cells = []
-
-        # Define set of Markov bases
-        self.basis_dictionaries = []
-        # Define active cells i.e. cells of a basis function that map to non-zero values
-        # self.basis_active_cells = []
-
+            
+    def construct_both_margin_preserving_markov_basis_for_cell(self,index,tup1,sorted_cells,sorted_cells_set):
+        # self.logger.hilight(f"Finding active candidates")
+        # Get all active candidate cells
+        active_candidate_cells = []
+        if index < len(sorted_cells)-1:
+            active_candidate_cells = self.active_candidates(tup1,sorted_cells[(index+1):])
+        # self.logger.hilight(f"Looping over {len(active_candidate_cells)} active candidates")
+        # Loop through active candidates
+        basis_functions = []
+        for tup2 in active_candidate_cells:
+            # Every cell in the proposed basis should be entirely contained
+            # in the list of available (free) cells.
+            basis_cells = (tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1]))
+            
+            # if all([bc in sorted_cells for bc in basis_cells]):
+            if set(basis_cells).issubset(sorted_cells_set):
+            
+                # Construct Markov basis move and store it in a dictionary
+                basis_functions.append({
+                    basis_cells[0]: np.int8(1),
+                    basis_cells[1]: np.int8(1),
+                    basis_cells[2]: np.int8(-1),
+                    basis_cells[3]: np.int8(-1)
+                })
+        
+        # if len(active_candidate_cells) > 0:
+        #     # Randomly choose an activate candidate cell
+        #     randm_idx = np.random.choice(list(range(len(active_candidate_cells))))
+            
+        #     tup2 = active_candidate_cells[randm_idx]
+        #     # Every cell in the proposed basis should be entirely contained
+        #     # in the list of available (free) cells.
+        #     basis_cells = (tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1]))
+            
+        #     # if all([bc in sorted_cells for bc in basis_cells]):
+        #     if set(basis_cells).issubset(sorted_cells_set):
+            
+        #         # Construct Markov basis move and store it in a dictionary
+        #         basis_functions.append({
+        #             basis_cells[0]: np.int8(1),
+        #             basis_cells[1]: np.int8(1),
+        #             basis_cells[2]: np.int8(-1),
+        #             basis_cells[3]: np.int8(-1)
+        #         })
+        
+        return basis_functions
+    
+    def build_basis_dictionaries_in_sequence(self):
         # Get all cells in lexicographic order (order first by row and then by col index)
         sorted_cells = sorted(self.ct.cells)
         sorted_cells_set = set(sorted_cells)
 
-        self.logger.progress(f"{len(sorted_cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(sorted_cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
-
+        # Define set of Markov bases
+        self.basis_dictionaries = []
         # Loop through each pair combination and keep only ones that don't share a row OR column
         for index,tup1 in enumerate(tqdm(
             sorted_cells,
             total = len(sorted_cells),
             disable = self.tqdm_disabled,
-            desc = 'Generating both margin Markov Basis cells',
+            desc = 'Generating both margin Markov Basis cells in sequence',
             leave = False
         )):
-            # Get all active candidate cells
-            active_candidate_cells = []
-            if index < len(sorted_cells)-1:
-                active_candidate_cells = self.active_candidates(tup1,sorted_cells[(index+1):])
-            # Loop through active candidates
-            for tup2 in active_candidate_cells:
-                # Every cell in the proposed basis should be entirely contained
-                # in the list of available (free) cells.
-                if set([tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])]).issubset(sorted_cells_set):
-                    # basis_cells.append((tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1])))
-                    basis_cells = (tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1]))
-
-                    # Construct Markov basis function
-                    def make_f_i(findex):
-                        def f_i(x):
-                            return np.int8(x == basis_cells[0] or x == basis_cells[1]) - \
-                                np.int8(x == (basis_cells[0][0],basis_cells[1][1]) or x == (basis_cells[1][0],basis_cells[0][1]))
-                        return f_i
-                    # Make function
-                    # self.logger.progress('Generating function')
-                    my_f_i = make_f_i(index)
-                    # self.logger.progress('Converting function to dictionary \n')
-                    my_f_i_dict = dict(zip(basis_cells,list(map(my_f_i, basis_cells))))
-
-                    # Update cells that map to non-zero values (i.e. active cells)
-                    # https://stackoverflow.com/questions/46172705/how-to-omit-keys-with-empty-non-zero-values
-                    # Add function to list of Markov bases
-                    self.basis_dictionaries.append(my_f_i_dict)
+            # Add function to list of Markov bases
+            self.basis_dictionaries += self.construct_both_margin_preserving_markov_basis_for_cell(
+                index,
+                tup1,
+                sorted_cells = sorted_cells,
+                sorted_cells_set = sorted_cells_set
+            )
+    
+    def build_basis_dictionaries_in_parallel(self):
+        # Get all cells in lexicographic order (order first by row and then by col index)
+        sorted_cells = sorted(self.ct.cells)
+        sorted_cells_set = set(sorted_cells)
         
-        self.logger.progress(f"{len(basis_cells)} basis functions found")
+        # Process active flag by tqdm position
+        self.basis_dictionaries = list(flatten(
+            Parallel(n_jobs = self.n_threads)(
+                delayed(self.construct_both_margin_preserving_markov_basis_for_cell)(
+                    index = i,
+                    tup1 = tup1,
+                    sorted_cells = sorted_cells,
+                    sorted_cells_set = sorted_cells_set
+                ) for i,tup1 in tqdm(
+                    enumerate(sorted_cells),
+                    total = len(sorted_cells),
+                    disable = False,# self.tqdm_disabled,
+                    desc = 'Generating both margin Markov Basis cells in parallel',
+                    leave = False
+                )
+            )
+        ))
+    def generate_both_margin_preserving_markov_basis(self) -> None:
+        # Get all cells in lexicographic order (order first by row and then by col index)
+        self.logger.progress(f"{len(self.ct.cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(self.ct.cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
 
-        
-        # for index in tqdm(
-        #     range(len(basis_cells)),
-        #     disable = self.tqdm_disabled,
-        #     desc = 'Generating both margin Markov Basis functions',
-        #     leave = False
-        # ):
-        #     # self.logger.progress('Checking cell admissibility')
-        #     # This is commented out because it checked in the previous loop
-        #     # Make sure that no cell in the basis is a constrained cell
-        #     # if np.any([basis_cell in self.ct.constraints['cells'] for basis_cell in  basis_cells[index]]):
-        #     #     print('inadmissible basis function found')
-        #     #     continue
-            
-        #     # self.logger.progress('Defining generating function')
-        #     # Construct Markov basis function
-        #     def make_f_i(findex):
-        #         def f_i(x):
-        #             return np.int8(x == basis_cells[findex][0] or x == basis_cells[findex][1]) - \
-        #                 np.int8(x == (basis_cells[findex][0][0],basis_cells[findex][1][1]) or x == (basis_cells[findex][1][0],basis_cells[findex][0][1]))
-        #         return f_i
-        #     # Make function
-        #     # self.logger.progress('Generating function')
-        #     my_f_i = make_f_i(index)
-        #     # self.logger.progress('Converting function to dictionary \n')
-        #     my_f_i_dict = dict(zip(basis_cells[index],list(map(my_f_i, basis_cells[index]))))
+        self.build_basis_dictionaries_in_sequence()
+        # if self.n_threads == 1:
+        #     start_time = time.time()
+        #     self.build_basis_dictionaries_in_sequence()
+        #     print('Sequentially',time.time()-start_time)
+        # else:
+        #     start_time = time.time()
+        #     self.build_basis_dictionaries_in_parallel()
+        #     print('In parallel',time.time()-start_time)
 
-        #     # Update cells that map to non-zero values (i.e. active cells)
-        #     # https://stackoverflow.com/questions/46172705/how-to-omit-keys-with-empty-non-zero-values
-        #     # self.basis_active_cells.append({k: v for k, v in my_f_i_dict.items() if v != 0})
-        #     # Add function to list of Markov bases
-        #     # self.basis_functions.append(my_f_i)
-        #     self.basis_dictionaries.append(my_f_i_dict)
+        self.logger.hilight(f"{len(self.basis_dictionaries)} basis functions found")
 
     def import_basis_function(self,filepath:str) -> Dict:
         # Import basis function from csv
@@ -338,7 +358,7 @@ class MarkovBasis(object):
             return False
         # Define filepath
         dirpath = os.path.join(
-            self.config['outputs']['out_directory'],
+            self.ct.config['outputs']['out_directory'],
             'markov_basis/'
         )
         
@@ -355,7 +375,7 @@ class MarkovBasis(object):
         if (not os.path.isfile(filepath)) or (not os.path.exists(dirpath)):
             self.logger.warning(f'Markov bases do not exist in {filepath}')
         else:
-            self.logger.debug('Reading Markov basis functions.')
+            self.logger.hilight('Reading Markov basis functions.')
             # Read markov basis functions
             self.basis_dictionaries = read_compressed_string(filepath)
 
