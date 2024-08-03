@@ -912,6 +912,8 @@ class RSquared_Analysis(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
     
 
     def run(self,*trial,**kwargs) -> None:
@@ -1151,6 +1153,8 @@ class LogTarget_Analysis(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -1554,6 +1558,8 @@ class JointTableSIM_MCMC(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
         
     def run(self,*trial,**kwargs) -> None:
 
@@ -1854,6 +1860,8 @@ class Table_MCMC(Experiment):
         
         self.logger.note(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -1976,6 +1984,8 @@ class SIM_NN(Experiment):
         
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
         
 
     def run(self,*trial,**kwargs) -> None:
@@ -2207,6 +2217,8 @@ class NonJointTableSIM_NN(Experiment):
         
         self.logger.note(f"{self.ct_mcmc}")
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
 
         
     def run(self,*trial,**kwargs) -> None:
@@ -2460,7 +2472,9 @@ class JointTableSIM_NN(Experiment):
         self.write_metadata()
         
         self.logger.info(f"{self.ct_mcmc}")
-        self.logger.note(f"Experiment: {self.outputs.experiment_id}. Sweep id: {self.outputs.sweep_id}")
+        self.logger.note(f"Experiment: {self.outputs.experiment_id}.")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
 
     def run(self,*trial,**kwargs) -> None:
 
@@ -2718,6 +2732,8 @@ class XGBoost_Comparison(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
         
 
     def run(self,*trial,**kwargs) -> None:
@@ -2914,6 +2930,8 @@ class RandomForest_Comparison(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
         
 
     def run(self,*trial,**kwargs) -> None:
@@ -3114,6 +3132,8 @@ class GBRT_Comparison(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
         
 
     def run(self,*trial,**kwargs) -> None:
@@ -3316,6 +3336,8 @@ class GraphAttentionNetwork_Comparison(Experiment):
         self.write_metadata()
         
         self.logger.note(f"Experiment: {self.outputs.experiment_id}")
+        if kwargs.get('sweep',{}):
+            self.logger.hilight(f"Sweep: {kwargs.get('sweep',{})}")
         
 
     def run(self,*trial,**kwargs) -> None:
