@@ -1,0 +1,96 @@
+{
+  "log_level": "info",
+  "sweep_mode": false,
+  "inputs": {
+    "n_workers": 1,
+    "n_threads": null,
+    "device": "cpu",
+    "seed": 9876,
+    "in_directory": "./data/inputs/synthetic",
+    "load_experiment": "",
+    "dataset": "synthetic_150x150_total_250000",
+    "data": {
+      "data_generation_seed": 4321,
+      "synthesis_method": "sde_solver",
+      "synthesis_n_samples": 1,
+      "dims": {
+        "time": 1,
+        "origin": 150,
+        "destination": 150
+      },
+      "origin_demand": {
+        "distribution": "normal",
+        "parameters": {
+          "mean": 0.1,
+          "std": 0.01
+        }
+      },
+      "destination_attraction_ts": {
+        "distribution": "normal",
+        "parameters": {
+          "mean": 0.1,
+          "std": 0.01
+        }
+      },
+      "cost_matrix": {
+        "distribution": "normal",
+        "parameters": {
+          "mean": 1.2,
+          "std": 1.2
+        }
+      }
+    },
+    "dims": {
+      "time": 1,
+      "origin": 150,
+      "destination": 150
+    }
+  },
+  "spatial_interaction_model": {
+    "name": "TotallyConstrained",
+    "grand_total": 250000,
+    "parameters": {
+      "bmax": 1.0,
+      "alpha": 0.0,
+      "beta": 1.2000000476837158
+    }
+  },
+  "harris_wilson_model": {
+    "dt": 0.0010000000474974513,
+    "parameters": {
+      "noise_percentage": 0.009999999776482582,
+      "epsilon": 1.0,
+      "sigma": 0.1414213627576828
+    }
+  },
+  "training": {
+    "batch_size": 1,
+    "table_inference": false,
+    "to_learn": [],
+    "intensity_model": "spatial_interaction_model",
+    "physics_model": "harris_wilson_model",
+    "num_steps": 2000
+  },
+  "experiments": [
+    {
+      "type": "DataGeneration",
+      "comment": "Generates synthetic datasets and store them to file",
+      "disable_tqdm": false,
+      "export_samples": false,
+      "export_metadata": false,
+      "overwrite": true
+    }
+  ],
+  "outputs": {
+    "write_start": 1,
+    "write_every": 1,
+    "out_directory": "./data/outputs/",
+    "out_group": "",
+    "title": ""
+  },
+  "experiment_type": "DataGeneration",
+  "load_data": false,
+  "datetime": "04_08_2024_10_02_12",
+  "export_samples": true,
+  "noise_regime": "high"
+}

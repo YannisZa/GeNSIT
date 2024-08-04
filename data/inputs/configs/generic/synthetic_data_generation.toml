@@ -17,11 +17,11 @@ load_experiment = ''
     'synthetic_200x200_total_1000000',
     'synthetic_500x500_total_1000000',
     'synthetic_1000x1000_total_1000000',
-    'synthetic_250x250_total_10000',
-    'synthetic_250x250_total_100000',
-    'synthetic_250x250_total_250000',
-    'synthetic_250x250_total_500000',
-    'synthetic_250x250_total_1000000',
+    'synthetic_150x150_total_10000',
+    'synthetic_150x150_total_100000',
+    'synthetic_150x150_total_250000',
+    'synthetic_150x150_total_500000',
+    'synthetic_150x150_total_1000000',
   ]
 
 [inputs.data]
@@ -32,12 +32,12 @@ load_experiment = ''
     time = +1
     [inputs.data.dims.origin.sweep]
       default = +50
-      range = [50,100,150,200,500,1000,250,250,250,250,250]
+      range = [50,100,150,200,500,1000,150,150,150,150,150]
       coupled = true
       target_name = 'dataset'
     [inputs.data.dims.destination.sweep]
       default = +50
-      range = [50,100,150,200,500,1000,250,250,250,250,250]
+      range = [50,100,150,200,500,1000,150,150,150,150,150]
       coupled = true
       target_name = 'dataset'
   [inputs.data.origin_demand]
