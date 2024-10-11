@@ -7,6 +7,7 @@
 - [Introduction](#introduction)
   - [Motivation](#motivation)
   - [Contribution](#contribution)
+  - [Related publications](#related-publications)
 - [Installation](#installation)
   - [Docker](#docker)
   - [OSX](#osx)
@@ -29,19 +30,24 @@
 
 # Introduction
 
-<img src="./gensit_framework.jpg" alt="framework" width="1200"/>
+<img src="./gensit_motivation.jpg" alt="motivation" height="300"/>
+
 
 ## Motivation
 
-Agent-based models (ABMs) have emerged as a pivotal tool for policy-making across various fields, such as transportation, economics, and epidemiology, particularly in response to complex challenges such as the COVID-19 pandemic. ABMs simulate individual agent interactions governed by stochastic dynamical systems, giving rise to an aggregate emergent structure. This allows decision-makers to test different policy interventions under varying conditions. To achieve this effectively, agent populations and their characteristics are synthesized subject to partially observable and fragmented census data at coarse spatio-temporal resolutions.
+High-resolution complex simulators such as agent-based models (ABMs) are increasingly deployed to assist policymaking in transportation , social sciences, and epidemiology. They simulate individual agent interactions governed by stochastic dynamic systems, giving rise to an aggregate, in a mean field sense, continuous emergent structure. This is achieved by computationally expensive forward simulations, which hinders ABM parameter calibration and large-scale testing of multiple policy scenarios. Considering ABMs for the COVID-19 pandemic as an example, the continuous mean field process corresponds to the spatial intensity of the infections which is noisily observed at some spatial aggregation level, while the individual and discrete human contact interactions that give rise to that intensity are at best partially observed or fully latent. In transportation and mobility, running examples in this work, the continuous mean field process corresponds to the spatial intensity of trips arising from unobserved individual agent trips between discrete sets of origin and destination locations. 
 
-This _population synthesis_ process aims to generate representative agents whose socio-economic profiles, once spatially aggregated and/or marginalized by agent trait, mirror the observed population-level data. This problem is closely related to estimating joint agent profile proportions (continuous setting) and counts (discrete setting) in _ecological inference_. Agent profiles mainly comprise of discrete categorical variables and the goal is to sample from the joint distribution of these variables. Samples from this distribution are summarised in multi-way contingency tables whose marginal summary statistics or their spatially cruder versions are observed.
-
-A facet of this sampling problem that is pertinent to population synthesis for many types of ABMs, including transportation ABMs, is the synthesis of the discrete spatial locations of agent activities. This is because network-wide simulated travel patterns are predominantly governed by the agent activity locations, which are fixed before simulation. Samples from the discrete joint distribution of trips between origins and destinations are summarised in **origin-destination matrices** (ODMs), namely two-way contingency tables. Observed realisations of this distribution are scarce, especially under refinement of the spatial resolution of locations (i.e. contingency table dimensions). Therefore, aggregate agent activity surveys by geographical region are leveraged. The discrepancy between the data and latent spatial resolutions induces a discrete combinatorial location choice space. Hence, a unique set of individual agent choices consistent with the data cannot be recovered. This unidentifiability issue can be mitigated by exploring this constrained space in a probabilistic manner. Given $M$ agents with $P$ possible origin-destination pairs, there are $P^M$ possible location configurations that need to be integrated over to compute a data likelihood, many of which are inconsistent with the data.
+The formal object of interest that describes the discrete count of these spatial interactions, e.g. agent trips between locations, is the origin-destination matrix (ODM). It is an $I\times J$ (two-way) contingency table $\mathbf{T}$ with elements $T_{i,j} \in \mathbb{N}$ counting the interactions of two spatial categorical variables $i,j \in \mathbb{N}_{>0}$, see Figure above. It is typically sparse due to infeasible links between origin and destination locations, and partially observed through summary statistics -- such as table row and/or column marginals -- due to privacy concerns, data availability, and data collection costs. Operating at the discrete ODM level and learning this latent contingency table from summary statistics is vital for handling high-resolution spatial constraints and partial observations such as the total number of agents interacting between a pair of locations. It is also necessary for _population synthesis_ in ABMs, which is performed prior to simulation in order to reduce the size of the ABM's parameter space. Moreover, it avoids errors and biases due to ad-hoc discretisation required when working with continuous approximations of the underlying discrete ODM $\mathbf{T}^*$.
 
 ## Contribution
 
 This repository introduces a [computational framework named `GeNSIT`](#introduction) see for exploring the constrained discrete origin-destination matrices of agent trip location choices using closed-form or Gibbs Markov Basis sampling. The underlying continuous choice probability or intensity function (unnormalised probability function) is modelled by total and singly constrained **spatial interaction models** (SIMs) or _gravity models_ embedded in the well-known Harris Wilson stochastic differential equations (SDEs). We employ Neural Networks to calibrate the SIM parameters. We include Markov Chain Monte Carlo (MCMC) schemes leveraged to learn the SIM parameters in previous works. For more details on the mathematical aspects of this repository please look at the [Publications section](#related-publications).
+
+## Related publications
+Zachos, Ioannis, Theodoros Damoulas, et al. ‘Table Inference for Combinatorial Origin-Destination Choices in Agent-Based Population Synthesis’. Stat, vol. 13, no. 1, 2024, p. e656, https://doi.org/10.1002/sta4.656.
+
+Zachos, Ioannis, Mark Girolami, et al. Generating Origin-Destination Matrices in Neural Spatial Interaction Models. no. arXiv:2410.07352, arXiv, Oct. 2024, https://doi.org/10.48550/arXiv.2410.07352. arXiv.
+
 
 [Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
 
