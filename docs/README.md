@@ -44,9 +44,15 @@ The formal object of interest that describes the discrete count of these spatial
 This repository introduces a [computational framework named `GeNSIT`](#introduction) see for exploring the constrained discrete origin-destination matrices of agent trip location choices using closed-form or Gibbs Markov Basis sampling. The underlying continuous choice probability or intensity function (unnormalised probability function) is modelled by total and singly constrained **spatial interaction models** (SIMs) or _gravity models_ embedded in the well-known Harris Wilson stochastic differential equations (SDEs). We employ Neural Networks to calibrate the SIM parameters. We include Markov Chain Monte Carlo (MCMC) schemes leveraged to learn the SIM parameters in previous works. For more details on the mathematical aspects of this repository please look at the [Publications section](#related-publications).
 
 ## Related publications
-Zachos, Ioannis, Theodoros Damoulas, et al. ‘Table Inference for Combinatorial Origin-Destination Choices in Agent-Based Population Synthesis’. Stat, vol. 13, no. 1, 2024, p. e656, https://doi.org/10.1002/sta4.656.
+Zachos, Ioannis, Theodoros Damoulas, et al. ‘Table Inference for Combinatorial Origin-Destination Choices in Agent-Based Population Synthesis’. Stat, vol. 13, no. 1, 2024, p. e656, https://doi.org/10.1002/sta4.656. 
+<a href="./zachos_stat.bib" target=”_blank” style="text-decoration: none;">
+    <img src="https://img.shields.io/badge/Export-BibTeX-orange" alt="stat">
+</a>
 
-Zachos, Ioannis, Mark Girolami, et al. Generating Origin-Destination Matrices in Neural Spatial Interaction Models. no. arXiv:2410.07352, arXiv, Oct. 2024, https://doi.org/10.48550/arXiv.2410.07352. arXiv.
+Zachos, Ioannis, Mark Girolami, et al. Generating Origin-Destination Matrices in Neural Spatial Interaction Models. no. arXiv:2410.07352, arXiv, Oct. 2024, https://doi.org/10.48550/arXiv.2410.07352. arXiv. <a href="./zachos_nips.bib" target=”_blank” style="text-decoration: none;">
+    <img src="https://img.shields.io/badge/Export-BibTeX-orange" alt="nips">
+</a>
+
 
 
 [Back to Table of Contents ⬆](#gensit-generating-neural-spatial-interaction-tables)
