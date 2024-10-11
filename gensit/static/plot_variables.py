@@ -116,8 +116,8 @@ RAW_EXPRESSIONS = {
     "SIM_MCMC": '\\ellamframeworktag',
     "JointTableSIM_MCMC": '\\zachosframeworktag',
     "SIM_NN": '\\gaskinframeworktag',
-    "JointTableSIM_NN": 'Joint (\\frameworktag)',
-    "NonJointTableSIM_NN": 'Disjoint (\\frameworktag)',
+    "JointTableSIM_NN": '\\frameworktag (Joint)',
+    "NonJointTableSIM_NN": '\\frameworktag (Disjoint)',
     "_unconstrained":'$\\emptyset$',
     "_total_constrained":'$T_{++}$',
     "_total_intensity_row_table_constrained":'$\\mytablerowsums$',
@@ -147,28 +147,31 @@ LABEL_EXPRESSIONS = {
 LATEX_EXPRESSIONS = {**RAW_EXPRESSIONS,**LABEL_EXPRESSIONS}
 LATEX_COORDINATES = ['label','annotate']+PLOT_COORDINATES+PLOT_AUX_COORDINATES
 
+
 LATEX_PREAMBLE = r'''
-\usepackage{amsmath}
-\usepackage{amsfonts}
+\usepackage{/home/iz230/GeNSIT/gensit/static/neurips_2024}
+\usepackage{color}
+\usepackage[table]{xcolor}  % colors
+
+\usepackage{mathptmx} % matches times roman font for math equations
 \usepackage{amssymb}
 \usepackage{amscd,dsfont}
 \usepackage{commath}
-\usepackage{xcolor}
-\usepackage{color}
+% \usepackage[utf8]{inputenc} % allow utf-8 input
+% \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+% \usepackage{hyperref}       % hyperlinks
+% \usepackage{url}            % simple URL typesetting
+% \usepackage{booktabs}       % professional-quality tables
+% \usepackage{amsfonts}       % blackboard math symbols
+% \usepackage{nicefrac}       % compact symbols for 1/2, etc.
+% \usepackage{microtype}      % microtypography
+% \usepackage{wrapfig}
+%% Choose your variant of English; be consistent
+% \usepackage[american]{babel}
+%% Some suggested packages, as needed:
+% \usepackage{mathtools} % amsmath with fixes and additions
 
-\newcommand{\mysilver}[1]{{\textcolor[HTML]{909090}{#1}}}
-\newcommand{\skyblue}[1]{{\textcolor[HTML]{1E88E5}{#1}}}
 \newcommand{\deepred}[1]{{\textcolor[HTML]{E20000}{#1}}}
-\newcommand{\myseagreen}[1]{{\textcolor[HTML]{2E8B57}{#1}}}
-\newcommand{\myorange}[1]{{\textcolor[HTML]{FFA500}{#1}}}
-\newcommand{\mydarkmagenta}[1]{{\textcolor[HTML]{8B008B}{#1}}}
-\newcommand{\mybrown}[1]{{\textcolor[HTML]{A52A2A}{#1}}}
-\newcommand{\tabcmpurple}[1]{{\textcolor[HTML]{5856c4}{#1}}}
-\newcommand{\tabcmgreen}[1]{{\textcolor[HTML]{a6c858}{#1}}}
-\newcommand{\tabcmorange}[1]{{\textcolor[HTML]{e0ad41}{#1}}}
-\newcommand{\tabcmred}[1]{{\textcolor[HTML]{ca4a58}{#1}}}
-\newcommand{\tabcmpink}[1]{{\textcolor[HTML]{c153af}{#1}}}
-\newcommand{\tabcmblue}[1]{{\textcolor[HTML]{8ebeda}{#1}}}
 
 \newcommand{\zachosframeworkbasename}{SIT-MCMC}
 \newcommand{\gaskinframeworkbasename}{SIM-NN}
@@ -256,14 +259,15 @@ LATEX_PREAMBLE = r'''
 \newcommand{\mydestattroned}[1]{z_{#1}}
 \newcommand{\mylogdestattrobs}{\mathbf{y}}
 \newcommand{\markovbasis}{\mathcal{M}}
-
 '''
 
-# "pgf.texsystem": "xelatex",
-# "pgf.rcfonts": False,
 LATEX_RC_PARAMETERS = {
-    'font.serif': ['Lucida Sans'],
-    'font.family': 'serif',
+    # 'font.serif': ['Lucida Sans'],
+    # 'font.family': 'serif',
+    # "pgf.texsystem": "pdflatex",  # Use pdflatex
+    'mathtext.default': 'regular',
+    'mathtext.fontset': 'stix',
+    'mathtext.fallback': 'stix',
     'text.usetex': True,
     'text.latex.preamble': LATEX_PREAMBLE,
 }
