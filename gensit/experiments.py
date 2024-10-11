@@ -853,6 +853,7 @@ class Experiment(object):
 class DataGeneration(Experiment):
 
     def __init__(self, config:Config, **kwargs):
+        
         # Initalise superclass
         super().__init__(config,**kwargs)
 
@@ -874,6 +875,9 @@ class DataGeneration(Experiment):
 class RSquared_Analysis(Experiment):
 
     def __init__(self, config:Config, **kwargs):
+        # Monitor total time
+        self.total_time = time.time()
+        
         # Initalise superclass
         super().__init__(config,**kwargs)
 
@@ -1105,6 +1109,10 @@ class RSquared_Analysis(Experiment):
         # Update metadata
         self.show_progress()
 
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
+
         # Write metadata
         self.write_metadata()
 
@@ -1116,6 +1124,9 @@ class RSquared_Analysis(Experiment):
 class LogTarget_Analysis(Experiment):
 
     def __init__(self, config:Config, **kwargs):
+        # Monitor total time
+        self.total_time = time.time()
+        
         # Initalise superclass
         super().__init__(config,**kwargs)
 
@@ -1282,6 +1293,10 @@ class LogTarget_Analysis(Experiment):
         # Update metadata
         self.show_progress()
 
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
+
         # Write metadata
         self.write_metadata()
 
@@ -1293,6 +1308,9 @@ class LogTarget_Analysis(Experiment):
 class SIM_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
 
+        # Monitor total time
+        self.total_time = time.time()
+        
         # Initalise superclass
         super().__init__(config,**kwargs)
 
@@ -1488,6 +1506,10 @@ class SIM_MCMC(Experiment):
         
         # Update metadata
         self.show_progress()
+        
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
 
         # Write metadata
         self.write_metadata()
@@ -1500,6 +1522,9 @@ class SIM_MCMC(Experiment):
 class JointTableSIM_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
 
+        # Monitor total time
+        self.total_time = time.time()
+        
         # Initalise superclass
         super().__init__(config,**kwargs)
 
@@ -1762,6 +1787,10 @@ class JointTableSIM_MCMC(Experiment):
         # Update metadata
         self.show_progress()
 
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
+
         # Write metadata
         self.write_metadata()
 
@@ -1772,6 +1801,9 @@ class JointTableSIM_MCMC(Experiment):
 
 class Table_MCMC(Experiment):
     def __init__(self, config:Config, **kwargs):
+        
+        # Monitor total time
+        self.total_time = time.time()
         
         # Initalise superclass
         super().__init__(config,**kwargs)
@@ -1937,6 +1969,10 @@ class Table_MCMC(Experiment):
         # Update metadata
         self.show_progress()
 
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
+
         # Write metadata
         self.write_metadata()
 
@@ -1948,6 +1984,9 @@ class Table_MCMC(Experiment):
 class SIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
         
+        # Monitor total time
+        self.total_time = time.time()
+
         # Initalise superclass
         super().__init__(config,**kwargs)
 
@@ -2064,12 +2103,12 @@ class SIM_NN(Experiment):
             position = self.position,
             desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
-
-            # Track the epoch training time
-            start_time = time.time()
             
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)):
+
+                # Track the intensity learning time
+                start_time = time.time()
                 
                 # Learn parameters by solving neural net
                 self.logger.debug('Solving neural net')
@@ -2113,13 +2152,16 @@ class SIM_NN(Experiment):
                     )
                 )
                 
+                # Track total sampling time
+                total_compute_time = time.time() - start_time
+
                 # Clean and write to file
                 loss_sample,n_processed_steps = self.model_update_and_export(
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
                     theta = theta_sample,
                     log_destination_attraction = torch.log(destination_attraction_sample),
-                    compute_time = time.time() - start_time,
+                    compute_time = total_compute_time,
                     # Batch size is in training settings
                     t = t,
                     data_size = len(training_data),
@@ -2147,6 +2189,10 @@ class SIM_NN(Experiment):
         # Update metadata
         self.show_progress()
 
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
+
         # Write metadata
         self.write_metadata()
 
@@ -2160,6 +2206,9 @@ class SIM_NN(Experiment):
 class NonJointTableSIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
         
+        # Monitor total time
+        self.total_time = time.time()
+
         # Initalise superclass
         super().__init__(config,**kwargs)
 
@@ -2301,14 +2350,13 @@ class NonJointTableSIM_NN(Experiment):
             position = self.position,
             desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
-
-            # Track the epoch training time
-            start_time = time.time()
-            
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(
                 torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)
             ):
+
+                # Track the intensity learning time
+                start_time = time.time()
 
                 # Learn parameters by solving neural net
                 self.logger.debug('Solving neural net')
@@ -2361,8 +2409,10 @@ class NonJointTableSIM_NN(Experiment):
                     )
                 )
 
-                # Clean and write to file
+                # Track total sampling time
                 total_compute_time = time.time() - start_time
+
+                # Clean and write to file
                 loss_sample,n_processed_steps = self.model_update_and_export(
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
@@ -2403,6 +2453,10 @@ class NonJointTableSIM_NN(Experiment):
         # Update metadata
         self.show_progress()
 
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
+
         # Write metadata
         self.write_metadata()
 
@@ -2415,6 +2469,9 @@ class NonJointTableSIM_NN(Experiment):
 
 class JointTableSIM_NN(Experiment):
     def __init__(self, config:Config, **kwargs):
+        
+        # Monitor total time
+        self.total_time = time.time()
 
         # Initalise superclass
         super().__init__(config,**kwargs)
@@ -2561,15 +2618,15 @@ class JointTableSIM_NN(Experiment):
             desc = f"{self.__class__.__name__} instance: {self.position}"
         ):
 
-            # Track the epoch training time
-            start_time = time.time()
             # Process the training set elementwise, updating the loss after batch_size steps
             for t, training_data in enumerate(
                 torch.unsqueeze(self.inputs.data.destination_attraction_ts,0)
             ):
+                
+                # Track the intensity learning time
+                start_time = time.time()
 
                 # Learn parameters by solving neural net
-                self.logger.debug('Solving neural net')
                 theta_sample = self.learning_model._neural_net(
                     torch.flatten(training_data)
                 )            
@@ -2608,8 +2665,8 @@ class JointTableSIM_NN(Experiment):
                         table_prev = table_sample,
                         log_intensity = log_intensity_sample
                     )
-                    table_compute_time = time.time() - start_table_time
                     table_samples.append(table_sample/table_sample.sum())
+                    table_compute_time = time.time() - start_table_time
 
                 # Update losses
                 loss_sample,n_processed_steps = self.learning_model.update_loss(
@@ -2626,10 +2683,11 @@ class JointTableSIM_NN(Experiment):
                     ),
                     aux_inputs = vars(self.inputs.data)
                 )
+                # Track total sampling time
+                total_compute_time = time.time() - start_time
 
                 # Clean loss and write to file
                 # This will only store the last table sample
-                total_compute_time = time.time() - start_time
                 loss_sample,n_processed_steps = self.model_update_and_export(
                     loss = loss_sample,
                     n_processed_steps = n_processed_steps,
@@ -2671,6 +2729,10 @@ class JointTableSIM_NN(Experiment):
         # Update metadata
         self.show_progress()
 
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
+
         # Write metadata
         self.write_metadata()
 
@@ -2683,6 +2745,9 @@ class JointTableSIM_NN(Experiment):
 
 class XGBoost_Comparison(Experiment):
     def __init__(self, config:Config, **kwargs):
+        
+        # Monitor total time
+        self.total_time = time.time()
         
         # Initalise superclass
         super().__init__(config,**kwargs)
@@ -2866,6 +2931,10 @@ class XGBoost_Comparison(Experiment):
         
         # Update metadata
         self.show_progress()
+        
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
 
         # Write metadata
         self.write_metadata()
@@ -2879,6 +2948,9 @@ class XGBoost_Comparison(Experiment):
 
 class RandomForest_Comparison(Experiment):
     def __init__(self, config:Config, **kwargs):
+        
+        # Monitor total time
+        self.total_time = time.time()
         
         # Initalise superclass
         super().__init__(config,**kwargs)
@@ -3071,6 +3143,10 @@ class RandomForest_Comparison(Experiment):
         # Update metadata
         self.show_progress()
 
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
+
         # Write metadata
         self.write_metadata()
 
@@ -3083,6 +3159,9 @@ class RandomForest_Comparison(Experiment):
 
 class GBRT_Comparison(Experiment):
     def __init__(self, config:Config, **kwargs):
+        
+        # Monitor total time
+        self.total_time = time.time()
         
         # Initalise superclass
         super().__init__(config,**kwargs)
@@ -3274,6 +3353,10 @@ class GBRT_Comparison(Experiment):
         # Update metadata
         self.show_progress()
 
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
+
         # Write metadata
         self.write_metadata()
 
@@ -3287,6 +3370,9 @@ class GBRT_Comparison(Experiment):
 
 class GraphAttentionNetwork_Comparison(Experiment):
     def __init__(self, config:Config, **kwargs):
+        
+        # Monitor total time
+        self.total_time = time.time()
         
         # Initalise superclass
         super().__init__(config,**kwargs)
@@ -3495,6 +3581,10 @@ class GraphAttentionNetwork_Comparison(Experiment):
         
         # Update metadata
         self.show_progress()
+
+        # Calculate total computation time
+        self.total_time = time.time() - self.total_time
+        self.config.settings['total_computation_time'] = self.total_time
 
         # Write metadata
         self.write_metadata()
