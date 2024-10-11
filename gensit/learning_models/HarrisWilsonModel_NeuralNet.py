@@ -166,6 +166,16 @@ class NeuralNet(nn.Module):
         :param learning_rate: the learning rate of the optimizer. Default is 1e-3.
         :param __: Additional model parameters (ignored)
         '''
+        # Setup logger
+        level = kwargs.get('level',None)
+        self.logger = setup_logger(
+            __name__+kwargs.get('instance',''),
+            console_level = level,
+            
+        ) if kwargs.get('logger',None) is None else kwargs['logger']
+        # Update logger level
+        self.logger.setLevels( console_level = level )
+        
         super().__init__()
         self.flatten = nn.Flatten()
 
@@ -281,6 +291,7 @@ class NeuralNet(nn.Module):
 
     # The model forward pass
     def forward(self, x):
+        self.logger.debug('Solving neural net')
         for i in range(len(self.layers)):
             if self.activation_funcs[i] is None:
                 x = self.layers[i](x)
