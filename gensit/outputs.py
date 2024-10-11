@@ -972,7 +972,7 @@ class Outputs(object):
         export_samples = export_samples[0] if len(export_samples) > 0 else True
         export_metadata = export_metadata[0] if len(export_metadata) > 0 else True
         
-        self.logger.info(f"Creating output file at:\n        {self.outputs_path}")
+        self.logger.hilight(f"Creating output file at:\n        {self.outputs_path}")
         makedir(self.outputs_path)
         if export_samples or export_metadata:
             self.create_output_subdirectories(sweep_id = self.sweep_id)
