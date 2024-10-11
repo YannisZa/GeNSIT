@@ -9,14 +9,17 @@ load_experiment = ''
 in_directory = './data/inputs/synthetic/'
 seed = 8888
 [inputs.dataset.sweep]
-  default = 'synthetic_50x50_total_1000000'
+  default = 'synthetic_100x100_total_1000000'
   range = [
-    'synthetic_50x50_total_1000000',
     'synthetic_100x100_total_1000000',
-    'synthetic_150x150_total_1000000',
     'synthetic_200x200_total_1000000',
-    'synthetic_250x250_total_1000000',
+    'synthetic_300x300_total_1000000',
+    'synthetic_400x400_total_1000000',
     'synthetic_500x500_total_1000000',
+    'synthetic_600x600_total_1000000',
+    'synthetic_700x700_total_1000000',
+    'synthetic_800x800_total_1000000',
+    'synthetic_900x900_total_1000000',
     'synthetic_1000x1000_total_1000000',
   ]
 
