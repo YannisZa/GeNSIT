@@ -583,7 +583,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             self.logger.error((self.ct.table_admissible(table_new)),(self.ct.table_sparse_admissible(table_new)))
             raise Exception('FAILED')
         
-        return table_new.to(float32), None, None, None, None
+        return table_new.to(float32)
     
 
     def degree_one_proposal_2way_table(self, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict]:
@@ -606,11 +606,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         for k in self.markov_basis.basis_dictionaries[func_index].keys():
             table_new[k] = table_prev[k] + epsilon * \
                 torch.tensor(self.markov_basis.basis_dictionaries[func_index][k],dtype = float32)
-        return table_new.to(device = self.ct.device,dtype = float32), \
-            int(epsilon), \
-            self.markov_basis.basis_dictionaries[func_index], \
-            func_index, \
-            {'support': [-1, 1], 'probs': [0.5, 0.5]}
+        return table_new.to(device = self.ct.device,dtype = float32)
 
     
     def degree_higher_proposal_2way_table_fishers_hypergeometric(self, tab_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict]:
@@ -629,6 +625,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         tab_new = torch.zeros(tab_prev.shape,dtype = float32,device = self.ct.device)
         tab_new[:] = tab_prev
 
+        self.logger.debug('Computing log odds ratio')
         # Compute log odds ratio for 2x2 table
         # Note that this form is a simplified version of the ratio 
         # of odds ratios for the four table cells that have been changed
@@ -647,6 +644,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         csum = np.int32(tab_prev[non_zero_cells[0]] + tab_prev[non_zero_cells[2]])
         total = np.sum([np.int32(tab_prev[non_zero_cells[i]]) for i in range(len(non_zero_cells))],dtype='int32')
         
+        self.logger.debug('Sampling 2x2 minor from fishers non-central hypergeometric')
         # Sample upper leftmost entry of 2x2 subtable from non-central hypergeometric distribution
         try:
             new_val = nchypergeom_fisher.rvs(M = total, n = rsum, N = csum, odds = omega)
@@ -661,17 +659,14 @@ class ContingencyTableMarkovChainMonteCarlo(object):
             print('markov_basis',self.markov_basis.basis_dictionaries[func_index])
             print('tab_prev',[tab_new[c] for c in non_zero_cells])
 
+        self.logger.debug('Updating new table cells')
         # Update upper leftmost entry and propagate to rest of cells
         tab_new[non_zero_cells[0]] = torch.tensor(new_val).to(device = self.ct.device,dtype = float32)
         tab_new[non_zero_cells[1]] = torch.tensor(rsum - new_val,dtype = float32)
         tab_new[non_zero_cells[2]] = torch.tensor(csum - new_val,dtype = float32)
         tab_new[non_zero_cells[3]] = torch.tensor(total - rsum - csum + new_val,dtype = float32)
         
-        return tab_new.to(device = self.ct.device,dtype = float32), \
-            None, \
-            self.markov_basis.basis_dictionaries[func_index], \
-            func_index, \
-            None
+        return tab_new
 
     def metropolis_log_acceptance_ratio_2way_table(self, table_new: torch.tensor, table_prev: torch.tensor, log_intensity: torch.tensor) -> Union[float, None]:
         '''Acceptance ratio for one degree proposals
@@ -708,12 +703,13 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
         self.logger.debug('2way table degree higher acceptance (NO VALIDITY CHECK - ASSUMES PROPOSAL IS WELL DEFINED)')
 
-        if self.ct.table_nonnegative(table_new):
-            return 0
-        else:
-            self.logger.error(
-                f'Proposed table {table_new} is inadmissible or non positive')
-            return -torch.tensor([float('inf')])
+        return 0
+        # if self.ct.table_nonnegative(table_new):
+        #     return 0
+        # else:
+        #     self.logger.error(
+        #         f'Proposed table {table_new} is inadmissible or non positive')
+        #     return -torch.tensor([float('inf')])
 
     def direct_sampling_log_acceptance_ratio_2way_table(self, table_new: torch.tensor, table_prev: torch.tensor, log_intensity: torch.tensor) -> Tuple[Dict, Dict, int, Dict]:
         return 0
@@ -759,11 +755,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
 
         self.logger.debug('Table Gibbs step')
         # Propose new sample
-        table_new, \
-        _, \
-        _, \
-        _, \
-        _ = self.proposal(
+        table_new = self.proposal(
             table_prev, 
             log_intensity
         )
@@ -778,7 +770,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         # Accept/reject
         if (log_acc >= 0) or (torch.log(torch.rand(1)) < log_acc):
             # Update unconstrained margins
-            self.ct.update_unconstrained_margins_from_table(table_new)
+            # self.ct.update_unconstrained_margins_from_table(table_new)
             return table_new, 1
         else:
             return table_prev, 0
