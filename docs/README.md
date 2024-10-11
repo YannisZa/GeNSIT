@@ -30,7 +30,7 @@
 
 # Introduction
 
-<img src="./gensit_motivation.jpg" alt="motivation" height="300"/>
+<img src="./gensit_motivation.jpg" alt="motivation" width="1000"/>
 
 
 ## Motivation
