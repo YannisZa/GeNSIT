@@ -45,11 +45,12 @@ This repository introduces a [computational framework named `GeNSIT`](#introduct
 
 ## Related publications
 Zachos, Ioannis, Theodoros Damoulas, et al. ‘Table Inference for Combinatorial Origin-Destination Choices in Agent-Based Population Synthesis’. Stat, vol. 13, no. 1, 2024, p. e656, https://doi.org/10.1002/sta4.656. 
-<a href="./zachos_stat.bib" target=”_blank” style="text-decoration: none;">
+<a href="./zachos_stat.bib" style="text-decoration: none;" download="./zachos_stat.bib">
     <img src="https://img.shields.io/badge/Export-BibTeX-orange" alt="stat">
 </a>
 
-Zachos, Ioannis, Mark Girolami, et al. Generating Origin-Destination Matrices in Neural Spatial Interaction Models. no. arXiv:2410.07352, arXiv, Oct. 2024, https://doi.org/10.48550/arXiv.2410.07352. arXiv. <a href="./zachos_nips.bib" target=”_blank” style="text-decoration: none;">
+Zachos, Ioannis, Mark Girolami, et al. Generating Origin-Destination Matrices in Neural Spatial Interaction Models. no. arXiv:2410.07352, arXiv, Oct. 2024, https://doi.org/10.48550/arXiv.2410.07352. arXiv. 
+<a href="./zachos_nips.bib" style="text-decoration: none;" download="./zachos_nips.bib">
     <img src="https://img.shields.io/badge/Export-BibTeX-orange" alt="nips">
 </a>
 
