@@ -1,7 +1,7 @@
 # GeNSIT: Generating Neural Spatial Interaction Tables
 
 
-[![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org) ![Python](https://img.shields.io/badge/Python-3.9-blue)
+[![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org) ![Python](https://img.shields.io/badge/Python-3.10-blue)
 
 - [GeNSIT: Generating Neural Spatial Interaction Tables](#gensit-generating-neural-spatial-interaction-tables)
 - [Introduction](#introduction)
@@ -281,6 +281,8 @@ Although $\mathbf{T}$ and $\boldsymbol{\Lambda}$ look like similar quantities we
 # Functionality
 
 The `GeNSIT` package provides functionality for five different operations: [`create`](#synthetic), [`run`](#run), [`plot`](#plot), [`reproduce`](#reproduce), [`summarise`](#summarise).
+
+> ⚠️ **WARNING:** Python tests have not been updated yet!
 
 ## Run
 
