@@ -235,27 +235,7 @@ class MarkovBasis(object):
         # self.logger.hilight(f"Looping over {len(active_candidate_cells)} active candidates")
         # Loop through active candidates
         basis_functions = []
-        for tup2 in active_candidate_cells:
-            # Every cell in the proposed basis should be entirely contained
-            # in the list of available (free) cells.
-            basis_cells = (tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1]))
-            
-            # if all([bc in sorted_cells for bc in basis_cells]):
-            if set(basis_cells).issubset(sorted_cells_set):
-            
-                # Construct Markov basis move and store it in a dictionary
-                basis_functions.append({
-                    basis_cells[0]: np.int8(1),
-                    basis_cells[1]: np.int8(1),
-                    basis_cells[2]: np.int8(-1),
-                    basis_cells[3]: np.int8(-1)
-                })
-        
-        # if len(active_candidate_cells) > 0:
-        #     # Randomly choose an activate candidate cell
-        #     randm_idx = np.random.choice(list(range(len(active_candidate_cells))))
-            
-        #     tup2 = active_candidate_cells[randm_idx]
+        # for tup2 in active_candidate_cells:
         #     # Every cell in the proposed basis should be entirely contained
         #     # in the list of available (free) cells.
         #     basis_cells = (tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1]))
@@ -271,13 +251,33 @@ class MarkovBasis(object):
         #             basis_cells[3]: np.int8(-1)
         #         })
         
+        if len(active_candidate_cells) > 0:
+            # Randomly choose an activate candidate cell
+            randm_idx = np.random.choice(list(range(len(active_candidate_cells))))
+            
+            tup2 = active_candidate_cells[randm_idx]
+            # Every cell in the proposed basis should be entirely contained
+            # in the list of available (free) cells.
+            basis_cells = (tup1,tup2,(tup1[0],tup2[1]),(tup2[0],tup1[1]))
+            
+            # if all([bc in sorted_cells for bc in basis_cells]):
+            if set(basis_cells).issubset(sorted_cells_set):
+            
+                # Construct Markov basis move and store it in a dictionary
+                basis_functions.append({
+                    basis_cells[0]: np.int8(1),
+                    basis_cells[1]: np.int8(1),
+                    basis_cells[2]: np.int8(-1),
+                    basis_cells[3]: np.int8(-1)
+                })
+        
         return basis_functions
     
     def build_basis_dictionaries_in_sequence(self):
         # Get all cells in lexicographic order (order first by row and then by col index)
         sorted_cells = sorted(self.ct.cells)
         sorted_cells_set = set(sorted_cells)
-
+        
         # Define set of Markov bases
         self.basis_dictionaries = []
         # Loop through each pair combination and keep only ones that don't share a row OR column
