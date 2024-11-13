@@ -3,8 +3,7 @@
 
 [![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org) ![Python](https://img.shields.io/badge/Python-3.10-blue)
 
-## YouTube video explainer
-Click on the image below for our video explainer.
+## Click on the image below to watch our video explainer
 [![LOOK AT OUR VIDEO EXPLAINER](https://img.youtube.com/vi/Rv9sNkG5N-0/0.jpg)](https://www.youtube.com/watch?v=Rv9sNkG5N-0)
 
 
