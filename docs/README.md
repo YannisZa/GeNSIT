@@ -1,12 +1,8 @@
 # GeNSIT: Generating Neural Spatial Interaction Tables
 
-
 [![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org) ![Python](https://img.shields.io/badge/Python-3.10-blue)
 
-## Video explainer
-[![LOOK AT OUR VIDEO EXPLAINER](https://img.youtube.com/vi/Rv9sNkG5N-0/0.jpg)](https://www.youtube.com/watch?v=Rv9sNkG5N-0)
-[https://www.youtube.com/watch?v=Rv9sNkG5N-0](https://www.youtube.com/watch?v=Rv9sNkG5N-0)
-
+[![WATCH OUR VIDEO EXPLAINER HERE](https://img.youtube.com/vi/Rv9sNkG5N-0/0.jpg)](https://www.youtube.com/watch?v=Rv9sNkG5N-0)
 
 
 - [GeNSIT: Generating Neural Spatial Interaction Tables](#gensit-generating-neural-spatial-interaction-tables)
