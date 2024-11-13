@@ -1,0 +1,125 @@
+log_level = 'info'
+sweep_mode = false
+
+[inputs]
+n_workers = +1
+n_threads = +6
+device = 'cpu'
+seed = 9876
+in_directory = './data/inputs/synthetic'
+load_experiment = ''
+dataset = 'synthetic_10x3_total_1'
+
+[inputs.data]
+  data_generation_seed = 4321
+  synthesis_method = 'sde_solver'
+  synthesis_n_samples = +1
+  [inputs.data.dims]
+    time = +1
+    origin = 10
+    destination = 3
+  [inputs.data.origin_demand]
+    distribution = 'normal'
+    [inputs.data.origin_demand.parameters]
+        mean = 0.1
+        std = 0.01
+  [inputs.data.destination_attraction_ts]
+    distribution = 'normal'
+    [inputs.data.destination_attraction_ts.parameters]
+        mean = 0.1
+        std = 0.01
+  [inputs.data.cost_matrix]
+    distribution = 'normal'
+    [inputs.data.cost_matrix.parameters]
+        mean = 1.2
+        std = 1.2
+
+[contingency_table]
+  sparse_margins = false
+  [contingency_table.constraints]
+    axes = [[+0,+1]]
+    cells = false
+  [spatial_interaction_model]
+  name = 'TotallyConstrained'  
+  grand_total = +33704
+  [spatial_interaction_model.parameters]
+    bmax = +1.0
+    alpha = +0.1
+    beta = +1.2
+
+
+[harris_wilson_model]
+  dt = +0.001
+  [harris_wilson_model.parameters]
+    noise_percentage = +3.0
+    epsilon = 1.0
+    sigma = 0.01414213562
+    
+[training]
+  N = 100
+  num_steps = +1
+  batch_size = +1
+  to_learn = []
+  intensity_model = 'spatial_interaction_model'
+  physics_model = 'harris_wilson_model'
+
+[mcmc]
+    disable_tqdm = true
+    mcmc_workers = +1
+    
+    [mcmc.contingency_table]
+      table_steps = +1
+      proposal = 'direct_sampling'
+      table0 = 'maximum_entropy_solution'
+      margin0 = 'multinomial'
+
+    [mcmc.parameters]
+      theta_steps = 1
+      step_size = 1.0
+      covariance = [[0.0149674,0.00182529],[0.00182529,0.0109968]]
+      
+    [mcmc.destination_attraction]
+      log_destination_attraction_steps = 1
+      leapfrog_steps = 3#10
+      leapfrog_step_size = 0.01 #0.02
+      ais_leapfrog_steps = 3#10
+      ais_leapfrog_step_size = 0.2#0.1
+      ais_samples = 10
+      n_bridging_distributions = 50
+
+[neural_network]
+  disable_tqdm = true
+  [neural_network.loss]
+    loss_name = ['table_likelihood_loss']
+    loss_function = ['custom']
+    [neural_network.loss.loss_kwargs]
+      nokey = nan
+  [neural_network.hyperparameters]
+    num_hidden_layers = +1
+    optimizer = 'Adam'
+    learning_rate = +0.002
+    [neural_network.hyperparameters.biases]
+      default = [+0.0, +4.0]
+      [neural_network.hyperparameters.biases.layer_specific]
+    [neural_network.hyperparameters.nodes_per_layer]
+      default = +20
+      [neural_network.hyperparameters.nodes_per_layer.layer_specific]
+    [neural_network.hyperparameters.activation_funcs]
+      default = 'linear'
+      [neural_network.hyperparameters.activation_funcs.layer_specific]
+        1 = 'abs'
+
+[[experiments]]
+  type = 'JointTableSIM_NN'
+  comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+
+[outputs]
+    write_start = +1
+    write_every = +1
+    out_directory = './data/outputs/'
+    out_group = ''
+    title = ''
