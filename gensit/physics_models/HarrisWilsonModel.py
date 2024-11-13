@@ -374,7 +374,8 @@ class HarrisWilson:
         dt = self.hyperparams['dt'] if dt is None else dt
         self.logger.trace('Cloning dest attractions')
         new_sizes = curr_destination_attractions.clone()
-        new_sizes.requires_grad = requires_grad
+        if requires_grad is not None:
+            new_sizes.requires_grad = requires_grad
 
         # Compute normalised demand
         demand_normalised = torch.exp(
@@ -452,8 +453,10 @@ class HarrisWilson:
                     curr_destination_attractions = sizes,
                     log_intensity_normalised = log_intensity_sample,
                     dt = dt,
-                    requires_grad = requires_grad,
+                    requires_grad = None,
                 )
+                if pbar is not None:
+                    pbar.update(1)
         else:
             sizes = [init_destination_attraction.clone()]
             for _ in range(n_iterations):
@@ -469,17 +472,17 @@ class HarrisWilson:
                         curr_destination_attractions = sizes[-1],
                         log_intensity_normalised = log_intensity_sample,
                         dt = dt,
-                        requires_grad = requires_grad,
+                        requires_grad = None,
                     )
                 )
+                if pbar is not None:
+                    pbar.update(1)
             sizes = torch.squeeze(torch.stack(tuple(sizes)))
 
         if semaphore is not None:
             semaphore.release()
         if samples is not None:
             samples[seed] = sizes
-        if pbar is not None:
-            pbar.update(1)
         return sizes
 
 
