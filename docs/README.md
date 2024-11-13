@@ -2,7 +2,7 @@
 
 [![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org) ![Python](https://img.shields.io/badge/Python-3.10-blue)
 
-[![WATCH OUR VIDEO EXPLAINER HERE](./docs/thumbnail.png)](https://www.youtube.com/watch?v=Rv9sNkG5N-0)
+[![WATCH OUR VIDEO EXPLAINER HERE](./thumbnail.png)](https://www.youtube.com/watch?v=Rv9sNkG5N-0)
 
 
 - [GeNSIT: Generating Neural Spatial Interaction Tables](#gensit-generating-neural-spatial-interaction-tables)
