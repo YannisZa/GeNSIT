@@ -5,7 +5,8 @@
 
 ## Video explainer
 [![LOOK AT OUR VIDEO EXPLAINER](https://img.youtube.com/vi/Rv9sNkG5N-0/0.jpg)](https://www.youtube.com/watch?v=Rv9sNkG5N-0)
-<iframe width="560" height="315" src="https://www.youtube.com/embed/Rv9sNkG5N-0" frameborder="0" allowfullscreen></iframe>
+[https://www.youtube.com/watch?v=Rv9sNkG5N-0](https://www.youtube.com/watch?v=Rv9sNkG5N-0)
+
 
 
 - [GeNSIT: Generating Neural Spatial Interaction Tables](#gensit-generating-neural-spatial-interaction-tables)
