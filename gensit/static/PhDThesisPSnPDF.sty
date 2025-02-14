@@ -1,0 +1,114 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%                                                                            %%
+%% Class ``PhD Thesis PSnPDF''                                                %%
+%%                                                                            %%
+%% A PhD thesis LaTeX template for Cambridge University Engineering Department%%
+%%                                                                            %%
+%% Version: v2.3.1                                                             %%
+%% Authors: Krishna Kumar                                                     %%
+%% License: MIT License (c) 2016 Krishna Kumar                                %%
+%% GitHub Repo: https://github.com/kks32/phd-thesis-template/                 %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% ************************** Class Identification ******************************
+\newcommand\fileversion{2.3.1}
+\newcommand\filedate{2016/04/23}
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{PhDThesisPSnPDF}[\filedate\space A PhD thesis class file
+ by Krishna Kumar (v\fileversion)]
+\typeout{https://github.com/kks32/phd-thesis-template/}
+
+
+% ******************************************************************************
+% **************************** Class Definition ********************************
+% ******************************************************************************
+
+% *********************** Define a Print/Online Version ************************
+\newif\if@print\@printtrue
+
+% ****************************** Define index **********************************
+\newif\ifPHD@index\PHD@indextrue
+
+% ******************************* Font Option **********************************
+\newif\ifPHD@times\PHD@timestrue            % Times with Math Support
+
+% *************************** Pre-defined Options ******************************
+% Font Size
+\PassOptionsToClass{12pt}{article}
+
+% Process options and load class
+\ProcessOptions\relax%
+
+% ******************************************************************************
+% ******************************** Packages ************************************
+% ******************************************************************************
+
+
+% *************************** Graphics and Figures *****************************
+\RequirePackage[usenames, dvipsnames]{color}
+\RequirePackage{graphicx}
+%   \RequirePackage{epstopdf}
+%   \RequirePackage[pdftex]{graphicx}
+%   \DeclareGraphicsExtensions{.png, .jpg, .pdf}
+%   \pdfcompresslevel=9
+
+
+% ********************************** Fonts **********************************
+\RequirePackage{textcomp}
+\RequirePackage{mathptmx}  % times roman, including math (where possible)
+
+
+% default: pdfLaTeX
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[T1]{fontenc}
+
+% If building with PDFLaTeX, use microtype spacing adjustments
+\RequirePackage[final]{microtype}
+
+% \input{/home/iz230/GeNSIT/gensit/static/glyphtounicode}
+% \pdfglyphtounicode{f_f}{FB00}
+% \pdfglyphtounicode{f_i}{FB01}
+% \pdfglyphtounicode{f_l}{FB02}
+% \pdfglyphtounicode{f_f_i}{FB03}
+% \pdfglyphtounicode{f_f_l}{FB04}
+% \pdfgentounicode=1
+
+\RequirePackage{amsfonts}
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+
+% %******************************* Print / Online ********************************
+% % Defines a print / online version to define page-layout and hyperrefering
+
+% % Moved below other usepackage definitions to fix PDFLaTeX footnote warning
+% % Based on the suggestion by John Plaice
+
+% \RequirePackage[unicode=true]{hyperref}
+
+% % For Print version
+% \hypersetup{
+%   final=true,
+%   plainpages=false,
+%   pdfstartview=FitV,
+%   pdftoolbar=true,
+%   pdfmenubar=true,
+%   bookmarksopen=true,
+%   bookmarksnumbered=true,
+%   breaklinks=true,
+%   linktocpage,
+%   colorlinks=true,
+%   linkcolor=black,
+%   urlcolor=black,
+%   citecolor=black,
+%   anchorcolor=black
+% }
+
+% \hypersetup{pdfpagelayout=OneColumn}
+
+% % ************************ URL Package and Definition **************************
+% \RequirePackage{url}
+% % Redefining urlstyle to use smaller fontsize in References with URLs
+% \newcommand{\url@leostyle}{%
+%  \@ifundefined{selectfont}{\renewcommand{\UrlFont}{\sffamily}}
+%  {\renewcommand{\UrlFont}{\normalsize}}}
+% \urlstyle{leo}
