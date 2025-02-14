@@ -2222,6 +2222,9 @@ class OutputSummary(object):
             # Combine them all into one pattern
             folder_patterns_re = "(" + ")|(".join(folder_patterns) + ")"
             # Get all output directories matching dataset name(s)
+            print(output_directory,
+                        dataset_names,
+                        'output_group',output_group)
             output_dirs = flatten([
                 get_all_subdirectories(
                     os.path.join(

@@ -148,28 +148,18 @@ LATEX_EXPRESSIONS = {**RAW_EXPRESSIONS,**LABEL_EXPRESSIONS}
 LATEX_COORDINATES = ['label','annotate']+PLOT_COORDINATES+PLOT_AUX_COORDINATES
 
 
+# \usepackage{/home/iz230/GeNSIT/gensit/static/neurips_2024}
+# \usepackage{mathptmx} % matches times roman font for math equations
+# \usepackage{amssymb}
+
+# \usepackage{/home/iz230/GeNSIT/gensit/static/PhDThesisPSnPDF}
+
 LATEX_PREAMBLE = r'''
-\usepackage{/home/iz230/GeNSIT/gensit/static/neurips_2024}
+\usepackage{/home/iz230/GeNSIT/gensit/static/PhDThesisPSnPDF}
 \usepackage{color}
 \usepackage[table]{xcolor}  % colors
-
-\usepackage{mathptmx} % matches times roman font for math equations
-\usepackage{amssymb}
 \usepackage{amscd,dsfont}
 \usepackage{commath}
-% \usepackage[utf8]{inputenc} % allow utf-8 input
-% \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
-% \usepackage{hyperref}       % hyperlinks
-% \usepackage{url}            % simple URL typesetting
-% \usepackage{booktabs}       % professional-quality tables
-% \usepackage{amsfonts}       % blackboard math symbols
-% \usepackage{nicefrac}       % compact symbols for 1/2, etc.
-% \usepackage{microtype}      % microtypography
-% \usepackage{wrapfig}
-%% Choose your variant of English; be consistent
-% \usepackage[american]{babel}
-%% Some suggested packages, as needed:
-% \usepackage{mathtools} % amsmath with fixes and additions
 
 \newcommand{\deepred}[1]{{\textcolor[HTML]{E20000}{#1}}}
 
@@ -262,12 +252,9 @@ LATEX_PREAMBLE = r'''
 '''
 
 LATEX_RC_PARAMETERS = {
-    # 'font.serif': ['Lucida Sans'],
-    # 'font.family': 'serif',
-    # "pgf.texsystem": "pdflatex",  # Use pdflatex
-    'mathtext.default': 'regular',
-    'mathtext.fontset': 'stix',
-    'mathtext.fallback': 'stix',
+    # 'mathtext.default': 'regular',
+    # 'mathtext.fontset': 'stix',
+    # 'mathtext.fallback': 'stix',
     'text.usetex': True,
     'text.latex.preamble': LATEX_PREAMBLE,
 }

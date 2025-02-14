@@ -24,7 +24,7 @@ class MissingData(DataException):
 
     def __str__(self):
         return f"""
-            Missing data {self.missing_data_name} in {self.location} ({self.data_names})!
+            Missing data '{self.missing_data_name}' in {self.location} ({self.data_names})!
         """
 
 class InvalidDataLength(DataException):

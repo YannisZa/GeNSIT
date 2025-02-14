@@ -122,16 +122,14 @@ def write_compressed_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
 
 
 def write_figure(figure,filepath,**settings):
-    
-    if settings.get('filename_ending','') == '':
-        filepath += '.'+settings['figure_format']
-    else:
-        filepath += '_'+str(settings.get('filename_ending',''))+'.'+settings['figure_format']
+    settings = settings.copy()
+    filename_ending = settings.pop('filename_ending','pdf')
+    filepath += '.'+filename_ending
 
     figure.savefig(
         filepath,
-        format = settings['figure_format'],
-        # bbox_inches='tight'
+        format=filename_ending,
+        **settings
     )
     
     plt.close(figure)
@@ -479,6 +477,7 @@ def find_common_substring(names):
 
 def get_all_subdirectories(out_path,stop_at:str='config.json',level:int = 2):
     directories = []
+    print('out_path',out_path)
     for root, dirs, files in walklevel(out_path,level = level):
         # If this is a dir that matches the stopping condition
         # or has a file that matches the stopping condition

@@ -331,8 +331,8 @@ def calculate_min_interval(x, alpha, **kwargs):
     n_intervals = N - interval_index0
 
     # Get all possible credible_interval_mass% probability intervals
-    left_boundary = x.isel(id = slice(0,n_intervals))
-    right_boundary = x.isel(id = slice(interval_index0,None))
+    left_boundary = x.isel(**{dim : slice(0,n_intervals)})
+    right_boundary = x.isel(**{dim : slice(interval_index0,None)})
     left_boundary,right_boundary = xr.align(left_boundary,right_boundary,join='override')
     interval_width = right_boundary - left_boundary
     
