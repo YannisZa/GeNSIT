@@ -208,24 +208,30 @@ Plot cumulative SRMSEs and CPs for every constraint and sampling method. Do this
 
 ```
 clear; gensit plot simple scatter -y table_srmse -x type -x end --x_discrete \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp1 -o ./data/outputs/ \
 -et JointTableSIM_MCMC -et JointTableSIM_NN -et NonJointTableSIM_NN \
 -el np -el MathUtils -el MiscUtils -el xr \
 -e table_coverage_probability "xr.apply_ufunc(roundint, 100*table_coverage.mean(['origin','destination'])).astype('int32')" \
 -e table_coverage_probability_size "xr.apply_ufunc(lambda x: np.exp(8*x-2), table_coverage.mean(['origin','destination']))" \
 -e table_srmse "apply_and_combine(table,functions=srmse_functions,fixed_kwargs=fixed_kwargs,isolated_sweeped_kwargs=isolated_sweeped_kwargs)" \
 -ea table \
--ea "endings=[10000,20000,40000,60000,80000,100000]" -ea "region_mass=[0.99]" \
+-ea "endings=[10000,20000,40000,60000,80000,100000]" \
+-ea "region_mass=[0.99]" \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
--ea "apply_and_combine=MiscUtils.xr_apply_and_combine_wrapper" -ea "srmse=MathUtils.srmse" -ea "islice=MiscUtils.xr_islice" -ea "coverage_probability=MathUtils.coverage_probability" -ea "sample_mean=MathUtils.sample_mean" -ea "roundint=MathUtils.roundint" \
+-ea "apply_and_combine=MiscUtils.xr_apply_and_combine_wrapper" \
+-ea "srmse=MathUtils.srmse" \
+-ea "islice=MiscUtils.xr_islice" \
+-ea "coverage_probability=MathUtils.coverage_probability" \
+-ea "sample_mean=MathUtils.sample_mean" \
+-ea "roundint=MathUtils.roundint" \
 -ea "cp_functions=[{'islice':{'callable':islice}},{'coverage_probability':{'callable':coverage_probability}}]" \
 -ea "srmse_functions=[{'islice':{'callable':islice}},{'sample_mean':{'callable':sample_mean}},{'srmse':{'callable':srmse}}]" \
--ea "fixed_kwargs={'islice':{'dim':'id'},'coverage_probability':{'ground_truth':ground_truth},'srmse':{'ground_truth':ground_truth},'sample_mean':{'dim':[str('id')]}}" \
+-ea "fixed_kwargs={'islice':{'dim':'iter'},'coverage_probability':{'ground_truth':ground_truth,'dim':'iter'},'srmse':{'ground_truth':ground_truth},'sample_mean':{'dim':'iter'}}" \
 -ea "isolated_sweeped_kwargs={'end':endings,'region_mass':region_mass}" \
 -ea "table_coverage=apply_and_combine(table,functions=cp_functions,fixed_kwargs=fixed_kwargs,isolated_sweeped_kwargs=isolated_sweeped_kwargs)" \
 -k sigma -k type -k name -k title \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
--cs "~da.title.isin(['_unconstrained','_total_constrained','_total_intensity_row_table_constrained'])" \
+-cs "~da.title.isin(['_unconstrained'])" \
 -c title -op 1.0 -mrkr sigma -msz table_coverage_probability_size -l title -l sigma -or asc table_coverage_probability_size  \
 -ft 'figure2/cumulative_srmse_and_cp_by_method' -ylab 'SRMSE' -xlab 'Method, $N$' \
 -la 0 0 -lc 2 -loc 'upper center' -bbta 0.5 -bbta 1.35 -lls 14 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 12 16 \
