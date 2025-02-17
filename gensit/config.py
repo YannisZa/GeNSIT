@@ -212,7 +212,13 @@ class Config:
             settings = self.schema
         )
         # Instantiate data type
-        data = instantiate_data_type(settings,schema,key_path)
+        try:
+            data = instantiate_data_type(settings,schema,key_path)
+        except:
+            print('key_path',key_path)
+            print('settings',settings)
+            print('schema',schema)
+            raise
         # return parsed data
         return data.value()
 

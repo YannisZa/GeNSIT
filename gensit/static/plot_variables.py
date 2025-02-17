@@ -90,7 +90,7 @@ PLOT_COLOURS = {
         "_doubly_constrained":COLOR_NAMES["tab20b_orange"],
         "_doubly_10#%_cell_constrained":COLOR_NAMES["tab20b_red"],
         "_doubly_20#%_cell_constrained":COLOR_NAMES["tab20c_blue"],
-    }
+    },
 }
 
 PLOT_HATCHES = {
@@ -256,6 +256,7 @@ LATEX_RC_PARAMETERS = {
     # 'mathtext.fontset': 'stix',
     # 'mathtext.fallback': 'stix',
     'text.usetex': True,
+    "font.family": "serif",
     'text.latex.preamble': LATEX_PREAMBLE,
 }
 

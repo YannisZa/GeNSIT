@@ -253,22 +253,24 @@ clear; gensit plot simple scatter -y table_srmse -x type -x end --x_discrete \
 
 ```
 clear; gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
--dn cambridge_work_commuter_lsoas_to_msoas/exp2 \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp2 -o ./data/outputs/ \
 -et NonJointTableSIM_NN -et JointTableSIM_NN \
 -el np -el MathUtils -el MiscUtils -el xr \
--e table_coverage_probability_size "xr.apply_ufunc(lambda x: np.exp(6*x), table_coverage.mean(['origin','destination']))" \
+-e table_coverage_probability_size "table_coverage.mean(['origin','destination'])" \
 -e table_srmse "srmse(prediction=mean_table,ground_truth=ground_truth)" \
--e ensemble_size "table_srmse.copy(data=[len(table.unstack('id').coords['seed'].values)])" \
+-e ensemble_size "table_srmse.copy(data=[len(table.coords['seed'].values)])" \
 -ea table \
--ea "mean_table=table.mean(['id'])" \
+-ea "mean_table=table.mean(['iter','seed'])" \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
--ea "srmse=MathUtils.srmse" -ea "coverage_probability=MathUtils.coverage_probability" -ea "roundint=MathUtils.roundint" \
--ea "table_coverage=coverage_probability(prediction=table,ground_truth=ground_truth)" \
+-ea "srmse=MathUtils.srmse" \
+-ea "coverage_probability=MathUtils.coverage_probability" \
+-ea "roundint=MathUtils.roundint" \
+-ea "table_coverage=coverage_probability(prediction=table.stack(id=['seed','iter']),ground_truth=ground_truth,dim='id')" \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
 -cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
 -k sigma -k type -k name -k title -k N \
 -mrkr sigma -c title -msz table_coverage_probability_size -op 1.0 -or asc table_coverage_probability_size -l sigma -l title \
--fs 10 10 -ff ps -ft 'figure3/exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
+-fs 10 10 -ff ps -ft 'figure3_rerun/exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
 -xlab 'Method, ($N$, $E$)' -ylab 'SRMSE' \
 -ylim 0.0 3.2 -ylr 90 -xtp 0 80 -ytl 0.0 0.2 -ytl 0.0 0.0 -xtl 5 8 -xtl 9 16 -yts 18 18 -xts 18 18 -xts 18 18 \
 -xtr 70 0 -xls 20 -yls 20 -xlim 0 111 -la 0 0 -lls 14 -loc 'upper center' -bbta 0.45 -bbta 1.3 -btta 0.4 -btta 1.0 -lc 3 -lp 0.01 -lcs 0.1
@@ -289,17 +291,18 @@ clear; gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size' --
 
 ```
 clear; gensit plot simple scatter -y table_srmse -x loss_name --x_discrete  \
--dn cambridge_work_commuter_lsoas_to_msoas/exp3 -et JointTableSIM_NN \
+-dn cambridge_work_commuter_lsoas_to_msoas/exp3 -o ./data/outputs/ -et JointTableSIM_NN \
 -el np -el MathUtils -el xr \
--e table_coverage_probability_size "xr.apply_ufunc(lambda x: np.exp(6*x), coverage_probability(prediction=table,ground_truth=ground_truth).mean(['origin','destination']))" \
--e table_srmse "srmse(prediction=table.mean(['id']),ground_truth=ground_truth)" \
+-e table_coverage_probability_size "coverage_probability(prediction=table,ground_truth=ground_truth,dim='iter').mean(['origin','destination'])" \
+-e table_srmse "srmse(prediction=table.mean('iter'),ground_truth=ground_truth)" \
 -ea table \
 -ea "ground_truth=outputs.inputs.data.ground_truth_table" \
--ea "srmse=MathUtils.srmse" -ea "coverage_probability=MathUtils.coverage_probability" \
+-ea "srmse=MathUtils.srmse" \
+-ea "coverage_probability=MathUtils.coverage_probability" \
 -k sigma -k type -k name -k title -k loss_name \
 -cs "~da.loss_name.isin([str(['total_table_distance_loss','total_intensity_distance_loss'])])" \
--cs "da.title.isin(['_doubly_constrained','_doubly_10%_cell_constrained','_doubly_20%_cell_constrained'])" \
--fs 10 10 -ff ps -ft 'figure4/loss_function_validation_intractable_odms' \
+-cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
+-fs 10 10 -ff ps -ft 'figure4_rerun/loss_function_validation_intractable_odms' \
 -mrkr sigma -c title -msz table_coverage_probability_size -or asc table_coverage_probability_size -l sigma -l title \
 -xlab 'Loss operator $\lossoperator$' -ylab 'SRMSE' \
 -ylim 0.0 2.2 -xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 1

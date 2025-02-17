@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from copy import deepcopy
+from collections import defaultdict
 from difflib import SequenceMatcher
 from itertools import chain, product, count
 from typing import Dict, List, Union, Tuple
@@ -1671,3 +1672,53 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name='shiftedcmap'):
     plt.register_cmap(cmap = newcmap)
 
     return newcmap
+
+def add_leaf(tree, path, values_dict):
+    """
+    Add a leaf node to the tree where each leaf is a dictionary of lists.
+    If any intermediate branches don't exist, they will be created automatically.
+    
+    Args:
+        tree (defaultdict): The tree structure.
+        path (list): A list of keys specifying the path to the leaf node.
+        values_dict (dict): A dictionary where the keys are the list names and the values are the elements to be appended.
+    """
+    node = tree
+    for key in path[:-1]:  # Traverse until the second-to-last node
+        # If the branch doesn't exist, create it (automatically adds intermediate branches)
+        if key not in node:
+            node[key] = defaultdict(lambda: defaultdict())  # Create a new branch if not already existing
+        node = node[key]  # Navigate deeper into the tree
+    # If the node is a leaf, initialize it as a dictionary of lists if not already created
+    if path[-1] not in node:
+        node[path[-1]] = {k: [] for k in values_dict.keys()}  # Initialize empty lists for the keys in the values_dict
+    # Append values to each list in the leaf node's dictionary
+    for key, value in values_dict.items():
+        node[path[-1]][key].append(value)
+
+# Traversal function that collects paths and leaf data
+def traverse_tree(tree,leaf_keys):
+    """
+    Traverse the tree and collect all leaf node data (path and lists).
+    
+    Args:
+        tree (defaultdict): The tree structure to traverse.
+        
+    Returns:
+        list: A list of tuples, where each tuple contains the path and leaf node data (dictionary of lists).
+    """
+    paths_and_leaves = []
+
+    def traverse_and_collect(node, path=[]):
+        """
+        Recursively traverse the tree and collect leaf nodes with their paths.
+        """
+        if any([lk == nk for lk in leaf_keys for nk in node.keys()]):
+            # We are at a leaf node, which is a dictionary of lists
+            paths_and_leaves.append((path, node))
+        else:
+            for key, child_node in node.items():
+                traverse_and_collect(child_node, path + [key])
+
+    traverse_and_collect(tree)
+    return paths_and_leaves
