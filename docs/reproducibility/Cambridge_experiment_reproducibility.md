@@ -44,7 +44,7 @@ clear; gensit summarise \
 -ea "mean_intensity=signed_mean_func(intensity,'intensity','signedmean',dim=['id'])" \
 -ea "mean_intensity=intensity.mean(['id'])" \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss']),str(['table_likelihood_loss'])])" \
--btt 'iter' 10000 90 1000 \
+--slice -btt 'iter' 10000 90 1000 \
 -k sigma -k type -k name -k title -fe SRMSEs -nw 20
 ```
 
@@ -65,7 +65,7 @@ clear; gensit summarise \
 -ea "intensity_covered=coverage_func(prediction=intensity,ground_truth=ground_truth,region_mass=region_masses)" \
 -ea "table_covered=coverage_func(prediction=table,ground_truth=ground_truth,region_mass=region_masses)" \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
--k sigma -k type -k name -k title \
+--slice -k sigma -k type -k name -k title \
 -fe CoverageProbabilities -nw 20
 ```
 
@@ -179,7 +179,7 @@ clear; gensit plot simple line --y_shade --y_group 'type' -y table_density -x de
 -btt 'iter' 100 100 1000 \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
 -cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
--k sigma -k type -k title \
+--slice -k sigma -k type -k title \
 -ft 'figure1/figure1_table_like_loss_kernel_density' -ff ps \
 -hchv 0.5 -hch sigma -c title -op 1.0 -msz 1 -l title -l sigma -or asc table_density_height \
 -xlab '$\lossoperator(\mytable,\myintensity)$' -ylab 'Kernel density' \
@@ -232,7 +232,7 @@ clear; gensit plot simple scatter -y table_srmse -x type -x end --x_discrete \
 -k sigma -k type -k name -k title \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
 -cs "~da.title.isin(['_unconstrained'])" \
--c title -op 1.0 -mrkr sigma -msz table_coverage_probability_size -l title -l sigma -or asc table_coverage_probability_size  \
+--slice -c title -op 1.0 -mrkr sigma -msz table_coverage_probability_size -l title -l sigma -or asc table_coverage_probability_size  \
 -ft 'figure2/cumulative_srmse_and_cp_by_method' -ylab 'SRMSE' -xlab 'Method, $N$' \
 -la 0 0 -lc 2 -loc 'upper center' -bbta 0.5 -bbta 1.35 -lls 14 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 12 16 \
 -xtp 0 102 -ytl 0.0 0.2 -xtl 1 1 -xtl 2 3 -xlim 0 19 -ylim 0 1.8 -xtr 75 0
@@ -252,6 +252,7 @@ clear; gensit plot simple scatter -y table_srmse -x type -x end --x_discrete \
 ## Figure 3
 
 ```
+pkill -9 -f "gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size'"; \
 clear; gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
 -dn cambridge_work_commuter_lsoas_to_msoas/exp2 -o ./data/outputs/ \
 -et NonJointTableSIM_NN -et JointTableSIM_NN \
@@ -266,10 +267,10 @@ clear; gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size' --
 -ea "coverage_probability=MathUtils.coverage_probability" \
 -ea "roundint=MathUtils.roundint" \
 -ea "table_coverage=coverage_probability(prediction=table.stack(id=['seed','iter']),ground_truth=ground_truth,dim='id')" \
+-k sigma -k type -k name -k title -k N \
 -cs "da.loss_name.isin([str(['dest_attraction_ts_likelihood_loss']),str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])])" \
 -cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
--k sigma -k type -k name -k title -k N \
--mrkr sigma -c title -msz table_coverage_probability_size -op 1.0 -or asc table_coverage_probability_size -l sigma -l title \
+--slice -mrkr sigma -c title -msz table_coverage_probability_size -op 1.0 -or asc table_coverage_probability_size -l sigma -l title \
 -fs 10 10 -ff ps -ft 'figure3_rerun/exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
 -xlab 'Method, ($N$, $E$)' -ylab 'SRMSE' \
 -ylim 0.0 3.2 -ylr 90 -xtp 0 80 -ytl 0.0 0.2 -ytl 0.0 0.0 -xtl 5 8 -xtl 9 16 -yts 18 18 -xts 18 18 -xts 18 18 \
@@ -302,7 +303,7 @@ clear; gensit plot simple scatter -y table_srmse -x loss_name --x_discrete  \
 -k sigma -k type -k name -k title -k loss_name \
 -cs "~da.loss_name.isin([str(['total_table_distance_loss','total_intensity_distance_loss'])])" \
 -cs "~da.title.isin(['_unconstrained','_total_intensity_row_table_constrained'])" \
--fs 10 10 -ff ps -ft 'figure4_rerun/loss_function_validation_intractable_odms' \
+--slice -fs 10 10 -ff ps -ft 'figure4_rerun/loss_function_validation_intractable_odms' \
 -mrkr sigma -c title -msz table_coverage_probability_size -or asc table_coverage_probability_size -l sigma -l title \
 -xlab 'Loss operator $\lossoperator$' -ylab 'SRMSE' \
 -ylim 0.0 2.2 -xtr 0 0 -xtp 0 100 -ytl 0.0 0.2 -xtl 1 1 -xtl 1.5 2 -lls 8 -xts 8 8 -xts 8 8 -nw 1

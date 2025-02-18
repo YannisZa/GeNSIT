@@ -164,7 +164,7 @@ clear; gensit summarise -dn DC/exp1 -et JointTableSIM_NN \
 -ea "table_srmse_test_by_seed=table_mean.groupby('seed').map(MathUtils.srmse,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask)" \
 -btt 'iter' 10000 9 10000 \
 -cs "da.loss_name==str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])" \
--k sigma -k type -k name -k title -fe table_SRMSEs -nw 1
+--slice -k sigma -k type -k name -k title -fe table_SRMSEs -nw 1
 ```
 
 
@@ -231,7 +231,7 @@ clear; gensit summarise -dn DC/exp1 -et JointTableSIM_NN \
 -ea "table_ssi_test=table_mean.groupby('seed').map(MathUtils.ssi,ground_truth=outputs.inputs.data.ground_truth_table,mask=outputs.inputs.data.test_cells_mask)" \
 -btt 'iter' 10000 9 100000 \
 -cs "da.loss_name==str(['dest_attraction_ts_likelihood_loss', 'table_likelihood_loss'])" \
--k sigma -k type -k name -k title -fe table_SSIs -nw 1
+--slice -k sigma -k type -k name -k title -fe table_SSIs -nw 1
 ```
 
 
