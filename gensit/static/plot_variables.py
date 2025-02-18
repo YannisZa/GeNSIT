@@ -158,13 +158,28 @@ LATEX_COORDINATES = ['label','annotate']+PLOT_COORDINATES+PLOT_AUX_COORDINATES
 # \usepackage{amssymb}
 
 # \usepackage{/home/iz230/GeNSIT/gensit/static/PhDThesisPSnPDF}
+# \usepackage{amscd}
+# \usepackage{dsfont}
+# \usepackage{commath}
+# \usepackage{mathtools}
+# \usepackage{amsmath}
+# \usepackage{amssymb}
+# \usepackage{amsthm}
+# \usepackage{newtxtext,newtxmath}
 
 LATEX_PREAMBLE = r'''
 \usepackage{/home/iz230/GeNSIT/gensit/static/PhDThesisPSnPDF}
 \usepackage{color}
 \usepackage[table]{xcolor}  % colors
-\usepackage{amscd,dsfont}
+
+\usepackage{amscd}
+\usepackage{dsfont}
 \usepackage{commath}
+\usepackage{mathtools}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{newtxtext,newtxmath}
 
 \newcommand{\deepred}[1]{{\textcolor[HTML]{E20000}{#1}}}
 
