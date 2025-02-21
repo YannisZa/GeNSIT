@@ -317,15 +317,15 @@ clear; gensit summarise -dn DC/exp1 -et NonJointTableSIM_NN \
 ```
 clear; gensit plot spatial empty -x residual_mean_colsums_spatial  \
 -dn DC/comparisons -et GraphAttentionNetwork_Comparison_UnsetNoise__doubly_and_cell_constrained_all_region_features \
--el np -el MathUtils \
+-el np -el MathUtils -o ./data/outputs/ \
 -e residual_mean_total_spatial "residual_mean_colsums.sum('destination')" \
 -e residual_mean_colsums_spatial "residual_mean_colsums.to_dataframe(name='data',dim_order=['destination'])" \
 -ea intensity \
 -ea "intensity_mean=intensity.groupby('seed').mean('iter',dtype='float64')" \
 -ea "residual_mean_colsums=intensity_mean.groupby('seed').map(lambda x: (x-outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True)).mean('seed',skipna=True).sum('origin')" \
 -xlab 'Longitude' -ylab 'Latitute' -at 'GMEL' \
--fs 10 10 -ff ps -ft 'mean_residual' -cm bwr  \
--ats 18 -ylr 90 -yts 12 0 -xts 12 0 -nw 1
+-fs 10 10 -ff ps -ft 'figure5/mean_residual' -cm RdYlBu_r -vmid 0.0 -la 0 0 \
+-ats 16 -ylr 90 -yts 12 0 -xts 12 0 -yls 16 0 -xls 16 0 -nw 1
 ```
 
 
@@ -339,6 +339,6 @@ clear; gensit plot spatial geoshow -x residual_mean_colsums_spatial  \
 -ea "intensity_mean=intensity.groupby('seed').mean('iter',dtype='float64')" \
 -ea "residual_mean_colsums=intensity_mean.groupby('seed').map(lambda x: (x-outputs.inputs.data.ground_truth_table).where(outputs.inputs.data.test_cells_mask,drop=True)).mean('seed',skipna=True).sum('origin')" \
 -xlab 'Longitude' -ylab 'Latitute' -at 'GMEL' \
--fs 10 10 -ff ps -ft ' mean_residual' -cm RdYlBu_r -vmid 0.0 -la 0 0 \
+-fs 10 10 -ff ps -ft 'mean_residual' -cm RdYlBu_r -vmid 0.0 -la 0 0 \
 -ats 18 -ylr 90 -yts 12 0 -xts 12 0 -nw 1
 ```
