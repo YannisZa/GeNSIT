@@ -28,8 +28,6 @@ def update_settings(setts):
 
     # Update sample names
     sample_names = []
-    if 'metric_args' in setts:
-        sample_names += list(setts['metric_args']) 
     if 'evaluation_kwargs' in setts:
         sample_names += list([k for k,_ in setts['evaluation_kwargs']])
     sample_names = set(sample_names).intersection(DATA_SCHEMA.keys())
@@ -562,7 +560,6 @@ _output_options = [
     click.option('--title','-en', multiple = True, type = click.STRING, default = [''], cls = NotRequiredIf, not_required_if='directories'),
     click.option('--exclude','-exc', type = click.STRING, default = [], multiple = True, cls = NotRequiredIf, not_required_if='directories'),
     click.option('--dates','-date', type = click.STRING, default = None, multiple = True, required = False),
-    click.option('--filename_ending', '-fe', default = '', type = click.STRING),
     # Slicing and grouping outputs options
     click.option('--burnin_thinning_trimming', '-btt', default=[], show_default = True, multiple = True, callback = btt_callback,
                  type=(click.STRING,click.IntRange(min = 0),click.IntRange(min = 1),click.IntRange(min = 1)), 
@@ -579,8 +576,6 @@ _output_options = [
             help='Every argument corresponds to a list of metrics, statistics and their corresponding axes e.g. passing  ("SRMSE", \"mean|sum\",  \"iter|sweep\") corresponds to applying mean across the iter dimension and then sum across sweep dimension before applying SRMSE metric'),
     click.option('--metric','-m', multiple = True, type = click.Choice(METRICS.keys()), required = False, default = None,
                 help = f'Sets list of metrics to compute over samples.'),
-    click.option('--metric_args', '-ma', multiple = True, required = False,
-            type = click.STRING, default = None, callback = to_list, help = f'''Metric keyword arguments.'''),
     click.option('--evaluate','-e', multiple = True, type=(click.STRING, click.STRING), required = False, default=[], 
                 callback = list_of_lists, help = f'''Evaluates expressions for one or more datasets. 
                 First argument is the name of the evaluation. Second is the evaluation expression'''),
@@ -720,7 +715,7 @@ def plot_coordinate_options(func):
 @click.option('--colourmap', '-cm', default='cblue',required = False, show_default = True,
             type = click.STRING, help = f'Sets main colourmap.')
 @click.option('--colourmap_midpoint', '-vmid', default=None, show_default = True,
-              type=click.FLOAT, help = f"Center the colormap around this midpoint.")
+              type=click.FLOAT, help = f"Center the colourmap around this midpoint.")
 @click.option('--colourbar/--no-colourbar', default = None, is_flag = True, show_default = True,
               help = f'Flag for plotting colourbars or not.')
 @click.option('--colourbar_title', '-ct', default = [None], show_default = False, multiple = True, callback = to_list, 
@@ -775,14 +770,12 @@ def plot(
         experiment_type,
         title,
         exclude,
-        filename_ending,
         burnin_thinning_trimming,
         statistic,
         coordinate_slice,
         input_slice,
         group_by,
         metric,
-        metric_args,
         evaluate,
         folder_kwargs,
         evaluation_kwargs,
@@ -951,6 +944,7 @@ def plot(
 ))
 @output_options
 @common_options
+@click.option('--filename_ending', '-fe', default = '', type = click.STRING)
 @click.option('--algorithm', '-a', default=['linear'], show_default = True, multiple = True,
               type = click.STRING, help = f'Sets algorithm name for use in.')
 @click.option('--sort_by','-sort', multiple = True, type = click.STRING, required = False)
@@ -963,14 +957,12 @@ def summarise(
         experiment_type,
         title,
         exclude,
-        filename_ending,
         burnin_thinning_trimming,
         statistic,
         coordinate_slice,
         input_slice,
         group_by,
         metric,
-        metric_args,
         evaluate,
         folder_kwargs,
         evaluation_kwargs,
@@ -991,6 +983,7 @@ def summarise(
         force_reload,
         slice,
         validation_data,
+        filename_ending,
         algorithm,
         sort_by,
         ascending,

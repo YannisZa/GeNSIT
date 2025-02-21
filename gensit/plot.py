@@ -468,27 +468,44 @@ class Plot(object):
                 cmap = cmap
             )
         elif plot_type == 'geoshow':
-            vmin = 0.6875967979000001#-31438.0324774265 #kwargs.get('vmin',None)
-            vmax = 8142008.5# 1451.6155# kwargs.get('vmax',None)
+            vmin = np.round(kwargs.get('vmin',None),2)
+            vmax = np.round(kwargs.get('vmax',None),2)
             print('vmin',vmin,'vmax',vmax)
+            print('Total error',np.abs(kwargs['x']['data'].values).sum())
+            print('Test cells',kwargs['x'].shape[0])
             ax = kwargs['x'].plot(
                 column = 'data',
                 ax = ax,
                 alpha = kwargs.get('alpha',None),
                 markersize = kwargs.get('s',None),
                 cmap = self.cmap,
-                norm = mcolors.SymLogNorm(vmin=vmin, linthresh=1.0, vmax=vmax), #mcolors.TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax),
+                # norm = mcolors.SymLogNorm(vmin=vmin, linthresh=1.0, vmax=vmax), 
+                norm = mcolors.TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax),
                 edgecolor = ('black',0.8),
                 legend = True,
-                # legend_kwds = dict(
-                    # ticks = mpl.ticker.FixedLocator(list(np.linspace(vmin,0,5,False))+list(np.linspace(0,vmax,5,False)))
-                # )
+                legend_kwds = dict(
+                    ticks = mpl.ticker.FixedLocator(list(np.linspace(vmin,0,5,False))+list(np.linspace(0,vmax,5,False)))
+                )
             )
-            ax.tick_params(labelsize=30)
+            # Add number labels on top of colored regions
+            for idx, row in kwargs['x'].iterrows():
+                if row.geometry.centroid.is_empty:
+                    continue  # Skip empty geometries
+                x, y = row.geometry.centroid.x, row.geometry.centroid.y
+                ax.annotate(
+                    text=str(np.round(row["data"],2)),
+                    xy=(x, y),
+                    ha="center",
+                    fontsize=8,
+                    color="black",  # Adjust for readability
+                    fontweight="bold"
+                )
+
+            ax.tick_params(labelsize=self.settings['x_tick_size'][0])
             # Access the colorbar
             cbar = ax.get_figure().get_axes()[1]
             # Set the fontsize of the colorbar
-            cbar.tick_params(labelsize=30)
+            cbar.tick_params(labelsize=self.settings['x_tick_size'][0])
         
         return ax
     
@@ -983,7 +1000,7 @@ class Plot(object):
         # print(group_hashmap)
         print(axes_lims)
         # print(discrete_ticks['x'])
-        
+
         # Extract data
         x_range = [dt[0] for dt in plot_settings['x']] # keep only major axis data
         marker_size = plot_settings.get('marker_size',1.0)
@@ -996,9 +1013,9 @@ class Plot(object):
         # Convert hatch pattern transparency levels to approapriate data type
         hatch_opacity = plot_settings.get('hatch_opacity','1.0')
         hatch_opacity = [float(hatch_opacity)] if isinstance(hatch_opacity,str) else hatch_opacity
-        colourmap = plot_settings.get('colourmap','black')
+        colourmap = self.settings.get('colourmap',None)
         colourmap = [colourmap] if isinstance(colourmap,str) else colourmap
-        colourmap_midpoint = plot_settings.get('colourmap_midpoint',0.0)
+        colourmap_midpoint = self.settings.get('colourmap_midpoint',None)
         colourmap_midpoint = [colourmap_midpoint] if isinstance(colourmap_midpoint,str) else colourmap_midpoint
         zorder = plot_settings.get('zorder',[1])
         zorder = [float(zorder)] if isinstance(zorder,str) else zorder 
@@ -1021,7 +1038,7 @@ class Plot(object):
 
         # Figure size 
         fig, ax = plt.subplots(
-            figsize = self.settings['figure_size'],
+            figsize = self.settings.get('figure_size',None),
             ncols = max(1,len(group_hashmap['x'])),
             nrows = max(1,len(group_hashmap['y'])),
             squeeze = False
@@ -1088,8 +1105,9 @@ class Plot(object):
             group_axes_data[axes_id]['edgecolor'] = ('black',group_axes_data[axes_id]['hatch_opacity']) \
                 if group_axes_data[axes_id]['hatch_opacity'] \
                 else (group_axes_data[axes_id]['facecolor'],group_axes_data[axes_id]['hatch_opacity'])
-            group_axes_data[axes_id]['vmin'] = axes_lims['x'][0]
-            group_axes_data[axes_id]['vmax'] = axes_lims['x'][1]
+            colourbar_limit = self.settings['colourbar_limit'][0]
+            group_axes_data[axes_id]['vmin'] = colourbar_limit[0] if colourbar_limit[0] else axes_lims['x'][0]
+            group_axes_data[axes_id]['vmax'] = colourbar_limit[1] if colourbar_limit[1] else axes_lims['x'][1]
             
             # print(sid,axes_id)
             # Print plotting data
@@ -1128,19 +1146,19 @@ class Plot(object):
         if self.settings['equal_aspect']:
             plt.gca().set_aspect('equal')
         
-
-        
         # Tight layout
-        if self.settings.get('figure_format','pdf') == 'ps':
-            fig.tight_layout(rect=(0, 0, 0.7, 1.1))
-        else:
-            fig.tight_layout()
+        # if self.settings.get('figure_format','pdf') == 'ps':
+        #     fig.tight_layout(rect=(0, 0, 0.7, 1.1))
+        # else:
+        #     fig.tight_layout()
 
         # Write figure
         write_figure(
             fig,
             filepath,
-            **self.settings
+            figure_format=self.settings.get('figure_format',''),
+            pad_inches=0.0,
+            bbox_inches='tight'
         )
         self.logger.info(f"Filename: {filename}")
         self.logger.success(f"Figure exported to {dirpath}")
@@ -1436,7 +1454,8 @@ class Plot(object):
 
     def merge_data_with_geometries(self,data,plot_sett):
         if getattr(self,'region_geometries',None) is None:
-            if getattr(plot_sett['outputs'],'inputs') is not None:
+            if getattr(plot_sett['outputs'],'inputs') is not None and \
+                'region_geometries' in list(plot_sett['outputs'].inputs.data_vars().keys()):
                 # Make sure region_geometries exist
                 try:
                     region_geometries = getattr(plot_sett['outputs'].inputs.data,'region_geometries')

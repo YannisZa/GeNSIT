@@ -187,6 +187,7 @@ class Outputs(object):
         avail_output_names = set(self.data_names).intersection(set(list(OUTPUT_SCHEMA.keys()))) \
             if self.data_names is not None \
             else set(list(OUTPUT_SCHEMA.keys()))
+            
         for sam in avail_output_names:
             if sam == 'intensity' and self.intensity_model_name != '':
                 # Add all intensity-related data names
@@ -417,8 +418,9 @@ class Outputs(object):
                     drop = True
                 )
             except Exception as exc:
-                self.logger.info(f"slicing using {sample_name}[{index}] {coord_slice} failed with {exc}")
-                self.logger.info(da.coords)
+                self.logger.warning(f"slicing using {sample_name}[{index}] {coord_slice} failed with {exc}")
+                self.logger.warning(da.coords)
+                self.logger.warning(traceback.format_exc())
                 continue
             # Make sure dataset is not empty
             if da.size <= 0:
@@ -710,6 +712,7 @@ class Outputs(object):
 
             # Load all necessary samples that were not loaded
             if len(samples_not_loaded) > 0:
+
                 self.logger.info(f"Collecting samples {', '.join(sorted(samples_not_loaded))}.")
 
                 # Do it concurrently
@@ -727,11 +730,9 @@ class Outputs(object):
                     )
                 
                 # Create xarray dataset
-                try:
-                    self.logger.info(f"Creating xarray(s) for {', '.join(sorted(samples_not_loaded))}.")
-                    
+                self.logger.info(f"Creating xarray(s) for {', '.join(sorted(samples_not_loaded))}.")
+                try:    
                     for sample_name in sorted(samples_not_loaded):
-                        
                         # Homogeneous data arrays are the ones that have common coordinates
                         # along all core dimensions and group_by dimensions
                         # Group by contains all sweeps + extra non-sweeped vars
@@ -848,6 +849,7 @@ class Outputs(object):
                     k:stringify_coordinate(parse(sweep[k])) for k in (list(CORE_COORDINATES_DTYPES.keys())+list(group_by))
                     if k in sweep and k != 'seed' and k not in slice_dict
                 }
+
             # Slice according to coordinate and index slice
             data_arr[sample_name] = self.slice_coordinates(
                 sample_name = sample_name,
@@ -1121,7 +1123,6 @@ class Outputs(object):
     
         # Outputs filepath
         dirpath = os.path.join(self.outputs_path,'sample_collections')
-
         if not os.path.isdir(dirpath) or \
             not os.path.exists(dirpath) or \
             self.settings.get('force_reload',False):
@@ -2174,7 +2175,7 @@ class OutputSummary(object):
     @classmethod
     def find_matching_output_folders(cls,__self__):
         if 'directories' in list(__self__.settings.keys()) and len(__self__.settings['directories']) > 0:
-            output_dirs = []
+            matching_dirs = []
             output_directory = __self__.settings['out_directory']
             for dataset_name in __self__.settings['dataset_name']:
                 for directory in list(__self__.settings['directories']):
@@ -2184,7 +2185,7 @@ class OutputSummary(object):
                         directory
                     )
                     if os.path.exists(path_dir):
-                        output_dirs.append(path_dir)
+                        matching_dirs.append(path_dir)
         else:
             # Search metadata based on search parameters
             # Get output directory and group
@@ -2219,30 +2220,35 @@ class OutputSummary(object):
                                     (f"{(dt+'*') if len(dt) > 0 else ''}")
                                 )
                             )
-            # Combine them all into one pattern
-            folder_patterns_re = "(" + ")|(".join(folder_patterns) + ")"
             # Get all output directories matching dataset name(s)
-            print(output_directory,
-                        dataset_names,
-                        'output_group',output_group)
-            output_dirs = flatten([
-                get_all_subdirectories(
-                    os.path.join(
-                        output_directory,
-                        dataset,
-                        output_group
+            try:
+                output_dirs = flatten([
+                    get_all_subdirectories(
+                        os.path.join(
+                            output_directory,
+                            dataset,
+                            output_group
+                        )
+                    ) for dataset in dataset_names 
+                    if os.path.isdir(
+                        os.path.join(
+                            output_directory,
+                            dataset,
+                            output_group
+                        )
                     )
-                ) for dataset in dataset_names 
-                if os.path.isdir(
-                    os.path.join(
-                        output_directory,
-                        dataset,
-                        output_group
-                    )
-                )
-            ])
+                ])
+            except:
+                raise Exception(f"""
+                    Could not get subdirectories for 
+                        output directory: {output_directory}
+                        dataset_names: {dataset_names}
+                        output_group: {output_group}
+                    """)
             # Sort them by string
             output_dirs = sorted(list(output_dirs))
+            # Combine them all into one pattern
+            folder_patterns_re = "(" + ")|(".join(folder_patterns) + ")"
             # Get all output dirs that match the pattern
             matching_dirs = [output_folder for output_folder in output_dirs if re.search(folder_patterns_re,output_folder)]
             # Exclude those that are specified
@@ -2506,11 +2512,11 @@ class OutputSummary(object):
                 ))
         else:
             # Import all input data
-                passed_inputs = deepcopy(Inputs(
-                    config = config,
-                    synthetic_data = False,
-                    logger = self.logger,
-                ))
+            passed_inputs = deepcopy(Inputs(
+                config = config,
+                synthetic_data = False,
+                logger = self.logger,
+            ))
 
         # Instantiate global outputs
         outputs = Outputs(
@@ -2525,8 +2531,6 @@ class OutputSummary(object):
         
         # Load all output data
         outputs.load(indx = indx)
-
-        # print(outputs.data)
 
         return outputs
 
@@ -2707,6 +2711,8 @@ class OutputSummary(object):
                 # Store evaluation of keyword argument
                 if keyword_eval is not None:
                     keyword_args[key] = keyword_eval
+                    if key in ['ground_truth_colsums','table_colsums_mean']:
+                        print(keyword_eval.values)
                     # try:
                         # print(key,dict(keyword_eval.unstack('sweep').sizes))
                     # except:
@@ -2831,7 +2837,7 @@ class OutputSummary(object):
                     if not sweeped_outputs and len(evaluation_data) <= 0:
                         evaluation_data[outputs.experiment_id] = {operation_name:data}
             else:
-                # print('no xarray found',operation_name,type(evaluation))
+                self.logger.debug(f"no xarray found from {operation_name}. Found {type(evaluation)} instead.")
                 # Get data list
                 if isinstance(evaluation,np.generic):
                     data = evaluation.tolist()
@@ -2849,7 +2855,7 @@ class OutputSummary(object):
 
                 # Initialise the evaluation data only if the outputs
                 # were not a result of any sweep
-                if not sweeped_outputs and len(evaluation_data) <= 0:
+                if not sweeped_outputs or len(evaluation_data) <= 0:
                     evaluation_data[outputs.experiment_id] = {operation_name:data}
 
         return list(evaluation_data.values())

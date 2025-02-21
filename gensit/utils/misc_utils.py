@@ -15,6 +15,7 @@ import numbers
 import decimal
 import operator
 import traceback
+import subprocess
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -124,16 +125,28 @@ def write_compressed_npy(data:np.ndarray,filepath:str,**kwargs:Dict) -> None:
 
 def write_figure(figure,filepath,**settings):
     settings = settings.copy()
-    filename_ending = settings.pop('filename_ending','pdf')
-    filepath += '.'+filename_ending
+    filename_ending = settings.pop('figure_format','pdf')
 
     figure.savefig(
-        filepath,
+        (filepath+'.'+filename_ending),
         format=filename_ending,
         **settings
     )
     
     plt.close(figure)
+
+    if filename_ending == 'ps':
+        subprocess.call(
+            ["ps2pdf", filepath+'.ps', filepath+'.pdf'], 
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL
+        )
+        subprocess.call(
+            ["pdfcrop", "--margins", "0 0 0 0", filepath+'.pdf', filepath+'.pdf'], 
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL
+        )
+
 
 
 def write_figure_data(plot_data:Union[dict,pd.DataFrame],filepath:str,keys:list=[],figure_settings:dict={}):
@@ -478,7 +491,6 @@ def find_common_substring(names):
 
 def get_all_subdirectories(out_path,stop_at:str='config.json',level:int = 2):
     directories = []
-    print('out_path',out_path)
     for root, dirs, files in walklevel(out_path,level = level):
         # If this is a dir that matches the stopping condition
         # or has a file that matches the stopping condition
