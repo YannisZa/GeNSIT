@@ -559,13 +559,18 @@ class Outputs(object):
         try:
             assert os.path.exists(h5file) and os.path.isfile(h5file)
         except:
-            raise MissingFiles(f"H5 file {h5file} not found.")
+            self.logger.error(MissingFiles(f"H5 file {h5file} not found."))
+            return {}
         
         # Read h5 data
-        local_coords,global_coords,data_vars = self.read_h5_file(
-            filename = h5file,
-            sample_names = sample_names
-        )
+        try:
+            local_coords,global_coords,data_vars = self.read_h5_file(
+                filename = h5file,
+                sample_names = sample_names
+            )
+        except Exception as e:
+            self.logger.error(e)
+            return {}
 
         # Convert set to list
         local_coords = {k:np.array(
@@ -2526,7 +2531,7 @@ class OutputSummary(object):
             inputs = passed_inputs,
             console_handling_level = self.settings['logging_mode'],
             logger = self.logger,
-            # base_dir = output_folder
+            base_dir = output_folder
         )
         
         # Load all output data
