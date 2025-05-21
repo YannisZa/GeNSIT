@@ -77,7 +77,6 @@ def sde_pot_hessian(**kwargs):
 
 
 def log_flow_matrix(**kwargs):
-    
     # Get data structure params
     device = kwargs.get('device','cpu')
     tensor = kwargs.get('torch',True)
@@ -149,7 +148,9 @@ def log_flow_matrix(**kwargs):
     # Reshape tensors to ensure operations are possible
     log_destination_attraction = torch.reshape(log_destination_attraction,(*iter_sizes,sweep,1,destination))
     origin_demand = origin_demand.repeat((*([1]*len(iter_sizes)),sweep))
-    cost_matrix = cost_matrix.repeat((*([1]*len(iter_sizes)),sweep,1))
+    origin_demand = torch.reshape(origin_demand,(*([1]*len(iter_sizes)),sweep,origin,1))
+    cost_matrix = cost_matrix.repeat((*([1]*len(iter_sizes)),sweep))
+    cost_matrix = torch.reshape(cost_matrix,(*([1]*len(iter_sizes)),sweep,origin,destination))
     alpha = torch.reshape(alpha,(*iter_sizes,sweep,1,1))
     beta = torch.reshape(beta,(*iter_sizes,sweep,1,1))
     log_grand_total = torch.log(grand_total).to(device = device)
