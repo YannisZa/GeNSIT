@@ -132,19 +132,19 @@ RAW_EXPRESSIONS = {
     "_doubly_20%_cell_constrained":'$\\mytablerowsums,\\mytablecolsums,\\mytablecells{_2}$',
     "TotallyConstrained":'$\\myintensitytotal$',
     "ProductionConstrained":'$\myintensityrowsums$',
-    "dest_attraction_ts_likelihood_loss":"$\\lossoperator\(\\mylogdestattr \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \)$",
-    "dest_attraction_ts_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mylogdestattr, \\mytable, \\myintensity \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \)$",
-    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mylogdestattr,\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
-    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss":"$\\lossoperator\( \\mylogdestattr, \\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
-    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mylogdestattr,\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$",
-    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss":"$\\lossoperator\( \\mylogdestattr, \\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$",
-    "table_likelihood_loss":"$\\lossoperator\(\\mytable, \\myintensity \)$",
-    "total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
-    "total_intensity_distance_likelihood_loss":"$\\lossoperator\(\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
-    "total_intensity_distance_loss":"$\\lossoperator\(\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \)$",
-    "total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$",
-    "total_table_distance_likelihood_loss":"$\\lossoperator\(\\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$",
-    "total_table_distance_loss":"$\\lossoperator\(\\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \)$"
+    "dest_attraction_ts_likelihood_loss":"$\\lossoperator\\left(\\mylogdestattr \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mylogdestattr, \\mytable, \\myintensity \\; ; \\; \\obsdata, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mylogdestattr,\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,total_intensity_distance_likelihood_loss":"$\\lossoperator\\left(\\mylogdestattr, \\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mylogdestattr,\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
+    "dest_attraction_ts_likelihood_loss,total_table_distance_likelihood_loss":"$\\lossoperator\\left(\\mylogdestattr, \\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
+    "table_likelihood_loss":"$\\lossoperator\\left(\\mytable, \\myintensity \\right)$",
+    "total_intensity_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
+    "total_intensity_distance_likelihood_loss":"$\\lossoperator\\left( \\myintensity \\; ; \\; \\obsdata^{\\myintensityoned}, \\boldsymbol{\\nu} \\right)$",
+    "total_intensity_distance_loss":"$\\lossoperator\\left( \\myintensity \\; ; \\; \\obsdata^{\\myintensityoned} \\right)$",
+    "total_table_distance_likelihood_loss,table_likelihood_loss":"$\\lossoperator\\left(\\mytable,\\myintensity \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
+    "total_table_distance_likelihood_loss":"$\\lossoperator\\left(\\mytable \\; ; \\; \\obsdata^{\\mytableoned}, \\boldsymbol{\\nu} \\right)$",
+    "total_table_distance_loss":"$\\lossoperator\\left(\\mytable \\; ; \\; \\obsdata^{\\mytableoned} \\right)$"
 }
 LABEL_EXPRESSIONS = {
     "sigma": '$\\sigma = '
@@ -186,18 +186,19 @@ LATEX_PREAMBLE = r'''
 \newcommand{\zachosframeworkbasename}{SIT-MCMC}
 \newcommand{\gaskinframeworkbasename}{SIM-NN}
 \newcommand{\ellamframeworkbasename}{SIM-MCMC}
+\newcommand{\liuframeworkbasename}{GMEL}
 \newcommand{\zachosframeworkfullname}{\textbf{S}patial \textbf{I}nteraction \textbf{T}able \textbf{M}arkov \textbf{C}hain \textbf{M}onte \textbf{C}arlo \;}
 \newcommand{\gaskinframeworkfullname}{\textbf{S}patial \textbf{I}nteraction \textbf{M}odel \textbf{N}eural \textbf{N}etwork\;}
 \newcommand{\ellamframeworkfullname}{\textbf{S}patial \textbf{I}nteraction \textbf{M}odel \textbf{M}arkov \textbf{C}hain \textbf{M}onte \textbf{C}arlo \;}
+\newcommand{\liuframeworkfullname}{\textbf{G}eo-contextual \textbf{M}ultitask \textbf{E}mbedding \textbf{L}earner \;}
 \newcommand{\zachosframework}{\zachosframeworkbasename \;}
 \newcommand{\gaskinframework}{\gaskinframeworkbasename \;}
 \newcommand{\ellamframework}{\ellamframeworkbasename \;}
+\newcommand{\liuframework}{\liuframeworkbasename \;}
 \newcommand{\zachosframeworktag}{\textsc{\zachosframeworkbasename}}
 \newcommand{\gaskinframeworktag}{\textsc{\gaskinframeworkbasename}}
 \newcommand{\ellamframeworktag}{\textsc{\ellamframeworkbasename}}
-\newcommand{\zachosframeworktagspace}{\textsc{\zachosframeworkbasename}\;}
-\newcommand{\gaskinframeworktagspace}{\textsc{\gaskinframeworkbasename}\;}
-\newcommand{\ellamframeworktagspace}{\textsc{\ellamframeworkbasename}\;}
+\newcommand{\liuframeworktag}{\textsc{\liuframeworkbasename}}
 
 \newcommand{\frameworkname}{GeNSIT}
 \newcommand{\frameworktag}{\textsc{\frameworkname}}
