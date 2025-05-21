@@ -6,7 +6,7 @@ n_workers = +1
 n_threads = +6
 device = 'cpu'
 in_directory = './data/inputs/'
-dataset = 'cambridge_work_commuter_lsoas_to_msoas'
+dataset = 'cambridge'
 load_experiment = ''
 seed = 1234
 # [inputs.seed.sweep]

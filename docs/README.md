@@ -166,11 +166,11 @@ Optional datasets may be:
 
 We consider agent trips from residence to workplace locations in Cambridge, UK. We use the following datasets from the Census 2011 data provided by the [Office of National Statistics](https://www.ons.gov.uk):
 
-- <a href="../data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_to_msoas.geojson" target="_blank">Lower super output areas (LSOAs), Middle super output areas (MSOAs)</a> as origin, destination locations, respectively.
-- <a href="../data/inputs/cambridge_work_commuter_lsoas_to_msoas/cost_matrices/clustered_facilities_sample_20x20_20_01_2023_sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_prob_origin_destination_adjusted_normalised_boundary_only_edge_corrected_cost_matrix_max_normalised.txt" target="_blank">Average shortest path in a transportation network</a> between a random sample of 20 residences inside each LSOA and 20 workplaces inside each MSOA as a cost matrix.
-- [Number of jobs available at each MSOA](./data/inputs/cambridge_work_commuter_lsoas_to_msoas/destination_attraction_time_series_sum_normalised.txt) as a destination attraction proxy used in the NN's loss function.
-- [Total distance travelled to work from each LSOA](./data/inputs/cambridge_work_commuter_lsoas_to_msoas/lsoas_total_distance_to_work.txt) as an input to the NN's loss function.
-- [Ground truth agent trip table](./data/inputs/cambridge_work_commuter_lsoas_to_msoas/table_lsoas_to_msoas.txt) a validation dataset. Parts of this table such as origin/destination demand (row/colsums) and a random subset of trips (cells) are also conditioned upon acting as table constraint data.
+- <a href="../data/inputs/cambridge/lsoas_to_msoas.geojson" target="_blank">Lower super output areas (LSOAs), Middle super output areas (MSOAs)</a> as origin, destination locations, respectively.
+- <a href="../data/inputs/cambridge/cost_matrices/clustered_facilities_sample_20x20_20_01_2023_sample_20x20_clustered_facilities_ripleys_k_500_euclidean_points%_prob_origin_destination_adjusted_normalised_boundary_only_edge_corrected_cost_matrix_max_normalised.txt" target="_blank">Average shortest path in a transportation network</a> between a random sample of 20 residences inside each LSOA and 20 workplaces inside each MSOA as a cost matrix.
+- [Number of jobs available at each MSOA](./data/inputs/cambridge/destination_attraction_time_series_sum_normalised.txt) as a destination attraction proxy used in the NN's loss function.
+- [Total distance travelled to work from each LSOA](./data/inputs/cambridge/lsoas_total_distance_to_work.txt) as an input to the NN's loss function.
+- [Ground truth agent trip table](./data/inputs/cambridge/table_lsoas_to_msoas.txt) a validation dataset. Parts of this table such as origin/destination demand (row/colsums) and a random subset of trips (cells) are also conditioned upon acting as table constraint data.
 
 We note the transportation network as well as the residence and workplace locations were extracted using Arup's [`genet`](https://github.com/arup-group/genet) and [`osmox`](https://github.com/arup-group/osmox), respectively. The geo-referenced map used as an input to these tools was downloaded from [Open Street Maps](https://www.openstreetmap.org/).
 
@@ -325,7 +325,7 @@ For example, the code below plots the log destination attraction predictions (x-
 ```
 docker run gensit plot simple scatter \
 -y log_destination_attraction_data -x mean_log_destination_attraction_predictions \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-dn cambridge/exp1 \
 -et JointTableSIM_MCMC -et JointTableSIM_NN -et NonJointTableSIM_NN \
 -el np -el xr -el MathUtils \
 -e mean_log_destination_attraction_predictions "signed_mean_func(log_destination_attraction,sign,dim=['id']).squeeze('time')" \
@@ -359,7 +359,7 @@ This command summarised the output data and creates a `csv` file with each data 
 
 ```
 docker run gensit summarise \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-dn cambridge/exp1 \
 -et JointTableSIM_NN \
 -el np -el MathUtils -el xr \
 -e table_srmse "srmse_func(prediction=mean_table,ground_truth=ground_truth)" \

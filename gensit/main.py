@@ -1043,7 +1043,7 @@ def reproduce(figure):
     if figure == 'figure1':
         subprocess.check_output([
             "gensit", "plot", "simple", "line", "--y_shade", "--y_group", "type", "-y", "table_density", "-x", "density_eval_points", 
-            "-dn", "cambridge_work_commuter_lsoas_to_msoas/exp1", "-et", "JointTableSIM_MCMC", "-et", "NonJointTableSIM_NN", "-et", "JointTableSIM_NN",
+            "-dn", "cambridge/exp1", "-et", "JointTableSIM_MCMC", "-et", "NonJointTableSIM_NN", "-et", "JointTableSIM_NN",
             "-el", "np", "-el", "ProbabilityUtils", "-el", "xr", 
             "-e", "table_density", "xr.apply_ufunc(kernel_density,table_like_loss.groupby('sweep'),kwargs={'x':xs,'bandwidth':bandwidth},exclude_dims=set(['id']),input_core_dims=[['id']],output_core_dims=[['id']])", 
             "-e", "density_eval_points", "xr.DataArray(xs)", 
@@ -1069,7 +1069,7 @@ def reproduce(figure):
     elif figure == 'figure2':
         subprocess.check_output([
             "gensit", "plot", "simple", "scatter", "-y", "table_srmse", "-x", "type", "-x", "end", "--x_discrete", 
-            "-dn", "cambridge_work_commuter_lsoas_to_msoas/exp1", 
+            "-dn", "cambridge/exp1", 
             "-et", "JointTableSIM_MCMC", "-et", "JointTableSIM_NN", "-et", "NonJointTableSIM_NN", 
             "-el", "np", "-el", "MathUtils", "-el", "MiscUtils", "-el", "xr", 
             "-e", "table_coverage_probability", "xr.apply_ufunc(roundint, 100*table_coverage.mean(['origin','destination'])).astype('int32')", 
@@ -1095,7 +1095,7 @@ def reproduce(figure):
     elif figure == 'figure3':
         subprocess.check_output([
             "gensit", "plot", "simple", "scatter", "-y", "table_srmse", "-x", "type", "-x", "N&ensemble_size", "--x_discrete", "-gb", "seed", 
-            "-dn", "cambridge_work_commuter_lsoas_to_msoas/exp2",
+            "-dn", "cambridge/exp2",
             "-et", "NonJointTableSIM_NN", "-et", "JointTableSIM_NN",
             "-el", "np", "-el", "MathUtils", "-el", "MiscUtils", "-el", "xr",
             "-e", "table_coverage_probability_size", "xr.apply_ufunc(lambda x: np.exp(6*x), table_coverage.mean(['origin','destination']))",

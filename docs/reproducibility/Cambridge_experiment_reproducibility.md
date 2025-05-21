@@ -5,22 +5,22 @@ Set `ulimit -n 50000`
 ## Experiment 1
 
 ```
-clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 4 -nw 7
-clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 4 -nw 7
-clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/repeated_experiments.toml -sm -et JointTableSIM_MCMC -nt 4 -nw 7
+clear; gensit run ./data/inputs/configs/cambridge/experiment1_disjoint.toml -sm -et NonJointTableSIM_NN -nt 4 -nw 7
+clear; gensit run ./data/inputs/configs/cambridge/experiment1_joint.toml -sm -et JointTableSIM_NN -nt 4 -nw 7
+clear; gensit run ./data/inputs/configs/cambridge/repeated_experiments.toml -sm -et JointTableSIM_MCMC -nt 4 -nw 7
 ```
 
 ## Experiment 2
 
 ```
-clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment2_disjoint.toml -sm -et NonJointTableSIM_NN -nt 20 -nw 1
-clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment2_joint.toml -sm -et JointTableSIM_NN -nt 20 -nw 1
+clear; gensit run ./data/inputs/configs/cambridge/experiment2_disjoint.toml -sm -et NonJointTableSIM_NN -nt 20 -nw 1
+clear; gensit run ./data/inputs/configs/cambridge/experiment2_joint.toml -sm -et JointTableSIM_NN -nt 20 -nw 1
 ```
 
 ## Experiment 3
 
 ```
-clear; gensit run ./data/inputs/configs/cambridge_lsoas_to_msoas/experiment3_joint.toml -sm -et JointTableSIM_NN -nt 5 -nw 7
+clear; gensit run ./data/inputs/configs/cambridge/experiment3_joint.toml -sm -et JointTableSIM_NN -nt 5 -nw 7
 ```
 
 # Summaries and Metrics
@@ -31,7 +31,7 @@ Get SRMSEs for all samples and all experiments:
 
 ```
 clear; gensit summarise \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-dn cambridge/exp1 \
 -et SIM_NN -et SIM_MCMC -et JointTableSIM_NN -et JointTableSIM_MCMC -et NonJointTableSIM_NN  \
 -el np -el MathUtils -el xr \
 -e table_srmse "srmse_func(prediction=mean_table,ground_truth=ground_truth)" \
@@ -52,7 +52,7 @@ Get coverage probabilities for all samples and all experiments:
 
 ```
 clear; gensit summarise \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-dn cambridge/exp1 \
 -et SIM_NN -et SIM_MCMC -et JointTableSIM_NN -et JointTableSIM_MCMC -et NonJointTableSIM_NN  \ \
 -el np -el MathUtils -el xr \
 -e intensity_coverage "xr.apply_ufunc(roundint, 100*intensity_covered.mean(['origin','destination']))" \
@@ -75,7 +75,7 @@ Get SRMSEs for all samples:
 
 ```
 clear; gensit summarise \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-dn cambridge/exp1 \
 -d NonJointTableSIM_NN_SweepedNoise_01_02_2024_16_51_58  \
 -el np -el MathUtils -el xr \
 -e table_srmse "srmse_func(prediction=mean_table,ground_truth=ground_truth)" \
@@ -92,7 +92,7 @@ clear; gensit summarise \
 ```
 
 ```
-clear; gensit summarise -dn cambridge_work_commuter_lsoas_to_msoas/comparisons \
+clear; gensit summarise -dn cambridge/comparisons \
 -et GraphAttentionNetwork_Comparison \
 -el np -el MathUtils -el xr \
 -e "intensity_all_srmse" "MathUtils.srmse(intensity_mean,ground_truth=ground_truth_table,mask=test_cells_mask)" \
@@ -105,7 +105,7 @@ clear; gensit summarise -dn cambridge_work_commuter_lsoas_to_msoas/comparisons \
 
 Get SSI for all samples:
 ```
-clear; gensit summarise -dn cambridge_work_commuter_lsoas_to_msoas/comparisons \
+clear; gensit summarise -dn cambridge/comparisons \
 -et GraphAttentionNetwork_Comparison \
 -el np -el MathUtils -el xr \
 -e intensity_ssi_train "MathUtils.ssi(intensity_mean,ground_truth=ground_truth_table,mask=train_cells_mask)" \
@@ -121,7 +121,7 @@ Get coverage probabilities for all samples:
 
 ```
 clear; gensit summarise \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 \
+-dn cambridge/exp1 \
 -d NonJointTableSIM_NN_SweepedNoise_01_02_2024_16_51_58 \
 -el np -el MathUtils -el MiscUtils -el xr \
 -e table_coverage "xr.apply_ufunc(roundint, 100*table_covered.mean(['origin','destination']))" \
@@ -142,7 +142,7 @@ clear; gensit summarise \
 ```
 
 ```
-clear; gensit summarise  -dn cambridge_work_commuter_lsoas_to_msoas/comparisons \
+clear; gensit summarise  -dn cambridge/comparisons \
 -et GraphAttentionNetwork_Comparison \
 -el np -el MathUtils -el xr \
 -e intensity_cp_train "xr.apply_ufunc(roundint, 100*intensity_cp_train.mean(['origin','destination'],skipna=True))" \
@@ -164,7 +164,7 @@ clear; gensit summarise  -dn cambridge_work_commuter_lsoas_to_msoas/comparisons 
 
 ```
 clear; gensit plot simple line --y_shade --y_group 'type' -y table_density -x density_eval_points \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 -et JointTableSIM_MCMC -et NonJointTableSIM_NN -et JointTableSIM_NN \
+-dn cambridge/exp1 -et JointTableSIM_MCMC -et NonJointTableSIM_NN -et JointTableSIM_NN \
 -el np -el ProbabilityUtils -el xr \
 -e table_density "xr.apply_ufunc(kernel_density,table_like_loss.groupby('sweep'),kwargs={'x':xs,'bandwidth':bandwidth},exclude_dims=set(['id']),input_core_dims=[['id']],output_core_dims=[['id']])" \
 -e density_eval_points "xr.DataArray(xs)" \
@@ -192,7 +192,7 @@ Load plot data and replot
 
 ```
 clear; gensit plot simple line --y_shade --y_group 'type' -y table_density -x density_eval_points \
--pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp1/paper_figures/figure1/ \
+-pdd ./data/outputs/cambridge/exp1/paper_figures/figure1/ \
 -ft 'figure1_table_like_loss_kernel_density' -ff ps \
 -xlab '$\lossoperator (\mytable,\myintensity)$' -ylab 'Kernel density' \
 -fs 6 10 -lls 11 -lp 0.5 -la 2 0 -lc 2 -loc 'lower center' -bbta 0.5 -bbta -1.1  \
@@ -208,7 +208,7 @@ Plot cumulative SRMSEs and CPs for every constraint and sampling method. Do this
 
 ```
 clear; gensit plot simple scatter -y table_srmse -x type -x end --x_discrete \
--dn cambridge_work_commuter_lsoas_to_msoas/exp1 -o ./data/outputs/ \
+-dn cambridge/exp1 -o ./data/outputs/ \
 -et JointTableSIM_MCMC -et JointTableSIM_NN -et NonJointTableSIM_NN \
 -el np -el MathUtils -el MiscUtils -el xr \
 -e table_coverage_probability "xr.apply_ufunc(roundint, 100*table_coverage.mean(['origin','destination'])).astype('int32')" \
@@ -242,7 +242,7 @@ Load plot data and replot
 
 ```
 clear; gensit plot simple scatter -y table_srmse -x type -x end --x_discrete \
--pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp1/paper_figures/figure2/ \
+-pdd ./data/outputs/cambridge/exp1/paper_figures/figure2/ \
 -fs 10 10 -ff ps -ft 'cumulative_srmse_and_cp_by_method' \
 -ylab 'SRMSE' -xlab 'Method, $N$' \
 -la 0 0 -lc 2 -loc 'upper center' -bbta 0.5 -bbta 1.35 -lls 14 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 12 16 \
@@ -254,7 +254,7 @@ clear; gensit plot simple scatter -y table_srmse -x type -x end --x_discrete \
 ```
 pkill -9 -f "gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size'"; \
 clear; gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
--dn cambridge_work_commuter_lsoas_to_msoas/exp2 -o ./data/outputs/ \
+-dn cambridge/exp2 -o ./data/outputs/ \
 -et NonJointTableSIM_NN -et JointTableSIM_NN \
 -el np -el MathUtils -el MiscUtils -el xr \
 -e table_coverage_probability_size "table_coverage.mean(['origin','destination'])" \
@@ -281,7 +281,7 @@ Load plot data and replot
 
 ```
 clear; gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size' --x_discrete -gb seed  \
--pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp2/paper_figures/figure3/ \
+-pdd ./data/outputs/cambridge/exp2/paper_figures/figure3/ \
 -fs 10 10 -ff ps -ft 'exploration_exploitation_tradeoff_srmse_cp_vs_method_epoch_seed' \
 -xlab 'Method, ($N$, $E$)' -ylab 'SRMSE' \
 -ylim 0.0 3.2 -ylr 90 -xtp 0 80 -ytl 0.0 0.2 -ytl 0.0 0.0 -xtl 5 8 -xtl 9 16 -yts 18 18 -xts 18 18 -xts 18 18 \
@@ -292,7 +292,7 @@ clear; gensit plot simple scatter -y table_srmse -x type -x 'N&ensemble_size' --
 
 ```
 clear; gensit plot simple scatter -y table_srmse -x loss_name --x_discrete  \
--dn cambridge_work_commuter_lsoas_to_msoas/exp3 -o ./data/outputs/ -et JointTableSIM_NN \
+-dn cambridge/exp3 -o ./data/outputs/ -et JointTableSIM_NN \
 -el np -el MathUtils -el xr \
 -e table_coverage_probability_size "coverage_probability(prediction=table,ground_truth=ground_truth,dim='iter').mean(['origin','destination'])" \
 -e table_srmse "srmse(prediction=table.mean('iter'),ground_truth=ground_truth)" \
@@ -318,7 +318,7 @@ Load plot data and replot
 
 ```
 clear; gensit plot simple scatter -y table_srmse -x loss_name --x_discrete  \
--pdd ./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp3/paper_figures/figure4/ \
+-pdd ./data/outputs/cambridge/exp3/paper_figures/figure4/ \
 -fs 10 10 -ff ps -ft 'figure4_loss_function_validation_all_odms' \
 -xlab 'Loss operator $\lossoperator$' -ylab 'SRMSE' \
 -la 0 0 -lc 2 -loc 'upper center' -bbta 0.5 -bbta 1.4 -lls 14 -ylr 90 -xls 20 -yls 20 -yts 18 18 -xts 12 16 \

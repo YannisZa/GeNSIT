@@ -5,7 +5,7 @@ from gensit.utils.misc_utils import write_txt
 from gensit.contingency_table import ContingencyTable2D
 
 # Specify path to table
-table_filenames = ['./data/inputs/cambridge_work_commuter_lsoas_to_msoas/table_lsoas_to_msoas.txt',
+table_filenames = ['./data/inputs/cambridge/table_lsoas_to_msoas.txt',
                    './data/inputs/synthetic_33x33_N_5000/table.txt']
 
 # Select settings to pass to contingency table

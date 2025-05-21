@@ -6,10 +6,10 @@ n_workers = +1
 n_threads = +6
 device = 'cpu'
 in_directory = './data/inputs/'
-dataset = 'cambridge_work_commuter_lsoas_to_msoas'
+dataset = 'cambridge'
 load_experiment = ''
 seed = 1234
-  
+
 [inputs.data]
     [inputs.data.origin_demand]
       file = 'origin_demand_sum_normalised.txt'
@@ -38,25 +38,20 @@ seed = 1234
     coupled = true
     target_name = 'title'
 
-
 [spatial_interaction_model]
   [spatial_interaction_model.name.sweep]
     default = 'TotallyConstrained'
-    range = ['TotallyConstrained','TotallyConstrained','TotallyConstrained','ProductionConstrained',
-    'TotallyConstrained','TotallyConstrained','TotallyConstrained']
+    range = ['TotallyConstrained','TotallyConstrained','TotallyConstrained','ProductionConstrained', 'TotallyConstrained','TotallyConstrained','TotallyConstrained']
     coupled = true
     target_name = 'title'
-    
   grand_total = +33704
   [spatial_interaction_model.parameters]
     bmax = +1.0
-    alpha = +1.0
-    beta = +1.0
   
 [harris_wilson_model]
   dt = +0.001
   [harris_wilson_model.parameters]
-    noise_percentage = +3.0 #+0.01
+    noise_percentage = +0.01
     epsilon = 1.0
     [harris_wilson_model.parameters.sigma.sweep]
       default = 0.0141421356
@@ -73,13 +68,13 @@ seed = 1234
     range = [['alpha', 'beta'],['alpha', 'beta'],['alpha', 'beta', 'sigma']]
     coupled = true
     target_name = 'sigma'
-
+  
 [hyperparameter_optimisation]
   n_trials = 100
   timeout = nan
   metric_minimise = true
   metric_evaluation = "MathUtils.srmse(prediction=prediction,ground_truth=ground_truth_table,mask=mask)"
-  
+
 [mcmc]
     disable_tqdm = true
     mcmc_workers = +1
@@ -118,21 +113,19 @@ seed = 1234
 [neural_network]
   disable_tqdm = true
   [neural_network.loss.loss_name.sweep]
-    default = ['table_likelihood_loss']
+    default = ['dest_attraction_ts_loss']
     range = [
-      ['table_likelihood_loss'],
-      ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+      ['dest_attraction_ts_loss'],
+      ['dest_attraction_ts_likelihood_loss']
     ]
-  
   [neural_network.loss.loss_function.sweep]
-    default = ['custom']
+    default = ['mseloss']
     range = [
-      ['custom'],
-      ['custom','custom']
+      ['mseloss'],
+      ['custom']
     ]
     coupled = true
     target_name = 'loss_name'
-
   [neural_network.loss.loss_kwargs.sweep]
     coupled = true
     target_name = 'loss_name'
@@ -142,7 +135,6 @@ seed = 1234
       nokey = nan
     [[neural_network.loss.loss_kwargs.sweep.range]]
       noise_percentage = nan
-
   [neural_network.hyperparameters]
     num_hidden_layers = +1
     optimizer = 'Adam'
@@ -158,10 +150,9 @@ seed = 1234
       [neural_network.hyperparameters.activation_funcs.layer_specific]
         1 = 'abs'
 
-
 [[experiments]]
-  type = 'JointTableSIM_NN'
-  comment = 'Dependent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  type = 'SIM_NN'
+  comment = 'Spatial Interaction Model parameter learning using Neural Networks'
   disable_tqdm = false
   export_samples = true
   export_metadata = true
@@ -169,8 +160,17 @@ seed = 1234
   validate_samples = false
 
 [[experiments]]
-  type = 'JointTableSIM_MCMC'
-  comment = 'Joint Table and Spatial Interaction Model parameter learning using Markov Chain Monte Carlo'
+  type = 'NonJointTableSIM_NN'
+  comment = 'Independent Joint Table and Spatial Interaction Model parameter learning using Neural Networks'
+  disable_tqdm = false
+  export_samples = true
+  export_metadata = true
+  overwrite = true
+  validate_samples = false
+
+[[experiments]]
+  type = 'SIM_MCMC'
+  comment = 'Spatial Interaction Model parameter learning using Markov Chain Monte Carlo'
   disable_tqdm = false
   export_samples = true
   export_metadata = true

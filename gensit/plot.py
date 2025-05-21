@@ -1815,8 +1815,8 @@ class Plot(object):
             # Loop through output folder
             plot_settings = []
            
-            metadata_collection = read_json("./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp3/paper_figures/figure4_rerun/loss_function_validation_all_losses_except_one_data.json")
-            metadata_collection = metadata_collection['../../data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp3/JointTableSIM_NN_SweepedNoise_01_02_2024_14_55_23']
+            metadata_collection = read_json("./data/outputs/cambridge/exp3/paper_figures/figure4_rerun/loss_function_validation_all_losses_except_one_data.json")
+            metadata_collection = metadata_collection['../../data/outputs/cambridge/exp3/JointTableSIM_NN_SweepedNoise_01_02_2024_14_55_23']
             # Create plot settings
             plot_sett = {}
 
@@ -1850,7 +1850,7 @@ class Plot(object):
             # plot all elements from data collection
             # from all output folder(s)
             # Create output dirpath and filename
-            dirpath = "./data/outputs/cambridge_work_commuter_lsoas_to_msoas/exp3/paper_figures/figure4_rerun_v2"
+            dirpath = "./data/outputs/cambridge/exp3/paper_figures/figure4_rerun_v2"
             filename = "loss_function_validation_all_odms"
             merged_plot_settings = self.merge_plot_settings(
                 plot_settings,
