@@ -3653,8 +3653,8 @@ class ExperimentSweep():
         deep_update(self.config.settings,'export_metadata',False)
 
         # Keep only first dataset just to instantiate outputs
-        datasets = []
-        if isinstance(self.config['inputs']['dataset'],dict):
+        dataset_sweeped = self.config.is_sweepable('dataset')
+        if dataset_sweeped:
             datasets = deepcopy(self.config['inputs']['dataset'])
             self.config['inputs']['dataset'] = ''
 
@@ -3663,8 +3663,8 @@ class ExperimentSweep():
             sweep = kwargs.get('sweep',{}),
             logger = self.logger
         )
-        
-        if len(datasets['sweep']['range']) == 1:
+
+        if not dataset_sweeped:
             # Make output home directory
             self.outputs_base_dir = self.outputs.outputs_path
         else:
@@ -3681,14 +3681,14 @@ class ExperimentSweep():
             )
 
         # Prepare writing to file
-        if len(datasets['sweep']['range']) == 1:
+        if not dataset_sweeped:
             self.outputs.open_output_file(sweep={})
 
         # Enable it again
         deep_updates(self.config.settings,{'export_samples':export_samples})
         deep_updates(self.config.settings,{'export_metadata':export_metadata})
 
-        if len(datasets['sweep']['range']) == 1:
+        if not dataset_sweeped:
             # Write metadata
             if self.config.settings['experiments'][0].get('export_metadata',True):
                 # Write to file
@@ -3698,7 +3698,7 @@ class ExperimentSweep():
                 )
         
         # Restore dataset config entries
-        if len(datasets['sweep']['range']) > 0:
+        if dataset_sweeped:
             self.config['inputs']['dataset'] = datasets
         self.logger.note(f"ExperimentSweep: {self.outputs.experiment_id} prepared")
     
