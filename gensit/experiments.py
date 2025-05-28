@@ -2837,9 +2837,9 @@ class XGBoost_Comparison(Experiment):
         N = self.config['training']['N']
 
         # Get covariates/features
-        features_max = self.inputs.data.region_features.max(dim=0).values
-        features_min = self.inputs.data.region_features.min(dim=0).values
-        features = (self.inputs.data.region_features - features_min)*2 / (features_max-features_min) - 1
+        features_max = self.inputs.data.destination_region_features.max(dim=0).values
+        features_min = self.inputs.data.destination_region_features.min(dim=0).values
+        features = (self.inputs.data.destination_region_features - features_min)*2 / (features_max-features_min) - 1
 
         # Get training and evaluation cells
         train_index = self.inputs.data.train_cells
@@ -3043,10 +3043,10 @@ class RandomForest_Comparison(Experiment):
         N = self.config['training']['N']
 
         # Get covariates/features
-        # features_max = self.inputs.data.region_features.max(dim=0).values
-        # features_min = self.inputs.data.region_features.min(dim=0).values
-        # features = (self.inputs.data.region_features - features_min)*2 / (features_max-features_min) - 1
-        features = self.inputs.data.region_features
+        # features_max = self.inputs.data.destination_region_features.max(dim=0).values
+        # features_min = self.inputs.data.destination_region_features.min(dim=0).values
+        # features = (self.inputs.data.destination_region_features - features_min)*2 / (features_max-features_min) - 1
+        features = self.inputs.data.destination_region_features
 
         # Get training and evaluation cells
         train_index = self.inputs.data.train_cells
@@ -3252,10 +3252,10 @@ class GBRT_Comparison(Experiment):
         N = self.config['training']['N']
 
         # Get covariates/features
-        # features_max = self.inputs.data.region_features.max(dim=0).values
-        # features_min = self.inputs.data.region_features.min(dim=0).values
-        # features = (self.inputs.data.region_features - features_min)*2 / (features_max-features_min) - 1
-        features = self.inputs.data.region_features
+        # features_max = self.inputs.data.destination_region_features.max(dim=0).values
+        # features_min = self.inputs.data.destination_region_features.min(dim=0).values
+        # features = (self.inputs.data.destination_region_features - features_min)*2 / (features_max-features_min) - 1
+        features = self.inputs.data.destination_region_features
         
         # Get training and evaluation cells
         train_index = self.inputs.data.train_cells
@@ -3443,9 +3443,9 @@ class GraphAttentionNetwork_Comparison(Experiment):
             self.position = (trial.number % self.config['inputs']['n_workers']) + 1
 
         # Get covariates/features
-        region_features_mean = self.inputs.data.region_features.mean(dim=0)
-        region_features_std = self.inputs.data.region_features.std(dim=0)
-        region_features = (self.inputs.data.region_features - region_features_mean) / region_features_std
+        region_features_mean = self.inputs.data.destination_region_features.mean(dim=0)
+        region_features_std = self.inputs.data.destination_region_features.std(dim=0)
+        region_features = (self.inputs.data.destination_region_features - region_features_mean) / region_features_std
 
         # Compute graph adjacency matrix 
         weighted_adjacency_matrix = torch.where(
