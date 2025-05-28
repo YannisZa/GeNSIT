@@ -172,7 +172,7 @@ class ContingencyTableMarkovChainMonteCarlo(object):
         )
 
     def initialise_table(self,intensity:list = None,margins:dict={}) -> None:
-        self.logger.hilight('Initialise table')
+        self.logger.hilight(f'Initialise table using {self.table_initialisation_solver_name}')
         
         # If no intensity provided 
         # Use uniform intensity for every cell
