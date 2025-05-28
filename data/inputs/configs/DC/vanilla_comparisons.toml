@@ -44,7 +44,7 @@ load_experiment = ''
 [training]
   num_steps = +1
   batch_size = +1000
-  N = 10000
+  N = 100000
   intensity_model = 'spatial_interaction_model'
   physics_model = 'harris_wilson_model'
   
