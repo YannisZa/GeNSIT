@@ -72,7 +72,7 @@ load_experiment = ''
 [mcmc]
   [mcmc.contingency_table]
     table_steps = +1
-    table0 = 'maximum_entropy_solution'
+    table0 = 'direct_sampling'#'maximum_entropy_solution'
     margin0 = 'multinomial'
     proposal = 'direct_sampling'#'degree_higher'
 
