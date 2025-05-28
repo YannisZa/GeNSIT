@@ -278,6 +278,9 @@ def markov_basis_distance(prediction:xr.DataArray,ground_truth:xr.DataArray=None
     ) / 2
 
 def coverage_probability(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
+    # Deepcopy
+    prediction = deepcopy(prediction)
+
     # Get region mass
     region_mass = kwargs.get('region_mass',0.95)
     
