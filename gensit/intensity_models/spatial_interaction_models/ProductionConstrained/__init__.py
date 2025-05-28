@@ -159,12 +159,12 @@ def log_flow_matrix(**kwargs):
     # Compute log utility
     log_utility = log_destination_attraction*alpha - cost_matrix*beta
     # Compute log normalisation factor over destinations
-    normalisation = torch.logsumexp(log_utility,dim=-1)
+    normalisation = torch.logsumexp(log_utility,dim=-1, keepdim=True)
     # and reshape it
-    normalisation = torch.reshape(normalisation,(*iter_sizes,sweep,origin,1))
+    # normalisation = torch.reshape(normalisation,(*iter_sizes,sweep,origin,1))
     # Evaluate log flow scaled
     log_flow = torch.log(origin_demand) + log_utility - normalisation + log_grand_total
-    
+    # log_flow = log_utility - normalisation
     if kwargs.get('torch',True):
         # Return torch tensor
         return log_flow
