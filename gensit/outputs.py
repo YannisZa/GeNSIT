@@ -1429,6 +1429,24 @@ class Outputs(object):
             sweep = sweep,
             index = index
         )
+    
+    def select(self,coord,val):
+        for v in self.data_vars().values():
+            try:
+                assert coord in list(v.dims)
+            except:
+                raise Exception(f"Coordinate {coord} missing in dims {','.join(list(map(str,list(v.dims))))}")
+        self_copy = deepcopy(self)
+        for sample_name,data in self_copy.data_vars().items():
+            try:
+                setattr(
+                    self_copy.data,
+                    sample_name,
+                    data.sel({coord:val})
+                )
+            except:
+                raise Exception(f"Could not select {coord}={val} from {sample_name}.")
+        return self_copy
 
     def get_sample(self,sample_name:str):
         
