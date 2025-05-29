@@ -10,7 +10,7 @@ dataset = 'DC'
 load_experiment = ''
 [inputs.seed.sweep]
   default = 1
-  range = "1:10:1"
+  range = "1:5:1"
 
 [inputs.data]
     [inputs.data.origin_demand]
@@ -32,15 +32,26 @@ load_experiment = ''
   sparse_margins = false
   [contingency_table.constraints]
     coupled = true
-    [contingency_table.constraints.axes.sweep]
-      default = []
-      range = [[[+0,+1]], [[+0],[+1]]]
-      coupled = true
-      target_name = 'title'
+    axes = [[+0],[+1]]
+    # [contingency_table.constraints.axes.sweep]
+    #   default = []
+    #   range = [[[+0,+1]], [[+0],[+1]]]
+    #   coupled = true
+    #   target_name = 'title'
+    # [contingency_table.constraints.axes.sweep]
+    #   default = []
+    #   range = [[[+0,+1]], [[+0],[+1]]]
+    #   coupled = true
+    #   target_name = 'title'
 
 [spatial_interaction_model]
-  name = 'TotallyConstrained'#'ProductionConstrained'
   grand_total = +200029
+  name = 'ProductionConstrained'
+  # [spatial_interaction_model.name.sweep]
+  #     default = 'TotallyConstrained'
+  #     range = ['TotallyConstrained', 'ProductionConstrained']
+  #     coupled = true
+  #     target_name = 'title'
   [spatial_interaction_model.parameters]
     bmax = +1.0
   
@@ -79,16 +90,13 @@ load_experiment = ''
     [mcmc.contingency_table]
       table_steps = +1
       margin0 = 'multinomial'
-      [mcmc.contingency_table.table0.sweep]
-        default = 'direct_sampling'
-        range = ['direct_sampling', 'maximum_entropy_solution']
-        coupled = true
-        target_name = 'title'
-      [mcmc.contingency_table.proposal.sweep]
-        default = 'direct_sampling'
-        range = ['direct_sampling', 'degree_higher']
-        coupled = true
-        target_name = 'title'
+      table0 = 'maximum_entropy_solution'
+      proposal = 'degree_higher'
+      # [mcmc.contingency_table.proposal.sweep]
+      #   default = 'direct_sampling'
+      #   range = ['direct_sampling', 'degree_higher']
+      #   coupled = true
+      #   target_name = 'title'
 
   [neural_network]
     disable_tqdm = true
@@ -171,6 +179,7 @@ load_experiment = ''
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'exp1'
-    [outputs.title.sweep]
-      default = '_totally_and_cell_constrained'
-      range = ['_totally_and_cell_constrained','_doubly_and_cell_constrained']
+    title = '_doubly_and_cell_constrained'
+    # [outputs.title.sweep]
+    #   default = '_totally_and_cell_constrained'
+    #   range = ['_totally_and_cell_constrained','_doubly_and_cell_constrained']
