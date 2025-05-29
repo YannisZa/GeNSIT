@@ -29,11 +29,14 @@ load_experiment = ''
       file = 'validation_cells.txt'
 
 [contingency_table]
-  disable_tqdm = true
   sparse_margins = false
   [contingency_table.constraints]
-    cells = true
-    axes = [[+0,+1]]#[[+0],[+1]]
+    coupled = true
+    [contingency_table.constraints.axes.sweep]
+      default = []
+      range = [[[+0,+1]], [[+0],[+1]]]
+      coupled = true
+      target_name = 'title'
 
 [spatial_interaction_model]
   name = 'TotallyConstrained'#'ProductionConstrained'
@@ -70,11 +73,22 @@ load_experiment = ''
   metric_evaluation = "MathUtils.srmse(prediction=prediction,ground_truth=ground_truth_table,mask=mask)"
   
 [mcmc]
-  [mcmc.contingency_table]
-    table_steps = +1
-    table0 = 'direct_sampling'#'maximum_entropy_solution'
-    margin0 = 'multinomial'
-    proposal = 'direct_sampling'#'degree_higher'
+    disable_tqdm = true
+    mcmc_workers = +1
+    
+    [mcmc.contingency_table]
+      table_steps = +1
+      margin0 = 'multinomial'
+      [mcmc.contingency_table.table0.sweep]
+        default = 'direct_sampling'
+        range = ['direct_sampling', 'maximum_entropy_solution']
+        coupled = true
+        target_name = 'title'
+      [mcmc.contingency_table.proposal.sweep]
+        default = 'direct_sampling'
+        range = ['direct_sampling', 'degree_higher']
+        coupled = true
+        target_name = 'title'
 
   [neural_network]
     disable_tqdm = true
@@ -157,4 +171,6 @@ load_experiment = ''
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'exp1'
-    title = '_totally_and_cell_constrained'#'_doubly_and_cell_constrained'
+    [outputs.title.sweep]
+      default = '_totally_and_cell_constrained'
+      range = ['_totally_and_cell_constrained','_doubly_and_cell_constrained']
