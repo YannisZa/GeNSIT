@@ -1647,162 +1647,6 @@ class Plot(object):
     ╩  ┴─┘└─┘ ┴   └┴┘┴└─┴ ┴┴  ┴  └─┘┴└─└─┘
     '''
     
-    # def data_plot(self,plot_func,**kwargs):
-            
-    #     self.logger.info('Running data_plot')
-    
-    #     # Try to load plot data from file
-    #     self.loaded, plot_settings = self.read_plot_data()
-        
-    #     if not self.loaded:
-
-    #         # Run output handler
-    #         outputs_summary = OutputSummary(
-    #             settings = self.settings,
-    #             logger = self.logger
-    #         )
-            
-    #         # Loop through output folder
-    #         plot_settings = []
-    #         for indx,output_folder in enumerate(outputs_summary.output_folders):
-                
-    #             # Get metadata collection for this 
-    #             metadata_collection,outputs = outputs_summary.collect_folder_metadata(
-    #                 indx,
-    #                 output_folder,
-    #                 **kwargs
-    #             )
-
-    #             # Create plot settings
-    #             plot_sett = {'outputs':outputs}
-
-    #             try:
-    #                 # Loop through metadata for each data collection member
-    #                 for metadata in tqdm(
-    #                     metadata_collection,
-    #                     desc = 'Extracting plot settings',
-    #                     leave = False
-    #                 ):
-    #                     # Loop through each entry of metadata
-    #                     for meta in metadata:
-    #                         plot_sett.update(
-    #                             self.extract_plot_settings(
-    #                                 vars = PLOT_VARIABLES,
-    #                                 meta = meta
-    #                             )
-    #                         )
-    #                         # print_json({k:plot_sett[k] for k in ['x','y','marker_size'] if k in plot_sett})
-
-    #                         # Add data
-    #                         plot_settings.append(deepcopy(plot_sett))
-                    
-
-    #                 # If plot is by experiment
-    #                 # plot all element from data collection
-    #                 # for every output folder
-    #                 if self.settings.get('by_experiment',False):
-    #                     # Export all plot settings
-    #                     # Create output dirpath and filename
-    #                     dirpath,filename = self.create_plot_filename(
-    #                         plot_setting = plot_sett,
-    #                         name = self.settings.get('figure_title','NONAME')
-    #                     )
-    #                     merged_plot_settings = self.merge_plot_settings(
-    #                         plot_sett,
-    #                         apply_zorder = True
-    #                     )
-    #                     # Make outputs directories (if necessary)
-    #                     makedir(dirpath)
-    #                     # Write figure data
-    #                     write_figure_data(
-    #                         plot_data = merged_plot_settings,
-    #                         filepath = os.path.join(dirpath,filename),
-    #                         keys = PLOT_COORDINATES_AND_CORE_FEATURES+['outputs'],
-    #                         figure_settings = self.settings
-    #                     )
-    #                     self.logger.success(f"Figure data exported to {dirpath}")
-    #                     # Merge all settings into one
-    #                     # Plot
-    #                     plot_func(
-    #                         merged_plot_settings,
-    #                         dirpath = dirpath,
-    #                         filename = filename
-    #                     )
-    #                     # Reset list of plot settings
-    #                     plot_settings = []
-    #             except:
-    #                 self.logger.error(traceback.format_exc())
-    #                 self.logger.error(f"Plot for folder {indx+1}/{len(outputs_summary.output_folders)} failed...")
-    #                 continue
-            
-
-    #         # If plot is NOT by experiment
-    #         # plot all elements from data collection
-    #         # from all output folder(s)
-    #         if not self.settings.get('by_experiment',False):
-    #             # Create output dirpath and filename
-    #             dirpath,filename = self.create_plot_filename(
-    #                 plot_setting = {'outputs':outputs},
-    #                 name = self.settings.get('figure_title','NONAME')
-    #             )
-    #             merged_plot_settings = self.merge_plot_settings(
-    #                 plot_settings,
-    #                 apply_zorder = True
-    #             )
-    #             # Make outputs directories (if necessary)
-    #             makedir(dirpath)
-    #             # Write figure data
-    #             write_figure_data(
-    #                 plot_data = merged_plot_settings,
-    #                 filepath = os.path.join(dirpath,filename),
-    #                 keys = PLOT_COORDINATES_AND_CORE_FEATURES+['outputs'],
-    #                 figure_settings = self.settings
-    #             )
-    #             self.logger.success(f"Figure data across experiments exported to {dirpath}")
-    #             # Plot
-    #             plot_func(
-    #                 plot_settings = merged_plot_settings,
-    #                 name = self.settings.get('title','NONAME'),
-    #                 dirpath = dirpath,
-    #                 filename = filename
-    #             )
-    #     else:
-    #         # Merge plot settings
-    #         # merged_plot_settings = self.merge_plot_settings(
-    #         #     plot_settings,
-    #         #     apply_zorder = False
-    #         # )
-    #         # if 'zorder' in plot_settings[0]:
-    #         #     # get value to order by
-    #         #     values = np.array(plot_settings[0]['zorder'])
-    #         #     if len(values.shape) > 1:
-    #         #         # Number of elements to sort
-    #         #         ndims = values.shape[1]
-    #         #         # Use lexsort to argsort along each axis successively
-    #         #         sorted_indices = np.lexsort([values[:,i].ravel() for i in range(ndims)])
-    #         #     else:
-    #         #         sorted_indices = np.argsort(values,axis=0)
-    #         #     # Update merged settings
-    #         #     # add 1.0 to avoid zorder = 0
-    #         #     plot_settings[0]['zorder'] = np.zeros(len(sorted_indices))
-    #         #     for i,j in enumerate(sorted_indices):
-    #         #         plot_settings[0]['zorder'][i] = len(sorted_indices) - j
-    #         #     print(values)
-    #         #     print(plot_settings[0]['zorder'])
-    #         #     sys.exit()
-    #         # Create output dirpath and filename
-    #         dirpath,filename = self.create_plot_filename(
-    #             plot_setting = plot_settings,
-    #             name = self.settings.get('figure_title','NONAME')
-    #         )
-    #         # Plot
-    #         plot_func(
-    #             plot_settings = plot_settings,
-    #             name = self.settings.get('title','NONAME'),
-    #             dirpath = dirpath,
-    #             filename = filename
-    #         )
-
     def data_plot(self,plot_func,**kwargs):
             
         self.logger.info('Running data_plot')
@@ -1812,67 +1656,116 @@ class Plot(object):
         
         if not self.loaded:
 
+            # Run output handler
+            outputs_summary = OutputSummary(
+                settings = self.settings,
+                logger = self.logger
+            )
+            
             # Loop through output folder
             plot_settings = []
-           
-            metadata_collection = read_json("./data/outputs/cambridge/exp3/paper_figures/figure4_rerun/loss_function_validation_all_losses_except_one_data.json")
-            metadata_collection = metadata_collection['../../data/outputs/cambridge/exp3/JointTableSIM_NN_SweepedNoise_01_02_2024_14_55_23']
-            # Create plot settings
-            plot_sett = {}
-
-            try:
-                # Loop through metadata for each data collection member
-                for metadata in tqdm(
-                    metadata_collection,
-                    desc = 'Extracting plot settings',
-                    leave = False
-                ):  
-                    plot_sett.update(
-                        self.extract_plot_settings(
-                            vars = PLOT_VARIABLES,
-                            meta = metadata
-                        )
-                    )
-                    # print_json({k:plot_sett[k] for k in ['x','y','marker_size'] if k in plot_sett})
-
-                    # Add data
-                    plot_settings.append(deepcopy(plot_sett))
+            for indx,output_folder in enumerate(outputs_summary.output_folders):
                 
-                print(json.dumps(plot_settings,indent=2))
-                # If plot is by experiment
-                # plot all element from data collection
-                # for every output folder
-            except:
-                self.logger.error(traceback.format_exc())
-        
+                # Get metadata collection for this 
+                metadata_collection,outputs = outputs_summary.collect_folder_metadata(
+                    indx,
+                    output_folder,
+                    **kwargs
+                )
+
+                # Create plot settings
+                plot_sett = {'outputs':outputs}
+
+                try:
+                    # Loop through metadata for each data collection member
+                    for metadata in tqdm(
+                        metadata_collection,
+                        desc = 'Extracting plot settings',
+                        leave = False
+                    ):
+                        # Loop through each entry of metadata
+                        for meta in metadata:
+                            plot_sett.update(
+                                self.extract_plot_settings(
+                                    vars = PLOT_VARIABLES,
+                                    meta = meta
+                                )
+                            )
+                            # print_json({k:plot_sett[k] for k in ['x','y','marker_size'] if k in plot_sett})
+
+                            # Add data
+                            plot_settings.append(deepcopy(plot_sett))
+                    
+
+                    # If plot is by experiment
+                    # plot all element from data collection
+                    # for every output folder
+                    if self.settings.get('by_experiment',False):
+                        # Export all plot settings
+                        # Create output dirpath and filename
+                        dirpath,filename = self.create_plot_filename(
+                            plot_setting = plot_sett,
+                            name = self.settings.get('figure_title','NONAME')
+                        )
+                        merged_plot_settings = self.merge_plot_settings(
+                            plot_sett,
+                            apply_zorder = True
+                        )
+                        # Make outputs directories (if necessary)
+                        makedir(dirpath)
+                        # Write figure data
+                        write_figure_data(
+                            plot_data = merged_plot_settings,
+                            filepath = os.path.join(dirpath,filename),
+                            keys = PLOT_COORDINATES_AND_CORE_FEATURES+['outputs'],
+                            figure_settings = self.settings
+                        )
+                        self.logger.success(f"Figure data exported to {dirpath}")
+                        # Merge all settings into one
+                        # Plot
+                        plot_func(
+                            merged_plot_settings,
+                            dirpath = dirpath,
+                            filename = filename
+                        )
+                        # Reset list of plot settings
+                        plot_settings = []
+                except:
+                    self.logger.error(traceback.format_exc())
+                    self.logger.error(f"Plot for folder {indx+1}/{len(outputs_summary.output_folders)} failed...")
+                    continue
+            
 
             # If plot is NOT by experiment
             # plot all elements from data collection
             # from all output folder(s)
-            # Create output dirpath and filename
-            dirpath = "./data/outputs/cambridge/exp3/paper_figures/figure4_rerun_v2"
-            filename = "loss_function_validation_all_odms"
-            merged_plot_settings = self.merge_plot_settings(
-                plot_settings,
-                apply_zorder = True
-            )
-            # Make outputs directories (if necessary)
-            makedir(dirpath)
-            # Write figure data
-            write_figure_data(
-                plot_data = merged_plot_settings,
-                filepath = os.path.join(dirpath,filename),
-                keys = PLOT_COORDINATES_AND_CORE_FEATURES,
-                figure_settings = self.settings
-            )
-            self.logger.success(f"Figure data across experiments exported to {dirpath}")
-            # Plot
-            plot_func(
-                plot_settings = merged_plot_settings,
-                name = self.settings.get('title','NONAME'),
-                dirpath = dirpath,
-                filename = filename
-            )
+            if not self.settings.get('by_experiment',False):
+                # Create output dirpath and filename
+                dirpath,filename = self.create_plot_filename(
+                    plot_setting = {'outputs':outputs},
+                    name = self.settings.get('figure_title','NONAME')
+                )
+                merged_plot_settings = self.merge_plot_settings(
+                    plot_settings,
+                    apply_zorder = True
+                )
+                # Make outputs directories (if necessary)
+                makedir(dirpath)
+                # Write figure data
+                write_figure_data(
+                    plot_data = merged_plot_settings,
+                    filepath = os.path.join(dirpath,filename),
+                    keys = PLOT_COORDINATES_AND_CORE_FEATURES+['outputs'],
+                    figure_settings = self.settings
+                )
+                self.logger.success(f"Figure data across experiments exported to {dirpath}")
+                # Plot
+                plot_func(
+                    plot_settings = merged_plot_settings,
+                    name = self.settings.get('title','NONAME'),
+                    dirpath = dirpath,
+                    filename = filename
+                )
         else:
             # Merge plot settings
             # merged_plot_settings = self.merge_plot_settings(
@@ -1909,3 +1802,110 @@ class Plot(object):
                 dirpath = dirpath,
                 filename = filename
             )
+
+    # def data_plot(self,plot_func,**kwargs):
+            
+    #     self.logger.info('Running data_plot')
+    
+    #     # Try to load plot data from file
+    #     self.loaded, plot_settings = self.read_plot_data()
+        
+    #     if not self.loaded:
+
+    #         # Loop through output folder
+    #         plot_settings = []
+           
+    #         metadata_collection = read_json("./data/outputs/cambridge/exp3/paper_figures/figure4_rerun/loss_function_validation_all_losses_except_one_data.json")
+    #         metadata_collection = metadata_collection['../../data/outputs/cambridge/exp3/JointTableSIM_NN_SweepedNoise_01_02_2024_14_55_23']
+    #         # Create plot settings
+    #         plot_sett = {}
+
+    #         try:
+    #             # Loop through metadata for each data collection member
+    #             for metadata in tqdm(
+    #                 metadata_collection,
+    #                 desc = 'Extracting plot settings',
+    #                 leave = False
+    #             ):  
+    #                 plot_sett.update(
+    #                     self.extract_plot_settings(
+    #                         vars = PLOT_VARIABLES,
+    #                         meta = metadata
+    #                     )
+    #                 )
+    #                 # print_json({k:plot_sett[k] for k in ['x','y','marker_size'] if k in plot_sett})
+
+    #                 # Add data
+    #                 plot_settings.append(deepcopy(plot_sett))
+                
+    #             print(json.dumps(plot_settings,indent=2))
+    #             # If plot is by experiment
+    #             # plot all element from data collection
+    #             # for every output folder
+    #         except:
+    #             self.logger.error(traceback.format_exc())
+        
+
+    #         # If plot is NOT by experiment
+    #         # plot all elements from data collection
+    #         # from all output folder(s)
+    #         # Create output dirpath and filename
+    #         dirpath = "./data/outputs/cambridge/exp3/paper_figures/figure4_rerun_v2"
+    #         filename = "loss_function_validation_all_odms"
+    #         merged_plot_settings = self.merge_plot_settings(
+    #             plot_settings,
+    #             apply_zorder = True
+    #         )
+    #         # Make outputs directories (if necessary)
+    #         makedir(dirpath)
+    #         # Write figure data
+    #         write_figure_data(
+    #             plot_data = merged_plot_settings,
+    #             filepath = os.path.join(dirpath,filename),
+    #             keys = PLOT_COORDINATES_AND_CORE_FEATURES,
+    #             figure_settings = self.settings
+    #         )
+    #         self.logger.success(f"Figure data across experiments exported to {dirpath}")
+    #         # Plot
+    #         plot_func(
+    #             plot_settings = merged_plot_settings,
+    #             name = self.settings.get('title','NONAME'),
+    #             dirpath = dirpath,
+    #             filename = filename
+    #         )
+    #     else:
+    #         # Merge plot settings
+    #         # merged_plot_settings = self.merge_plot_settings(
+    #         #     plot_settings,
+    #         #     apply_zorder = False
+    #         # )
+    #         # if 'zorder' in plot_settings[0]:
+    #         #     # get value to order by
+    #         #     values = np.array(plot_settings[0]['zorder'])
+    #         #     if len(values.shape) > 1:
+    #         #         # Number of elements to sort
+    #         #         ndims = values.shape[1]
+    #         #         # Use lexsort to argsort along each axis successively
+    #         #         sorted_indices = np.lexsort([values[:,i].ravel() for i in range(ndims)])
+    #         #     else:
+    #         #         sorted_indices = np.argsort(values,axis=0)
+    #         #     # Update merged settings
+    #         #     # add 1.0 to avoid zorder = 0
+    #         #     plot_settings[0]['zorder'] = np.zeros(len(sorted_indices))
+    #         #     for i,j in enumerate(sorted_indices):
+    #         #         plot_settings[0]['zorder'][i] = len(sorted_indices) - j
+    #         #     print(values)
+    #         #     print(plot_settings[0]['zorder'])
+    #         #     sys.exit()
+    #         # Create output dirpath and filename
+    #         dirpath,filename = self.create_plot_filename(
+    #             plot_setting = plot_settings,
+    #             name = self.settings.get('figure_title','NONAME')
+    #         )
+    #         # Plot
+    #         plot_func(
+    #             plot_settings = plot_settings,
+    #             name = self.settings.get('title','NONAME'),
+    #             dirpath = dirpath,
+    #             filename = filename
+    #         )
