@@ -365,6 +365,36 @@ def calculate_min_interval(x, alpha, **kwargs):
 
     return hdi_min, hdi_max
 
+def mean_absolute_residual_percentage_error(prediction:xr.DataArray,ground_truth:xr.DataArray,**kwargs):
+    mask = kwargs.get('mask',None)
+    dim = kwargs.get('dim','origin')
+        
+    if mask is not None:
+        # Apply mask
+        prediction = prediction.where(mask,drop=True)
+        ground_truth = ground_truth.where(mask,drop=True)
+
+    relative_marginal_l1_error = abs(
+        prediction.sum(dim,dtype='float64')
+        - ground_truth.sum(dim,dtype='float64')
+    )
+    relative_marginal_l1_error /= ground_truth.sum(dim,dtype='float64')
+    if 'seed' in relative_marginal_l1_error.dims:
+        relative_marginal_l1_error = relative_marginal_l1_error.mean(['seed'],dtype='float64')
+    return relative_marginal_l1_error
+
+    # relative_marginal_l1_error = abs(
+    #     prediction
+    #     - ground_truth
+    # )
+    # relative_marginal_l1_error /= ground_truth
+    # if 'seed' in relative_marginal_l1_error.dims:
+    #     relative_marginal_l1_error = relative_marginal_l1_error.mean(dim,dtype='float64').mean(['seed'],dtype='float64')
+    # else:
+    #     relative_marginal_l1_error = relative_marginal_l1_error.mean(dim,dtype='float64')
+    # return relative_marginal_l1_error
+
+
 def von_neumann_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
     # Convert matrix to square
     matrix = (prediction@prediction.T).astype('float32')
