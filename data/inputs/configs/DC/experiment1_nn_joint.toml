@@ -10,7 +10,7 @@ dataset = 'DC'
 load_experiment = ''
 [inputs.seed.sweep]
   default = 1
-  range = "1:10:1"
+  range = "1:5:1"
   
 [inputs.data]
     [inputs.data.origin_demand]
@@ -31,12 +31,21 @@ load_experiment = ''
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints]
-    cells = true
-    axes = [[0,1]]#[[0],[1]]
+    coupled = true
+    [contingency_table.constraints.axes.sweep]
+      default = []
+      range = [[[+0,+1]], [[+0],[+1]]]
+      coupled = true
+      target_name = 'title'
+    
 
 [spatial_interaction_model]
-  name = 'TotallyConstrained'# 'ProductionConstrained'
   grand_total = +200029
+  [spatial_interaction_model.name.sweep]
+      default = 'TotallyConstrained'
+      range = ['TotallyConstrained', 'ProductionConstrained']
+      coupled = true
+      target_name = 'title'
   [spatial_interaction_model.parameters]
     bmax = +1.0
   
@@ -74,10 +83,18 @@ load_experiment = ''
     
     [mcmc.contingency_table]
       table_steps = +1
-      table0 = 'direct_sampling'#'maximum_entropy_solution'
       margin0 = 'multinomial'
-      proposal = 'direct_sampling'#'degree_higher'
-      
+      [mcmc.contingency_table.table0.sweep]
+        default = 'direct_sampling'
+        range = ['direct_sampling', 'maximum_entropy_solution']
+        coupled = true
+        target_name = 'title'
+      [mcmc.contingency_table.proposal.sweep]
+        default = 'direct_sampling'
+        range = ['direct_sampling', 'degree_higher']
+        coupled = true
+        target_name = 'title'
+
     [mcmc.parameters]
       theta_steps = 1
       step_size = 1.0
@@ -103,29 +120,34 @@ load_experiment = ''
 [neural_network]
   disable_tqdm = true
   [neural_network.loss]
-    [neural_network.loss.loss_name.sweep]
-      default = ['table_likelihood_loss']
-      range = [
-        ['table_likelihood_loss'],
-        ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
-      ]
-    [neural_network.loss.loss_function.sweep]
-      default = ['custom']
-      range = [
-        ['custom'],
-        ['custom','custom']
-      ]
-      coupled = true
-      target_name = 'loss_name'
-    [neural_network.loss.loss_kwargs.sweep]
-      coupled = true
-      target_name = 'loss_name'
-      [neural_network.loss.loss_kwargs.sweep.default]
-        nokey = nan
-      [[neural_network.loss.loss_kwargs.sweep.range]]
-        nokey = nan
-      [[neural_network.loss.loss_kwargs.sweep.range]]
-        noise_percentage = nan
+    loss_name = ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+    loss_function = ['custom','custom']
+    [neural_network.loss.loss_kwargs]
+      noise_percentage = nan
+
+    # [neural_network.loss.loss_name.sweep]
+    #   default = ['table_likelihood_loss']
+    #   range = [
+    #     ['table_likelihood_loss'],
+    #     ['dest_attraction_ts_likelihood_loss','table_likelihood_loss']
+    #   ]
+    # [neural_network.loss.loss_function.sweep]
+    #   default = ['custom']
+    #   range = [
+    #     ['custom'],
+    #     ['custom','custom']
+    #   ]
+    #   coupled = true
+    #   target_name = 'loss_name'
+    # [neural_network.loss.loss_kwargs.sweep]
+    #   coupled = true
+    #   target_name = 'loss_name'
+    #   [neural_network.loss.loss_kwargs.sweep.default]
+    #     nokey = nan
+    #   [[neural_network.loss.loss_kwargs.sweep.range]]
+    #     nokey = nan
+    #   [[neural_network.loss.loss_kwargs.sweep.range]]
+    #     noise_percentage = nan
   [neural_network.hyperparameters]
     num_hidden_layers = +1
     optimizer = 'Adam'
@@ -195,4 +217,6 @@ load_experiment = ''
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'exp1'
-    title = '_totally_and_cell_constrained'#'_doubly_and_cell_constrained'
+    [outputs.title.sweep]
+      default = '_totally_and_cell_constrained'
+      range = ['_totally_and_cell_constrained','_doubly_and_cell_constrained']
