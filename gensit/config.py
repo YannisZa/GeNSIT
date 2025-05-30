@@ -157,7 +157,33 @@ class Config:
         return self.settings.keys()
 
     def get(self,key,default):
-        return self.settings.get(key,default)
+        all_paths = self.path_find(
+            key = key,
+            settings = self.settings,
+            current_key_path = [],
+            all_key_paths = []
+        )
+        if len(all_paths) <= 0: return default
+            
+        if self.has_sweep(all_paths[0],self.settings):
+            # Get sweep configuration
+            value,found = self.path_get(
+                key_path = all_paths[0]+["sweep","range"],
+                settings = self.settings
+            )
+            if not found: return default
+            # Parse values
+            return self.parse_data(value,(all_paths[0]+["sweep","range"]))
+        else:
+            # Get sweep configuration
+            value,found = self.path_get(
+                key_path = all_paths[0],
+                settings = self.settings
+            )
+            if not found: return default
+            # Parse values
+            return value
+        
 
     def __delitem__(self, key):
         del self.settings[key]
