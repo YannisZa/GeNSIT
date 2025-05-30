@@ -6,7 +6,7 @@ import xarray as xr
 from tqdm import tqdm
 from numpy import shape 
 from copy import deepcopy
-from scipy import optimize
+from scipy import optimize,stats
 from torch import int32, float32
 from scipy.special import gammaln
 from itertools import chain, combinations
@@ -75,22 +75,41 @@ def relative_l_0(prediction:xr.DataArray,ground_truth:xr.DataArray=None,normalis
         res = ((prediction - ground_truth)/normalisation_constant).to(dtype = float32)
     return res
 
-def l_1(prediction:xr.DataArray,ground_truth:xr.DataArray=None,normalisation_constant:float = None,progress_proxy = None):
-    N,I,J = shape(prediction)
-    if shape(ground_truth) != (N,I,J):
-        ground_truth = torch.unsqueeze(ground_truth,dim = 0)
-    res = torch.absolute(prediction - ground_truth).to(device = float32)
-    return res
+def l_1(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
+    prediction = prediction.astype('float32')
+    ground_truth = ground_truth.astype('float32')
+    prediction,ground_truth = xr.broadcast(prediction,ground_truth)
+    prediction,ground_truth = xr.align(prediction,ground_truth, join='exact')
+    mask = kwargs.get('mask',None)
+    if mask is not None:
+        # Apply mask
+        prediction = prediction.where(mask)
+        ground_truth = ground_truth.where(mask)
+    
+    l1_error = abs(
+        prediction
+        - ground_truth
+    )
+    return l1_error
 
-def relative_l_1(prediction:xr.DataArray,ground_truth:xr.DataArray=None,normalisation_constant:float = None,progress_proxy = None):
-    N,I,J = shape(prediction)
-    if shape(ground_truth) != (N,I,J):
-        ground_truth = torch.unsqueeze(ground_truth,dim = 0)
-    if normalisation_constant is None:
-        res = (torch.absolute(prediction - ground_truth)/torch.sum(torch.absolute(ground_truth))).astype('float32')
-    else:
-        res = (torch.absolute(prediction - ground_truth)/normalisation_constant).astype('float32')
-    return res
+
+def relative_l_1(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
+    prediction = prediction.astype('float32')
+    ground_truth = ground_truth.astype('float32')
+    prediction,ground_truth = xr.broadcast(prediction,ground_truth)
+    prediction,ground_truth = xr.align(prediction,ground_truth, join='exact')
+    mask = kwargs.get('mask',None)
+    if mask is not None:
+        # Apply mask
+        prediction = prediction.where(mask)
+        ground_truth = ground_truth.where(mask)
+    
+    relative_l1_error = abs(
+        prediction
+        - ground_truth
+    )
+    relative_l1_error /= np.min(ground_truth,1)
+    return relative_l1_error
 
 def l_2(prediction:xr.DataArray,ground_truth:xr.DataArray=None,progress_proxy=None):
     N,I,J = shape(prediction)
@@ -383,16 +402,6 @@ def mean_absolute_residual_percentage_error(prediction:xr.DataArray,ground_truth
         relative_marginal_l1_error = relative_marginal_l1_error.mean(['seed'],dtype='float64')
     return relative_marginal_l1_error
 
-    # relative_marginal_l1_error = abs(
-    #     prediction
-    #     - ground_truth
-    # )
-    # relative_marginal_l1_error /= ground_truth
-    # if 'seed' in relative_marginal_l1_error.dims:
-    #     relative_marginal_l1_error = relative_marginal_l1_error.mean(dim,dtype='float64').mean(['seed'],dtype='float64')
-    # else:
-    #     relative_marginal_l1_error = relative_marginal_l1_error.mean(dim,dtype='float64')
-    # return relative_marginal_l1_error
 
 
 def von_neumann_entropy(prediction:xr.DataArray,ground_truth:xr.DataArray=None,**kwargs):
@@ -530,3 +539,119 @@ def l2(x,y,**kwargs):
 
 def check_symmetric(a, rtol=1e-05, atol=1e-08):
     return np.allclose(a, a.T, rtol=rtol, atol=atol)
+
+
+def perform_one_tailed_ttest(sample_a: np.ndarray, sample_b: np.ndarray, sample_a_name:str="sample_a", sample_b_name:str="sample_b", alpha: float = 0.05) -> dict:
+    """
+    Performs a one-tailed Welch's t-test:
+        H0: mean(sample_a) >= mean(sample_b)
+        H1: mean(sample_a) < mean(sample_b)
+
+    Parameters:
+        sample_a (np.ndarray): First sample (e.g., treatment group)
+        sample_b (np.ndarray): Second sample (e.g., control group)
+        alpha (float): Significance level (default: 0.05)
+
+    Returns:
+        dict: {
+            "t_statistic": float,
+            "p_value": float,
+            "reject_null": bool,
+            "conclusion": str
+        }
+    """
+    
+    # Input validation
+    if not isinstance(sample_a, np.ndarray) or not isinstance(sample_b, np.ndarray):
+        raise TypeError("Both sample_a and sample_b must be numpy arrays.")
+
+    if sample_a.size < 2 or sample_b.size < 2:
+        raise ValueError("Each sample must contain at least two observations.")
+
+    if not (0 < alpha < 1):
+        raise ValueError("Alpha must be a float between 0 and 1.")
+
+    # Perform Welch's t-test
+    t_statistic, p_value_two_tailed = stats.ttest_ind(sample_a, sample_b, equal_var=False)
+
+    # Convert to one-tailed p-value (less-than test)
+    p_value = p_value_two_tailed / 2 if t_statistic < 0 else 1 - (p_value_two_tailed / 2)
+
+    # Determine result
+    reject_null = p_value < alpha
+    conclusion = (
+        f"Reject H₀: Evidence suggests mean({sample_a_name}) < mean({sample_b_name})."
+        if reject_null else
+        f"Fail to reject H₀: No evidence that mean({sample_a_name}) < mean({sample_b_name})."
+    )
+
+    return {
+        "t_statistic": t_statistic,
+        "p_value": p_value,
+        "reject_null": reject_null,
+        "conclusion": conclusion
+    }
+
+def perform_one_tailed_ttest_using_summaries(
+    mean1: float, std1: float, n1: int,
+    mean2: float, std2: float, n2: int,
+    name1:str = "mean1", name2:str = "mean2",
+    alpha: float = 0.05
+) -> dict:
+    """
+    Perform a one-tailed Welch's t-test from summary statistics.
+
+    H₀: mean1 ≥ mean2
+    H₁: mean1 < mean2
+
+    Parameters:
+        mean1, std1, n1: Mean, standard deviation, and size of sample 1
+        mean2, std2, n2: Mean, standard deviation, and size of sample 2
+        alpha: Significance level (default: 0.05)
+
+    Returns:
+        dict: {
+            "t_statistic": float,
+            "degrees_of_freedom": float,
+            "p_value": float,
+            "reject_null": bool,
+            "conclusion": str
+        }
+    """
+    # Input checks
+    if n1 < 2 or n2 < 2:
+        raise ValueError("Each sample must have at least 2 observations.")
+    if std1 < 0 or std2 < 0:
+        raise ValueError("Standard deviations must be non-negative.")
+    if not (0 < alpha < 1):
+        raise ValueError("Alpha must be between 0 and 1.")
+
+    # Compute standard errors
+    se1_sq = (std1 ** 2) / n1
+    se2_sq = (std2 ** 2) / n2
+
+    # Compute t-statistic (Welch’s formula)
+    t_stat = (mean1 - mean2) / np.sqrt(se1_sq + se2_sq)
+
+    # Compute degrees of freedom (Welch–Satterthwaite equation)
+    numerator = (se1_sq + se2_sq) ** 2
+    denominator = ((se1_sq ** 2) / (n1 - 1)) + ((se2_sq ** 2) / (n2 - 1))
+    df = numerator / denominator
+
+    # One-tailed p-value (for H1: mean1 < mean2)
+    p_value = stats.t.cdf(t_stat, df)
+
+    reject_null = p_value < alpha
+    conclusion = (
+        f"Reject H₀: Evidence suggests {name1} < {name2}."
+        if reject_null else
+        f"Fail to reject H₀: No evidence that {name1} < {name2}."
+    )
+
+    return {
+        "t_statistic": t_stat,
+        "degrees_of_freedom": df,
+        "p_value": p_value,
+        "reject_null": reject_null,
+        "conclusion": conclusion
+    }
