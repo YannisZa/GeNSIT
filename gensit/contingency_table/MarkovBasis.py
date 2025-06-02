@@ -323,7 +323,7 @@ class MarkovBasis(object):
 
     def generate_both_margin_preserving_grobner_markov_basis(self) -> None:
         # Get all cells in lexicographic order (order first by row and then by col index)
-        self.logger.progress(f"{len(self.ct.cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(self.ct.cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
+        self.logger.info(f"{len(self.ct.cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(self.ct.cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
 
         
         self.graph = collections.defaultdict(set)
@@ -498,7 +498,7 @@ class MarkovBasis(object):
 
     def generate_both_margin_preserving_markov_basis(self) -> None:
         # Get all cells in lexicographic order (order first by row and then by col index)
-        self.logger.progress(f"{len(self.ct.cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(self.ct.cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
+        self.logger.info(f"{len(self.ct.cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(self.ct.cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
 
         self.build_basis_dictionaries_in_sequence()
         # if self.n_threads == 1:
@@ -592,7 +592,6 @@ class MarkovBasis(object):
 
         # Make directory
         makedir(dirpath)
-        print(filepath)
         # Do not overwrite functions
         if (not os.path.isfile(filepath)) and (os.path.exists(dirpath)):
             write_compressed_string(str(self.basis_dictionaries),filepath)
@@ -658,7 +657,8 @@ class MarkovBasis2DTable(MarkovBasis):
         if len(self.ct.constraints['constrained_axes']) == 2:
             self.generate_one_margin_preserving_markov_basis()
         elif len(self.ct.constraints['constrained_axes']) == 3:
-            self.generate_both_margin_preserving_grobner_markov_basis()
-            # self.generate_both_margin_preserving_markov_basis()
+            # This is very slow and should be avoided
+            # self.generate_both_margin_preserving_grobner_markov_basis()
+            self.generate_both_margin_preserving_markov_basis()
         else:
             raise ValueError(f"Cannot generaive markov basis for constraints {self.ct.constraints['constrained_axes']}")
