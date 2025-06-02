@@ -22,16 +22,16 @@ load_experiment = ''
     [inputs.data.ground_truth_table]
       file = 'ground_truth_table.txt'
     [inputs.data.train_cells]
-      file = 'zero_and_train_cells.txt'
+      file = 'neighbourhood_split_zero_and_train_cells.txt'
     [inputs.data.test_cells]
-      file = 'test_cells.txt'
+      file = 'neighbourhood_split_test_cells.txt'
     [inputs.data.validation_cells]
-      file = 'validation_cells.txt'
+      file = 'neighbourhood_split_validation_cells.txt'
 
 [contingency_table]
   sparse_margins = false
   [contingency_table.constraints]
-    coupled = true
+    cells = true
     axes = [[+0],[+1]]
     # [contingency_table.constraints.axes.sweep]
     #   default = []
@@ -179,7 +179,7 @@ load_experiment = ''
     write_every = +1
     out_directory = './data/outputs/'
     out_group = 'exp1'
-    title = '_doubly_and_cell_constrained'
+    title = '_doubly_and_cell_constrained_ensemble5_neighbourhood_cell_split'
     # [outputs.title.sweep]
     #   default = '_totally_and_cell_constrained'
     #   range = ['_totally_and_cell_constrained','_doubly_and_cell_constrained']
