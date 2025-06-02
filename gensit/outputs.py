@@ -329,7 +329,7 @@ class Outputs(object):
 
     def slice_coordinates(self,sample_name,index,samples):
         # Slice according to coordinate value slice
-        if self.coordinate_slice or self.settings.get('burnin_thinning_trimming',[]):            
+        if self.coordinate_slice or self.settings.get('burnin_thinning_trimming',[]):
             self.logger.progress(f"Slicing {sample_name}")
             
             # Apply coordinate value slice
@@ -364,7 +364,6 @@ class Outputs(object):
                 # Instead just keep the data as it was before index slicing
                 traceback.print_exc()
                 return None
-            
         return samples
 
     def data_vars(self):
