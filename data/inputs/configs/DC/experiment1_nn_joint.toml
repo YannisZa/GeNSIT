@@ -1,5 +1,5 @@
 log_level = 'info'
-sweep_mode = true
+sweep_mode = false
 
 [inputs]
 n_workers = +1
@@ -214,6 +214,7 @@ load_experiment = ''
     chunk_size = +20_000
     write_start = +1
     write_every = +1
+    export_basis = true
     out_directory = './data/outputs/'
     out_group = 'exp1'
     title = '_doubly_and_cell_constrained'
