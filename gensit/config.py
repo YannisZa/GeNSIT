@@ -1094,7 +1094,7 @@ class Config:
         for value in self.sweep_params['isolated'].values():
             self.logger.debug(f"{value['path']}: {sweep_configuration[i]}")
             new_config.path_set(
-                new_config,
+                new_config.settings,
                 sweep_configuration[i],
                 value['path']
             )
@@ -1107,16 +1107,15 @@ class Config:
             for value in sweep_group:
                 self.logger.debug(f"{value['path']}: {sweep_configuration[i]}")
                 new_config.path_set(
-                    new_config,
+                    new_config.settings,
                     sweep_configuration[i],
-                    value['path']
+                    value['path'],
                 )
                 # Update current sweep
                 sweep[value['var']] = sweep_configuration[i] \
                 if not cast_to_str \
                 else str(sweep_configuration[i])
                 i += 1
-        
         # Return config and sweep params
         return new_config,sweep
 
