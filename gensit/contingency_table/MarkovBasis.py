@@ -2,12 +2,14 @@ import os
 import sys
 import torch
 import time
+import collections
 import numpy as np
 import pandas as pd
 
+from copy import deepcopy
 from torch import int32
 from tqdm.auto import tqdm
-from typing import Dict,Tuple,List
+from typing import Dict,Tuple,List,Set
 from joblib import Parallel, delayed
 
 from gensit.utils.misc_utils import f_to_df,df_to_f,f_to_array, makedir, setup_logger,write_compressed_string,read_compressed_string, unpack_dims, ndims, flatten
@@ -50,7 +52,7 @@ class MarkovBasis(object):
         if 'outputs' in list(self.ct.config.settings.keys()) and \
             'export_basis' in list(self.ct.config.settings['outputs'].keys()):
             self.export = self.ct.config.settings['outputs']['export_basis']
-
+        
         # Initialise bases
         # self.basis_functions = None
         self.basis_dictionaries = None
@@ -124,7 +126,7 @@ class MarkovBasis(object):
     def check_markov_basis_validity_sequentially(self) -> bool:
         for i in tqdm(
             range(len(self.basis_dictionaries)),
-            disable = self.tqdm_disabled,
+            disable = False,
             desc = 'Checking Markov Basis validity sequentially',
             leave = False
         ):
@@ -318,6 +320,182 @@ class MarkovBasis(object):
                 )
             )
         ))
+
+    def generate_both_margin_preserving_grobner_markov_basis(self) -> None:
+        # Get all cells in lexicographic order (order first by row and then by col index)
+        self.logger.progress(f"{len(self.ct.cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(self.ct.cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
+
+        
+        self.graph = collections.defaultdict(set)
+        self.origins = set()
+        self.destinations = set()
+        for (o,d) in self.ct.cells:
+            self.graph[f"o{o+1}"].add(f"d{d+1}")
+            self.graph[f"d{d+1}"].add(f"o{o+1}")
+            self.origins.add(f"o{o+1}")
+            self.destinations.add(f"d{d+1}")
+        self.unique_cycles = set()
+
+        # Find all cycles in graph
+        all_cycles = self.find_all_cycles(max_length=10)
+        # Define set of Markov bases
+        self.basis_dictionaries = []
+        for cycle in tqdm(all_cycles,desc='Construct Markov basis from cycles'):
+            mb_move = {}
+            counter = 0
+            cycle_complete = cycle+[cycle[0]]
+            for p1, p2 in zip(cycle_complete, cycle_complete[1:]):
+                origin = int(p1.replace('o','') if 'o' in p1 else p2.replace('o',''))-1
+                destination = int(p2.replace('d','') if 'd' in p2 else p1.replace('d',''))-1
+                # Convert bipartite graph cycle to markov basis move
+                mb_move[(origin,destination)] = 1 if counter % 2 == 0 else -1
+                counter += 1
+            # Add to markov bases
+            self.basis_dictionaries.append(mb_move)
+                # self.logger.info(f"Cycle ({len(cycle)}): {cycle}.\n MB move: {mb_move}")
+                # self.logger.info(f"Cycle ({len(cycle)}).\n MB move: {mb_move}")
+        # for mb_move in tqdm(self.basis_dictionaries,total=len(self.basis_dictionaries)):
+        #     self.logger.info(f"{mb_move}")
+
+    
+    def find_all_cycles(self, max_length: int) -> list[list]:
+        """
+        Finds all unique simple cycles starting from each origin node, but only up to length `max_length`.
+
+        Args:
+            max_length:  The maximum allowed number of nodes in a cycle (i.e. #edges in the cycle).
+        
+        Returns:
+            A list of lists, each inner list is a unique cycle (in its canonical form),
+            where len(cycle) <= max_length.
+        """
+        self.unique_cycles.clear()  # reset from any previous call
+
+        # For each origin, start a DFS.  We track path as a list of nodes, plus a set for O(1) membership checks.
+        for origin_node in tqdm(self.origins, total=len(self.origins), desc=f'Find cycles of length {max_length}'):
+            # Initialize path = [origin_node].  We mark origin_node as “visited” in path_nodes_set.
+            self._dfs_find_cycles(
+                start_node=origin_node,
+                current_node=origin_node,
+                path=[origin_node],
+                path_nodes_set={origin_node},
+                max_length=max_length
+            )
+
+        # Convert each canonical tuple back to a list before returning.
+        return [list(cycle_tuple) for cycle_tuple in self.unique_cycles]
+
+    def _dfs_find_cycles(
+        self,
+        start_node: any,
+        current_node: any,
+        path: list,
+        path_nodes_set: set,
+        max_length: int
+    ):
+        """
+        Recursive DFS to discover cycles, but never allow a cycle's node‐count to exceed max_length.
+
+        Args:
+            start_node:      The origin where this DFS began.
+            current_node:    The node we are currently visiting.
+            path:            List of nodes from start_node up to current_node (inclusive).
+            path_nodes_set:  A set of the same nodes in 'path', for O(1) membership checks.
+            max_length:      The maximum permitted number of nodes in any cycle.
+
+        Behavior:
+            - If neighbor == start_node and len(path) >= 3 and len(path) <= max_length:
+                we have a valid cycle (origin → … → origin).  (len(path) is #distinct nodes.)
+            - If neighbor is already in path_nodes_set (and not equal to start_node), skip it (no revisiting).
+            - Otherwise, if adding the neighbor would make path‐length > max_length, skip recursing.
+            - Else, add neighbor and recurse.
+        """
+        for neighbor in self.graph[current_node]:
+            # ----- CASE 1: We might close a cycle by returning to start_node -----
+            if neighbor == start_node and len(path) >= 3:
+                # If we appended start_node, the cycle would have node‐count = len(path) + 1,
+                # but we only store the “distinct nodes” (we always strip off the duplicate tail before canonicalizing).
+                # In your code, you do: cycle = path + [start_node], then strip off the last in _add_unique_cycle.
+                # Here, `len(path)` is exactly the number of distinct nodes.  So check:
+                if len(path) <= max_length:
+                    cycle = path + [start_node]
+                    self._add_unique_cycle(cycle)
+                # Whether we recorded it or not, continue exploring other neighbors from current_node:
+                continue
+
+            # ----- CASE 2: Already visited (non‐start) ⇒ skip to avoid non‐simple path -----
+            if neighbor in path_nodes_set:
+                continue
+
+            # ----- CASE 3: Check if adding this neighbor would exceed max_length -----
+            # Currently path has `len(path)` distinct nodes.  If we append this neighbor as a new node,
+            # we would end up with `len(path) + 1` distinct nodes.  If that is > max_length, skip recursing.
+            if len(path) + 1 > max_length:
+                continue
+
+            # ----- CASE 4: Safe to go deeper -----
+            path.append(neighbor)
+            path_nodes_set.add(neighbor)
+
+            # Recurse, flipping to neighbor, but we remain in origin/destination logic if needed.
+            # (Your original code didn’t enforce a strict bipartite check here, but presumably
+            #  the bipartite property was encoded in self.graph.  We simply keep DFS going.)
+            self._dfs_find_cycles(
+                start_node=start_node,
+                current_node=neighbor,
+                path=path,
+                path_nodes_set=path_nodes_set,
+                max_length=max_length
+            )
+
+            # Backtrack:
+            path_nodes_set.remove(neighbor)
+            path.pop()
+
+    def _add_unique_cycle(self, cycle_path: list):
+        """
+        Canonicalize a discovered cycle (path includes duplicated start at end) and store it if new.
+
+        Args:
+            cycle_path: e.g. ['o1','d2','o2','d3','o1']
+        """
+        # Strip off the final duplicate of the start:
+        nodes_in_cycle = tuple(cycle_path[:-1])
+        if not nodes_in_cycle:
+            return
+
+        # Find the lexicographically smallest node (so that rotation always begins there).
+        min_node = min(nodes_in_cycle)
+
+        # Collect all indices where the cycle touches min_node
+        min_indices = [i for i, node in enumerate(nodes_in_cycle) if node == min_node]
+        canonical_form = None
+
+        for start_index in min_indices:
+            # 1) Forward rotation so that nodes_in_cycle[start_index] is first
+            forward = collections.deque(nodes_in_cycle)
+            forward.rotate(-start_index)
+            forward_tuple = tuple(forward)
+
+            # 2) Reverse the entire cycle, then rotate so that min_node is first in the reversed list
+            rev_list = list(nodes_in_cycle)[::-1]
+            try:
+                rev_start_idx = rev_list.index(min_node)
+            except ValueError:
+                reverse_tuple = forward_tuple
+            else:
+                rev_deque = collections.deque(rev_list)
+                rev_deque.rotate(-rev_start_idx)
+                reverse_tuple = tuple(rev_deque)
+
+            candidate = forward_tuple if forward_tuple <= reverse_tuple else reverse_tuple
+            if canonical_form is None or candidate < canonical_form:
+                canonical_form = candidate
+
+        if canonical_form:
+            self.unique_cycles.add(canonical_form)
+
+
     def generate_both_margin_preserving_markov_basis(self) -> None:
         # Get all cells in lexicographic order (order first by row and then by col index)
         self.logger.progress(f"{len(self.ct.cells)} free cells + {len(self.ct.constraints['cells'])} constrained cells out of {np.prod(list(self.ct.data.dims.values()))} total cells ({len(self.ct.cells)+len(self.ct.constraints['cells'])} = {np.prod(list(self.ct.data.dims.values()))})")
@@ -414,7 +592,7 @@ class MarkovBasis(object):
 
         # Make directory
         makedir(dirpath)
-
+        print(filepath)
         # Do not overwrite functions
         if (not os.path.isfile(filepath)) and (os.path.exists(dirpath)):
             write_compressed_string(str(self.basis_dictionaries),filepath)
@@ -480,6 +658,7 @@ class MarkovBasis2DTable(MarkovBasis):
         if len(self.ct.constraints['constrained_axes']) == 2:
             self.generate_one_margin_preserving_markov_basis()
         elif len(self.ct.constraints['constrained_axes']) == 3:
-            self.generate_both_margin_preserving_markov_basis()
+            self.generate_both_margin_preserving_grobner_markov_basis()
+            # self.generate_both_margin_preserving_markov_basis()
         else:
             raise ValueError(f"Cannot generaive markov basis for constraints {self.ct.constraints['constrained_axes']}")
