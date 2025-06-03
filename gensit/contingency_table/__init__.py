@@ -925,60 +925,6 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             # The loop can now end
             firstIteration = False
         return margin
-    
-
-    def minres_given_constraints(self,min_residual,residual_margins,single_cell_update:bool=True):
-        # get all contraint axes
-        ax_constraints = list(residual_margins.keys())
-        # Constraint axis minimum length
-        min_constraint_ax_len = min([len(ax) for ax in ax_constraints])
-
-        # If empty return residual 1 for all non-zero entries
-        if len(ax_constraints) <= 0:
-            min_residual[min_residual < 0] = torch.tensor(1,dtype=float32,device=self.device)
-        
-        # If only grant total is given
-        elif min_constraint_ax_len == ndims(self):
-            # Minimum residual
-            min_residual_value = torch.floor(
-                min([torch.min(val) for val in residual_margins.values()]) 
-                / torch.count_nonzero(min_residual)
-            )
-            if (not single_cell_update) or (min_residual_value >= 1):
-                min_residual[min_residual > 0] = min_residual_value
-            elif single_cell_update and (min_residual_value < 1):
-                # All values to max
-                min_residual[min_residual > 0] = torch.tensor(1.0,dtype=float32,device=self.device)
-        else:
-            # If both rowsums and colsums are provided
-            if len(ax_constraints) == (ndims(self) + 1):
-                updated_cells = torch.minimum(*[
-                    torch.tensor(
-                        broadcast2d(
-                            residual_margins[tuplize((ax,))],
-                            shape = tuple(list(self.dims)),
-                            expanded_axis = ax
-                        ),
-                        dtype = float32
-                    ) for ax in range(ndims(self))
-                ])
-                # Update cells at locations where there is residual value left
-                min_residual[min_residual > 0] = updated_cells[min_residual > 0]
-            # If either rowsums or colsums are provided
-            else:
-                # Find singleton axis that is constraints
-                ax = min(ax_constraints,key = len)
-                updated_cells = broadcast2d(
-                    residual_margins[ax],
-                    shape = tuple(list(self.dims)),
-                    expanded_axis = ax[0]
-                )
-                updated_cells = torch.tensor(updated_cells,dtype = float32)
-                # Update cells at locations where there is residual value left
-                min_residual[min_residual > 0] = updated_cells[min_residual > 0]
-        
-        return min_residual
-
 
     def table_monte_carlo_sample(self,intensity:list = None, margins: dict = {}, **__) -> Union[torch.tensor, None]:
         # Update margins
@@ -1112,9 +1058,13 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         ground_truth_table = deepcopy(self.data.ground_truth_table).to(dtype = float32,device = self.device)
         # Initialise table to zero
         table0 = torch.zeros(tuple(list(self.dims))).to(dtype = float32,device = self.device)
-        # Minimum residual table
-        min_residual = (np.iinfo(np.int32).max*torch.ones(tuple(list(self.dims)))).to(dtype = float32,device = self.device)
-        
+        # Free cells
+        free_cells = set(deepcopy(self.cells))
+        # Unchosen free cells
+        unchosen_free_cells = deepcopy(free_cells)
+        # Keep track of zero tensor
+        zero_tensor = torch.tensor(0.0,dtype=float32,device=self.device)
+
         # Apply cell constaints if at least one cell is fixed
         if len(self.constraints['cells']) > 0:
             # Extract indices
@@ -1122,8 +1072,6 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
             rows, cols = cells[:, 0], cells[:, 1]
             # Fix table cells
             table0[rows, cols] = ground_truth_table[rows, cols]
-            # Set minimum residual to zero
-            min_residual[rows, cols] = torch.tensor(0.0,dtype=torch.float32, device = self.device)
 
         # Keep a copy of summay statitics
         residual_margins = deepcopy(self.residual_margins)
@@ -1131,97 +1079,66 @@ class ContingencyTable2D(ContingencyTableIndependenceModel, ContingencyTableDepe
         residual_margins = {k:v for k,v in residual_margins.items() if k in self.constraints['constrained_axes']}
         
         self.logger.debug(f"INIT RESIDUAL MARGINS {dict({k:v.sum() for k,v in residual_margins.items()})}")
-        # Update minimum residual only if all residual margins are non-zero 
-        if np.all([torch.min(val) > 0 for val in residual_margins.values()]):
-            min_residual = torch.tensor(
-                self.minres_given_constraints(min_residual,residual_margins,single_cell_update=False),
-                dtype = float32
-            )
-            # Get the indices of non-zero elements
-            non_zero_indices = torch.nonzero(min_residual)
-            # Get all cells that have non-zero entries
-            cells = np.array([])
-            if len(non_zero_indices) > 0:
-                cells = np.array(list(zip(non_zero_indices[:,0], non_zero_indices[:,1])))
-            # Update multiple table cells at once
-            table0[non_zero_indices] += torch.tensor(
-                                            min_residual[non_zero_indices], 
-                                            dtype = float32,
-                                            device = self.device
-                                        )
-            # Update residual margins
-            residual_margins = self.update_margins_from_cells(
-                margins = residual_margins, 
-                axes = list(residual_margins.keys()),
-                constrained_cells = cells,
-                table = table0
-            )
-            if not self.table_cells_admissible(table0):
-                print('Table cells became inadmissible in first step')
-                raise Exception()
-        else:
-            min_residual = torch.tensor(min_residual, dtype = float32)
-        
-        self.logger.debug(f"RESIDUAL MARGINS {dict({k:v.sum() for k,v in residual_margins.items()})}")
-        # Count number of steps run max entropy updates
-        counter = 0
 
-        # Update min residual
-        min_residual = self.minres_given_constraints(min_residual,residual_margins,single_cell_update=True)
-        
-        while not self.table_admissible(table0):
-            # Get the minimum non-zero value
-            min_val = torch.min(min_residual[min_residual > 0])
-
-            # Find all indices where the tensor equals this minimum non-zero value
-            min_val_indices = (min_residual == min_val).nonzero(as_tuple=False)
-            
-            if min_val_indices.shape[0] == 1:
-                smallest_value_cell = tuplize([min_val_indices[0,i] for i in range(ndims(self))])
+        table_admissible = False
+        while not table_admissible:
+            # self.logger.iteration(f"{len(unchosen_free_cells)} to choose from")
+            random_cell_idx = np.random.randint(len(unchosen_free_cells))
+            random_cell = list(unchosen_free_cells)[random_cell_idx]
+            # Find each cell's minimum allowable by the margins contribution
+            cell_min_contribution = self.minres_given_constraints(random_cell,residual_margins)
+            # if no contribution is allowed then this cell must be fixed
+            if cell_min_contribution <= 0:
+                # self.logger.iteration(f"{random_cell} cell removed")
+                free_cells.remove(random_cell)
+                unchosen_free_cells.remove(random_cell)
+            # if contribution is allowed then add 1
             else:
-                rand_idx = torch.randint(0, min_val_indices.shape[0], size=(1,))[0]
-                smallest_value_cell = tuplize([min_val_indices[rand_idx][i] for i in range(ndims(self))])
-            
-            # Try to add maximum amount possible
-            table0[smallest_value_cell] += torch.tensor(
-                min_residual[smallest_value_cell], 
-                dtype=float32, 
-                device = self.device
-            )
-            self.logger.iteration(f"{smallest_value_cell}: {min_residual[smallest_value_cell]}. Total residual: {residual_margins[(0,1)]}")
-            if not self.table_cells_admissible(table0):
-                print(f'Table cells became inadmissible after iteration {counter}')
-                raise Exception()
-            
-            # Update residual margins
-            residual_margins = self.update_margins_from_cells(
-                margins = residual_margins, 
-                axes = list(residual_margins.keys()),
-                constrained_cells=[smallest_value_cell],
-                table={smallest_value_cell:min_residual[smallest_value_cell]}
-            )
-            # Update min residual
-            min_residual = self.minres_given_constraints(min_residual,residual_margins,single_cell_update=True)
+                # Contribution is 1
+                contribution = torch.tensor(1.0,dtype=float32,device=self.device)
+                # Add 1 to table
+                table0[random_cell] += contribution
+                self.logger.iteration(f"{random_cell}: {contribution}. Total residual: {residual_margins[tuplize(range(ndims(self)))]}")
+                # Update residual margins
+                residual_margins = self.update_margins_from_cells(
+                    margins = residual_margins, 
+                    axes = list(residual_margins.keys()),
+                    constrained_cells = [random_cell],
+                    table = {random_cell:contribution}
+                )
+                unchosen_free_cells.remove(random_cell)
+            # If all cells have been chosen at least once, then reset possible cell choices
+            if len(unchosen_free_cells) <= 0:
+                unchosen_free_cells = deepcopy(free_cells)
 
-            if not self.table_admissible(table0) and \
-                (min_residual[smallest_value_cell] < 0 or \
-                any([v.sum() < 0 for v in residual_margins.values()]) or \
-                residual_margins[tuplize(range(ndims(self)))] <= 0):
+            if torch.equal(residual_margins[tuplize(range(ndims(self)))],zero_tensor) or \
+                len(free_cells) <= 0:
+                table_admissible = self.table_admissible(table0)
 
-                print('table_margins_admissible',self.table_margins_admissible(table0))
-                print('table_cells_admissible',self.table_cells_admissible(table0))
-                print("min_residual[smallest_value_cell] < 0",min_residual[smallest_value_cell] < 0)
-                print("any([v.sum() < 0 for v in residual_margins.values()])",any([v.sum() < 0 for v in residual_margins.values()]))
-                print("residual_margins[tuplize(range(ndims(self)))] <= 0",residual_margins[tuplize(range(ndims(self)))] <= 0)
-                self.logger.error('Failed to update min residual in maximum entropy solution')
-                print(min_residual)
-                print(table0.sum())
-                pprint(residual_margins)
-                raise Exception('Failed to update min residual in maximum entropy solution')
-            
-            # Increment counter
-            counter += 1
-
+        zero_cells = 0
+        for c in self.cells:
+            if table0[c[0],c[1]] <= 0: zero_cells += 1
+        self.logger.progress(f"{zero_cells} zero cells out of {len(self.cells)}")
         self.admissibility_debugging('Maximum entropy solution',table0)
         return table0.to(device = self.device,dtype = float32)
         
+    def minres_given_constraints(self,cell,residual_margins):
+        # get all contraint axes
+        ax_constraints = list(residual_margins.keys())
+        
+        # If empty return residual 1 for all non-zero entries
+        if len(ax_constraints) <= 0:
+            return torch.tensor(1,dtype=float32,device=self.device)
+        
+        # If at least one margin is fixed
+        else:
+            applicable_margins = []
+            for cax,margin in residual_margins.items():
+                if cax == (0,1):  # Total
+                    applicable_margins.append(margin)
+                elif cax == (0,):
+                    applicable_margins.append(margin[cell[1]])
+                elif cax == (1,):
+                    applicable_margins.append(margin[cell[0]])
+
+            return min(applicable_margins)
